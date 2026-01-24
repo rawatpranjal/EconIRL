@@ -11,29 +11,47 @@ uv pip install -e .
 ## Quick Start
 
 ```python
-from econirl import RustBusEnvironment, LinearUtility, NFXPEstimator
-from econirl.simulation import simulate_panel
+from econirl import NFXP
+from econirl.datasets import load_rust_bus
 
-# Create environment with known parameters
-env = RustBusEnvironment(operating_cost=0.001, replacement_cost=3.0)
+# Load data
+df = load_rust_bus()
 
-# Simulate data
-panel = simulate_panel(env, n_individuals=500, n_periods=100)
-
-# Estimate
-utility = LinearUtility.from_environment(env)
-estimator = NFXPEstimator()
-result = estimator.estimate(panel, utility, env.problem_spec, env.transition_matrices)
+# Fit model
+est = NFXP(n_states=90, discount=0.9999)
+est.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 # View results
-print(result.summary())
+print(est.params_)   # {'theta_c': 0.00107, 'RC': 9.35}
+print(est.summary())
+
+# Simulate
+sim = est.simulate(n_agents=100, n_periods=50)
+
+# Counterfactual: what if RC doubled?
+cf = est.counterfactual(RC=est.params_["RC"] * 2)
 ```
+
+### Available Estimators
+
+| Estimator | Description |
+|-----------|-------------|
+| `NFXP` | Nested Fixed Point (Rust 1987) |
+| `CCP` | Conditional Choice Probability (Hotz-Miller) |
+
+All estimators share the same interface:
+- `est.fit(df, state=, action=, id=)` - fit model
+- `est.params_` - parameter estimates
+- `est.se_` - standard errors
+- `est.summary()` - formatted results
+- `est.simulate()` - simulate choices
+- `est.counterfactual()` - policy analysis
 
 ## Features
 
 - Economist-friendly API (utility, preferences, characteristics)
 - StatsModels-style `summary()` output
-- Multiple estimation methods (NFXP, with CCP/MaxEnt planned)
+- Multiple estimation methods (NFXP, CCP, with MaxEnt planned)
 - Rich inference (standard errors, confidence intervals, hypothesis tests)
 - Gymnasium-compatible environments
 - Counterfactual analysis and visualization
