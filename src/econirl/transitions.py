@@ -116,7 +116,7 @@ class TransitionEstimator:
             # Uniform distribution if no valid transitions
             probs = np.ones(self.max_increase + 1) / (self.max_increase + 1)
 
-        self.probs_ = tuple(probs)
+        self.probs_ = tuple(float(p) for p in probs)
 
         # Build the transition matrix
         self.matrix_ = self._build_matrix(self.probs_)
