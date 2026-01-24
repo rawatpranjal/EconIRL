@@ -3,6 +3,7 @@
 from econirl.estimation.base import Estimator, EstimationResult
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.ccp import CCPEstimator
+from econirl.estimation.maxent_irl import MaxEntIRLEstimator
 from econirl.estimation.transitions import (
     estimate_transition_probs,
     estimate_transition_probs_by_group,
@@ -13,6 +14,7 @@ __all__ = [
     "EstimationResult",
     "NFXPEstimator",
     "CCPEstimator",
+    "MaxEntIRLEstimator",
     "estimate_transition_probs",
     "estimate_transition_probs_by_group",
 ]
