@@ -77,3 +77,34 @@ class TestTableIV:
         table = table_iv_transitions(original=False)
 
         assert (table['n_transitions'] > 0).all()
+
+
+class TestTableV:
+    """Tests for Table V replication (structural estimates)."""
+
+    def test_table_v_runs(self):
+        """Table V estimation should complete without error."""
+        from econirl.replication.rust1987.tables import table_v_structural
+
+        # Use synthetic data and single group for speed
+        table = table_v_structural(groups=[1], estimators=["NFXP"], original=False)
+
+        assert table is not None
+        assert 'theta_c' in table.columns
+
+    def test_table_v_has_standard_errors(self):
+        """Table V should include standard errors."""
+        from econirl.replication.rust1987.tables import table_v_structural
+
+        table = table_v_structural(groups=[1], estimators=["NFXP"], original=False)
+
+        # Should have SE columns
+        se_cols = [c for c in table.columns if 'se' in c.lower()]
+        assert len(se_cols) > 0
+
+    def test_table_v_converges(self):
+        """Estimation should converge."""
+        from econirl.replication.rust1987.tables import table_v_structural
+
+        table = table_v_structural(groups=[1], estimators=["Hotz-Miller"], original=False)
+        assert table['converged'].all()
