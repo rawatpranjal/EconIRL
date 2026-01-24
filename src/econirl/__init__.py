@@ -61,7 +61,7 @@ from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.ccp import CCPEstimator
 
 # Sklearn-style Estimators (recommended)
-from econirl.estimators import NFXP, CCP
+from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL
 
 # Sklearn-style Utilities
 from econirl.utilities import Utility, LinearCost, make_utility
@@ -87,6 +87,8 @@ __all__ = [
     # Sklearn-style Estimators (recommended)
     "NFXP",
     "CCP",
+    "MaxEntIRL",
+    "MaxMarginIRL",
     # Sklearn-style Utilities
     "Utility",
     "LinearCost",
