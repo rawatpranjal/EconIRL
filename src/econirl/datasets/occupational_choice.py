@@ -47,7 +47,7 @@ def load_occupational_choice(
             - action: Chosen action (0=school, 1=white_collar, 2=blue_collar, 3=home)
             - education: Education level (0-4, representing years/degree levels)
             - experience: Work experience (0-9, discretized)
-            - age: Age category (0-4, representing age groups)
+            - age: Age group (0-1: young/old)
 
     Example:
         >>> from econirl.datasets import load_occupational_choice
@@ -61,7 +61,7 @@ def load_occupational_choice(
         >>> print(f"Panel with {panel.num_individuals} individuals")
 
     Notes:
-        State encoding: state = education * 20 + experience * 2 + age // 10
+        State encoding: state = education * 20 + experience * 2 + age // 20
         This gives approximately 5 * 10 * 2 = 100 discrete states.
 
         Action interpretation:
