@@ -1,7 +1,6 @@
 """Integration test: MCE IRL on Rust bus engine data."""
 import pytest
 import numpy as np
-import torch
 
 from econirl.datasets import load_rust_bus
 from econirl.estimators.mce_irl import MCEIRL
@@ -15,10 +14,9 @@ class TestMCEIRLBusIntegration:
         """Load bus data."""
         return load_rust_bus()
 
-    def test_mce_irl_fits_bus_data(self, bus_data):
-        """MCE IRL should fit bus data without error."""
-        df = bus_data
-
+    @pytest.fixture
+    def fitted_model(self, bus_data):
+        """Create and fit MCE IRL model on bus data."""
         n_states = 90
         features = np.arange(n_states).reshape(-1, 1) / 100
 
@@ -32,31 +30,18 @@ class TestMCEIRLBusIntegration:
             inner_max_iter=2000,
             verbose=False,
         )
+        model.fit(bus_data, state="mileage_bin", action="replaced", id="bus_id")
+        return model
 
-        model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
+    def test_mce_irl_fits_bus_data(self, fitted_model):
+        """MCE IRL should fit bus data without error."""
+        assert fitted_model.params_ is not None
+        assert fitted_model.log_likelihood_ is not None
+        assert fitted_model.policy_ is not None
 
-        assert model.params_ is not None
-        assert model.log_likelihood_ is not None
-        assert model.policy_ is not None
-
-    def test_replacement_probability_reasonable(self, bus_data):
+    def test_replacement_probability_reasonable(self, fitted_model):
         """Predicted replacement probability should be in reasonable range."""
-        df = bus_data
-        n_states = 90
-        features = np.arange(n_states).reshape(-1, 1) / 100
-
-        model = MCEIRL(
-            n_states=n_states,
-            discount=0.99,
-            feature_matrix=features,
-            feature_names=["mileage"],
-            se_method="hessian",
-            inner_max_iter=2000,
-            verbose=False,
-        )
-        model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
-
-        proba = model.predict_proba(np.array([0]))
+        proba = fitted_model.predict_proba(np.array([0]))
         p_replace = proba[0, 1]
 
         # Should be in reasonable range (empirical is ~5%)
@@ -64,24 +49,9 @@ class TestMCEIRLBusIntegration:
         # not fully separate the actions at state 0
         assert 0.001 < p_replace <= 0.5, f"P(replace|s=0) = {p_replace} out of range"
 
-    def test_log_likelihood_improves_over_baseline(self, bus_data):
+    def test_log_likelihood_improves_over_baseline(self, fitted_model, bus_data):
         """Log-likelihood should be better than uniform random policy."""
-        df = bus_data
-        n_states = 90
-        features = np.arange(n_states).reshape(-1, 1) / 100
-
-        model = MCEIRL(
-            n_states=n_states,
-            discount=0.99,
-            feature_matrix=features,
-            feature_names=["mileage"],
-            se_method="hessian",
-            inner_max_iter=2000,
-            verbose=False,
-        )
-        model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
-
-        n_obs = len(df)
+        n_obs = len(bus_data)
         uniform_ll = n_obs * np.log(0.5)
 
-        assert model.log_likelihood_ > uniform_ll
+        assert fitted_model.log_likelihood_ > uniform_ll
