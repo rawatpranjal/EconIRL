@@ -262,6 +262,122 @@ def mce_irl_seed():
     np.random.set_state(old_state)
 
 
+# ============================================================================
+# MCE IRL sklearn-style Test Fixtures
+# ============================================================================
+
+
+def generate_mce_irl_panel_data(
+    n_individuals: int = 10,
+    n_periods: int = 20,
+    n_states: int = 20,
+    replace_threshold: int = 10,
+    replace_prob: float = 0.1,
+    transition_probs: tuple = (0.3, 0.6, 0.1),
+    seed: int = 42,
+):
+    """Generate synthetic panel data for MCE IRL testing.
+
+    This helper function creates data suitable for MCEIRL sklearn-style estimator tests.
+    The data follows a simple MDP structure where agents occasionally "replace" (action=1)
+    resetting to state 0, otherwise "keep" (action=0) and progress through states.
+
+    Parameters
+    ----------
+    n_individuals : int
+        Number of individuals (trajectories) to generate.
+    n_periods : int
+        Number of time periods per individual.
+    n_states : int
+        Total number of states in the MDP.
+    replace_threshold : int
+        State above which replacement becomes more likely.
+    replace_prob : float
+        Base probability of replacement when below threshold.
+    transition_probs : tuple
+        Probabilities for state transitions (stay, +1, +2) when keeping.
+    seed : int
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    pd.DataFrame
+        Panel data with columns: id, period, state, action.
+    """
+    import pandas as pd
+
+    np.random.seed(seed)
+
+    data = []
+    for i in range(n_individuals):
+        state = 0
+        for t in range(n_periods):
+            # Simple stochastic policy based on state
+            action = 1 if state > replace_threshold or np.random.random() < replace_prob else 0
+            next_state = 0 if action == 1 else min(
+                state + np.random.choice([0, 1, 2], p=transition_probs),
+                n_states - 1
+            )
+            data.append({
+                "id": i,
+                "period": t,
+                "state": state,
+                "action": action,
+            })
+            state = next_state
+
+    return pd.DataFrame(data)
+
+
+@pytest.fixture
+def mce_irl_sample_df():
+    """Sample DataFrame for MCE IRL sklearn-style estimator tests.
+
+    Generates a panel dataset with 10 individuals, 20 periods, and 20 states.
+    This fixture is shared across multiple test classes in test_mce_irl_sklearn.py.
+    """
+    return generate_mce_irl_panel_data(
+        n_individuals=10,
+        n_periods=20,
+        n_states=20,
+        replace_threshold=10,
+        replace_prob=0.1,
+        transition_probs=(0.3, 0.6, 0.1),
+        seed=42,
+    )
+
+
+@pytest.fixture
+def mce_irl_fitted_estimator(mce_irl_sample_df):
+    """Fitted MCEIRL estimator for sklearn-style tests.
+
+    Creates and fits a MCEIRL estimator with the sample panel data.
+    Uses hessian-based standard errors for speed.
+
+    This fixture is shared across multiple test classes in test_mce_irl_sklearn.py:
+    - TestMCEIRLAttributes
+    - TestMCEIRLSummary
+    - TestMCEIRLPredictProba
+    """
+    from econirl.estimators.mce_irl import MCEIRL
+
+    estimator = MCEIRL(
+        n_states=20,
+        discount=0.95,
+        verbose=False,
+        se_method="hessian",
+        inner_max_iter=500,
+    )
+    estimator.fit(
+        data=mce_irl_sample_df,
+        state="state",
+        action="action",
+        id="id",
+    )
+
+    return estimator
+
+
 @pytest.fixture
 def simple_problem():
     """Create a simple 10-state MDP with known structure.
