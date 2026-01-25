@@ -43,6 +43,8 @@ from scipy import optimize
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
+from econirl.preferences.action_reward import ActionDependentReward
+from econirl.preferences.base import BaseUtilityFunction
 from econirl.preferences.reward import LinearReward
 
 
@@ -248,7 +250,7 @@ class MCEIRLEstimator(BaseEstimator):
     def _compute_empirical_features(
         self,
         panel: Panel,
-        reward_fn: LinearReward,
+        reward_fn: BaseUtilityFunction,
     ) -> torch.Tensor:
         """Compute empirical feature expectations from demonstrations.
 
@@ -256,18 +258,46 @@ class MCEIRLEstimator(BaseEstimator):
             μ_D = (1/N) Σ_{i,t} φ(s_{i,t}, a_{i,t})
 
         For state-only features: μ_D = (1/N) Σ_{i,t} φ(s_{i,t})
+
+        Handles both:
+        - LinearReward (state-only): 2D feature matrix (n_states, n_features)
+        - ActionDependentReward: 3D feature matrix (n_states, n_actions, n_features)
         """
-        state_features = reward_fn.state_features  # (n_states, n_features)
-        n_features = state_features.shape[1]
+        # Get feature matrix - handle both 2D and 3D cases
+        if isinstance(reward_fn, ActionDependentReward):
+            feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
+        elif isinstance(reward_fn, LinearReward):
+            feature_matrix = reward_fn.state_features  # (n_states, n_features)
+        else:
+            # Try to get feature_matrix, fall back to state_features
+            if hasattr(reward_fn, 'feature_matrix'):
+                feature_matrix = reward_fn.feature_matrix
+            elif hasattr(reward_fn, 'state_features'):
+                feature_matrix = reward_fn.state_features
+            else:
+                raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
 
-        feature_sum = torch.zeros(n_features, dtype=state_features.dtype)
-        total_obs = 0
+        total_obs = sum(len(traj) for traj in panel.trajectories)
 
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                state = traj.states[t].item()
-                feature_sum += state_features[state]
-                total_obs += 1
+        if feature_matrix.ndim == 3:
+            # Action-dependent features: (n_states, n_actions, n_features)
+            n_features = feature_matrix.shape[2]
+            feature_sum = torch.zeros(n_features, dtype=feature_matrix.dtype)
+
+            for traj in panel.trajectories:
+                for t in range(len(traj)):
+                    s = traj.states[t].item()
+                    a = traj.actions[t].item()
+                    feature_sum += feature_matrix[s, a, :]
+        else:
+            # State-only features: (n_states, n_features)
+            n_features = feature_matrix.shape[1]
+            feature_sum = torch.zeros(n_features, dtype=feature_matrix.dtype)
+
+            for traj in panel.trajectories:
+                for t in range(len(traj)):
+                    s = traj.states[t].item()
+                    feature_sum += feature_matrix[s, :]
 
         if total_obs > 0:
             return feature_sum / total_obs
@@ -275,21 +305,54 @@ class MCEIRLEstimator(BaseEstimator):
 
     def _compute_expected_features(
         self,
+        policy: torch.Tensor,
         state_visitation: torch.Tensor,
-        reward_fn: LinearReward,
+        reward_fn: BaseUtilityFunction,
     ) -> torch.Tensor:
         """Compute expected feature expectations under the learned policy.
 
-        Computes: μ_π = Σ_s D(s) φ(s)
+        Handles both state-only and action-dependent features:
+        - State-only: μ_π = Σ_s D(s) φ(s)
+        - Action-dependent: μ_π = Σ_s Σ_a D(s) π(a|s) φ(s,a)
 
-        where D(s) is the state visitation frequency.
+        where D(s) is the state visitation frequency and π(a|s) is the policy.
+
+        Parameters
+        ----------
+        policy : torch.Tensor
+            Policy probabilities π(a|s), shape (n_states, n_actions).
+        state_visitation : torch.Tensor
+            State visitation frequencies D(s), shape (n_states,).
+        reward_fn : BaseUtilityFunction
+            Reward function with feature matrix.
+
+        Returns
+        -------
+        torch.Tensor
+            Expected features, shape (n_features,).
         """
-        state_features = reward_fn.state_features  # (n_states, n_features)
+        # Get feature matrix - handle both 2D and 3D cases
+        if isinstance(reward_fn, ActionDependentReward):
+            feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
+        elif isinstance(reward_fn, LinearReward):
+            feature_matrix = reward_fn.state_features  # (n_states, n_features)
+        else:
+            # Try to get feature_matrix, fall back to state_features
+            if hasattr(reward_fn, 'feature_matrix'):
+                feature_matrix = reward_fn.feature_matrix
+            elif hasattr(reward_fn, 'state_features'):
+                feature_matrix = reward_fn.state_features
+            else:
+                raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
 
-        # μ_π = Σ_s D(s) φ(s) = D^T @ φ
-        expected_features = torch.einsum("s,sk->k", state_visitation, state_features)
-
-        return expected_features
+        if feature_matrix.ndim == 3:
+            # Action-dependent: (n_states, n_actions, n_features)
+            # E[φ] = Σ_s Σ_a D(s) * π(a|s) * φ(s,a,k)
+            return torch.einsum("s,sa,sak->k", state_visitation, policy, feature_matrix)
+        else:
+            # State-only: (n_states, n_features)
+            # E[φ] = Σ_s D(s) * φ(s,k)
+            return torch.einsum("s,sk->k", state_visitation, feature_matrix)
 
     def _compute_initial_distribution(
         self,
@@ -311,7 +374,7 @@ class MCEIRLEstimator(BaseEstimator):
     def _optimize(
         self,
         panel: Panel,
-        utility: LinearReward,
+        utility: BaseUtilityFunction,
         problem: DDCProblem,
         transitions: torch.Tensor,
         initial_params: torch.Tensor | None = None,
@@ -357,7 +420,7 @@ class MCEIRLEstimator(BaseEstimator):
                 inner_not_converged += 1
 
             D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
-            expected_features = self._compute_expected_features(D, reward_fn)
+            expected_features = self._compute_expected_features(policy, D, reward_fn)
 
             # Feature matching gradient: μ_D - μ_π
             # We want to INCREASE params in direction where μ_D > μ_π
@@ -401,7 +464,7 @@ class MCEIRLEstimator(BaseEstimator):
         D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
 
         # Feature difference for diagnostics
-        final_expected = self._compute_expected_features(D, reward_fn)
+        final_expected = self._compute_expected_features(policy, D, reward_fn)
         feature_diff = torch.norm(empirical_features - final_expected).item()
 
         # Log-likelihood
@@ -464,7 +527,7 @@ class MCEIRLEstimator(BaseEstimator):
     def _bootstrap_inference(
         self,
         panel: Panel,
-        reward_fn: LinearReward,
+        reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
         transitions: torch.Tensor,
         point_estimate: torch.Tensor,
@@ -500,7 +563,7 @@ class MCEIRLEstimator(BaseEstimator):
                 reward_matrix = reward_fn.compute(params)
                 V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
                 D = self._compute_state_visitation(policy, transitions, problem, boot_initial)
-                expected_features = self._compute_expected_features(D, reward_fn)
+                expected_features = self._compute_expected_features(policy, D, reward_fn)
 
                 gradient = expected_features - empirical_features
                 params = params - 0.1 * gradient
@@ -522,7 +585,7 @@ class MCEIRLEstimator(BaseEstimator):
         self,
         params: torch.Tensor,
         panel: Panel,
-        reward_fn: LinearReward,
+        reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
         transitions: torch.Tensor,
         initial_dist: torch.Tensor,
