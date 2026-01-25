@@ -61,7 +61,7 @@ from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.ccp import CCPEstimator
 
 # Sklearn-style Estimators (recommended)
-from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL
+from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL
 
 # Sklearn-style Utilities
 from econirl.utilities import Utility, LinearCost, make_utility
@@ -71,6 +71,9 @@ from econirl.transitions import TransitionEstimator
 
 # Datasets
 from econirl import datasets
+
+# Preprocessing
+from econirl import preprocessing
 
 # Replication
 from econirl import replication
@@ -89,6 +92,7 @@ __all__ = [
     "CCP",
     "MaxEntIRL",
     "MaxMarginIRL",
+    "MCEIRL",
     # Sklearn-style Utilities
     "Utility",
     "LinearCost",
@@ -101,6 +105,8 @@ __all__ = [
     "CCPEstimator",
     # Datasets
     "datasets",
+    # Preprocessing
+    "preprocessing",
     # Replication
     "replication",
 ]
