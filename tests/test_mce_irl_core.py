@@ -578,3 +578,55 @@ class TestMCEIRLEdgeCases:
         assert result.policy is not None
         # Policy for action 0 should be high across states
         assert (result.policy[:, 0] > 0.5).sum() >= n_states // 2
+
+
+class TestMCEIRLInference:
+    """Tests for MCE IRL inference capabilities."""
+
+    @pytest.fixture
+    def fitted_result(self, simple_problem, synthetic_panel):
+        """Fit MCE IRL and return result."""
+        problem, transitions = simple_problem
+
+        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        reward_fn = LinearReward(
+            state_features=features,
+            parameter_names=["cost"],
+            n_actions=2,
+        )
+
+        config = MCEIRLConfig(
+            compute_se=True,
+            se_method="hessian",
+            inner_max_iter=500,
+            outer_max_iter=100,
+            learning_rate=0.5,
+            verbose=False,
+        )
+        estimator = MCEIRLEstimator(config=config)
+
+        return estimator.estimate(
+            panel=synthetic_panel,
+            utility=reward_fn,
+            problem=problem,
+            transitions=transitions,
+        )
+
+    def test_standard_errors_computed(self, fitted_result):
+        """Standard errors should be computed when requested."""
+        se = fitted_result.standard_errors
+        assert se is not None
+        assert len(se) == 1  # One parameter
+        assert torch.isfinite(se).all(), f"SE not finite: {se}"
+
+    def test_confidence_interval_valid(self, fitted_result):
+        """95% CI should be valid."""
+        params = fitted_result.parameters
+        se = fitted_result.standard_errors
+
+        ci_low = params - 1.96 * se
+        ci_high = params + 1.96 * se
+
+        # CI should contain the point estimate
+        assert (ci_low <= params).all()
+        assert (params <= ci_high).all()
