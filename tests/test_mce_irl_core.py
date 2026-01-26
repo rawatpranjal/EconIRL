@@ -246,9 +246,12 @@ class TestMCEIRLConfig:
         config = MCEIRLConfig()
 
         assert config.optimizer == "L-BFGS-B"
-        assert config.learning_rate == 0.1
+        assert config.learning_rate == 0.02  # Optimized for Adam
         assert config.outer_max_iter == 200
         assert config.inner_max_iter == 10000
+        assert config.use_adam is True
+        assert config.gradient_clip == 1.0
+        assert config.inner_solver == "hybrid"
         assert config.compute_se is True
         assert config.verbose is False
 

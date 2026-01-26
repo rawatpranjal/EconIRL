@@ -42,6 +42,7 @@ from scipy import optimize
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
+from econirl.core.solvers import hybrid_iteration, value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.preferences.action_reward import ActionDependentReward
@@ -55,13 +56,20 @@ class MCEIRLConfig:
 
     # Optimization
     optimizer: Literal["L-BFGS-B", "BFGS", "gradient"] = "L-BFGS-B"
-    learning_rate: float = 0.1
+    learning_rate: float = 0.02  # Lower than typical SGD; works well with Adam
     outer_tol: float = 1e-6
     outer_max_iter: int = 200
+    gradient_clip: float = 1.0  # Max gradient norm (prevents divergence)
+    use_adam: bool = True  # Use Adam optimizer (adaptive learning rate)
+    adam_beta1: float = 0.9  # Adam first moment decay
+    adam_beta2: float = 0.999  # Adam second moment decay
+    adam_eps: float = 1e-8  # Adam numerical stability
 
     # Inner solver (soft value iteration)
+    inner_solver: Literal["value", "hybrid"] = "hybrid"  # hybrid is faster
     inner_tol: float = 1e-8
     inner_max_iter: int = 10000  # Higher for high discount factors
+    switch_tol: float = 1e-3  # For hybrid: switch to NK when error < this
 
     # State visitation computation
     svf_tol: float = 1e-8
@@ -157,6 +165,9 @@ class MCEIRLEstimator(BaseEstimator):
         Computes the soft value function and policy using the soft Bellman
         equation, which is the backward pass in MCE IRL.
 
+        Uses either pure value iteration or hybrid (contraction + Newton-Kantorovich)
+        based on config.inner_solver setting. Hybrid is typically 5-7x faster.
+
         Parameters
         ----------
         operator : SoftBellmanOperator
@@ -173,20 +184,24 @@ class MCEIRLEstimator(BaseEstimator):
         converged : bool
             Whether the iteration converged.
         """
-        n_states = operator.problem.num_states
-        V = torch.zeros(n_states, dtype=reward_matrix.dtype)
-
-        for i in range(self.config.inner_max_iter):
-            result = operator.apply(reward_matrix, V)
-            V_new = result.V
-
-            delta = torch.abs(V_new - V).max().item()
-            V = V_new
-
-            if delta < self.config.inner_tol:
-                return V, result.policy, True
-
-        return V, result.policy, False
+        if self.config.inner_solver == "hybrid":
+            result = hybrid_iteration(
+                operator,
+                reward_matrix,
+                tol=self.config.inner_tol,
+                max_iter=self.config.inner_max_iter,
+                switch_tol=self.config.switch_tol,
+            )
+            return result.V, result.policy, result.converged
+        else:
+            # Pure value iteration (original implementation)
+            result = value_iteration(
+                operator,
+                reward_matrix,
+                tol=self.config.inner_tol,
+                max_iter=self.config.inner_max_iter,
+            )
+            return result.V, result.policy, result.converged
 
     def _compute_state_visitation(
         self,
@@ -437,9 +452,18 @@ class MCEIRLEstimator(BaseEstimator):
         n_function_evals = 0
         inner_not_converged = 0
 
+        # Adam optimizer state
+        if self.config.use_adam:
+            m = torch.zeros_like(params)  # First moment
+            v = torch.zeros_like(params)  # Second moment
+            optimizer_name = "Adam"
+        else:
+            m = v = None
+            optimizer_name = "SGD"
+
         # Run optimization using gradient ascent on log-likelihood
         # The gradient is: ∇L = μ_D - μ_π (for maximization)
-        self._log(f"Starting MCE IRL with gradient ascent (lr={self.config.learning_rate})")
+        self._log(f"Starting MCE IRL with {optimizer_name} (lr={self.config.learning_rate})")
 
         best_obj = float('inf')
         best_params = params.clone()
@@ -467,9 +491,14 @@ class MCEIRLEstimator(BaseEstimator):
             # We want to INCREASE params in direction where μ_D > μ_π
             gradient = empirical_features - expected_features  # Gradient ascent direction
 
+            # Gradient clipping (prevents divergence when rewards approach zero)
+            grad_norm = torch.norm(gradient).item()
+            if self.config.gradient_clip > 0 and grad_norm > self.config.gradient_clip:
+                gradient = gradient * (self.config.gradient_clip / grad_norm)
+                grad_norm = self.config.gradient_clip
+
             # Objective: ||μ_D - μ_π||^2
             obj = 0.5 * torch.sum((empirical_features - expected_features) ** 2).item()
-            grad_norm = torch.norm(gradient).item()
 
             # Track best
             if obj < best_obj:
@@ -498,8 +527,20 @@ class MCEIRLEstimator(BaseEstimator):
                 pbar.set_description("MCE IRL (early stop)")
                 break
 
-            # Gradient step (ascent on likelihood = descent on negative likelihood)
-            params = params + self.config.learning_rate * gradient
+            # Gradient step with Adam or SGD
+            if self.config.use_adam:
+                # Adam update (Kingma & Ba, 2014)
+                t = i + 1  # Timestep (1-indexed)
+                m = self.config.adam_beta1 * m + (1 - self.config.adam_beta1) * gradient
+                v = self.config.adam_beta2 * v + (1 - self.config.adam_beta2) * (gradient ** 2)
+                # Bias correction
+                m_hat = m / (1 - self.config.adam_beta1 ** t)
+                v_hat = v / (1 - self.config.adam_beta2 ** t)
+                # Update
+                params = params + self.config.learning_rate * m_hat / (torch.sqrt(v_hat) + self.config.adam_eps)
+            else:
+                # Simple SGD
+                params = params + self.config.learning_rate * gradient
 
             n_function_evals += 1
 

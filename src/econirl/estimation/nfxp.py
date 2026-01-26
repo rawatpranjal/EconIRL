@@ -30,7 +30,7 @@ import torch
 from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.solvers import value_iteration, policy_iteration
+from econirl.core.solvers import value_iteration, policy_iteration, hybrid_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod, compute_numerical_hessian
@@ -67,9 +67,10 @@ class NFXPEstimator(BaseEstimator):
         self,
         se_method: SEMethod = "asymptotic",
         optimizer: Literal["L-BFGS-B", "BFGS", "Newton-CG"] = "L-BFGS-B",
-        inner_solver: Literal["value", "policy"] = "policy",
+        inner_solver: Literal["value", "policy", "hybrid"] = "hybrid",
         inner_tol: float = 1e-10,
         inner_max_iter: int = 100000,  # Sufficient for beta=0.9999
+        switch_tol: float = 1e-3,
         outer_tol: float = 1e-6,
         outer_max_iter: int = 1000,
         compute_hessian: bool = True,
@@ -80,13 +81,20 @@ class NFXPEstimator(BaseEstimator):
         Args:
             se_method: Method for computing standard errors
             optimizer: Scipy optimizer for outer loop
-            inner_solver: Solver for inner loop ("value" or "policy").
-                         "policy" uses matrix inversion, faster for high beta.
+            inner_solver: Solver for inner loop.
+                - "value": Pure contraction (value iteration), linear convergence
+                - "policy": Policy iteration with matrix solve, faster for high beta
+                - "hybrid": Hybrid contraction + Newton-Kantorovich (recommended).
+                           Starts with cheap contractions, switches to NK near
+                           solution for quadratic convergence. Per Rust (2000),
+                           typically 10-100x faster than pure contraction.
             inner_tol: Tolerance for inner loop convergence
             inner_max_iter: Max iterations for inner loop. Default 100000 is
                            sufficient for beta=0.9999. Value iteration
                            convergence is O(1/(1-beta)), so high discount
                            factors require many more iterations.
+            switch_tol: For hybrid solver, switch from contraction to NK when
+                       error < this value. Default 1e-3 is usually optimal.
             outer_tol: Tolerance for outer optimization convergence
             outer_max_iter: Max iterations for outer optimization
             compute_hessian: Whether to compute Hessian for inference
@@ -101,6 +109,7 @@ class NFXPEstimator(BaseEstimator):
         self._inner_solver = inner_solver
         self._inner_tol = inner_tol
         self._inner_max_iter = inner_max_iter
+        self._switch_tol = switch_tol
         self._outer_tol = outer_tol
         self._outer_max_iter = outer_max_iter
 
@@ -121,6 +130,14 @@ class NFXPEstimator(BaseEstimator):
                 tol=self._inner_tol,
                 max_iter=self._inner_max_iter,
                 eval_method="matrix",
+            )
+        elif self._inner_solver == "hybrid":
+            return hybrid_iteration(
+                operator,
+                flow_utility,
+                tol=self._inner_tol,
+                max_iter=self._inner_max_iter,
+                switch_tol=self._switch_tol,
             )
         else:
             return value_iteration(
@@ -285,7 +302,9 @@ class NFXPEstimator(BaseEstimator):
             optimization_time=optimization_time,
             metadata={
                 "optimizer": self._optimizer,
+                "inner_solver": self._inner_solver,
                 "inner_tol": self._inner_tol,
+                "switch_tol": self._switch_tol if self._inner_solver == "hybrid" else None,
                 "outer_tol": self._outer_tol,
             },
         )
