@@ -39,6 +39,7 @@ from typing import Literal
 import numpy as np
 import torch
 from scipy import optimize
+from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.types import DDCProblem, Panel
@@ -305,24 +306,29 @@ class MCEIRLEstimator(BaseEstimator):
 
     def _compute_expected_features(
         self,
+        panel: Panel,
         policy: torch.Tensor,
-        state_visitation: torch.Tensor,
         reward_fn: BaseUtilityFunction,
     ) -> torch.Tensor:
         """Compute expected feature expectations under the learned policy.
 
-        Handles both state-only and action-dependent features:
-        - State-only: μ_π = Σ_s D(s) φ(s)
-        - Action-dependent: μ_π = Σ_s Σ_a D(s) π(a|s) φ(s,a)
+        Computes expectations over the EMPIRICAL state sequence from the data,
+        not the stationary distribution. For each state the expert visited,
+        we compute what actions the current policy would take:
 
-        where D(s) is the state visitation frequency and π(a|s) is the policy.
+            μ_π = (1/N) Σ_{i,t} Σ_a π(a|s_{i,t}) φ(s_{i,t}, a)
+
+        This is the correct formulation for MCE IRL because:
+        1. It matches the empirical features which are computed over the same states
+        2. At true parameters, the gradient (empirical - expected) should be zero
+        3. Using stationary distribution creates a mismatch that prevents recovery
 
         Parameters
         ----------
+        panel : Panel
+            Panel data containing the empirical state sequence.
         policy : torch.Tensor
             Policy probabilities π(a|s), shape (n_states, n_actions).
-        state_visitation : torch.Tensor
-            State visitation frequencies D(s), shape (n_states,).
         reward_fn : BaseUtilityFunction
             Reward function with feature matrix.
 
@@ -345,14 +351,35 @@ class MCEIRLEstimator(BaseEstimator):
             else:
                 raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
 
+        total_obs = sum(len(traj) for traj in panel.trajectories)
+
         if feature_matrix.ndim == 3:
             # Action-dependent: (n_states, n_actions, n_features)
-            # E[φ] = Σ_s Σ_a D(s) * π(a|s) * φ(s,a,k)
-            return torch.einsum("s,sa,sak->k", state_visitation, policy, feature_matrix)
+            # E[φ] = (1/N) Σ_{i,t} Σ_a π(a|s_{i,t}) * φ(s_{i,t}, a, k)
+            n_features = feature_matrix.shape[2]
+            n_actions = feature_matrix.shape[1]
+            feature_sum = torch.zeros(n_features, dtype=feature_matrix.dtype)
+
+            for traj in panel.trajectories:
+                for t in range(len(traj)):
+                    s = traj.states[t].item()
+                    for a in range(n_actions):
+                        feature_sum += policy[s, a] * feature_matrix[s, a, :]
         else:
             # State-only: (n_states, n_features)
-            # E[φ] = Σ_s D(s) * φ(s,k)
-            return torch.einsum("s,sk->k", state_visitation, feature_matrix)
+            # E[φ] = (1/N) Σ_{i,t} φ(s_{i,t}, k)
+            # Note: For state-only features, policy doesn't affect expected features
+            n_features = feature_matrix.shape[1]
+            feature_sum = torch.zeros(n_features, dtype=feature_matrix.dtype)
+
+            for traj in panel.trajectories:
+                for t in range(len(traj)):
+                    s = traj.states[t].item()
+                    feature_sum += feature_matrix[s, :]
+
+        if total_obs > 0:
+            return feature_sum / total_obs
+        return feature_sum
 
     def _compute_initial_distribution(
         self,
@@ -378,9 +405,16 @@ class MCEIRLEstimator(BaseEstimator):
         problem: DDCProblem,
         transitions: torch.Tensor,
         initial_params: torch.Tensor | None = None,
+        true_params: torch.Tensor | None = None,
         **kwargs,
     ) -> EstimationResult:
-        """Run MCE IRL optimization."""
+        """Run MCE IRL optimization.
+
+        Parameters
+        ----------
+        true_params : torch.Tensor, optional
+            True parameters for debugging. If provided, RMSE is shown in progress bar.
+        """
         start_time = time.time()
 
         reward_fn = utility
@@ -412,15 +446,22 @@ class MCEIRLEstimator(BaseEstimator):
         patience_counter = 0
         max_patience = 20
 
-        for i in range(self.config.outer_max_iter):
+        # Use tqdm for progress tracking
+        pbar = tqdm(
+            range(self.config.outer_max_iter),
+            desc="MCE IRL",
+            disable=not self.config.verbose,
+            leave=True,
+        )
+
+        for i in pbar:
             # Forward and backward passes
             reward_matrix = reward_fn.compute(params)
             V, policy, inner_converged = self._soft_value_iteration(operator, reward_matrix)
             if not inner_converged:
                 inner_not_converged += 1
 
-            D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
-            expected_features = self._compute_expected_features(policy, D, reward_fn)
+            expected_features = self._compute_expected_features(panel, policy, reward_fn)
 
             # Feature matching gradient: μ_D - μ_π
             # We want to INCREASE params in direction where μ_D > μ_π
@@ -438,8 +479,15 @@ class MCEIRLEstimator(BaseEstimator):
             else:
                 patience_counter += 1
 
-            if self.config.verbose and (i + 1) % 10 == 0:
-                self._log(f"Iter {i+1}: obj={obj:.6f}, ||grad||={grad_norm:.6f}")
+            # Update progress bar with metrics
+            postfix = {
+                "obj": f"{obj:.6f}",
+                "||grad||": f"{grad_norm:.4f}",
+            }
+            if true_params is not None:
+                rmse = torch.sqrt(torch.mean((params - true_params) ** 2)).item()
+                postfix["RMSE"] = f"{rmse:.6f}"
+            pbar.set_postfix(postfix)
 
             # Check convergence
             if grad_norm < self.config.outer_tol:
@@ -447,7 +495,7 @@ class MCEIRLEstimator(BaseEstimator):
                 break
 
             if patience_counter > max_patience:
-                self._log(f"Early stopping: no improvement for {max_patience} iterations")
+                pbar.set_description("MCE IRL (early stop)")
                 break
 
             # Gradient step (ascent on likelihood = descent on negative likelihood)
@@ -455,6 +503,7 @@ class MCEIRLEstimator(BaseEstimator):
 
             n_function_evals += 1
 
+        pbar.close()
         final_params = best_params
         converged = grad_norm < self.config.outer_tol if grad_norm else False
 
@@ -464,7 +513,7 @@ class MCEIRLEstimator(BaseEstimator):
         D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
 
         # Feature difference for diagnostics
-        final_expected = self._compute_expected_features(policy, D, reward_fn)
+        final_expected = self._compute_expected_features(panel, policy, reward_fn)
         feature_diff = torch.norm(empirical_features - final_expected).item()
 
         # Log-likelihood
@@ -562,8 +611,7 @@ class MCEIRLEstimator(BaseEstimator):
             for _ in range(50):  # Fewer iterations for bootstrap
                 reward_matrix = reward_fn.compute(params)
                 V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
-                D = self._compute_state_visitation(policy, transitions, problem, boot_initial)
-                expected_features = self._compute_expected_features(policy, D, reward_fn)
+                expected_features = self._compute_expected_features(boot_panel, policy, reward_fn)
 
                 gradient = expected_features - empirical_features
                 params = params - 0.1 * gradient
