@@ -7,12 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **MCE IRL parameter recovery**: Fixed critical bug where expected features were computed using stationary distribution instead of empirical state sequence. This caused gradients to be non-zero at true parameters, preventing convergence. The fix iterates over the empirical state sequence from demonstrations, reducing gradient norm at true parameters by 25-250x. ([Kim et al. 2021](https://proceedings.mlr.press/v139/kim21c.html) provides theoretical grounding for reward identifiability in IRL.)
-
 ### Added
+- **GAIL Estimator** (`GAILEstimator`): Generative Adversarial Imitation Learning adapted for tabular MDPs
+  - Supports tabular and linear discriminators
+  - Uses soft value iteration for policy optimization (no neural networks)
+  - Configurable via `GAILConfig`
+  - Reference: Ho & Ermon (2016) "Generative Adversarial Imitation Learning"
+- **AIRL Estimator** (`AIRLEstimator`): Adversarial Inverse Reinforcement Learning for tabular MDPs
+  - Recovers disentangled reward function robust to dynamics changes
+  - Supports potential-based shaping: f(s,a,s') = r(s,a) + γV(s') - V(s)
+  - Configurable via `AIRLConfig`
+  - Reference: Fu et al. (2018) "Learning Robust Rewards with Adversarial IRL"
+- **Discriminator classes**: `TabularDiscriminator` and `LinearDiscriminator` for adversarial methods
+- New `econirl.estimation.adversarial` submodule for adversarial IRL algorithms
 - **tqdm progress tracking** in MCE IRL with optional RMSE display when `true_params` is provided for debugging
 - **`true_params` argument** to `MCEIRLEstimator.estimate()` for monitoring parameter recovery during optimization
+
+### Fixed
+- **MCE IRL parameter recovery**: Fixed critical bug where expected features were computed using stationary distribution instead of empirical state sequence. This caused gradients to be non-zero at true parameters, preventing convergence. The fix iterates over the empirical state sequence from demonstrations, reducing gradient norm at true parameters by 25-250x. ([Kim et al. 2021](https://proceedings.mlr.press/v139/kim21c.html) provides theoretical grounding for reward identifiability in IRL.)
 
 ### Changed
 - `_compute_expected_features()` signature now takes `panel` instead of `state_visitation` to enable iteration over empirical states
