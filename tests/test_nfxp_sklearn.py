@@ -137,7 +137,7 @@ class TestNFXPFit:
 class TestNFXPAttributes:
     """Tests for NFXP attributes after fit()."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def fitted_estimator(self):
         """Create and fit an NFXP estimator."""
         from econirl.estimators import NFXP
@@ -236,7 +236,7 @@ class TestNFXPAttributes:
 class TestNFXPSummary:
     """Tests for NFXP.summary() method."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def fitted_estimator(self):
         """Create and fit an NFXP estimator."""
         from econirl.estimators import NFXP
@@ -300,7 +300,7 @@ class TestNFXPSummary:
 class TestNFXPPredictProba:
     """Tests for NFXP.predict_proba() method."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def fitted_estimator(self):
         """Create and fit an NFXP estimator."""
         from econirl.estimators import NFXP
@@ -404,7 +404,7 @@ class TestNFXPImport:
 class TestNFXPSimulate:
     """Tests for NFXP.simulate() method."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def fitted_estimator(self):
         """Create and fit an NFXP estimator."""
         from econirl.estimators import NFXP
@@ -514,7 +514,7 @@ class TestNFXPSimulate:
 class TestNFXPCounterfactual:
     """Tests for NFXP.counterfactual() method."""
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def fitted_estimator(self):
         """Create and fit an NFXP estimator."""
         from econirl.estimators import NFXP

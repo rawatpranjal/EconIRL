@@ -147,6 +147,51 @@ class NFXPEstimator(BaseEstimator):
                 max_iter=self._inner_max_iter,
             )
 
+    def _estimate_initial_params(
+        self,
+        panel: Panel,
+        utility: UtilityFunction,
+        problem: DDCProblem,
+    ) -> torch.Tensor:
+        """Estimate rough starting values from data.
+
+        Uses the empirical replacement rate and average mileage at replacement
+        to get a non-degenerate starting point for optimization.
+        """
+        n_params = utility.num_parameters
+
+        # Compute empirical replacement rate and average mileage
+        total_obs = 0
+        n_replace = 0
+        mileage_at_replace = 0.0
+
+        for traj in panel.trajectories:
+            for t in range(len(traj)):
+                total_obs += 1
+                if traj.actions[t].item() == 1:  # Replace action
+                    n_replace += 1
+                    mileage_at_replace += traj.states[t].item()
+
+        if n_replace > 0 and total_obs > 0:
+            replace_rate = n_replace / total_obs
+            avg_mileage = mileage_at_replace / n_replace
+
+            # For Rust-style models with 2 parameters [operating_cost, RC]:
+            # At the replacement threshold, roughly:
+            #   RC ≈ operating_cost * avg_mileage / replace_rate
+            # Use heuristic: set operating_cost so that at avg_mileage,
+            # the cost is a moderate fraction of state space
+            if n_params == 2:
+                n_states = problem.num_states
+                # operating_cost ~ 1/n_states (so cost at max state is ~1)
+                op_cost_init = 1.0 / n_states
+                # RC ~ operating_cost * avg_mileage * (1 - gamma) / replace_rate
+                rc_init = max(0.5, op_cost_init * avg_mileage / max(replace_rate, 0.01))
+                return torch.tensor([op_cost_init, rc_init], dtype=torch.float32)
+
+        # Generic fallback: small positive values
+        return torch.full((n_params,), 0.01, dtype=torch.float32)
+
     def _optimize(
         self,
         panel: Panel,
@@ -181,9 +226,14 @@ class NFXPEstimator(BaseEstimator):
                 UserWarning,
             )
 
-        # Initialize
+        # Initialize — use data-driven starting values if defaults are zeros
         if initial_params is None:
             initial_params = utility.get_initial_parameters()
+            # If all zeros, estimate rough starting values from data
+            if (initial_params == 0).all():
+                initial_params = self._estimate_initial_params(
+                    panel, utility, problem
+                )
 
         # Create Bellman operator
         operator = SoftBellmanOperator(problem, transitions)
@@ -228,16 +278,17 @@ class NFXPEstimator(BaseEstimator):
             # Return negative for minimization
             return -ll
 
-        # Define gradient (numerical for now, could use autodiff)
+        # Define gradient (numerical, with adaptive step size)
         def gradient(params_np):
-            eps = 1e-5
             grad = torch.zeros(len(params_np))
             for i in range(len(params_np)):
+                # Adaptive epsilon: scale to parameter magnitude
+                eps_i = max(1e-5, abs(params_np[i]) * 1e-4)
                 params_plus = params_np.copy()
                 params_minus = params_np.copy()
-                params_plus[i] += eps
-                params_minus[i] -= eps
-                grad[i] = (objective(params_plus) - objective(params_minus)) / (2 * eps)
+                params_plus[i] += eps_i
+                params_minus[i] -= eps_i
+                grad[i] = (objective(params_plus) - objective(params_minus)) / (2 * eps_i)
             return grad.numpy()
 
         # Run optimization
@@ -334,10 +385,12 @@ class NFXPEstimator(BaseEstimator):
             flow_utility, solver_result.V
         )
 
-        # Compute gradient for each parameter
+        # Compute gradient for each parameter (adaptive epsilon)
         for k in range(n_params):
+            eps_k = max(eps, abs(params[k].item()) * 1e-4)
+
             params_plus = params.clone()
-            params_plus[k] += eps
+            params_plus[k] += eps_k
 
             flow_utility_plus = utility.compute(params_plus)
             solver_plus = self._solve_inner(operator, flow_utility_plus)
@@ -346,7 +399,7 @@ class NFXPEstimator(BaseEstimator):
             )
 
             params_minus = params.clone()
-            params_minus[k] -= eps
+            params_minus[k] -= eps_k
 
             flow_utility_minus = utility.compute(params_minus)
             solver_minus = self._solve_inner(operator, flow_utility_minus)
@@ -364,7 +417,7 @@ class NFXPEstimator(BaseEstimator):
                     grad_k = (
                         log_probs_plus[state, action]
                         - log_probs_minus[state, action]
-                    ) / (2 * eps)
+                    ) / (2 * eps_k)
                     gradients[obs_idx, k] = grad_k
 
                     obs_idx += 1

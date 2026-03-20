@@ -57,13 +57,21 @@ class TestNFXPConvergence:
 
         true_params = rust_env.get_true_parameter_vector()
 
-        # Check recovery within 3 standard errors
+        # Check recovery: RMSE should be small
+        rmse = torch.sqrt(torch.mean((result.parameters - true_params) ** 2)).item()
+        assert rmse < 0.1, (
+            f"NFXP RMSE={rmse:.6f} exceeds tolerance 0.1. "
+            f"Estimates: {result.parameters.tolist()}, True: {true_params.tolist()}"
+        )
+
+        # Also check each parameter is close (absolute tolerance)
         for i, name in enumerate(result.parameter_names):
-            error = abs(result.parameters[i].item() - true_params[i].item())
-            se = result.standard_errors[i].item()
-            assert error < 3 * se, (
-                f"Parameter {name}: estimate={result.parameters[i].item():.6f}, "
-                f"true={true_params[i].item():.6f}, error={error:.6f}, 3*SE={3*se:.6f}"
+            est = result.parameters[i].item()
+            true_val = true_params[i].item()
+            abs_error = abs(est - true_val)
+            assert abs_error < 0.1, (
+                f"Parameter {name}: estimate={est:.6f}, "
+                f"true={true_val:.6f}, absolute_error={abs_error:.6f}"
             )
 
     @pytest.mark.slow

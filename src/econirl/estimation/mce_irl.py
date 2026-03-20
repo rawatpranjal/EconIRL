@@ -324,19 +324,22 @@ class MCEIRLEstimator(BaseEstimator):
         panel: Panel,
         policy: torch.Tensor,
         reward_fn: BaseUtilityFunction,
+        transitions: torch.Tensor | None = None,
+        initial_dist: torch.Tensor | None = None,
+        discount: float = 0.9,
     ) -> torch.Tensor:
         """Compute expected feature expectations under the learned policy.
 
-        Computes expectations over the EMPIRICAL state sequence from the data,
-        not the stationary distribution. For each state the expert visited,
-        we compute what actions the current policy would take:
+        For action-dependent features (3D), computes expectations over the
+        EMPIRICAL state sequence, weighting by the current policy's action
+        probabilities:
 
             μ_π = (1/N) Σ_{i,t} Σ_a π(a|s_{i,t}) φ(s_{i,t}, a)
 
-        This is the correct formulation for MCE IRL because:
-        1. It matches the empirical features which are computed over the same states
-        2. At true parameters, the gradient (empirical - expected) should be zero
-        3. Using stationary distribution creates a mismatch that prevents recovery
+        For state-only features (2D), computes expectations using the state
+        visitation distribution under the current policy:
+
+            μ_π = Σ_s d_π(s) φ(s)
 
         Parameters
         ----------
@@ -346,6 +349,13 @@ class MCEIRLEstimator(BaseEstimator):
             Policy probabilities π(a|s), shape (n_states, n_actions).
         reward_fn : BaseUtilityFunction
             Reward function with feature matrix.
+        transitions : torch.Tensor, optional
+            Transition matrices, shape (n_actions, n_states, n_states).
+            Required for state-only features.
+        initial_dist : torch.Tensor, optional
+            Initial state distribution. Required for state-only features.
+        discount : float
+            Discount factor for state visitation computation.
 
         Returns
         -------
@@ -380,21 +390,38 @@ class MCEIRLEstimator(BaseEstimator):
                     s = traj.states[t].item()
                     for a in range(n_actions):
                         feature_sum += policy[s, a] * feature_matrix[s, a, :]
+
+            if total_obs > 0:
+                return feature_sum / total_obs
+            return feature_sum
         else:
             # State-only: (n_states, n_features)
-            # E[φ] = (1/N) Σ_{i,t} φ(s_{i,t}, k)
-            # Note: For state-only features, policy doesn't affect expected features
-            n_features = feature_matrix.shape[1]
-            feature_sum = torch.zeros(n_features, dtype=feature_matrix.dtype)
+            # Use state visitation frequencies under the current policy
+            n_states = feature_matrix.shape[0]
 
-            for traj in panel.trajectories:
-                for t in range(len(traj)):
-                    s = traj.states[t].item()
-                    feature_sum += feature_matrix[s, :]
-
-        if total_obs > 0:
-            return feature_sum / total_obs
-        return feature_sum
+            if transitions is not None and initial_dist is not None:
+                # Create a temporary DDCProblem for the existing _compute_state_visitation
+                problem = DDCProblem(
+                    num_states=n_states,
+                    num_actions=policy.shape[1],
+                    discount_factor=discount,
+                )
+                d = self._compute_state_visitation(
+                    policy, transitions, problem, initial_dist
+                )
+                # E_π[φ] = Σ_s d_π(s) * φ(s)
+                return d @ feature_matrix
+            else:
+                # Fallback: iterate over empirical states
+                n_features = feature_matrix.shape[1]
+                feature_sum = torch.zeros(n_features, dtype=feature_matrix.dtype)
+                for traj in panel.trajectories:
+                    for t in range(len(traj)):
+                        s = traj.states[t].item()
+                        feature_sum += feature_matrix[s, :]
+                if total_obs > 0:
+                    return feature_sum / total_obs
+                return feature_sum
 
     def _compute_initial_distribution(
         self,
@@ -485,7 +512,12 @@ class MCEIRLEstimator(BaseEstimator):
             if not inner_converged:
                 inner_not_converged += 1
 
-            expected_features = self._compute_expected_features(panel, policy, reward_fn)
+            expected_features = self._compute_expected_features(
+                panel, policy, reward_fn,
+                transitions=transitions,
+                initial_dist=initial_dist,
+                discount=problem.discount_factor,
+            )
 
             # Feature matching gradient: μ_D - μ_π
             # We want to INCREASE params in direction where μ_D > μ_π
