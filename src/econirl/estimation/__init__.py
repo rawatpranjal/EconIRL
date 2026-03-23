@@ -37,6 +37,9 @@ from econirl.estimation.deep_maxent_irl import DeepMaxEntIRLEstimator
 # NNES
 from econirl.estimation.nnes import NNESEstimator
 
+# f-IRL
+from econirl.estimation.f_irl import FIRLEstimator
+
 __all__ = [
     # Base
     "Estimator",
@@ -74,6 +77,8 @@ __all__ = [
     "DeepMaxEntIRLEstimator",
     # NNES
     "NNESEstimator",
+    # f-IRL
+    "FIRLEstimator",
     # Utilities
     "estimate_transition_probs",
     "estimate_transition_probs_by_group",

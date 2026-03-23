@@ -23,6 +23,7 @@ _ACTION_DEPENDENT_NAMES = {
     "AIRLEstimator",
     "GAILEstimator",
     "BayesianIRLEstimator",
+    "FIRLEstimator",
 }
 
 # Estimator classes that need LinearReward (state-only features)

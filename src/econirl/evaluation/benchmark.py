@@ -275,6 +275,7 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
         BayesianIRLEstimator,
         BehavioralCloningEstimator,
         DeepMaxEntIRLEstimator,
+        FIRLEstimator,
         NNESEstimator,
         CCPEstimator,
         GAILEstimator,
@@ -462,6 +463,16 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
             name="NNES",
             can_recover_params=True,
         ),
+        EstimatorSpec(
+            FIRLEstimator,
+            kwargs=dict(
+                f_divergence="kl",
+                lr=0.5,
+                max_iter=500,
+            ),
+            name="f-IRL",
+            can_recover_params=False,
+        ),
     ]
 
 
@@ -537,8 +548,8 @@ def run_single(
             if spec.name == "GCL":
                 # GCL returns cost parameters c(s,a) — negate to get rewards
                 estimated_reward = -summary.parameters.reshape(n_s, n_a)
-            elif spec.name == "Deep MaxEnt":
-                # Deep MaxEnt returns reward matrix R(s,a) directly
+            elif spec.name in ("Deep MaxEnt", "f-IRL"):
+                # These return reward matrix R(s,a) directly
                 estimated_reward = summary.parameters.reshape(n_s, n_a)
             elif len(summary.parameters) == len(true_params):
                 estimated_reward = torch.einsum(
