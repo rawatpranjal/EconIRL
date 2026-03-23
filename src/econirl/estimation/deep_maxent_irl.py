@@ -168,9 +168,11 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
 
         # Initial state distribution from data
         init_counts = torch.zeros(n_states)
-        for traj in panel.trajectories:
-            if len(traj) > 0:
-                init_counts[traj.states[0].item()] += 1
+        init_states = torch.tensor(
+            [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
+            dtype=torch.long,
+        )
+        init_counts.scatter_add_(0, init_states, torch.ones_like(init_states, dtype=torch.float32))
         mu = init_counts / init_counts.sum().clamp(min=1)
 
         visitation = mu.clone()
@@ -199,12 +201,12 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
         operator = SoftBellmanOperator(problem, transitions)
 
         # Compute empirical state-action visitation
-        sa_counts = torch.zeros(n_states, n_actions)
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                sa_counts[s, a] += 1
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        idx = all_states * n_actions + all_actions
+        sa_counts = torch.zeros(n_states * n_actions).scatter_add_(
+            0, idx.long(), torch.ones(idx.shape[0])
+        ).reshape(n_states, n_actions)
         empirical_sa = sa_counts / sa_counts.sum()
 
         # Build reward network
@@ -261,12 +263,9 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
                     max_iter=self._inner_max_iter,
                 )
                 lp = operator.compute_log_choice_probabilities(rm, sr.V)
-                ll = 0.0
-                for traj in panel.trajectories:
-                    for t in range(len(traj)):
-                        s = traj.states[t].item()
-                        a = traj.actions[t].item()
-                        ll += lp[s, a].item()
+                all_states = panel.get_all_states()
+                all_actions = panel.get_all_actions()
+                ll = lp[all_states, all_actions].sum().item()
 
                 if ll > best_ll:
                     best_ll = ll

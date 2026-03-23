@@ -137,12 +137,12 @@ class CCPEstimator(BaseEstimator):
             CCP matrix of shape (num_states, num_actions)
         """
         # Count state-action frequencies
-        counts = torch.zeros((num_states, num_actions), dtype=torch.float32)
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                state = traj.states[t].item()
-                action = traj.actions[t].item()
-                counts[state, action] += 1
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        idx = all_states * num_actions + all_actions
+        counts = torch.zeros(num_states * num_actions, dtype=torch.float32).scatter_add_(
+            0, idx.long(), torch.ones(idx.shape[0])
+        ).reshape(num_states, num_actions)
 
         # Get state counts
         state_counts = counts.sum(dim=1)
@@ -381,12 +381,9 @@ class CCPEstimator(BaseEstimator):
         log_probs = torch.nn.functional.log_softmax(v / sigma, dim=1)
 
         # Sum log-likelihood over observations
-        ll = 0.0
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                state = traj.states[t].item()
-                action = traj.actions[t].item()
-                ll += log_probs[state, action].item()
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        ll = log_probs[all_states, all_actions].sum().item()
 
         return ll
 
@@ -420,12 +417,12 @@ class CCPEstimator(BaseEstimator):
         n_replace = 0
         mileage_at_replace = 0.0
 
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                total_obs += 1
-                if traj.actions[t].item() == 1:
-                    n_replace += 1
-                    mileage_at_replace += traj.states[t].item()
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        total_obs = all_states.shape[0]
+        replace_mask = all_actions == 1
+        n_replace = replace_mask.sum().item()
+        mileage_at_replace = all_states[replace_mask].float().sum().item()
 
         if n_replace > 0 and total_obs > 0 and n_params == 2:
             replace_rate = n_replace / total_obs
@@ -651,18 +648,11 @@ class CCPEstimator(BaseEstimator):
             )
             log_probs_minus = torch.nn.functional.log_softmax(v_minus / sigma, dim=1)
 
-            # Compute gradients for each observation
-            obs_idx = 0
-            for traj in panel.trajectories:
-                for t in range(len(traj)):
-                    state = traj.states[t].item()
-                    action = traj.actions[t].item()
-
-                    grad_k = (
-                        log_probs_plus[state, action] - log_probs_minus[state, action]
-                    ) / (2 * eps)
-                    gradients[obs_idx, k] = grad_k
-
-                    obs_idx += 1
+            # Compute gradients for all observations
+            all_states = panel.get_all_states()
+            all_actions = panel.get_all_actions()
+            gradients[:, k] = (
+                log_probs_plus[all_states, all_actions] - log_probs_minus[all_states, all_actions]
+            ) / (2 * eps)
 
         return gradients

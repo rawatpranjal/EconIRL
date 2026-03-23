@@ -92,12 +92,12 @@ class BehavioralCloningEstimator(BaseEstimator):
         n_actions = problem.num_actions
 
         # Count state-action pairs
-        counts = torch.zeros(n_states, n_actions)
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                counts[s, a] += 1
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        idx = all_states * n_actions + all_actions
+        counts = torch.zeros(n_states * n_actions).scatter_add_(
+            0, idx.long(), torch.ones(idx.shape[0])
+        ).reshape(n_states, n_actions)
 
         # Laplace smoothing
         counts = counts + self._smoothing
@@ -108,12 +108,7 @@ class BehavioralCloningEstimator(BaseEstimator):
         policy = counts / row_sums
 
         # Log-likelihood of observed data under the empirical policy
-        ll = 0.0
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                ll += torch.log(policy[s, a] + 1e-10).item()
+        ll = torch.log(policy[all_states, all_actions] + 1e-10).sum().item()
 
         elapsed = time.time() - start
         self._log(f"Computed empirical policy in {elapsed:.3f}s, LL={ll:.2f}")

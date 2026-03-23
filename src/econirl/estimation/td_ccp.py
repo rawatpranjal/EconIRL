@@ -180,13 +180,12 @@ class TDCCPEstimator(BaseEstimator):
             CCP matrix of shape (num_states, num_actions).
         """
         smoothing = self._config.ccp_smoothing
-        counts = torch.zeros((num_states, num_actions), dtype=torch.float32)
-
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                counts[s, a] += 1
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        idx = all_states * num_actions + all_actions
+        counts = torch.zeros(num_states * num_actions, dtype=torch.float32).scatter_add_(
+            0, idx.long(), torch.ones(idx.shape[0])
+        ).reshape(num_states, num_actions)
 
         state_counts = counts.sum(dim=1, keepdim=True)
         ccps = (counts + smoothing) / (state_counts + num_actions * smoothing)
@@ -465,12 +464,9 @@ class TDCCPEstimator(BaseEstimator):
             v = _compute_choice_values(params)
             log_probs = torch.nn.functional.log_softmax(v / sigma, dim=1)
 
-            ll = 0.0
-            for traj in panel.trajectories:
-                for t in range(len(traj)):
-                    s = traj.states[t].item()
-                    a = traj.actions[t].item()
-                    ll += log_probs[s, a].item()
+            all_states = panel.get_all_states()
+            all_actions = panel.get_all_actions()
+            ll = log_probs[all_states, all_actions].sum().item()
             return ll
 
         # Store the ll function for Hessian computation later
