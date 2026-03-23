@@ -85,6 +85,14 @@ def run(config_path: str) -> dict:
     if estimator_name == "TD-CCP" and "config" in est_kwargs:
         est_kwargs["config"] = TDCCPConfig(**est_kwargs["config"])
 
+    # Fall back to benchmark-tuned defaults when no kwargs specified
+    if not est_kwargs:
+        from econirl.evaluation.benchmark import get_default_estimator_specs
+        for default_spec in get_default_estimator_specs():
+            if default_spec.name == estimator_name:
+                est_kwargs = dict(default_spec.kwargs)
+                break
+
     spec = EstimatorSpec(
         estimator_class=cls,
         kwargs=est_kwargs,
@@ -119,6 +127,8 @@ def run(config_path: str) -> dict:
         "estimates": {k: _sanitize(v) for k, v in result.estimates.items()},
         "true_params": {k: _sanitize(v) for k, v in result.true_params.items()},
     }
+
+    out["idea_number"] = config.get("idea_number")
 
     # --- Richer output: action agreement ---
     learned_pol = getattr(result, "learned_policy", None)

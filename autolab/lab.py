@@ -27,7 +27,7 @@ PROGRAM_PATH = ROOT / "program.md"
 RESULTS_DIR = ROOT / "results"
 RUN_SCRIPT = ROOT / "run_experiment.py"
 
-DEFAULT_EXPERIMENT_TIMEOUT = 600  # seconds per experiment
+DEFAULT_EXPERIMENT_TIMEOUT = 120  # seconds per experiment (toy problems finish in <30s)
 CLAUDE_TIMEOUT = 120  # seconds for Claude proposal
 
 
@@ -106,7 +106,7 @@ def _build_prompt(program: str, log: list[dict], exp_num: int) -> str:
     if not best_text:
         best_text = "  (no results yet)\n"
 
-    return f"""You are an ML researcher designing hyperparameter experiments for econometric IRL estimators.
+    return f"""You are an ML researcher running autonomous hyperparameter experiments on a tiny 5-state MDP.
 
 ## Research Program
 {program}
@@ -116,18 +116,24 @@ def _build_prompt(program: str, log: list[dict], exp_num: int) -> str:
 ## Best Results Per Estimator
 {best_text}
 ## Task
-Propose experiment #{exp_num}. Return ONLY a JSON object (no markdown fences) with these fields:
+Propose experiment #{exp_num}. Pick from the bag of ideas in the research program based on results so far.
+
+All experiments MUST use: n_states=5, discount_factor=0.95, n_agents=100, n_periods=50, seed=42.
+
+If an estimator has no baseline yet, run defaults first (Idea #1). Focus effort where the gap to target is largest.
+
+Return ONLY a JSON object (no markdown fences) with these fields:
 - "reasoning": string explaining why this experiment (1-2 sentences)
+- "idea_number": int (1-25) from the bag of ideas
 - "experiment_id": "exp_{exp_num:03d}"
 - "estimator": one of ["NFXP", "CCP", "MCE IRL", "MaxEnt IRL", "Max Margin", "TD-CCP", "GLADIUS", "GAIL", "AIRL", "GCL"]
-- "dgp": object with optional keys: n_states, discount_factor, replacement_cost, operating_cost, quadratic_cost
+- "dgp": {{"n_states": 5, "discount_factor": 0.95}}
 - "estimator_kwargs": object with estimator-specific hyperparameters
-- "n_agents": int (default 200)
-- "n_periods": int (default 100)
-- "seed": int (default 42)
+- "n_agents": 100
+- "n_periods": 50
+- "seed": 42
 
 For TD-CCP, put TDCCPConfig fields inside "estimator_kwargs"."config".
-Focus on Tier 3-4 estimators (GAIL, GCL, MaxEnt IRL, AIRL) unless you have a specific reason to test others.
 """
 
 
@@ -271,8 +277,8 @@ def run_experiment(config: dict, timeout: int = DEFAULT_EXPERIMENT_TIMEOUT) -> d
 
 BASELINES = {
     "NFXP": 100.0, "CCP": 100.0, "MCE IRL": 100.0,
-    "TD-CCP": 99.9, "GLADIUS": 99.8, "Max Margin": 98.3,
-    "AIRL": 79.9, "MaxEnt IRL": 47.3, "GCL": 36.3, "GAIL": 36.1,
+    "TD-CCP": 0.0, "GLADIUS": 0.0, "Max Margin": 0.0,
+    "AIRL": 0.0, "MaxEnt IRL": 0.0, "GCL": 0.0, "GAIL": 0.0,
 }
 
 
@@ -304,6 +310,76 @@ def generate_findings(log: list[dict]) -> None:
             lines.append(f"| {name} | {pct:.1f}% | {baseline:.1f}% | {sign}{delta:.1f}% |")
         else:
             lines.append(f"| {name} | — | {baseline:.1f}% | — |")
+
+    # --- Progress Trajectory ---
+    # Track first result, best result, improvement, and run count per estimator
+    TARGETS = {
+        "NFXP": 99.5, "CCP": 99.5, "MCE IRL": 99.0,
+        "TD-CCP": 98.0, "GLADIUS": 98.0, "Max Margin": 95.0,
+        "AIRL": 90.0, "MaxEnt IRL": 90.0, "GCL": 90.0, "GAIL": 90.0,
+    }
+    first_per_est: dict[str, float] = {}
+    best_per_est: dict[str, float] = {}
+    count_per_est: dict[str, int] = {}
+    for entry in log:
+        if entry.get("status") != "success":
+            continue
+        est = entry.get("estimator", "")
+        pct = entry.get("pct_optimal")
+        if pct is None:
+            continue
+        count_per_est[est] = count_per_est.get(est, 0) + 1
+        if est not in first_per_est:
+            first_per_est[est] = pct
+        if est not in best_per_est or pct > best_per_est[est]:
+            best_per_est[est] = pct
+
+    if first_per_est:
+        lines += [
+            "",
+            "## Progress Trajectory",
+            "",
+            "| Estimator | First | Best | Improvement | # Runs | Target |",
+            "|-----------|-------|------|-------------|--------|--------|",
+        ]
+        for name in sorted(TARGETS.keys(), key=lambda n: -(best_per_est.get(n, 0))):
+            if name in first_per_est:
+                first = first_per_est[name]
+                bst = best_per_est[name]
+                delta = bst - first
+                sign = "+" if delta >= 0 else ""
+                target = TARGETS.get(name, "—")
+                runs = count_per_est.get(name, 0)
+                lines.append(f"| {name} | {first:.1f}% | {bst:.1f}% | {sign}{delta:.1f}% | {runs} | {target}% |")
+
+    # --- Ideas Explored ---
+    idea_results: dict[int, list[float]] = {}
+    for entry in log:
+        idea = entry.get("idea_number")
+        if idea is None:
+            # Check inside config
+            idea = entry.get("config", {}).get("idea_number")
+        if idea is not None:
+            pct = entry.get("pct_optimal")
+            if idea not in idea_results:
+                idea_results[idea] = []
+            if pct is not None:
+                idea_results[idea].append(pct)
+
+    if idea_results:
+        lines += [
+            "",
+            "## Ideas Explored",
+            "",
+            "| Idea # | Times Tried | Best pct_optimal |",
+            "|--------|-------------|------------------|",
+        ]
+        for idea_num in sorted(idea_results.keys()):
+            results = idea_results[idea_num]
+            tries = len(results)
+            best_pct = max(results) if results else None
+            best_str = f"{best_pct:.1f}%" if best_pct is not None else "N/A"
+            lines.append(f"| {idea_num} | {tries} | {best_str} |")
 
     # --- Ground Truth Report ---
     gt_entries = [e for e in log if e.get("status") == "success" and e.get("ground_truth")]
@@ -445,6 +521,13 @@ def main():
         reasoning = config.pop("reasoning", "")
         print(f"  Reasoning: {reasoning}")
         print(f"  Estimator: {config['estimator']}")
+
+        # DGP guard: cap n_states at 10 for toy experiments
+        dgp = config.get("dgp", {})
+        if dgp.get("n_states", 5) > 10:
+            print(f"  WARNING: Capping n_states from {dgp['n_states']} to 10")
+            dgp["n_states"] = 10
+            config["dgp"] = dgp
 
         # Inject resource guardrails
         config["max_memory_gb"] = args.max_memory_gb

@@ -381,15 +381,11 @@ class MCEIRLEstimator(BaseEstimator):
         if feature_matrix.ndim == 3:
             # Action-dependent: (n_states, n_actions, n_features)
             # E[φ] = (1/N) Σ_{i,t} Σ_a π(a|s_{i,t}) * φ(s_{i,t}, a, k)
-            n_features = feature_matrix.shape[2]
-            n_actions = feature_matrix.shape[1]
-            feature_sum = torch.zeros(n_features, dtype=feature_matrix.dtype)
-
-            for traj in panel.trajectories:
-                for t in range(len(traj)):
-                    s = traj.states[t].item()
-                    for a in range(n_actions):
-                        feature_sum += policy[s, a] * feature_matrix[s, a, :]
+            # Vectorized: gather all states, then batch multiply
+            all_states = torch.cat([traj.states for traj in panel.trajectories])
+            # policy[all_states] → (N, n_actions), feature_matrix[all_states] → (N, n_actions, n_features)
+            # Sum over actions and observations
+            feature_sum = (policy[all_states].unsqueeze(-1) * feature_matrix[all_states]).sum(dim=(0, 1))
 
             if total_obs > 0:
                 return feature_sum / total_obs

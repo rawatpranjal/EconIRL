@@ -71,6 +71,7 @@ class GAILConfig:
     max_rounds: int = 100
     batch_size: int = 0  # 0 means use all
     entropy_coef: float = 0.0
+    reward_transform: Literal["softplus", "logit"] = "softplus"  # "logit" uses raw D(s,a)
     convergence_tol: float = 1e-4
     compute_se: bool = True
     se_method: Literal["bootstrap", "asymptotic"] = "bootstrap"
@@ -447,7 +448,10 @@ class GAILEstimator(BaseEstimator):
             disc_losses.append(disc_loss)
 
             # Derive reward from discriminator
-            reward_matrix = discriminator.get_reward_matrix(reward_type="gail")
+            if self.config.reward_transform == "logit":
+                reward_matrix = discriminator.get_reward_matrix(reward_type="airl")
+            else:
+                reward_matrix = discriminator.get_reward_matrix(reward_type="gail")
 
             # Add entropy bonus if specified
             if self.config.entropy_coef > 0:
@@ -477,7 +481,10 @@ class GAILEstimator(BaseEstimator):
         pbar.close()
 
         # Final reward matrix
-        final_reward = discriminator.get_reward_matrix(reward_type="gail")
+        if self.config.reward_transform == "logit":
+            final_reward = discriminator.get_reward_matrix(reward_type="airl")
+        else:
+            final_reward = discriminator.get_reward_matrix(reward_type="gail")
 
         # Compute pseudo log-likelihood
         log_probs = operator.compute_log_choice_probabilities(final_reward, V)

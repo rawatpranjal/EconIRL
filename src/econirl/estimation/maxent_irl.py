@@ -31,14 +31,14 @@ import time
 from typing import Literal
 
 import torch
-from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration, policy_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod, compute_numerical_hessian
-from econirl.preferences.base import UtilityFunction
+from econirl.preferences.action_reward import ActionDependentReward
+from econirl.preferences.base import BaseUtilityFunction, UtilityFunction
 from econirl.preferences.reward import LinearReward
 
 
@@ -145,40 +145,26 @@ class MaxEntIRLEstimator(BaseEstimator):
     def _compute_empirical_features(
         self,
         panel: Panel,
-        reward_fn: LinearReward,
+        reward_fn,
     ) -> torch.Tensor:
         """Compute empirical feature expectations from demonstrations.
 
-        Computes the average state features visited by the demonstrator:
-            mu_D = (1/N) sum_{i,t} phi(s_{i,t})
-
-        where N is the total number of observations.
-
-        Args:
-            panel: Panel data with observed trajectories
-            reward_fn: LinearReward function (for state features)
-
-        Returns:
-            Empirical feature expectations, shape (num_features,)
+        Handles both state-only (2D) and action-dependent (3D) features.
         """
-        state_features = reward_fn.state_features  # (num_states, num_features)
-        num_features = state_features.shape[1]
-
-        # Accumulate features over all observations
-        feature_sum = torch.zeros(num_features, dtype=state_features.dtype)
-        total_obs = 0
-
-        for traj in panel.trajectories:
-            for t in range(len(traj)):
-                state = traj.states[t].item()
-                feature_sum += state_features[state]
-                total_obs += 1
-
-        # Average feature expectations
-        if total_obs > 0:
-            return feature_sum / total_obs
+        if isinstance(reward_fn, ActionDependentReward):
+            feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
+            n_features = feature_matrix.shape[2]
+            all_states = torch.cat([traj.states for traj in panel.trajectories])
+            all_actions = torch.cat([traj.actions for traj in panel.trajectories])
+            feature_sum = feature_matrix[all_states, all_actions, :].sum(dim=0)
+            total_obs = len(all_states)
+            return feature_sum / total_obs if total_obs > 0 else feature_sum
         else:
-            return feature_sum
+            state_features = reward_fn.state_features  # (num_states, num_features)
+            all_states = torch.cat([traj.states for traj in panel.trajectories])
+            feature_sum = state_features[all_states].sum(dim=0)
+            total_obs = len(all_states)
+            return feature_sum / total_obs if total_obs > 0 else feature_sum
 
     def _compute_state_visitation_frequency(
         self,
@@ -241,29 +227,14 @@ class MaxEntIRLEstimator(BaseEstimator):
         self,
         policy: torch.Tensor,
         transitions: torch.Tensor,
-        reward_fn: LinearReward,
+        reward_fn,
         problem: DDCProblem,
         panel: Panel | None = None,
     ) -> torch.Tensor:
         """Compute expected feature expectations under the current policy.
 
-        Computes:
-            mu_pi = sum_s mu(s) phi(s)
-
-        where mu(s) is the state visitation frequency under policy pi.
-
-        Args:
-            policy: Choice probabilities, shape (num_states, num_actions)
-            transitions: Transition matrices, shape (num_actions, num_states, num_states)
-            reward_fn: LinearReward function (for state features)
-            problem: DDC problem specification
-            panel: Optional panel data (for computing initial distribution)
-
-        Returns:
-            Expected feature expectations, shape (num_features,)
+        Handles both state-only (2D) and action-dependent (3D) features.
         """
-        state_features = reward_fn.state_features  # (num_states, num_features)
-
         # Compute initial state distribution from data if available
         initial_distribution = None
         if panel is not None:
@@ -283,10 +254,14 @@ class MaxEntIRLEstimator(BaseEstimator):
             initial_distribution=initial_distribution,
         )
 
-        # Compute expected features: sum_s mu(s) phi(s)
-        expected_features = torch.einsum("s,sk->k", visitation, state_features)
-
-        return expected_features
+        if isinstance(reward_fn, ActionDependentReward):
+            # 3D: E_π[φ] = Σ_s d(s) Σ_a π(a|s) φ(s,a)
+            feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
+            return torch.einsum("s,sa,sak->k", visitation, policy, feature_matrix)
+        else:
+            # 2D: E_π[φ] = Σ_s d(s) φ(s)
+            state_features = reward_fn.state_features
+            return torch.einsum("s,sk->k", visitation, state_features)
 
     def _optimize(
         self,
@@ -317,14 +292,15 @@ class MaxEntIRLEstimator(BaseEstimator):
         """
         start_time = time.time()
 
-        # Validate that utility is a LinearReward
-        if not isinstance(utility, LinearReward):
+        # Support both LinearReward (state-only) and ActionDependentReward (3D)
+        if not isinstance(utility, (LinearReward, ActionDependentReward)):
             raise TypeError(
-                f"MaxEntIRLEstimator requires LinearReward, got {type(utility).__name__}. "
-                "Use LinearReward for IRL estimation."
+                f"MaxEntIRLEstimator requires LinearReward or ActionDependentReward, "
+                f"got {type(utility).__name__}."
             )
 
         reward_fn = utility
+        self._use_action_features = isinstance(utility, ActionDependentReward)
 
         # Initialize parameters
         if initial_params is None:
@@ -341,24 +317,33 @@ class MaxEntIRLEstimator(BaseEstimator):
         total_inner_iterations = 0
         num_function_evals = 0
 
-        # Define objective function (negative log-likelihood for minimization)
-        def objective(params_np):
+        # Use L-BFGS-B with a CONSISTENT (f, ∇f) pair:
+        #   f = -LL(θ) = -Σ_{i,t} log π(a_{i,t}|s_{i,t}; θ)  (negative log-likelihood)
+        #   ∇f = expected_features - empirical_features  (gradient of NLL)
+        # These are consistent because the MaxEnt IRL gradient IS ∂(-LL)/∂θ.
+        self._log(f"Starting MaxEnt IRL optimization with L-BFGS-B")
+
+        def objective_and_gradient(params_np):
             nonlocal total_inner_iterations, num_function_evals
             num_function_evals += 1
 
             params = torch.tensor(params_np, dtype=torch.float32)
-
-            # Compute reward matrix
             reward_matrix = reward_fn.compute(params)
-
-            # Solve for value function and policy
             solver_result = self._solve_inner(operator, reward_matrix)
             total_inner_iterations += solver_result.num_iterations
 
-            if not solver_result.converged:
-                self._log(f"Warning: Inner loop did not converge")
+            # Compute negative log-likelihood (objective to minimize)
+            log_probs = operator.compute_log_choice_probabilities(
+                reward_matrix, solver_result.V
+            )
+            nll = 0.0
+            for traj in panel.trajectories:
+                for t in range(len(traj)):
+                    state = traj.states[t].item()
+                    action = traj.actions[t].item()
+                    nll -= log_probs[state, action].item()
 
-            # Compute expected features under current policy
+            # Gradient of NLL = expected - empirical features
             expected_features = self._compute_expected_features(
                 solver_result.policy,
                 transitions,
@@ -366,65 +351,23 @@ class MaxEntIRLEstimator(BaseEstimator):
                 problem,
                 panel,
             )
-
-            # Gradient = empirical - expected (for maximization)
-            # For minimization: gradient = expected - empirical
-            gradient = expected_features - empirical_features
-
-            # Log-likelihood is proportional to: empirical_features @ params - log Z
-            # We use a proxy: negative of gradient norm as a measure of fit
-            # (The actual likelihood requires computing log Z which is expensive)
-
-            # For L-BFGS-B, we use the gradient directly
-            # The "objective" is ||empirical - expected||^2 which we minimize
-            obj_value = 0.5 * torch.sum(gradient ** 2).item()
+            grad = (expected_features - empirical_features).numpy().astype(float)
 
             if self._verbose and num_function_evals % 10 == 0:
-                grad_norm = torch.norm(gradient).item()
-                self._log(f"Eval {num_function_evals}: ||grad|| = {grad_norm:.6f}")
+                self._log(f"Eval {num_function_evals}: NLL={nll:.2f}, ||grad||={np.linalg.norm(grad):.6f}")
 
-            return obj_value
+            return nll, grad
 
-        def gradient_fn(params_np):
-            """Compute gradient for L-BFGS."""
-            params = torch.tensor(params_np, dtype=torch.float32)
+        import numpy as np
+        lower, upper = reward_fn.get_parameter_bounds()
+        bounds = list(zip(lower.numpy(), upper.numpy()))
 
-            # Compute reward matrix
-            reward_matrix = reward_fn.compute(params)
-
-            # Solve for policy
-            solver_result = self._solve_inner(operator, reward_matrix)
-
-            # Compute expected features
-            expected_features = self._compute_expected_features(
-                solver_result.policy,
-                transitions,
-                reward_fn,
-                problem,
-                panel,
-            )
-
-            # Gradient = expected - empirical (for minimizing ||empirical - expected||^2)
-            # Chain rule: d/dtheta [0.5 * ||emp - exp||^2] = (exp - emp) @ d(exp)/dtheta
-            # For linear reward, d(exp)/dtheta is complex, so we approximate with
-            # the feature-matching gradient
-            gradient = expected_features - empirical_features
-
-            return gradient.numpy().astype(float)
-
-        # Run optimization
-        self._log(f"Starting MaxEnt IRL optimization with {self._optimizer}")
-
-        bounds = None
-        if self._optimizer == "L-BFGS-B":
-            lower, upper = reward_fn.get_parameter_bounds()
-            bounds = list(zip(lower.numpy(), upper.numpy()))
-
+        from scipy import optimize
         result = optimize.minimize(
-            objective,
+            objective_and_gradient,
             initial_params.numpy(),
-            method=self._optimizer,
-            jac=gradient_fn,
+            method="L-BFGS-B",
+            jac=True,
             bounds=bounds,
             options={
                 "maxiter": self._outer_max_iter,
@@ -433,8 +376,8 @@ class MaxEntIRLEstimator(BaseEstimator):
             },
         )
 
-        # Extract final parameters
         final_params = torch.tensor(result.x, dtype=torch.float32)
+        converged = result.success
 
         # Compute final value function and policy
         reward_matrix = reward_fn.compute(final_params)
@@ -503,11 +446,11 @@ class MaxEntIRLEstimator(BaseEstimator):
             policy=solver_result.policy,
             hessian=hessian,
             gradient_contributions=gradient_contributions,
-            converged=result.success,
+            converged=converged,
             num_iterations=result.nit,
             num_function_evals=num_function_evals,
             num_inner_iterations=total_inner_iterations,
-            message=result.message if hasattr(result, 'message') else "",
+            message=str(result.message) if hasattr(result, 'message') else "",
             optimization_time=optimization_time,
             metadata={
                 "optimizer": self._optimizer,

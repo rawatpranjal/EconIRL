@@ -17,6 +17,7 @@ from econirl.preferences.reward import LinearReward
 # Estimator classes that need ActionDependentReward
 _ACTION_DEPENDENT_NAMES = {
     "MCEIRLEstimator",
+    "MaxEntIRLEstimator",
     "MaxMarginPlanningEstimator",
     "AIRLEstimator",
     "GAILEstimator",
@@ -24,7 +25,6 @@ _ACTION_DEPENDENT_NAMES = {
 
 # Estimator classes that need LinearReward (state-only features)
 _LINEAR_REWARD_NAMES = {
-    "MaxEntIRLEstimator",
     "MaxMarginIRLEstimator",
 }
 

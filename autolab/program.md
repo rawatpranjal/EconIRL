@@ -1,105 +1,95 @@
-# AutoLab Research Program — econirl Hyperparameter Exploration
+# AutoLab Research Program — Toy MDP Autoresearch
 
 ## Objective
 
-Improve Tier 3-4 estimators through hyperparameter tuning. All estimators use the MultiComponentBus benchmark (K=1) evaluated via the `pct_optimal` metric (baseline-normalized: 0% = random, 100% = optimal).
+Achieve near-perfect performance (90-99.5% pct_optimal) for ALL 10 estimators on a tiny 5-state MDP. On a problem this small, every method should recover the optimal policy if tuned correctly. The goal is to find what hyperparameters make each estimator work flawlessly on the simplest possible problem.
 
-## Baselines (default hyperparameters, n_states=20, seed=42)
+## Fixed DGP (do not change)
 
-| Tier | Estimator    | pct_optimal | Status      |
-|------|-------------|-------------|-------------|
-| 1    | NFXP        | 100.0%      | Converged   |
-| 1    | CCP         | 100.0%      | Converged   |
-| 1    | MCE IRL     | 100.0%      | Converged   |
-| 2    | TD-CCP      | 99.9%       | Converged   |
-| 2    | GLADIUS     | 99.8%       | Converged   |
-| 2    | Max Margin  | 98.3%       | Converged   |
-| 3    | AIRL        | 79.9%       | Converged   |
-| 3    | MaxEnt IRL  | 47.3%       | Converged   |
-| 4    | GCL         | 36.3%       | Converged   |
-| 4    | GAIL        | 36.1%       | Converged   |
+All experiments MUST use these exact parameters:
 
-## Search Space
+- **n_states**: 5
+- **discount_factor**: 0.95
+- **n_agents**: 100
+- **n_periods**: 50
+- **seed**: 42
 
-### GAIL (baseline 36.1%)
-- discriminator_type: ["linear", "mlp"]
-- max_rounds: [100, 200, 500, 1000]
-- discriminator_lr: [0.001, 0.005, 0.01, 0.02, 0.05]
-- discriminator_steps: [1, 3, 5, 10, 20]
-- compute_se: false
+## Baselines & Aspirational Targets
 
-### AIRL (baseline 79.9%)
-- reward_type: ["linear", "mlp"]
-- max_rounds: [100, 200, 500, 1000]
-- reward_lr: [0.001, 0.005, 0.01, 0.02, 0.05]
-- discriminator_steps: [1, 3, 5, 10, 20]
-- compute_se: false
+| Tier | Estimator    | Baseline    | Target   |
+|------|-------------|-------------|----------|
+| 1    | NFXP        | ~100%       | 99.5%+   |
+| 1    | CCP         | ~100%       | 99.5%+   |
+| 1    | MCE IRL     | ~100%       | 99.0%+   |
+| 2    | TD-CCP      | (run first) | 98.0%+   |
+| 2    | GLADIUS     | (run first) | 98.0%+   |
+| 2    | Max Margin  | (run first) | 95.0%+   |
+| 3    | AIRL        | (run first) | 90.0%+   |
+| 3    | MaxEnt IRL  | (run first) | 90.0%+   |
+| 4    | GCL         | (run first) | 90.0%+   |
+| 4    | GAIL        | (run first) | 90.0%+   |
 
-### GCL (baseline 36.3%)
-- max_iterations: [100, 300, 500, 1000]
-- cost_lr: [1e-4, 5e-4, 1e-3, 5e-3]
-- embed_dim: [8, 16, 32, 64]
-- hidden_dims: [[32,32], [64,64], [32,32,32]]
-- importance_clipping: [3.0, 5.0, 10.0]
-- n_sample_trajectories: [100, 200, 500]
-- normalize_reward: [true, false]
+## Bag of Ideas
 
-### MaxEnt IRL (baseline 47.3%)
-- inner_solver: ["value", "policy"]
-- inner_max_iter: [2000, 5000, 10000]
-- inner_tol: [1e-8, 1e-10]
-- outer_max_iter: [100, 300, 500, 1000]
-- compute_hessian: false
+Pick from these ideas in any order based on what you learn from results. You don't have to go in order. Focus effort where the gap to target is largest.
 
-### GLADIUS (transfer robustness)
-- bellman_penalty_weight: [0.01, 0.1, 0.5, 1.0]
-- max_epochs: [200, 500, 1000]
-- q_hidden_dim / v_hidden_dim: [16, 32, 64]
-- q_num_layers / v_num_layers: [2, 3]
-- weight_decay: [1e-4, 1e-3, 1e-2]
-- batch_size: [128, 256, 512]
-- compute_se: false
+### Baselines & Warm-Starting (Ideas 1-4)
 
-### DGP variations
-- n_states: [10, 20, 30, 50]
-- n_agents: [50, 100, 200, 500]
-- discount_factor: [0.95, 0.99]
+1. **Establish defaults** — Run each estimator with default hyperparameters on the toy DGP. This is the mandatory first step for any estimator without a baseline.
+2. **CCP warm-start for GAIL** — Initialize GAIL's discriminator using empirical CCPs from data. The discriminator should start near the true policy rather than random.
+3. **CCP warm-start for AIRL** — Same idea: initialize AIRL's reward network from CCP-estimated values.
+4. **Oracle initialization for MaxEnt IRL** — Initialize MaxEnt IRL parameters near the true values to check if the optimizer can maintain a good solution (diagnostic for convergence basin).
+
+### Learning Rate & Optimization (Ideas 5-8)
+
+5. **Tiny learning rate + many rounds for GAIL** — Try lr=0.0001 with max_rounds=1000-2000. Adversarial methods often need slow, stable optimization.
+6. **Tiny learning rate + many rounds for AIRL** — Same approach for AIRL: reward_lr=0.0001, max_rounds=1000-2000.
+7. **Adam vs SGD for MaxEnt IRL** — If MaxEnt IRL supports different optimizers, compare Adam with lr=0.001 vs default.
+8. **Learning rate warmup for GCL** — Try very small cost_lr (1e-5) with many iterations (1000+). GCL's importance sampling can be unstable at high learning rates.
+
+### Architecture & Capacity (Ideas 9-12)
+
+9. **Tiny discriminator for GAIL** — Use discriminator with hidden_dim=8 or 16 (not 64). A 5-state problem doesn't need a big network.
+10. **Tiny reward network for AIRL** — Same: small reward network (hidden_dim=8-16) for 5 states.
+11. **Tiny cost network for GCL** — embed_dim=4-8, hidden_dims=[8,8]. The cost function for 5 states is simple.
+12. **Tiny networks for GLADIUS/TD-CCP** — q_hidden_dim=8-16, v_hidden_dim=8-16. Match network capacity to problem complexity.
+
+### Regularization & Stability (Ideas 13-17)
+
+13. **Entropy bonus for GAIL** — Add entropy regularization to the policy to prevent premature convergence to a suboptimal deterministic policy.
+14. **Importance clipping for GCL** — Try importance_clipping=2.0 or 3.0 to reduce variance in GCL's importance-weighted gradients.
+15. **Reward normalization for GCL** — Set normalize_reward=True to keep GCL's learned costs in a stable range.
+16. **Bellman penalty tuning for GLADIUS** — Try bellman_penalty_weight in [0.01, 0.1, 0.5, 1.0]. Higher penalty enforces Bellman consistency but may over-constrain.
+17. **Weight decay for neural methods** — Add weight_decay=0.01 to TD-CCP, GLADIUS to prevent overfitting on 5-state data.
+
+### Training Duration (Ideas 18-20)
+
+18. **Extended training for GAIL** — max_rounds=2000-5000. Maybe GAIL just needs more rounds to converge on this problem.
+19. **Extended training for GCL** — max_iterations=2000-5000. Same hypothesis.
+20. **Extended training for MaxEnt IRL** — outer_max_iter=1000-2000, inner_max_iter=10000. Ensure both inner and outer loops fully converge.
+
+### Solver & Inner Loop (Ideas 21-23)
+
+21. **Policy iteration for MaxEnt IRL** — inner_solver="policy" instead of "value". Policy iteration can converge faster for small MDPs.
+22. **Tight inner tolerance** — inner_tol=1e-12 for MaxEnt IRL, MCE IRL. Ensure the inner soft VI loop converges precisely.
+23. **Hybrid value/policy iteration for TD-CCP** — If TD-CCP supports solver selection, try policy iteration for the inner Bellman solve.
+
+### Discriminator Balance (Ideas 24-25)
+
+24. **More discriminator steps for GAIL** — discriminator_steps=10-20 per policy round. The discriminator may need to be stronger to provide useful gradients.
+25. **Fewer discriminator steps for AIRL** — discriminator_steps=1-2. AIRL's structured discriminator may overfit with too many steps on 5 states.
 
 ## Budget
 
-- Max experiments: 50
-- Wall-clock limit: 4 hours
-- Per-experiment timeout: 600 seconds
+- **Max experiments**: 30
+- **Wall-clock limit**: 2 hours
+- **Per-experiment timeout**: 120 seconds
 
-## Ground Truth Criteria
+## Instructions for Claude
 
-Per-estimator success thresholds at each difficulty level (toy/standard/hard):
-
-| Estimator   | Toy pct_optimal | Toy param_rmse | Std pct_optimal | Hard pct_optimal |
-|-------------|-----------------|----------------|-----------------|------------------|
-| NFXP        | 99.5%           | 0.15           | 99.0%           | 95.0%            |
-| CCP         | 99.5%           | 0.15           | 99.0%           | 95.0%            |
-| MCE IRL     | 99.0%           | 0.20           | 98.0%           | 90.0%            |
-| Max Margin  | 95.0%           | —              | 90.0%           | 80.0%            |
-| TD-CCP      | 98.0%           | 0.25           | 95.0%           | 85.0%            |
-| GLADIUS     | 98.0%           | 0.25           | 95.0%           | 85.0%            |
-| AIRL        | 70.0%           | —              | 50.0%           | 30.0%            |
-| MaxEnt IRL  | 60.0%           | —              | 40.0%           | 20.0%            |
-| GAIL        | 50.0%           | —              | 30.0%           | 10.0%            |
-| GCL         | 50.0%           | —              | 30.0%           | 10.0%            |
-
-Difficulty levels by n_states: toy (<=10), standard (11-30), hard (>30).
-
-## Validation Strategy
-
-1. **Toy baselines first**: Run each estimator on toy DGP (n_states=5, gamma=0.95) to validate correctness before spending budget on harder problems
-2. **Tune on standard**: Once toy passes, tune hyperparameters on standard DGP (n_states=20, gamma=0.99)
-3. **Stress-test winners**: Validate best configs on hard DGP (n_states=50, gamma=0.99)
-
-## Strategy
-
-1. Start with GAIL (largest gap to close, fast to run)
-2. Explore discriminator architecture and learning rate first
-3. After GAIL, move to GCL, then MaxEnt IRL, then AIRL
-4. Validate top-3 configs per estimator across seeds [42, 123, 456]
-5. Try DGP variations (n_states, discount_factor) on winners
+When proposing experiments:
+- If an estimator has no baseline result yet, run Idea #1 (defaults) first
+- Focus effort where the gap between current best and target is largest
+- Report which `idea_number` (1-25) you are testing
+- Do NOT change the DGP — all experiments use n_states=5, discount_factor=0.95
+- Combine ideas if it makes sense (e.g., tiny network + low learning rate)
