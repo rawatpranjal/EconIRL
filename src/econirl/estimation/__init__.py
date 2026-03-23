@@ -31,6 +31,9 @@ from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
 # Bayesian IRL
 from econirl.estimation.bayesian_irl import BayesianIRLEstimator
 
+# Deep MaxEnt IRL
+from econirl.estimation.deep_maxent_irl import DeepMaxEntIRLEstimator
+
 __all__ = [
     # Base
     "Estimator",
@@ -64,6 +67,8 @@ __all__ = [
     "GLADIUSConfig",
     # Bayesian IRL
     "BayesianIRLEstimator",
+    # Deep MaxEnt IRL
+    "DeepMaxEntIRLEstimator",
     # Utilities
     "estimate_transition_probs",
     "estimate_transition_probs_by_group",
