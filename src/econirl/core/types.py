@@ -9,7 +9,7 @@ This module defines the fundamental data structures used throughout econirl:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -41,6 +41,10 @@ class DDCProblem:
     num_actions: int
     discount_factor: float = 0.9999
     scale_parameter: float = 1.0
+    state_dim: int | None = None
+    state_encoder: Callable[[torch.Tensor], torch.Tensor] | None = field(
+        default=None, hash=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if self.num_states < 1:

@@ -197,37 +197,40 @@ class GLADIUSEstimator(BaseEstimator):
     def name(self) -> str:
         return "GLADIUS"
 
-    def _build_state_features(self, states: torch.Tensor, n_states: int) -> torch.Tensor:
+    def _build_state_features(self, states: torch.Tensor, problem: DDCProblem) -> torch.Tensor:
         """Build state feature vectors from state indices.
 
-        Uses normalized state index as features for the tabular case.
+        Uses the problem's state_encoder if available, otherwise
+        normalizes state index to [0, 1].
 
         Args:
             states: Tensor of state indices, shape (batch,).
-            n_states: Total number of states.
+            problem: Problem specification with optional state_encoder.
 
         Returns:
-            Feature tensor of shape (batch, 1) with values in [0, 1].
+            Feature tensor of shape (batch, state_dim).
         """
-        return (states.float() / max(n_states - 1, 1)).unsqueeze(-1)
+        if problem.state_encoder is not None:
+            return problem.state_encoder(states)
+        return (states.float() / max(problem.num_states - 1, 1)).unsqueeze(-1)
 
-    def _build_state_features_all(self, n_states: int) -> torch.Tensor:
+    def _build_state_features_all(self, problem: DDCProblem) -> torch.Tensor:
         """Build feature vectors for all states.
 
         Args:
-            n_states: Total number of states.
+            problem: Problem specification.
 
         Returns:
-            Feature tensor of shape (n_states, 1).
+            Feature tensor of shape (n_states, state_dim).
         """
-        return self._build_state_features(torch.arange(n_states), n_states)
+        return self._build_state_features(torch.arange(problem.num_states), problem)
 
     def _compute_log_likelihood(
         self,
         q_net: QNetwork,
         states: torch.Tensor,
         actions: torch.Tensor,
-        n_states: int,
+        problem: DDCProblem,
         sigma: float,
     ) -> float:
         """Compute the log-likelihood of the full dataset.
@@ -236,14 +239,14 @@ class GLADIUSEstimator(BaseEstimator):
             q_net: Trained Q-network.
             states: All observed state indices.
             actions: All observed action indices.
-            n_states: Number of states.
+            problem: Problem specification.
             sigma: Scale parameter.
 
         Returns:
             Total log-likelihood (scalar).
         """
         with torch.no_grad():
-            state_feat = self._build_state_features(states, n_states)
+            state_feat = self._build_state_features(states, problem)
             q_all = q_net.forward_all_actions(state_feat)  # (N, n_actions)
             log_probs = q_all / sigma - torch.logsumexp(q_all / sigma, dim=1, keepdim=True)
             ll = log_probs[torch.arange(len(actions)), actions].sum().item()
@@ -368,7 +371,7 @@ class GLADIUSEstimator(BaseEstimator):
         n_obs = len(all_states)
 
         # --- Step 2: Build networks ---
-        state_dim = 1  # normalized state index
+        state_dim = problem.state_dim or 1
         q_net = QNetwork(state_dim, n_actions, self.config.q_hidden_dim, self.config.q_num_layers)
         ev_net = EVNetwork(state_dim, n_actions, self.config.v_hidden_dim, self.config.v_num_layers)
 
@@ -402,8 +405,8 @@ class GLADIUSEstimator(BaseEstimator):
                 sp_batch = all_next_states[idx]
 
                 # Build features
-                s_feat = self._build_state_features(s_batch, n_states)
-                sp_feat = self._build_state_features(sp_batch, n_states)
+                s_feat = self._build_state_features(s_batch, problem)
+                sp_feat = self._build_state_features(sp_batch, problem)
 
                 # Action one-hot
                 a_onehot = F.one_hot(a_batch.long(), n_actions).float()
@@ -478,7 +481,7 @@ class GLADIUSEstimator(BaseEstimator):
         ev_net.eval()
 
         with torch.no_grad():
-            all_state_feat = self._build_state_features_all(n_states)
+            all_state_feat = self._build_state_features_all(problem)
 
             # Compute Q(s, a) and EV(s, a) for all (s, a)
             q_table = q_net.forward_all_actions(all_state_feat)  # (n_states, n_actions)
@@ -501,7 +504,7 @@ class GLADIUSEstimator(BaseEstimator):
         parameters = self._extract_parameters(utility, reward_table)
 
         # Compute log-likelihood
-        ll = self._compute_log_likelihood(q_net, all_states, all_actions, n_states, sigma)
+        ll = self._compute_log_likelihood(q_net, all_states, all_actions, problem, sigma)
 
         optimization_time = time.time() - start_time
 

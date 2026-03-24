@@ -113,9 +113,11 @@ class NNESEstimator(BaseEstimator):
     def name(self) -> str:
         return "NNES (Nguyen 2025)"
 
-    def _build_state_features(self, states: torch.Tensor, n_states: int) -> torch.Tensor:
-        """Normalize state indices to [0, 1] features for NN input."""
-        denom = max(n_states - 1, 1)
+    def _build_state_features(self, states: torch.Tensor, problem: DDCProblem) -> torch.Tensor:
+        """Build state features from state indices using problem's encoder."""
+        if problem.state_encoder is not None:
+            return problem.state_encoder(states)
+        denom = max(problem.num_states - 1, 1)
         return (states.float() / denom).unsqueeze(-1)
 
     def _train_value_network(
@@ -136,7 +138,7 @@ class NNESEstimator(BaseEstimator):
         sigma = problem.scale_parameter
         beta = problem.discount_factor
 
-        v_net = _ValueNetwork(1, self._hidden_dim, self._num_layers)
+        v_net = _ValueNetwork(problem.state_dim or 1, self._hidden_dim, self._num_layers)
         optimizer = torch.optim.Adam(v_net.parameters(), lr=self._v_lr)
 
         # Get all transitions from data
@@ -144,8 +146,8 @@ class NNESEstimator(BaseEstimator):
         all_actions = panel.get_all_actions()
         all_next_states = panel.get_all_next_states()
 
-        feat_s = self._build_state_features(all_states, n_states)
-        feat_sp = self._build_state_features(all_next_states, n_states)
+        feat_s = self._build_state_features(all_states, problem)
+        feat_sp = self._build_state_features(all_next_states, problem)
 
         # Compute flow utility at initial params
         feature_matrix = utility.feature_matrix  # (S, A, K)
@@ -178,7 +180,7 @@ class NNESEstimator(BaseEstimator):
                 q_vals = flow_u[s_idx] + beta * torch.einsum(
                     "ast,t->sa",
                     transitions[:, s_idx, :].permute(1, 0, 2),
-                    v_net(self._build_state_features(torch.arange(n_states), n_states)).detach(),
+                    v_net(self._build_state_features(torch.arange(n_states), problem)).detach(),
                 ).reshape(len(idx), n_actions)
 
                 # Bellman target
@@ -226,7 +228,7 @@ class NNESEstimator(BaseEstimator):
         )
 
         # Extract V(s) for all states
-        all_state_feat = self._build_state_features(torch.arange(n_states), n_states)
+        all_state_feat = self._build_state_features(torch.arange(n_states), problem)
         with torch.no_grad():
             v_all = v_net(all_state_feat)  # (S,)
 

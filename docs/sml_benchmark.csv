@@ -1,0 +1,20 @@
+tier,K,M,estimator,n_states,n_agents,n_periods,time_seconds,pct_optimal,pct_optimal_transfer,converged,skipped
+Small,1,20,BC,20,200,100,0.00,99.75,99.75,True,False
+Medium,2,15,BC,225,450,225,0.00,98.00,97.89,True,False
+Small,1,20,NFXP,20,200,100,10.61,99.99,99.99,True,False
+Medium,2,15,NFXP,225,450,225,27.45,99.99,99.99,True,False
+Small,1,20,CCP,20,200,100,0.21,99.99,99.99,True,False
+Medium,2,15,CCP,225,450,225,3.38,99.97,99.97,False,False
+Small,1,20,MCE IRL,20,200,100,84.62,99.98,99.98,False,False
+Medium,2,15,MCE IRL,225,450,225,106.35,99.99,99.99,False,False
+Small,1,20,Deep MaxEnt,20,200,100,65.76,99.68,99.57,True,False
+Medium,2,15,Deep MaxEnt,225,450,225,51.92,97.75,94.78,True,False
+Small,1,20,Max Margin,20,200,100,7.44,93.88,93.60,False,False
+Medium,2,15,Max Margin,225,450,225,12.62,91.30,90.92,False,False
+Small,1,20,AIRL,20,200,100,56.52,89.67,89.18,False,False
+Medium,2,15,AIRL,225,450,225,282.42,85.60,85.01,False,False
+Small,1,20,TD-CCP,20,200,100,33.59,99.98,100.00,True,False
+Medium,2,15,TD-CCP,225,450,225,297.00,99.80,99.99,True,False
+Large,3,15,BC,3375,1000,500,0.03,93.33,93.08,True,False
+Large,3,15,NFXP,3375,1000,500,814.79,99.96,99.96,True,False
+Large,3,15,CCP,3375,1000,500,120.88,99.99,99.99,False,False

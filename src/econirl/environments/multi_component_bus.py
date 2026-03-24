@@ -187,6 +187,27 @@ class MultiComponentBusEnvironment(DDCEnvironment):
     def parameter_names(self) -> list[str]:
         return ["replacement_cost", "operating_cost", "quadratic_cost"]
 
+    @property
+    def state_dim(self) -> int:
+        """Number of continuous state dimensions (one per component)."""
+        return self._K
+
+    def encode_states(self, states: torch.Tensor) -> torch.Tensor:
+        """Decode flat state indices to per-component normalized mileage.
+
+        Args:
+            states: Tensor of flat state indices, shape (batch,).
+
+        Returns:
+            Tensor of shape (batch, K) with values in [0, 1].
+        """
+        s = states.clone()
+        components = torch.zeros(len(s), self._K, dtype=torch.float32)
+        for k in range(self._K):
+            components[:, k] = (s % self._M).float() / max(self._M - 1, 1)
+            s = s // self._M
+        return components
+
     # ------------------------------------------------------------------
     # Build methods
     # ------------------------------------------------------------------

@@ -390,10 +390,12 @@ class TestGLADIUSStateFeatures:
 
     def test_state_features_range(self):
         """State features should be in [0, 1]."""
+        from econirl.core.types import DDCProblem
         estimator = GLADIUSEstimator(max_epochs=1)
         n_states = 10
+        problem = DDCProblem(num_states=n_states, num_actions=2)
         states = torch.arange(n_states)
-        features = estimator._build_state_features(states, n_states)
+        features = estimator._build_state_features(states, problem)
 
         assert features.shape == (n_states, 1)
         assert features.min() >= 0.0
@@ -403,16 +405,20 @@ class TestGLADIUSStateFeatures:
 
     def test_state_features_all(self):
         """_build_state_features_all should match per-state features."""
+        from econirl.core.types import DDCProblem
         estimator = GLADIUSEstimator(max_epochs=1)
         n_states = 5
-        all_feat = estimator._build_state_features_all(n_states)
-        per_feat = estimator._build_state_features(torch.arange(n_states), n_states)
+        problem = DDCProblem(num_states=n_states, num_actions=2)
+        all_feat = estimator._build_state_features_all(problem)
+        per_feat = estimator._build_state_features(torch.arange(n_states), problem)
         assert torch.allclose(all_feat, per_feat)
 
     def test_state_features_single_state(self):
         """Single-state environment should not divide by zero."""
+        from econirl.core.types import DDCProblem
         estimator = GLADIUSEstimator(max_epochs=1)
-        features = estimator._build_state_features(torch.tensor([0]), n_states=1)
+        problem = DDCProblem(num_states=1, num_actions=2)
+        features = estimator._build_state_features(torch.tensor([0]), problem)
         assert features.shape == (1, 1)
         assert torch.isfinite(features).all()
 

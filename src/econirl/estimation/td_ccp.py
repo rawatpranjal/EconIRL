@@ -230,21 +230,22 @@ class TDCCPEstimator(BaseEstimator):
     # Step 3: Train component networks via AVI with semi-gradient TD
     # ------------------------------------------------------------------
 
-    def _build_state_features(self, states: torch.Tensor, num_states: int) -> torch.Tensor:
-        """Create normalized features for NN input from state indices.
+    def _build_state_features(self, states: torch.Tensor, problem: DDCProblem) -> torch.Tensor:
+        """Create features for NN input from state indices.
 
-        Maps integer state indices to a feature vector suitable for
-        neural network input. Currently uses a single normalized
-        feature: state / (num_states - 1).
+        Uses the problem's state_encoder if available, otherwise
+        normalizes state index to [0, 1].
 
         Args:
             states: Tensor of integer state indices.
-            num_states: Total number of states (for normalization).
+            problem: Problem specification with optional state_encoder.
 
         Returns:
-            Feature tensor of shape (len(states), 1).
+            Feature tensor of shape (len(states), state_dim).
         """
-        denom = max(num_states - 1, 1)
+        if problem.state_encoder is not None:
+            return problem.state_encoder(states)
+        denom = max(problem.num_states - 1, 1)
         return (states.float() / denom).unsqueeze(-1)
 
     def _train_component_network(
@@ -252,7 +253,7 @@ class TDCCPEstimator(BaseEstimator):
         flow: torch.Tensor,
         states: torch.Tensor,
         next_states: torch.Tensor,
-        num_states: int,
+        problem: DDCProblem,
         gamma: float,
     ) -> tuple[_EVComponentNetwork, list[float]]:
         """Train a single EV component network via AVI with semi-gradient TD.
@@ -273,14 +274,14 @@ class TDCCPEstimator(BaseEstimator):
             Tuple of (trained network, list of per-epoch losses).
         """
         cfg = self._config
-        input_dim = 1  # normalized state
+        input_dim = problem.state_dim or 1
 
         net = _EVComponentNetwork(input_dim, cfg.hidden_dim, cfg.num_hidden_layers)
         optimizer = torch.optim.Adam(net.parameters(), lr=cfg.learning_rate)
 
         # Precompute state features for the whole dataset
-        feat_s = self._build_state_features(states, num_states)
-        feat_sp = self._build_state_features(next_states, num_states)
+        feat_s = self._build_state_features(states, problem)
+        feat_sp = self._build_state_features(next_states, problem)
         flow_s = flow[states]  # flow values at s_t
 
         n_samples = len(states)
@@ -323,7 +324,7 @@ class TDCCPEstimator(BaseEstimator):
         flow_features: torch.Tensor,
         flow_entropy: torch.Tensor,
         panel: Panel,
-        num_states: int,
+        problem: DDCProblem,
         gamma: float,
     ) -> tuple[list[_EVComponentNetwork], _EVComponentNetwork, dict[str, list[float]]]:
         """Train all EV component networks (one per feature + entropy).
@@ -352,7 +353,7 @@ class TDCCPEstimator(BaseEstimator):
                 flow=flow_features[:, k],
                 states=states,
                 next_states=next_states,
-                num_states=num_states,
+                problem=problem,
                 gamma=gamma,
             )
             feature_nets.append(net)
@@ -364,7 +365,7 @@ class TDCCPEstimator(BaseEstimator):
             flow=flow_entropy,
             states=states,
             next_states=next_states,
-            num_states=num_states,
+            problem=problem,
             gamma=gamma,
         )
         loss_histories["entropy"] = entropy_losses
@@ -560,13 +561,13 @@ class TDCCPEstimator(BaseEstimator):
             flow_features=flow_features,
             flow_entropy=flow_entropy,
             panel=panel,
-            num_states=num_states,
+            problem=problem,
             gamma=gamma,
         )
 
         # Extract learned EV components for all states
         all_state_features = self._build_state_features(
-            torch.arange(num_states), num_states
+            torch.arange(num_states), problem
         )
         ev_features, ev_entropy = self._evaluate_ev_components(
             feature_nets, entropy_net, all_state_features

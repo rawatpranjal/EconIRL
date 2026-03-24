@@ -181,3 +181,78 @@ ax3.legend(fontsize=10)
 plt.tight_layout()
 plt.savefig("docs/scaling_pareto.png", dpi=150, bbox_inches="tight")
 print("Saved docs/scaling_pareto.png")
+
+# ── Figure 4: S/M/L Benchmark ──
+import os
+
+sml_csv = "docs/sml_benchmark.csv"
+if os.path.exists(sml_csv):
+    df_sml = pd.read_csv(sml_csv)
+    df_sml_active = df_sml[~df_sml["skipped"]].copy()
+
+    tier_order = {"Small": 0, "Medium": 1, "Large": 2}
+    tier_labels = {
+        "Small": "Small\n(K=1, 20 states)",
+        "Medium": "Medium\n(K=2, 225 states)",
+        "Large": "Large\n(K=3, 3375 states)",
+    }
+
+    sml_estimators = df_sml_active["estimator"].unique()
+
+    fig_sml, (ax_s1, ax_s2, ax_s3) = plt.subplots(1, 3, figsize=(22, 7))
+
+    for est in sml_estimators:
+        sub = df_sml_active[df_sml_active["estimator"] == est].copy()
+        sub["tier_idx"] = sub["tier"].map(tier_order)
+        sub = sub.sort_values("tier_idx")
+
+        color = FAMILY_COLORS.get(est, "#333")
+        marker = FAMILY_MARKERS.get(est, "o")
+
+        ax_s1.plot(
+            sub["tier_idx"], sub["time_seconds"],
+            marker=marker, color=color, label=est,
+            linewidth=1.5, markersize=7,
+        )
+        ax_s2.plot(
+            sub["tier_idx"], sub["pct_optimal"],
+            marker=marker, color=color, label=est,
+            linewidth=1.5, markersize=7,
+        )
+        if "pct_optimal_transfer" in sub.columns:
+            sub_t = sub.dropna(subset=["pct_optimal_transfer"])
+            if len(sub_t) > 0:
+                ax_s3.plot(
+                    sub_t["tier_idx"], sub_t["pct_optimal_transfer"],
+                    marker=marker, color=color, label=est,
+                    linewidth=1.5, markersize=7,
+                )
+
+    for ax in [ax_s1, ax_s2, ax_s3]:
+        ax.set_xticks([0, 1, 2])
+        ax.set_xticklabels(
+            [tier_labels[t] for t in ["Small", "Medium", "Large"]]
+        )
+        ax.grid(True, alpha=0.3)
+
+    ax_s1.set_yscale("log")
+    ax_s1.set_ylabel("Time (seconds)", fontsize=13)
+    ax_s1.set_title("Estimation Time by Tier", fontsize=14)
+    ax_s1.legend(fontsize=7, ncol=2, loc="upper left")
+    ax_s1.axhline(y=900, color="red", linestyle="--", alpha=0.5)
+
+    ax_s2.set_ylim(0, 105)
+    ax_s2.set_ylabel("% of Optimal Value", fontsize=13)
+    ax_s2.set_title("Policy Quality by Tier", fontsize=14)
+    ax_s2.axhline(y=90, color="green", linestyle="--", alpha=0.3)
+
+    ax_s3.set_ylim(0, 105)
+    ax_s3.set_ylabel("% of Optimal (Transfer)", fontsize=13)
+    ax_s3.set_title("Transfer Performance by Tier", fontsize=14)
+    ax_s3.axhline(y=90, color="green", linestyle="--", alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig("docs/sml_benchmark.png", dpi=150, bbox_inches="tight")
+    print("Saved docs/sml_benchmark.png")
+else:
+    print(f"Skipping S/M/L figure: {sml_csv} not found")

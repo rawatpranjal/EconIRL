@@ -93,7 +93,23 @@ class DDCEnvironment(gym.Env, ABC):
             num_actions=self.num_actions,
             discount_factor=self._discount_factor,
             scale_parameter=self._scale_parameter,
+            state_dim=self.state_dim,
+            state_encoder=self.encode_states,
         )
+
+    @property
+    def state_dim(self) -> int:
+        """Dimensionality of the continuous state representation."""
+        return 1
+
+    def encode_states(self, states: torch.Tensor) -> torch.Tensor:
+        """Encode flat state indices to continuous features.
+
+        Default: normalized scalar s/(S-1) with shape (batch, 1).
+        Override for multi-dimensional environments.
+        """
+        denom = max(self.num_states - 1, 1)
+        return (states.float() / denom).unsqueeze(-1)
 
     @property
     @abstractmethod

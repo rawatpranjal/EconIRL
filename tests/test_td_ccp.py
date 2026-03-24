@@ -269,7 +269,7 @@ class TestNNTrainingConvergence:
             flow=flow_features[:, 0],
             states=states,
             next_states=next_states,
-            num_states=problem_spec_small.num_states,
+            problem=problem_spec_small,
             gamma=problem_spec_small.discount_factor,
         )
 
@@ -307,7 +307,7 @@ class TestNNTrainingConvergence:
             flow_features=flow_features,
             flow_entropy=flow_entropy,
             panel=panel,
-            num_states=problem_spec_small.num_states,
+            problem=problem_spec_small,
             gamma=problem_spec_small.discount_factor,
         )
 

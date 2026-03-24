@@ -35,6 +35,7 @@ class BenchmarkDGP:
     """
 
     n_states: int = 20
+    K: int = 1
     replacement_cost: float = 2.0
     operating_cost: float = 1.0
     quadratic_cost: float = 0.5
@@ -98,9 +99,9 @@ class BenchmarkResult:
 
 
 def _make_env(dgp: BenchmarkDGP) -> MultiComponentBusEnvironment:
-    """Create a K=1 multi-component bus environment from DGP."""
+    """Create a multi-component bus environment from DGP."""
     return MultiComponentBusEnvironment(
-        K=1,
+        K=dgp.K,
         M=dgp.n_states,
         replacement_cost=dgp.replacement_cost,
         operating_cost=dgp.operating_cost,
@@ -168,7 +169,7 @@ def _compute_transfer_pct_optimal(
         dgp: DGP with transfer_transition_probs.
     """
     transfer_env = MultiComponentBusEnvironment(
-        K=1,
+        K=dgp.K,
         M=dgp.n_states,
         replacement_cost=dgp.replacement_cost,
         operating_cost=dgp.operating_cost,
@@ -231,7 +232,7 @@ def _evaluate_policy_transfer(
         dgp: DGP with transfer_transition_probs.
     """
     transfer_env = MultiComponentBusEnvironment(
-        K=1,
+        K=dgp.K,
         M=dgp.n_states,
         replacement_cost=dgp.replacement_cost,
         operating_cost=dgp.operating_cost,
@@ -584,7 +585,7 @@ def run_single(
 
         return BenchmarkResult(
             estimator=spec.name,
-            n_states=dgp.n_states,
+            n_states=env.num_states,
             n_agents=n_agents,
             seed=seed,
             param_rmse=param_rmse,
@@ -603,7 +604,7 @@ def run_single(
         elapsed = time.perf_counter() - t0
         return BenchmarkResult(
             estimator=spec.name,
-            n_states=dgp.n_states,
+            n_states=env.num_states,
             n_agents=n_agents,
             seed=seed,
             param_rmse=None,
@@ -653,6 +654,7 @@ def run_benchmark(
             for seed in seeds:
                 current_dgp = BenchmarkDGP(
                     n_states=n_states,
+                    K=dgp.K,
                     replacement_cost=dgp.replacement_cost,
                     operating_cost=dgp.operating_cost,
                     quadratic_cost=dgp.quadratic_cost,
@@ -1040,6 +1042,123 @@ def run_scaling_benchmark(
                 t = cell.iloc[0]["time_seconds"]
                 row_str += f"  {t:6.1f}"
         print(row_str)
+
+    return df
+
+
+def run_sml_benchmark(
+    seed: int = 42,
+    timeout_seconds: float = 900,
+) -> pd.DataFrame:
+    """Run Small/Medium/Large benchmark across K dimensions.
+
+    Tests all estimators at three tiers that naturally separate method classes:
+    - Small (K=1, M=20, 20 states): All methods fast, all ~100%
+    - Medium (K=2, M=15, 225 states): All methods work, structural still fast
+    - Large (K=3, M=15, 3375 states): VI-based timeout, neural methods 10x faster
+
+    Args:
+        seed: Random seed for data simulation.
+        timeout_seconds: Per-estimator timeout. Estimators that exceed this
+            at one tier are skipped at all larger tiers.
+
+    Returns:
+        DataFrame with columns: tier, K, M, estimator, n_states, n_agents,
+        n_periods, time_seconds, pct_optimal, pct_optimal_transfer, converged.
+    """
+    tiers = [
+        ("Small", 1, 20),   # 20 states
+        ("Medium", 2, 15),  # 225 states
+        ("Large", 3, 15),   # 3375 states
+    ]
+
+    results: list[dict] = []
+    timed_out: set[str] = set()
+
+    for tier_name, K, M in tiers:
+        n_states = M ** K
+        n_agents = max(200, 2 * n_states)
+        n_periods = max(100, n_states)
+        dgp = BenchmarkDGP(K=K, n_states=M, discount_factor=0.99)
+        specs = get_scaling_estimator_specs(n_states)
+
+        print(f"\n--- {tier_name}: K={K}, M={M}, states={n_states}, "
+              f"n_agents={n_agents}, n_periods={n_periods} ---")
+
+        for spec in specs:
+            if spec.name in timed_out:
+                results.append({
+                    "tier": tier_name,
+                    "K": K,
+                    "M": M,
+                    "estimator": spec.name,
+                    "n_states": n_states,
+                    "n_agents": n_agents,
+                    "n_periods": n_periods,
+                    "time_seconds": float("nan"),
+                    "pct_optimal": float("nan"),
+                    "pct_optimal_transfer": float("nan"),
+                    "converged": False,
+                    "skipped": True,
+                })
+                continue
+
+            result = run_single(
+                dgp, spec, n_agents=n_agents,
+                n_periods=n_periods, seed=seed,
+            )
+
+            transfer = result.pct_optimal_transfer
+            results.append({
+                "tier": tier_name,
+                "K": K,
+                "M": M,
+                "estimator": spec.name,
+                "n_states": n_states,
+                "n_agents": n_agents,
+                "n_periods": n_periods,
+                "time_seconds": result.time_seconds,
+                "pct_optimal": result.pct_optimal,
+                "pct_optimal_transfer": (
+                    transfer if transfer is not None else float("nan")
+                ),
+                "converged": result.converged,
+                "skipped": False,
+            })
+
+            transfer_str = (
+                f"transfer={transfer:5.1f}%"
+                if transfer is not None
+                else "transfer=N/A"
+            )
+            status = "OK" if result.converged else "FAIL"
+            print(
+                f"  {spec.name:>15s}: {result.time_seconds:7.1f}s  "
+                f"pct_optimal={result.pct_optimal:6.1f}%  "
+                f"{transfer_str}  [{status}]"
+            )
+
+            if result.time_seconds > timeout_seconds:
+                timed_out.add(spec.name)
+                print(f"  {'':>15s}  ^ timed out — skipping at larger tiers")
+
+    df = pd.DataFrame(results)
+
+    # Print summary table
+    print("\n=== S/M/L Benchmark Summary ===")
+    for tier_name, K, M in tiers:
+        print(f"\n{tier_name} (K={K}, M={M}, {M**K} states):")
+        tier_df = df[df["tier"] == tier_name]
+        for _, row in tier_df.iterrows():
+            if row.get("skipped", False):
+                print(
+                    f"  {row['estimator']:>15s}: "
+                    f"skipped (timed out at smaller tier)"
+                )
+            else:
+                t = row["time_seconds"]
+                pct = row["pct_optimal"]
+                print(f"  {row['estimator']:>15s}: {t:7.1f}s  {pct:6.1f}%")
 
     return df
 
