@@ -137,13 +137,13 @@ def run_experiment(
         print(f"{'=' * 50}")
 
     config = MCEIRLConfig(
-        learning_rate=0.1,
+        optimizer="L-BFGS-B",
         outer_max_iter=500,
         outer_tol=1e-8,
         inner_solver="hybrid",
         inner_tol=1e-8,
         inner_max_iter=5000,
-        use_adam=True,
+        use_adam=False,
         compute_se=False,
         verbose=verbose,
     )
