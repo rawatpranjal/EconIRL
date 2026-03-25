@@ -52,7 +52,7 @@ for spec in specs:
 | AIRL        | Adversarial | No  | Yes |  99.4% |  99.5% | 123.0s |
 | GCL         | Adversarial | No  | Yes |  92.7% |  95.3% | 166.5s |
 | **Inverse Q-Learning** | | | | | | |
-| IQ-Learn    | IRL         | No  | Yes |  96.3% |  95.9% |   0.0s |
+| IQ-Learn    | IRL         | No  | Yes |  99.5% |  99.1% |   0.0s |
 | **Baseline** | | | | | | |
 | BC          | Baseline    | No  | No  |  99.5% |  99.5% |   0.1s |
 

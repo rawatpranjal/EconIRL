@@ -492,8 +492,8 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
             kwargs=dict(
                 q_type="tabular",
                 divergence="chi2",
-                alpha=1.0,
-                max_iter=500,
+                alpha=10.0,
+                max_iter=1000,
             ),
             name="IQ-Learn",
             can_recover_params=False,
