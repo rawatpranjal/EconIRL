@@ -20,6 +20,7 @@ src/econirl/
 ```
 
 Each subdirectory has its own CLAUDE.md with detailed interface documentation. See:
+- `docs/estimator_guide.md` - **Estimator selection guide**: why each of the 9 core estimators exists, paper-backed theorems, and when to use which
 - `src/econirl/core/CLAUDE.md` - Types, Bellman operator, solvers
 - `src/econirl/estimation/CLAUDE.md` - All 10 estimators and base contract
 - `src/econirl/environments/CLAUDE.md` - Environment base class and 3 implementations
@@ -33,14 +34,14 @@ Each subdirectory has its own CLAUDE.md with detailed interface documentation. S
 The following estimators are the core focus for real-data replication and benchmarking:
 
 1. **NFXP-NK** — Nested Fixed Point with SA→NK polyalgorithm (Iskhakov et al. 2016). BHHH optimizer, analytical gradient via implicit differentiation. The main structural estimator.
+2. **CCP** 
 2. **NNES** — Neural Network Estimation of Structural models (neural version of NFXP)
+7. **TD-CCP** — Temporal Difference CCP (AE paper 2022, neural approximate VI) (VERY IMP)
 3. **SEES** — Simulation-based Estimation of Economic Structural models
 4. **MCE-IRL** — Maximum Causal Entropy IRL (Ziebart 2010). Feature matching with soft Bellman.
-5. **MCE-IRL (Deep)** — Deep MaxEnt with neural reward function
+5. **MCE-IRL (Deep)** — Deep MaxEnt with neural reward function (in the style of imitation learning)
 6. **GLADIUS** — Model-free DDC estimation (Q-network + EV-network)
-7. **TD-CCP** — Temporal Difference CCP (Aguirregabiria & Mira style, neural approximate VI)
 8. **AIRL** — Adversarial IRL (Fu et al. 2018). Reward recovery via discriminator.
-9. **IQL** — Implicit Q-Learning for offline IRL
 
 Each estimator should be validated on at least one real-data replication (Rust bus, Keane-Wolpin, NGSIM, etc.) before being considered production-ready.
 
