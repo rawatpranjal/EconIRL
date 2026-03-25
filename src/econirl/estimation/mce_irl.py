@@ -42,7 +42,7 @@ from scipy import optimize
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.solvers import hybrid_iteration, value_iteration, backward_induction
+from econirl.core.solvers import hybrid_iteration, policy_iteration, value_iteration, backward_induction
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.preferences.action_reward import ActionDependentReward
@@ -66,7 +66,7 @@ class MCEIRLConfig:
     adam_eps: float = 1e-8  # Adam numerical stability
 
     # Inner solver (soft value iteration)
-    inner_solver: Literal["value", "hybrid"] = "hybrid"  # hybrid is faster
+    inner_solver: Literal["value", "hybrid", "policy"] = "hybrid"  # hybrid is faster
     inner_tol: float = 1e-8
     inner_max_iter: int = 10000  # Higher for high discount factors
     switch_tol: float = 1e-3  # For hybrid: switch to NK when error < this
@@ -160,6 +160,7 @@ class MCEIRLEstimator(BaseEstimator):
         operator: SoftBellmanOperator,
         reward_matrix: torch.Tensor,
         num_periods: int | None = None,
+        V_init: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Run soft value iteration (backward pass).
 
@@ -191,10 +192,21 @@ class MCEIRLEstimator(BaseEstimator):
             fh_result = backward_induction(operator, reward_matrix, num_periods)
             return fh_result.V, fh_result.policy, True
 
-        if self.config.inner_solver == "hybrid":
+        if self.config.inner_solver == "policy":
+            result = policy_iteration(
+                operator,
+                reward_matrix,
+                V_init=V_init,
+                tol=self.config.inner_tol,
+                max_iter=self.config.inner_max_iter,
+                eval_method="matrix",
+            )
+            return result.V, result.policy, result.converged
+        elif self.config.inner_solver == "hybrid":
             result = hybrid_iteration(
                 operator,
                 reward_matrix,
+                V_init=V_init,
                 tol=self.config.inner_tol,
                 max_iter=self.config.inner_max_iter,
                 switch_tol=self.config.switch_tol,
@@ -205,6 +217,7 @@ class MCEIRLEstimator(BaseEstimator):
             result = value_iteration(
                 operator,
                 reward_matrix,
+                V_init=V_init,
                 tol=self.config.inner_tol,
                 max_iter=self.config.inner_max_iter,
             )
@@ -420,12 +433,15 @@ class MCEIRLEstimator(BaseEstimator):
             )
             d = self._compute_state_visitation(policy, transitions, problem, initial_dist)
 
-            if feature_matrix.ndim == 3:
+            # Promote feature_matrix to match computation dtype (float64 for high gamma)
+            fm = feature_matrix.to(dtype=d.dtype)
+            pol = policy.to(dtype=d.dtype)
+            if fm.ndim == 3:
                 # E_π[φ] = Σ_s D_π(s) Σ_a π(a|s) φ(s,a,k)
-                return torch.einsum("s,sa,sak->k", d, policy, feature_matrix)
+                return torch.einsum("s,sa,sak->k", d, pol, fm)
             else:
                 # E_π[φ] = Σ_s D_π(s) φ(s,k)
-                return d @ feature_matrix
+                return d @ fm
 
         # --- Fallback: empirical state iteration (only works for action-dependent) ---
         total_obs = sum(len(traj) for traj in panel.trajectories)
@@ -545,7 +561,11 @@ class MCEIRLEstimator(BaseEstimator):
         start_time = time.time()
 
         reward_fn = utility
-        operator = SoftBellmanOperator(problem, transitions)
+        # Use float64 for the Bellman operator to handle high discount factors
+        # (condition number of (I - beta*P) ~ 1/(1-beta), so float32 is insufficient
+        # for beta > 0.99)
+        transitions_f64 = transitions.double()
+        operator = SoftBellmanOperator(problem, transitions_f64)
 
         # Initialize parameters
         if initial_params is None:
@@ -553,9 +573,9 @@ class MCEIRLEstimator(BaseEstimator):
         else:
             params = initial_params.clone()
 
-        # Compute empirical features (constant)
-        empirical_features = self._compute_empirical_features(panel, reward_fn)
-        initial_dist = self._compute_initial_distribution(panel, problem.num_states)
+        # Compute empirical features (constant) — all in float64 for precision
+        empirical_features = self._compute_empirical_features(panel, reward_fn).double()
+        initial_dist = self._compute_initial_distribution(panel, problem.num_states).double()
 
         self._log(f"Empirical features: {empirical_features}")
         self._log(f"Initial distribution entropy: {-(initial_dist * torch.log(initial_dist + 1e-10)).sum():.3f}")
@@ -571,30 +591,55 @@ class MCEIRLEstimator(BaseEstimator):
             all_states = panel.get_all_states()
             all_actions = panel.get_all_actions()
 
+            prev_V = [None]  # mutable container for warm-starting
+            gamma = problem.discount_factor
+            sigma = problem.scale_parameter
+
             def neg_ll_and_grad(theta_np):
                 nonlocal n_function_evals, inner_not_converged
                 n_function_evals += 1
                 theta = torch.tensor(theta_np, dtype=torch.float64)
-                # Compute reward, solve Bellman, get policy
-                reward_matrix = reward_fn.compute(theta.float())
-                V, policy, converged = self._soft_value_iteration(operator, reward_matrix)
+                # Compute reward in float64 for numerical precision with high discount factors
+                reward_matrix = reward_fn.compute(theta.float()).double()
+                V, policy, converged = self._soft_value_iteration(
+                    operator, reward_matrix, V_init=prev_V[0],
+                )
+                prev_V[0] = V.clone()
                 if not converged:
                     inner_not_converged += 1
-                # Log-likelihood
+                # Log-likelihood: LL = Σ_t log π(a_t|s_t)
                 log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
                 ll = log_probs[all_states, all_actions].sum().item()
-                # Expected features under policy
-                expected_features = self._compute_expected_features(
-                    panel, policy, reward_fn,
-                    transitions=transitions,
-                    initial_dist=initial_dist,
-                    discount=problem.discount_factor,
-                )
-                # Gradient of LL = μ_D - μ_π
-                grad = (empirical_features - expected_features).numpy().astype(np.float64)
+                # Analytical gradient via implicit differentiation (same as NFXP):
+                # dV/dθ_k = (I - γ P_π)^{-1} [Σ_a π(a|s) φ(s,a,k)]
+                # dLL/dθ_k = (1/σ) Σ_t [dQ_k(s_t,a_t) - dV_k(s_t)]
+                fm = reward_fn.feature_matrix.double() if hasattr(reward_fn, 'feature_matrix') else reward_fn.state_features.double()
+                n_params = fm.shape[-1]
+                n_states = problem.num_states
+                # Build P_π: policy-weighted transition matrix
+                P_pi = torch.einsum("sa,asn->sn", policy, transitions_f64)
+                # Solve for dV/dθ (one linear system per parameter)
+                A = torch.eye(n_states, dtype=torch.float64) - gamma * P_pi
+                grad_ll = np.zeros(n_params, dtype=np.float64)
+                for k in range(n_params):
+                    if fm.ndim == 3:
+                        pi_phi_k = (policy * fm[:, :, k]).sum(dim=1)  # (S,)
+                    else:
+                        pi_phi_k = fm[:, k]  # (S,)
+                    dV_k = torch.linalg.solve(A, pi_phi_k)
+                    # dQ_k(s,a) = φ(s,a,k) + γ Σ_s' P(s'|s,a) dV_k(s')
+                    EV_k = torch.einsum("asn,n->sa", transitions_f64, dV_k)  # (S, A)
+                    if fm.ndim == 3:
+                        dQ_k = fm[:, :, k] + gamma * EV_k  # (S, A)
+                    else:
+                        dQ_k = fm[:, k].unsqueeze(1) + gamma * EV_k  # (S, A)
+                    # ∂LL/∂θ_k = (1/σ) Σ_t [dQ_k(s_t,a_t) - Σ_a π(a|s_t) dQ_k(s_t,a)]
+                    dQ_obs = dQ_k[all_states, all_actions]  # (N,)
+                    dV_obs = (policy[all_states] * dQ_k[all_states]).sum(dim=1)  # (N,)
+                    grad_ll[k] = ((dQ_obs - dV_obs) / sigma).sum().item()
                 if n_function_evals % 10 == 0:
-                    self._log(f"Eval {n_function_evals}: NLL={-ll:.2f}, ||grad||={np.linalg.norm(grad):.6f}")
-                return -ll, -grad
+                    self._log(f"Eval {n_function_evals}: NLL={-ll:.2f}, ||grad||={np.linalg.norm(grad_ll):.6f}")
+                return -ll, -grad_ll
 
             result_scipy = optimize.minimize(
                 neg_ll_and_grad,
@@ -612,12 +657,12 @@ class MCEIRLEstimator(BaseEstimator):
             converged = result_scipy.success
 
             # Final solution
-            reward_matrix = reward_fn.compute(final_params)
+            reward_matrix = reward_fn.compute(final_params).double()
             V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
-            D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
+            D = self._compute_state_visitation(policy, transitions_f64, problem, initial_dist)
             final_expected = self._compute_expected_features(
                 panel, policy, reward_fn,
-                transitions=transitions, initial_dist=initial_dist,
+                transitions=transitions_f64, initial_dist=initial_dist,
                 discount=problem.discount_factor,
             )
             feature_diff = torch.norm(empirical_features - final_expected).item()
@@ -645,6 +690,7 @@ class MCEIRLEstimator(BaseEstimator):
                 metadata={
                     "optimizer": self.config.optimizer,
                     "empirical_features": empirical_features.tolist(),
+                    "final_expected_features": final_expected.tolist(),
                     "feature_diff": feature_diff,
                 },
             )
@@ -679,12 +725,16 @@ class MCEIRLEstimator(BaseEstimator):
         finite_horizon = problem.num_periods is not None
         num_periods = problem.num_periods
 
+        prev_V_grad = None  # warm-start for gradient path
+
         for i in pbar:
             # Forward and backward passes
-            reward_matrix = reward_fn.compute(params)
+            reward_matrix = reward_fn.compute(params).double()
             V, policy, inner_converged = self._soft_value_iteration(
-                operator, reward_matrix, num_periods=num_periods
+                operator, reward_matrix, num_periods=num_periods,
+                V_init=prev_V_grad,
             )
+            prev_V_grad = V.clone() if not finite_horizon else None
             if not inner_converged:
                 inner_not_converged += 1
 
@@ -693,13 +743,13 @@ class MCEIRLEstimator(BaseEstimator):
                 # Average policy across periods weighted by empirical period distribution
                 expected_features = self._compute_expected_features_finite_horizon(
                     panel, policy, reward_fn, num_periods,
-                    transitions=transitions, initial_dist=initial_dist,
+                    transitions=transitions_f64, initial_dist=initial_dist,
                     discount=problem.discount_factor,
                 )
             else:
                 expected_features = self._compute_expected_features(
                     panel, policy, reward_fn,
-                    transitions=transitions,
+                    transitions=transitions_f64,
                     initial_dist=initial_dist,
                     discount=problem.discount_factor,
                 )
@@ -766,7 +816,7 @@ class MCEIRLEstimator(BaseEstimator):
         converged = grad_norm < self.config.outer_tol if grad_norm else False
 
         # Final solution
-        reward_matrix = reward_fn.compute(final_params)
+        reward_matrix = reward_fn.compute(final_params).double()
         V, policy, _ = self._soft_value_iteration(
             operator, reward_matrix, num_periods=num_periods
         )
@@ -774,7 +824,7 @@ class MCEIRLEstimator(BaseEstimator):
         if finite_horizon:
             final_expected = self._compute_expected_features_finite_horizon(
                 panel, policy, reward_fn, num_periods,
-                transitions=transitions, initial_dist=initial_dist,
+                transitions=transitions_f64, initial_dist=initial_dist,
                 discount=problem.discount_factor,
             )
             D = torch.zeros(problem.num_states)
@@ -796,10 +846,10 @@ class MCEIRLEstimator(BaseEstimator):
             V = V[0] if V.dim() > 1 else V
             policy = policy[0] if policy.dim() > 2 else policy
         else:
-            D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
+            D = self._compute_state_visitation(policy, transitions_f64, problem, initial_dist)
             final_expected = self._compute_expected_features(
                 panel, policy, reward_fn,
-                transitions=transitions, initial_dist=initial_dist,
+                transitions=transitions_f64, initial_dist=initial_dist,
                 discount=problem.discount_factor,
             )
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
@@ -817,12 +867,12 @@ class MCEIRLEstimator(BaseEstimator):
 
             if self.config.se_method == "bootstrap":
                 standard_errors = self._bootstrap_inference(
-                    panel, reward_fn, problem, transitions, final_params, initial_dist
+                    panel, reward_fn, problem, transitions_f64, final_params, initial_dist
                 )
             else:
                 # Numerical Hessian
                 hessian = self._numerical_hessian(
-                    final_params, panel, reward_fn, problem, transitions, initial_dist
+                    final_params, panel, reward_fn, problem, transitions_f64, initial_dist
                 )
 
         optimization_time = time.time() - start_time
@@ -891,7 +941,7 @@ class MCEIRLEstimator(BaseEstimator):
             params = point_estimate.clone()
 
             for _ in range(50):  # Fewer iterations for bootstrap
-                reward_matrix = reward_fn.compute(params)
+                reward_matrix = reward_fn.compute(params).double()
                 V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
                 expected_features = self._compute_expected_features(
                     boot_panel, policy, reward_fn,
@@ -970,7 +1020,7 @@ class MCEIRLEstimator(BaseEstimator):
         hessian = torch.zeros((n_params, n_params), dtype=params.dtype)
 
         def ll_at(p):
-            reward_matrix = reward_fn.compute(p)
+            reward_matrix = reward_fn.compute(p).double()
             V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
 
