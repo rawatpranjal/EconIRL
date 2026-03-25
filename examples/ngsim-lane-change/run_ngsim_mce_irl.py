@@ -146,40 +146,79 @@ def load_and_compute_features(max_vehicles=500, subsample=10):
 
 
 def build_feature_matrix(df):
-    """Build (n_states, n_actions, n_features) matrix from per-observation features.
+    """Build (n_states, n_actions, n_features) STRUCTURAL feature matrix.
 
-    For each (state, action) cell, compute the MEAN feature values observed.
-    This gives the expected feature per (s, a) that MCE IRL will match.
+    Features are defined from the state/action structure, NOT empirical averages.
+    State-level features (speed, headway) use empirical means per state.
+    Action-level features (lane change) are structural binary indicators.
+
+    This matches the DDC/IRL convention: φ(s,a) is a known function of (s,a),
+    and θ are the unknown parameters to be estimated.
     """
     n_states = N_LANES * N_SPEED_BINS
     n_actions = N_ACTIONS
 
-    feat_cols = ["f_speed", "f_accel", "f_lateral", "f_jerk",
-                 "f_headway_front", "f_headway_rear", "f_collision", "f_lane_change"]
-
-    # Compute mean features per (state, action)
-    features = torch.zeros(n_states, n_actions, N_FEATURES)
-    counts = torch.zeros(n_states, n_actions)
+    # Compute empirical state-level statistics from data
+    state_speed = torch.zeros(n_states)
+    state_headway_front = torch.zeros(n_states)
+    state_headway_rear = torch.zeros(n_states)
+    state_accel = torch.zeros(n_states)
+    state_collision = torch.zeros(n_states)
+    state_counts = torch.zeros(n_states)
 
     for _, row in df.iterrows():
-        s, a = int(row.state), int(row.action)
-        if 0 <= s < n_states and 0 <= a < n_actions:
-            for k, col in enumerate(feat_cols):
-                features[s, a, k] += row[col]
-            counts[s, a] += 1
+        s = int(row.state)
+        if 0 <= s < n_states:
+            state_speed[s] += row.f_speed
+            state_headway_front[s] += row.f_headway_front
+            state_headway_rear[s] += row.f_headway_rear
+            state_accel[s] += row.f_accel
+            state_collision[s] += row.f_collision
+            state_counts[s] += 1
 
-    # Normalize to means
-    counts_safe = counts.clamp(min=1).unsqueeze(-1)
-    features = features / counts_safe
+    state_counts_safe = state_counts.clamp(min=1)
+    state_speed /= state_counts_safe
+    state_headway_front /= state_counts_safe
+    state_headway_rear /= state_counts_safe
+    state_accel /= state_counts_safe
+    state_collision /= state_counts_safe
 
-    # Normalize features to [-1, 1] range for numerical stability
-    for k in range(N_FEATURES):
+    # Build structural features: (n_states, n_actions, 5 features)
+    # Reduced to 5 well-identified features matching Huang et al. categories
+    n_features_used = 5
+    features = torch.zeros(n_states, n_actions, n_features_used)
+
+    for s in range(n_states):
+        lane = s // N_SPEED_BINS
+        speed_bin = s % N_SPEED_BINS
+
+        for a in range(n_actions):
+            # f1: Speed (travel efficiency) — structural from state definition
+            features[s, a, 0] = speed_bin / (N_SPEED_BINS - 1)
+
+            # f2: Acceleration magnitude (comfort) — empirical per state
+            features[s, a, 1] = -state_accel[s]  # negative = high accel is bad
+
+            # f3: Front headway risk — empirical per state
+            features[s, a, 2] = -state_headway_front[s]  # negative = close following is bad
+
+            # f4: Collision risk — empirical per state
+            features[s, a, 3] = -state_collision[s]  # negative = collision is bad
+
+            # f5: Lane change cost — STRUCTURAL, action-dependent
+            if a == 0 or a == 2:  # left or right
+                features[s, a, 4] = -1.0  # lane change penalty
+            else:
+                features[s, a, 4] = 0.0   # stay = no penalty
+
+    # Normalize each feature to [-1, 1]
+    for k in range(n_features_used):
         fk = features[:, :, k]
         fmax = fk.abs().max()
         if fmax > 0:
             features[:, :, k] = fk / fmax
 
-    return features
+    return features, ["speed", "accel_cost", "headway_risk", "collision_risk", "lane_change_cost"]
 
 
 def build_problem_from_data(df):
@@ -212,13 +251,13 @@ def build_problem_from_data(df):
         if zero_rows.any():
             transitions[a, zero_rows] = 1.0 / n_states
 
-    # Build feature matrix
-    print("Computing Huang et al. (2021) features...")
-    features = build_feature_matrix(df)
+    # Build structural feature matrix
+    print("Computing structural features (Huang et al. categories)...")
+    features, feature_names = build_feature_matrix(df)
 
     utility = LinearUtility(
         feature_matrix=features,
-        parameter_names=FEATURE_NAMES,
+        parameter_names=feature_names,
     )
 
     # Build panel
@@ -248,11 +287,12 @@ def run_mce_irl(panel, utility, problem, transitions):
     print("\n── Running MCE IRL (Ziebart 2008 / Huang et al. 2021 features) ──")
 
     config = MCEIRLConfig(
-        compute_se=True,
-        inner_max_iter=500,
-        outer_max_iter=200,
-        learning_rate=0.05,
-        outer_tol=1e-5,
+        compute_se=False,
+        optimizer="L-BFGS-B",       # More stable than Adam for this problem
+        inner_max_iter=1000,         # Ensure inner convergence
+        outer_max_iter=500,          # More outer iterations
+        learning_rate=0.01,          # Lower LR for stability
+        outer_tol=1e-6,
         verbose=True,
     )
     estimator = MCEIRLEstimator(config=config)
@@ -291,7 +331,7 @@ def run_mce_irl(panel, utility, problem, transitions):
     if result.parameters is not None:
         params = result.parameters
         ses = result.standard_errors if hasattr(result, 'standard_errors') and result.standard_errors is not None else [None] * len(params)
-        for i, name in enumerate(FEATURE_NAMES):
+        for i, name in enumerate(utility.parameter_names):
             if i < len(params):
                 w = params[i].item()
                 se_str = f"{ses[i].item():.4f}" if ses[i] is not None else "N/A"
@@ -319,43 +359,121 @@ Our discrete MCE IRL results should show:
     return result
 
 
-def run_comparison_estimators(panel, utility, problem, transitions):
-    """Run CCP and NFXP for comparison."""
+def run_all_three(panel, utility, problem, transitions):
+    """Run MaxEnt IRL (2008), MCE IRL (2010), and NFXP-NK."""
     results = {}
 
-    # CCP
+    # 1. MaxEnt IRL (Ziebart 2008) — uses L-BFGS-B, should converge well
     try:
-        from econirl.estimation.ccp import CCPEstimator
-        print("\n── Running CCP (Hotz-Miller) for comparison ──")
+        from econirl.estimation.maxent_irl import MaxEntIRLEstimator
+        from econirl.preferences.action_reward import ActionDependentReward
+        print("\n── MaxEnt IRL (Ziebart 2008) — L-BFGS-B ──")
+
+        # MaxEntIRL needs ActionDependentReward, wrap our LinearUtility features
+        reward_fn = ActionDependentReward(
+            feature_matrix=utility.feature_matrix,
+            parameter_names=utility.parameter_names,
+        )
+
         t0 = time.time()
-        est = CCPEstimator()
+        est = MaxEntIRLEstimator(
+            optimizer="L-BFGS-B",
+            inner_solver="value",
+            inner_tol=1e-8,
+            inner_max_iter=1000,
+            outer_tol=1e-6,
+            outer_max_iter=500,
+            verbose=True,
+        )
+        r = est.estimate(panel=panel, utility=reward_fn, problem=problem, transitions=transitions)
+        elapsed = time.time() - t0
+        print(f"  Time: {elapsed:.1f}s, Converged: {r.converged}")
+        if r.parameters is not None:
+            for i, name in enumerate(utility.parameter_names):
+                if i < len(r.parameters):
+                    print(f"  {name}: {r.parameters[i].item():.4f}")
+        if r.log_likelihood is not None:
+            print(f"  LL: {r.log_likelihood:.2f}")
+        results["MaxEnt IRL (2008)"] = (r, elapsed)
+    except Exception as e:
+        print(f"  MaxEnt IRL failed: {e}")
+        import traceback; traceback.print_exc()
+
+    # 2. MCE IRL (Ziebart 2010) — Adam optimizer
+    try:
+        from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
+        print("\n── MCE IRL (Ziebart 2010) — Adam ──")
+        config = MCEIRLConfig(
+            compute_se=False,
+            use_adam=True,
+            learning_rate=0.001,        # Very small for stability
+            outer_max_iter=2000,         # Many iterations
+            inner_max_iter=1000,
+            outer_tol=1e-6,
+            verbose=True,
+        )
+        t0 = time.time()
+        est = MCEIRLEstimator(config=config)
         r = est.estimate(panel=panel, utility=utility, problem=problem, transitions=transitions)
         elapsed = time.time() - t0
         print(f"  Time: {elapsed:.1f}s, Converged: {r.converged}")
         if r.parameters is not None:
-            for i, name in enumerate(FEATURE_NAMES):
+            for i, name in enumerate(utility.parameter_names):
                 if i < len(r.parameters):
                     print(f"  {name}: {r.parameters[i].item():.4f}")
-        results["CCP"] = (r, elapsed)
+        if r.log_likelihood is not None:
+            print(f"  LL: {r.log_likelihood:.2f}")
+        results["MCE IRL (2010)"] = (r, elapsed)
     except Exception as e:
-        print(f"  CCP failed: {e}")
+        print(f"  MCE IRL failed: {e}")
+        import traceback; traceback.print_exc()
 
-    # NFXP
+    # 3. NFXP-NK (Rust 1987 / Iskhakov et al. 2016) — L-BFGS-B, gold standard
     try:
         from econirl.estimation.nfxp import NFXPEstimator
-        print("\n── Running NFXP (Rust) for comparison ──")
+        print("\n── NFXP-NK (Rust 1987) — L-BFGS-B ──")
         t0 = time.time()
         est = NFXPEstimator()
         r = est.estimate(panel=panel, utility=utility, problem=problem, transitions=transitions)
         elapsed = time.time() - t0
         print(f"  Time: {elapsed:.1f}s, Converged: {r.converged}")
         if r.parameters is not None:
-            for i, name in enumerate(FEATURE_NAMES):
+            for i, name in enumerate(utility.parameter_names):
                 if i < len(r.parameters):
                     print(f"  {name}: {r.parameters[i].item():.4f}")
-        results["NFXP"] = (r, elapsed)
+        if r.log_likelihood is not None:
+            print(f"  LL: {r.log_likelihood:.2f}")
+        results["NFXP-NK"] = (r, elapsed)
     except Exception as e:
         print(f"  NFXP failed: {e}")
+        import traceback; traceback.print_exc()
+
+    # 4. AIRL (Fu et al. 2018) — adversarial reward recovery
+    try:
+        from econirl.estimation.adversarial.airl import AIRLEstimator, AIRLConfig
+        print("\n── AIRL (Fu et al. 2018) — Adversarial ──")
+        airl_config = AIRLConfig(
+            reward_type="linear",
+            reward_lr=0.01,
+            max_rounds=200,
+            generator_max_iter=500,
+            verbose=True,
+        )
+        t0 = time.time()
+        est = AIRLEstimator(config=airl_config)
+        r = est.estimate(panel=panel, utility=utility, problem=problem, transitions=transitions)
+        elapsed = time.time() - t0
+        print(f"  Time: {elapsed:.1f}s, Converged: {r.converged}")
+        if r.parameters is not None:
+            for i, name in enumerate(utility.parameter_names):
+                if i < len(r.parameters):
+                    print(f"  {name}: {r.parameters[i].item():.4f}")
+        if r.log_likelihood is not None:
+            print(f"  LL: {r.log_likelihood:.2f}")
+        results["AIRL (2018)"] = (r, elapsed)
+    except Exception as e:
+        print(f"  AIRL failed: {e}")
+        import traceback; traceback.print_exc()
 
     return results
 
@@ -376,11 +494,8 @@ if __name__ == "__main__":
     # Build problem
     problem, transitions, utility, panel = build_problem_from_data(df)
 
-    # Run MCE IRL (primary)
-    mce_result = run_mce_irl(panel, utility, problem, transitions)
-
-    # Run comparison estimators
-    comparison = run_comparison_estimators(panel, utility, problem, transitions)
+    # Run all three: MaxEnt IRL (2008), MCE IRL (2010), NFXP-NK
+    results = run_all_three(panel, utility, problem, transitions)
 
     print("\n" + "=" * 60)
     print("DONE")

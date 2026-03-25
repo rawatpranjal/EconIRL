@@ -1,0 +1,5 @@
+estimator,time_seconds,converged,log_likelihood,speed,accel_cost,headway_risk,collision_risk,lane_change_cost,status
+NFXP-NK,5.1,True,-42327.53,0.253196,0.061521,0.169626,0.034077,2.383524,OK
+MaxEnt IRL,7.8,False,-42347.12,0.043303,-0.011139,-0.010668,0.022729,2.379658,OK
+MCE IRL,2.4,True,-42335.97,0.225692,0.047680,0.161777,0.071426,2.386096,OK
+AIRL,438.3,False,-47303.62,0.076159,-0.004496,-0.048741,-0.007311,1.492881,OK

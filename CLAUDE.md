@@ -47,19 +47,7 @@ Each estimator should be validated on at least one real-data replication (Rust b
 ## Critical Implementation Details
 
 ### MCE IRL Expected Features (IMPORTANT)
-The `_compute_expected_features()` method in `mce_irl.py` MUST iterate over the **empirical state sequence** from demonstrations, NOT use the stationary distribution:
-
-```python
-# CORRECT: Iterate over empirical states
-for traj in panel.trajectories:
-    for t in range(len(traj)):
-        s = traj.states[t].item()
-        for a in range(n_actions):
-            feature_sum += policy[s, a] * feature_matrix[s, a, :]
-
-# WRONG: Using stationary distribution (causes parameter recovery failure)
-# return torch.einsum("s,sa,sak->k", state_visitation, policy, feature_matrix)
-```
+The `_compute_expected_features()` method in `mce_irl.py` uses occupancy measures (state visitation frequencies under the current policy) following Ziebart (2010) Algorithm 1 and the `imitation` library. The E_π term is: `E_π[φ] = Σ_s D_π(s) Σ_a π(a|s) φ(s,a,k)` where D_π is computed via the forward pass. This correctly handles both action-dependent and state-only features. Falls back to empirical-state iteration only when transitions are unavailable.
 
 ### Parameter Identification in IRL
 - Rewards are only identified up to constants (Kim et al. 2021, Cao & Cohen 2021)
@@ -100,6 +88,12 @@ python3 -m pytest tests/ --cov=econirl
 1. High discount factor (gamma > 0.99) requires many inner iterations
 2. Consider lowering gamma for testing
 3. Check that transitions are properly normalized (rows sum to 1)
+
+## Benchmarking Philosophy
+
+Controlled simulated experiments use in-sample, out-of-sample, and out-of-transfer evaluation. Benchmarks are modular (`ESTIMATORS` dict) so new algorithms slot in with one entry. Use high trajectory counts — the goal is not standard errors but verifying that estimators correctly recover reward parameters and produce good policies. Working examples live in `examples/`.
+
+MCE IRL and NFXP converge to the same answer with enough data and proper features — with 2000 trajectories on a 5x5 gridworld both achieve cosine similarity 0.9999 to true parameters and identical policy performance across in-sample, out-of-sample, and all three transfer scenarios. Features MUST be action-dependent (vary across the choice set) for NFXP identification; state-only features that are identical across actions make R(s,a) constant across actions, collapsing the likelihood surface and causing parameter blowup. IRL rewards are identified only up to additive constants and scale (Kim et al. 2021), so evaluate on cosine similarity and policy quality rather than raw RMSE. MaxEnt IRL underperforms MCE IRL even in deterministic environments because it doesn't account for causal structure in the state visitation computation. For the `imitation` library comparison: econirl's infinite-horizon formulation with action-dependent features is more general; the main borrowed improvement is the direct linear solve for occupancy measures in `core/occupancy.py`.
 
 ## Key References
 

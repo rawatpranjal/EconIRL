@@ -29,6 +29,11 @@ from econirl.datasets.geolife import load_geolife, get_geolife_info
 from econirl.datasets.stanford_drone import load_stanford_drone, get_stanford_drone_info
 from econirl.datasets.eth_ucy import load_eth_ucy, get_eth_ucy_info
 
+# Real-world DDC/IRL datasets
+from econirl.datasets.foursquare import load_foursquare, get_foursquare_info
+from econirl.datasets.ngsim import load_ngsim, get_ngsim_info
+from econirl.datasets.taxi_gridworld import load_taxi_gridworld, get_taxi_gridworld_info
+
 __all__ = [
     # DDC Datasets
     "load_rust_bus",
@@ -47,4 +52,12 @@ __all__ = [
     "get_stanford_drone_info",
     "load_eth_ucy",
     "get_eth_ucy_info",
+    # Real-world DDC/IRL Datasets
+    "load_foursquare",
+    "get_foursquare_info",
+    "load_ngsim",
+    "get_ngsim_info",
+    # Benchmark Datasets
+    "load_taxi_gridworld",
+    "get_taxi_gridworld_info",
 ]
