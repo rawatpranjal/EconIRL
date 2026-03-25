@@ -270,29 +270,63 @@ class MCEIRLEstimator(BaseEstimator):
 
         return D
 
+    def _compute_empirical_state_occupancy(
+        self,
+        panel: Panel,
+        n_states: int,
+        n_actions: int,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute empirical state and state-action occupancy from demonstrations.
+
+        Following Ziebart (2008) and the imitation library: count how often
+        each state (and state-action pair) appears in the demonstrations,
+        normalized to a distribution.
+
+        Returns
+        -------
+        D_demo : torch.Tensor
+            State occupancy, shape (n_states,). Sums to 1.
+        D_demo_sa : torch.Tensor
+            State-action occupancy, shape (n_states, n_actions). Sums to 1.
+        """
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        total_obs = len(all_states)
+
+        D_s = torch.zeros(n_states, dtype=torch.float32)
+        D_sa = torch.zeros(n_states, n_actions, dtype=torch.float32)
+
+        D_s.scatter_add_(0, all_states, torch.ones(total_obs))
+        idx_flat = all_states * n_actions + all_actions
+        D_sa.view(-1).scatter_add_(0, idx_flat, torch.ones(total_obs))
+
+        if total_obs > 0:
+            D_s = D_s / total_obs
+            D_sa = D_sa / total_obs
+
+        return D_s, D_sa
+
     def _compute_empirical_features(
         self,
         panel: Panel,
         reward_fn: BaseUtilityFunction,
+        n_states: int | None = None,
+        n_actions: int | None = None,
     ) -> torch.Tensor:
-        """Compute empirical feature expectations from demonstrations.
+        """Compute empirical feature expectations using state-action occupancy.
 
-        Computes the average state-action features visited by the demonstrator:
-            μ_D = (1/N) Σ_{i,t} φ(s_{i,t}, a_{i,t})
+        Uses the empirical state-action occupancy measure D_demo(s,a):
+            μ_D = Σ_s Σ_a D_demo(s,a) φ(s,a)
 
-        For state-only features: μ_D = (1/N) Σ_{i,t} φ(s_{i,t})
-
-        Handles both:
-        - LinearReward (state-only): 2D feature matrix (n_states, n_features)
-        - ActionDependentReward: 3D feature matrix (n_states, n_actions, n_features)
+        This is consistent with the occupancy-measure E_π computation,
+        following Ziebart (2008) Eq. 6 and the imitation library.
         """
-        # Get feature matrix - handle both 2D and 3D cases
+        # Get feature matrix
         if isinstance(reward_fn, ActionDependentReward):
-            feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
+            feature_matrix = reward_fn.feature_matrix  # (S, A, K)
         elif isinstance(reward_fn, LinearReward):
-            feature_matrix = reward_fn.state_features  # (n_states, n_features)
+            feature_matrix = reward_fn.state_features  # (S, K)
         else:
-            # Try to get feature_matrix, fall back to state_features
             if hasattr(reward_fn, 'feature_matrix'):
                 feature_matrix = reward_fn.feature_matrix
             elif hasattr(reward_fn, 'state_features'):
@@ -300,21 +334,23 @@ class MCEIRLEstimator(BaseEstimator):
             else:
                 raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
 
-        total_obs = sum(len(traj) for traj in panel.trajectories)
-
         if feature_matrix.ndim == 3:
-            # Action-dependent features: (n_states, n_actions, n_features)
-            all_states = panel.get_all_states()
-            all_actions = panel.get_all_actions()
-            feature_sum = feature_matrix[all_states, all_actions, :].sum(dim=0)
+            _ns, _na = feature_matrix.shape[0], feature_matrix.shape[1]
+            D_s, D_sa = self._compute_empirical_state_occupancy(
+                panel, n_states or _ns, n_actions or _na
+            )
+            # μ_D = Σ_s Σ_a D_demo(s,a) φ(s,a,k)
+            return torch.einsum("sa,sak->k", D_sa, feature_matrix)
         else:
-            # State-only features: (n_states, n_features)
+            _ns = feature_matrix.shape[0]
+            # For state-only features, compute state occupancy directly
             all_states = panel.get_all_states()
-            feature_sum = feature_matrix[all_states, :].sum(dim=0)
-
-        if total_obs > 0:
-            return feature_sum / total_obs
-        return feature_sum
+            total_obs = len(all_states)
+            D_s = torch.zeros(_ns, dtype=torch.float32)
+            D_s.scatter_add_(0, all_states, torch.ones(total_obs))
+            if total_obs > 0:
+                D_s = D_s / total_obs
+            return D_s @ feature_matrix
 
     def _compute_expected_features(
         self,
@@ -327,30 +363,31 @@ class MCEIRLEstimator(BaseEstimator):
     ) -> torch.Tensor:
         """Compute expected feature expectations under the learned policy.
 
-        For action-dependent features (3D), computes expectations over the
-        EMPIRICAL state sequence, weighting by the current policy's action
-        probabilities:
+        Uses the occupancy-measure approach from Ziebart (2010) Algorithm 1
+        and the imitation library (Gleave & Toyer 2022):
 
-            μ_π = (1/N) Σ_{i,t} Σ_a π(a|s_{i,t}) φ(s_{i,t}, a)
+            μ_π = Σ_s D_π(s) Σ_a π(a|s) φ(s, a)
 
-        For state-only features (2D), computes expectations using the state
-        visitation distribution under the current policy:
+        where D_π(s) is the state visitation frequency under the current
+        policy, computed via the forward pass. This correctly handles both
+        action-dependent and state-only features — when φ(s,a) = φ(s),
+        the policy weights still matter through D_π.
 
-            μ_π = Σ_s d_π(s) φ(s)
+        Falls back to empirical-state iteration only if transitions are
+        not available.
 
         Parameters
         ----------
         panel : Panel
-            Panel data containing the empirical state sequence.
+            Panel data (used only as fallback if transitions unavailable).
         policy : torch.Tensor
             Policy probabilities π(a|s), shape (n_states, n_actions).
         reward_fn : BaseUtilityFunction
             Reward function with feature matrix.
         transitions : torch.Tensor, optional
             Transition matrices, shape (n_actions, n_states, n_states).
-            Required for state-only features.
         initial_dist : torch.Tensor, optional
-            Initial state distribution. Required for state-only features.
+            Initial state distribution.
         discount : float
             Discount factor for state visitation computation.
 
@@ -365,7 +402,6 @@ class MCEIRLEstimator(BaseEstimator):
         elif isinstance(reward_fn, LinearReward):
             feature_matrix = reward_fn.state_features  # (n_states, n_features)
         else:
-            # Try to get feature_matrix, fall back to state_features
             if hasattr(reward_fn, 'feature_matrix'):
                 feature_matrix = reward_fn.feature_matrix
             elif hasattr(reward_fn, 'state_features'):
@@ -373,44 +409,39 @@ class MCEIRLEstimator(BaseEstimator):
             else:
                 raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
 
+        # --- Occupancy measure approach (correct for all feature types) ---
+        # E_π[φ] = Σ_s D_π(s) Σ_a π(a|s) φ(s,a)
+        if transitions is not None and initial_dist is not None:
+            n_states = policy.shape[0]
+            problem = DDCProblem(
+                num_states=n_states,
+                num_actions=policy.shape[1],
+                discount_factor=discount,
+            )
+            d = self._compute_state_visitation(policy, transitions, problem, initial_dist)
+
+            if feature_matrix.ndim == 3:
+                # E_π[φ] = Σ_s D_π(s) Σ_a π(a|s) φ(s,a,k)
+                return torch.einsum("s,sa,sak->k", d, policy, feature_matrix)
+            else:
+                # E_π[φ] = Σ_s D_π(s) φ(s,k)
+                return d @ feature_matrix
+
+        # --- Fallback: empirical state iteration (only works for action-dependent) ---
         total_obs = sum(len(traj) for traj in panel.trajectories)
 
         if feature_matrix.ndim == 3:
-            # Action-dependent: (n_states, n_actions, n_features)
-            # E[φ] = (1/N) Σ_{i,t} Σ_a π(a|s_{i,t}) * φ(s_{i,t}, a, k)
-            # Vectorized: gather all states, then batch multiply
             all_states = torch.cat([traj.states for traj in panel.trajectories])
-            # policy[all_states] → (N, n_actions), feature_matrix[all_states] → (N, n_actions, n_features)
-            # Sum over actions and observations
             feature_sum = (policy[all_states].unsqueeze(-1) * feature_matrix[all_states]).sum(dim=(0, 1))
-
             if total_obs > 0:
                 return feature_sum / total_obs
             return feature_sum
         else:
-            # State-only: (n_states, n_features)
-            # Use state visitation frequencies under the current policy
-            n_states = feature_matrix.shape[0]
-
-            if transitions is not None and initial_dist is not None:
-                # Create a temporary DDCProblem for the existing _compute_state_visitation
-                problem = DDCProblem(
-                    num_states=n_states,
-                    num_actions=policy.shape[1],
-                    discount_factor=discount,
-                )
-                d = self._compute_state_visitation(
-                    policy, transitions, problem, initial_dist
-                )
-                # E_π[φ] = Σ_s d_π(s) * φ(s)
-                return d @ feature_matrix
-            else:
-                # Fallback: iterate over empirical states
-                all_states = panel.get_all_states()
-                feature_sum = feature_matrix[all_states, :].sum(dim=0)
-                if total_obs > 0:
-                    return feature_sum / total_obs
-                return feature_sum
+            all_states = panel.get_all_states()
+            feature_sum = feature_matrix[all_states, :].sum(dim=0)
+            if total_obs > 0:
+                return feature_sum / total_obs
+            return feature_sum
 
     def _compute_expected_features_finite_horizon(
         self,
@@ -418,16 +449,27 @@ class MCEIRLEstimator(BaseEstimator):
         policy: torch.Tensor,
         reward_fn: BaseUtilityFunction,
         num_periods: int,
+        transitions: torch.Tensor | None = None,
+        initial_dist: torch.Tensor | None = None,
+        discount: float = 0.95,
     ) -> torch.Tensor:
-        """Compute expected features under time-indexed policy for finite horizon.
+        """Compute expected features using finite-horizon occupancy measures.
 
-        For each observation (s_it, t), uses the period-specific policy π_t(a|s)
-        to compute expected features: (1/N) Σ_{i,t} Σ_a π_t(a|s_{it}) φ(s_{it}, a)
+        Uses forward-pass state visitation with time-indexed policies:
+            D_0(s) = ρ_0(s)
+            D_{t+1}(s') = Σ_s Σ_a D_t(s) π_t(a|s) P(s'|s,a)
+            E_π[φ] = Σ_t γ^t Σ_s D_t(s) Σ_a π_t(a|s) φ(s,a,k)
 
         Parameters
         ----------
         policy : torch.Tensor
             Time-indexed policy, shape (num_periods, n_states, n_actions).
+        transitions : torch.Tensor, optional
+            Transition matrices, shape (n_actions, n_states, n_states).
+        initial_dist : torch.Tensor, optional
+            Initial state distribution ρ_0, shape (n_states,).
+        discount : float
+            Discount factor γ.
         """
         if hasattr(reward_fn, 'feature_matrix'):
             feature_matrix = reward_fn.feature_matrix
@@ -436,30 +478,35 @@ class MCEIRLEstimator(BaseEstimator):
         else:
             raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
 
-        total_obs = sum(len(traj) for traj in panel.trajectories)
+        n_states = policy.shape[1]
+        n_actions = policy.shape[2]
 
-        if feature_matrix.ndim == 3:
-            # Action-dependent: (n_states, n_actions, n_features)
-            n_features = feature_matrix.shape[2]
-            feature_sum = torch.zeros(n_features)
-
-            for traj in panel.trajectories:
-                for t in range(len(traj.states)):
-                    period = min(t, num_periods - 1)
-                    s = traj.states[t].item()
-                    # Σ_a π_t(a|s) * φ(s, a, k)
-                    feature_sum += (policy[period, s].unsqueeze(-1) * feature_matrix[s]).sum(dim=0)
-
-            if total_obs > 0:
-                return feature_sum / total_obs
-            return feature_sum
+        if initial_dist is None:
+            D_t = torch.ones(n_states) / n_states
         else:
-            # State-only features: same as infinite horizon (no time dependence in features)
-            all_states = panel.get_all_states()
-            feature_sum = feature_matrix[all_states, :].sum(dim=0)
-            if total_obs > 0:
-                return feature_sum / total_obs
-            return feature_sum
+            D_t = initial_dist.clone()
+
+        # Forward pass: accumulate discounted occupancy measures
+        feature_sum = torch.zeros(feature_matrix.shape[-1])
+
+        for t in range(num_periods):
+            if feature_matrix.ndim == 3:
+                # E_π[φ]_t = γ^t Σ_s D_t(s) Σ_a π_t(a|s) φ(s,a,k)
+                feature_sum += (discount ** t) * torch.einsum(
+                    "s,sa,sak->k", D_t, policy[t], feature_matrix
+                )
+            else:
+                # State-only: E_π[φ]_t = γ^t Σ_s D_t(s) φ(s,k)
+                feature_sum += (discount ** t) * (D_t @ feature_matrix)
+
+            # Advance state distribution: D_{t+1}(s') = Σ_s Σ_a D_t(s) π_t(a|s) P(s'|s,a)
+            if transitions is not None and t < num_periods - 1:
+                P_pi_t = torch.einsum("sa,ast->st", policy[t], transitions)
+                D_t = P_pi_t.T @ D_t
+
+        # Normalize by total discounted weight
+        total_weight = sum(discount ** t for t in range(num_periods))
+        return feature_sum / total_weight
 
     def _compute_initial_distribution(
         self,
@@ -517,6 +564,92 @@ class MCEIRLEstimator(BaseEstimator):
         n_function_evals = 0
         inner_not_converged = 0
 
+        # ── L-BFGS-B path (scipy) ──
+        if self.config.optimizer in ("L-BFGS-B", "BFGS"):
+            self._log(f"Starting MCE IRL with {self.config.optimizer}")
+
+            all_states = panel.get_all_states()
+            all_actions = panel.get_all_actions()
+
+            def neg_ll_and_grad(theta_np):
+                nonlocal n_function_evals, inner_not_converged
+                n_function_evals += 1
+                theta = torch.tensor(theta_np, dtype=torch.float64)
+                # Compute reward, solve Bellman, get policy
+                reward_matrix = reward_fn.compute(theta.float())
+                V, policy, converged = self._soft_value_iteration(operator, reward_matrix)
+                if not converged:
+                    inner_not_converged += 1
+                # Log-likelihood
+                log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
+                ll = log_probs[all_states, all_actions].sum().item()
+                # Expected features under policy
+                expected_features = self._compute_expected_features(
+                    panel, policy, reward_fn,
+                    transitions=transitions,
+                    initial_dist=initial_dist,
+                    discount=problem.discount_factor,
+                )
+                # Gradient of LL = μ_D - μ_π
+                grad = (empirical_features - expected_features).numpy().astype(np.float64)
+                if n_function_evals % 10 == 0:
+                    self._log(f"Eval {n_function_evals}: NLL={-ll:.2f}, ||grad||={np.linalg.norm(grad):.6f}")
+                return -ll, -grad
+
+            result_scipy = optimize.minimize(
+                neg_ll_and_grad,
+                params.numpy().astype(np.float64),
+                method=self.config.optimizer,
+                jac=True,
+                options={
+                    "maxiter": self.config.outer_max_iter,
+                    "ftol": 1e-10,
+                    "gtol": self.config.outer_tol,
+                    "disp": False,
+                },
+            )
+            final_params = torch.tensor(result_scipy.x, dtype=torch.float32)
+            converged = result_scipy.success
+
+            # Final solution
+            reward_matrix = reward_fn.compute(final_params)
+            V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
+            D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
+            final_expected = self._compute_expected_features(
+                panel, policy, reward_fn,
+                transitions=transitions, initial_dist=initial_dist,
+                discount=problem.discount_factor,
+            )
+            feature_diff = torch.norm(empirical_features - final_expected).item()
+            log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
+            ll = log_probs[all_states, all_actions].sum().item()
+
+            self._log(f"L-BFGS-B complete: NLL={-ll:.2f}, ||grad||={np.linalg.norm(result_scipy.jac):.6f}, converged={converged}")
+            if inner_not_converged > 0:
+                self._log(f"Warning: Inner loop did not converge {inner_not_converged} times")
+
+            optimization_time = time.time() - start_time
+            return EstimationResult(
+                parameters=final_params,
+                log_likelihood=ll,
+                value_function=V,
+                policy=policy,
+                hessian=None,
+                gradient_contributions=None,
+                converged=converged,
+                num_iterations=n_function_evals,
+                num_function_evals=n_function_evals,
+                num_inner_iterations=0,
+                message=result_scipy.message,
+                optimization_time=optimization_time,
+                metadata={
+                    "optimizer": self.config.optimizer,
+                    "empirical_features": empirical_features.tolist(),
+                    "feature_diff": feature_diff,
+                },
+            )
+
+        # ── Adam/SGD path (gradient ascent) ──
         # Adam optimizer state
         if self.config.use_adam:
             m = torch.zeros_like(params)  # First moment
@@ -559,7 +692,9 @@ class MCEIRLEstimator(BaseEstimator):
                 # For finite horizon, compute expected features using time-indexed policy
                 # Average policy across periods weighted by empirical period distribution
                 expected_features = self._compute_expected_features_finite_horizon(
-                    panel, policy, reward_fn, num_periods
+                    panel, policy, reward_fn, num_periods,
+                    transitions=transitions, initial_dist=initial_dist,
+                    discount=problem.discount_factor,
                 )
             else:
                 expected_features = self._compute_expected_features(
@@ -638,7 +773,9 @@ class MCEIRLEstimator(BaseEstimator):
 
         if finite_horizon:
             final_expected = self._compute_expected_features_finite_horizon(
-                panel, policy, reward_fn, num_periods
+                panel, policy, reward_fn, num_periods,
+                transitions=transitions, initial_dist=initial_dist,
+                discount=problem.discount_factor,
             )
             D = torch.zeros(problem.num_states)
 
@@ -660,7 +797,11 @@ class MCEIRLEstimator(BaseEstimator):
             policy = policy[0] if policy.dim() > 2 else policy
         else:
             D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
-            final_expected = self._compute_expected_features(panel, policy, reward_fn)
+            final_expected = self._compute_expected_features(
+                panel, policy, reward_fn,
+                transitions=transitions, initial_dist=initial_dist,
+                discount=problem.discount_factor,
+            )
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
             ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
 
@@ -752,10 +893,14 @@ class MCEIRLEstimator(BaseEstimator):
             for _ in range(50):  # Fewer iterations for bootstrap
                 reward_matrix = reward_fn.compute(params)
                 V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
-                expected_features = self._compute_expected_features(boot_panel, policy, reward_fn)
+                expected_features = self._compute_expected_features(
+                    boot_panel, policy, reward_fn,
+                    transitions=transitions, initial_dist=boot_initial,
+                    discount=problem.discount_factor,
+                )
 
-                gradient = expected_features - empirical_features
-                params = params - 0.1 * gradient
+                gradient = empirical_features - expected_features  # μ_D - μ_π (ascent)
+                params = params + 0.1 * gradient
 
                 if torch.norm(gradient) < 0.01:
                     break
