@@ -162,32 +162,62 @@ def main():
     print(f"  Agreement: |dLL| = {abs(result_nfxp.log_likelihood - result_npl.log_likelihood):.4f}")
 
     # =========================================================================
-    # Step 5: Per-Group Estimation
+    # Step 5: Per-Group and Pooled-Group Estimation
     # =========================================================================
     print_section("Step 5: Per-Group NFXP Estimation")
 
-    print(f"\n  {'Group':<8} {'Name':<16} {'Buses':>5} {'Obs':>6} {'Repl':>5} {'op_cost':>10} {'RC':>10} {'c':>8} {'LL':>10}")
-    print("  " + "-" * 90)
+    # Groups 1 & 2 have zero replacements (newer buses, low mileage), so RC is
+    # unidentified for them individually. Rust (1987) Table IX reports:
+    #   - Group 4 alone
+    #   - Groups 1,2,3 pooled
+    #   - Groups 1,2,3,4 pooled (our Step 3 result)
+    # We follow the same groupings.
 
-    for group_id in sorted(df["group"].unique()):
-        group_df = df[df["group"] == group_id]
-        group_panel = load_rust_bus(original=True, group=group_id, as_panel=True)
-        group_trans = estimate_transitions_from_panel(group_panel, num_states=90, max_increment=2)
+    # Rust (1987) p.1018: "I decided to pool bus groups 1, 2, and 3
+    # and estimate group 4 separately." Table IX reports these groupings.
+    group_configs = {
+        "Groups 1,2,3": [1, 2, 3],
+        "Group 4": [4],
+        "Groups 1,2,3,4": [1, 2, 3, 4],
+    }
+
+    # Paper Table IX reference values (β=0.9999, linear cost, 90 states)
+    paper_values = {
+        "Groups 1,2,3": {"RC": 11.7270, "c": 4.8259, "n": 3864},
+        "Group 4": {"RC": 10.0750, "c": 2.2930, "n": 4292},
+        "Groups 1,2,3,4": {"RC": 9.7558, "c": 2.6275, "n": 8156},
+    }
+
+    print(f"\n  {'Config':<20} {'Buses':>5} {'Obs':>6} {'Repl':>5} {'RC':>8} {'(paper)':>8} {'c':>8} {'(paper)':>8} {'LL':>10}")
+    print("  " + "-" * 95)
+
+    from econirl.core.types import Panel
+
+    for config_name, groups in group_configs.items():
+        config_df = df[df["group"].isin(groups)]
+        full_panel = load_rust_bus(original=True, as_panel=True)
+        bus_ids_in_groups = set(config_df["bus_id"].unique())
+        filtered_trajs = [t for t in full_panel.trajectories if t.individual_id in bus_ids_in_groups]
+        config_panel = Panel(trajectories=filtered_trajs)
+        config_trans = estimate_transitions_from_panel(config_panel, num_states=90, max_increment=2)
+        n_repl = config_df["replaced"].sum()
+        pv = paper_values[config_name]
 
         try:
-            result_g = run_nfxp(group_panel, utility, problem, group_trans)
-            g_op = result_g.parameters[0].item()
+            result_g = run_nfxp(config_panel, utility, problem, config_trans)
             g_rc = result_g.parameters[1].item()
-            g_c = g_op / 0.001
+            g_c = result_g.parameters[0].item() / 0.001
             g_ll = result_g.log_likelihood
-            n_repl = group_df["replaced"].sum()
             print(
-                f"  {group_id:<8} {group_names.get(group_id, '?'):<16} "
-                f"{group_df['bus_id'].nunique():>5} {len(group_df):>6} {n_repl:>5} "
-                f"{g_op:>10.6f} {g_rc:>10.4f} {g_c:>8.4f} {g_ll:>10.2f}"
+                f"  {config_name:<20} {config_df['bus_id'].nunique():>5} {len(config_df):>6} {n_repl:>5} "
+                f"{g_rc:>8.2f} {pv['RC']:>8.2f} {g_c:>8.2f} {pv['c']:>8.2f} {g_ll:>10.2f}"
             )
         except Exception as e:
-            print(f"  {group_id:<8} {group_names.get(group_id, '?'):<16}  FAILED: {e}")
+            print(f"  {config_name:<20}  FAILED: {e}")
+
+    print(f"\n  Paper values from Rust (1987) Table IX, Model 11/19 (linear cost, beta=0.9999)")
+    print(f"  Note: Paper uses full LL (choices + transitions); we use partial LL (choices only)")
+    print(f"  Note: Paper has {paper_values['Groups 1,2,3,4']['n']} obs vs our {n_obs} (minor data processing diff)")
 
     # =========================================================================
     # Step 6: Cross-Validate with ruspy (if installed)
