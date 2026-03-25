@@ -1,284 +1,261 @@
 #!/usr/bin/env python3
 """
-Rust (1987) Bus Engine Replacement Replication
-===============================================
+Rust (1987) Bus Engine Replacement — Full Replication
+=====================================================
 
-This example replicates the estimation of the bus engine replacement model
-from John Rust's seminal 1987 Econometrica paper using the econirl package.
+Replicates the structural estimation from:
+    Rust, J. (1987). "Optimal Replacement of GMC Bus Engines: An Empirical
+    Model of Harold Zurcher." Econometrica, 55(5), 999-1033.
 
-The model:
-- Harold Zurcher (superintendent) observes bus mileage each period
-- Decides whether to keep running or replace the engine
-- Replacement has fixed cost, operating cost increases with mileage
-- Goal: Estimate the cost parameters from observed choices
+Using the NFXP algorithm with the SA→NK polyalgorithm from:
+    Iskhakov, Jorgensen, Rust & Schjerning (2016). "Comment on Constrained
+    Optimization Approaches to Estimation of Structural Models." Econometrica.
 
-This script demonstrates:
-1. Setting up the environment with known parameters
-2. Simulating panel data
-3. Estimating parameters using NFXP
-4. Evaluating parameter recovery
-5. Conducting counterfactual analysis
-6. Generating publication-ready output
+Implementation follows the ruspy reference (OpenSourceEconomics/ruspy).
+
+Pipeline:
+    1. Load original Rust (1987) data (162 buses, 4 groups, Madison Metro)
+    2. Estimate transition probabilities from data (first stage)
+    3. Estimate structural parameters via NFXP with BHHH + analytical gradient
+    4. Cross-validate with CCP/NPL estimator
+    5. Per-group estimation
+    6. Compare with ruspy (if installed)
 
 Usage:
     python examples/rust_bus_replication.py
 """
 
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
+import time
 
-# econirl imports
+import numpy as np
+import torch
+
+from econirl.datasets import load_rust_bus
 from econirl.environments.rust_bus import RustBusEnvironment
+from econirl.estimation.ccp import CCPEstimator
+from econirl.estimation.nfxp import NFXPEstimator, estimate_transitions_from_panel
+from econirl.estimation.transitions import estimate_transition_probs
 from econirl.preferences.linear import LinearUtility
-from econirl.estimation.nfxp import NFXPEstimator
-from econirl.simulation.synthetic import simulate_panel
-from econirl.simulation.counterfactual import counterfactual_policy, compute_welfare_effect
-from econirl.visualization.policy import (
-    plot_choice_probabilities,
-    plot_empirical_vs_predicted,
-    plot_counterfactual_comparison,
-)
-from econirl.visualization.value import plot_value_function, create_value_summary_figure
+
+
+def print_header(title: str) -> None:
+    print()
+    print("=" * 72)
+    print(title)
+    print("=" * 72)
+
+
+def print_section(title: str) -> None:
+    print(f"\n--- {title} ---")
+
+
+def run_nfxp(panel, utility, problem, transitions, verbose=False):
+    """Run NFXP with BHHH optimizer and analytical gradient."""
+    estimator = NFXPEstimator(
+        optimizer="BHHH",
+        inner_solver="policy",
+        inner_tol=1e-12,
+        inner_max_iter=200,
+        analytical_gradient=True,
+        compute_hessian=True,
+        outer_tol=1e-3,
+        verbose=verbose,
+    )
+    return estimator.estimate(panel, utility, problem, transitions)
+
+
+def run_npl(panel, utility, problem, transitions, K=20):
+    """Run CCP-NPL (Aguirregabiria-Mira) for cross-validation."""
+    estimator = CCPEstimator(
+        num_policy_iterations=K,
+        compute_hessian=True,
+        verbose=False,
+    )
+    return estimator.estimate(panel, utility, problem, transitions)
 
 
 def main():
-    print("=" * 70)
-    print("Rust (1987) Bus Engine Replacement - econirl Replication")
-    print("=" * 70)
-    print()
+    print_header("Rust (1987) Bus Engine Replacement — Full Replication")
+    print("econirl NFXP with BHHH + analytical gradient (Iskhakov et al. 2016)")
 
     # =========================================================================
-    # Step 1: Create Environment with Known Parameters
+    # Step 1: Load Original Data
     # =========================================================================
-    print("Step 1: Creating Rust Bus Environment")
-    print("-" * 40)
+    print_section("Step 1: Load Original Data")
 
-    # These are the "true" parameters we'll try to recover
-    TRUE_OPERATING_COST = 0.001
-    TRUE_REPLACEMENT_COST = 3.0
+    df = load_rust_bus(original=True)
+    panel = load_rust_bus(original=True, as_panel=True)
 
-    env = RustBusEnvironment(
-        operating_cost=TRUE_OPERATING_COST,
-        replacement_cost=TRUE_REPLACEMENT_COST,
-        num_mileage_bins=90,
-        discount_factor=0.9999,
-        scale_parameter=1.0,
-        seed=42,
-    )
+    n_obs = len(df)
+    n_buses = df["bus_id"].nunique()
+    n_groups = df["group"].nunique()
+    n_replace = df["replaced"].sum()
+    replace_rate = df["replaced"].mean()
 
-    print(env.describe())
-
-    # =========================================================================
-    # Step 2: Simulate Panel Data
-    # =========================================================================
-    print("\nStep 2: Simulating Panel Data")
-    print("-" * 40)
-
-    N_INDIVIDUALS = 500
-    N_PERIODS = 100
-    SEED = 12345
-
-    panel = simulate_panel(
-        env,
-        n_individuals=N_INDIVIDUALS,
-        n_periods=N_PERIODS,
-        seed=SEED,
-    )
-
-    print(f"Simulated panel with:")
-    print(f"  - {panel.num_individuals} individuals")
-    print(f"  - {N_PERIODS} periods each")
-    print(f"  - {panel.num_observations:,} total observations")
-
-    # Summary statistics
-    actions = panel.get_all_actions()
-    replace_rate = (actions == 1).float().mean().item()
-    print(f"\nEmpirical replacement rate: {replace_rate:.1%}")
+    print(f"  Observations:     {n_obs:,}")
+    print(f"  Buses:            {n_buses}")
+    print(f"  Groups:           {n_groups} (Grumman 870, RT-50, T8H203, A5308)")
+    print(f"  Replacements:     {n_replace} ({replace_rate:.2%})")
+    print(f"  Mileage range:    bins {df['mileage_bin'].min()}-{df['mileage_bin'].max()}")
+    print(f"  Mean mileage:     bin {df['mileage_bin'].mean():.1f}")
 
     # =========================================================================
-    # Step 3: Set Up Estimation
+    # Step 2: Estimate Transition Probabilities (First Stage)
     # =========================================================================
-    print("\nStep 3: Setting Up NFXP Estimation")
-    print("-" * 40)
+    print_section("Step 2: Estimate Transition Probabilities (First Stage)")
 
-    # Create utility specification
+    trans_probs = estimate_transition_probs(df)
+    print(f"  P(dx=0) = {trans_probs[0]:.4f}")
+    print(f"  P(dx=1) = {trans_probs[1]:.4f}")
+    print(f"  P(dx=2) = {trans_probs[2]:.4f}")
+
+    # Build transition matrices from estimated probabilities
+    transitions = estimate_transitions_from_panel(panel, num_states=90, max_increment=2)
+
+    # Also estimate per group
+    from econirl.estimation.transitions import estimate_transition_probs_by_group
+
+    trans_by_group = estimate_transition_probs_by_group(df)
+    print("\n  Per-group transition probabilities:")
+    group_names = {1: "Grumman 870", 2: "Chance RT-50", 3: "GMC T8H203", 4: "GMC A5308"}
+    for g, probs in trans_by_group.items():
+        n = len(df[df["group"] == g])
+        print(f"    Group {g} ({group_names.get(g, '?'):>14}): ({probs[0]:.4f}, {probs[1]:.4f}, {probs[2]:.4f})  n={n}")
+
+    # =========================================================================
+    # Step 3: NFXP Estimation (Pooled, All Groups)
+    # =========================================================================
+    print_section("Step 3: NFXP Estimation (Pooled, All Groups)")
+
+    env = RustBusEnvironment(num_mileage_bins=90, discount_factor=0.9999)
     utility = LinearUtility.from_environment(env)
-    print(f"Parameters to estimate: {utility.parameter_names}")
-
-    # Get problem specification and transitions
     problem = env.problem_spec
-    transitions = env.transition_matrices
 
-    # Create estimator
-    estimator = NFXPEstimator(
-        se_method="asymptotic",
-        optimizer="L-BFGS-B",
-        inner_tol=1e-10,
-        outer_tol=1e-6,
-        verbose=True,
-    )
+    t0 = time.time()
+    result_nfxp = run_nfxp(panel, utility, problem, transitions, verbose=True)
+    t_nfxp = time.time() - t0
 
-    # =========================================================================
-    # Step 4: Estimate Parameters
-    # =========================================================================
-    print("\nStep 4: Running NFXP Estimation")
-    print("-" * 40)
+    print(f"\n  Time: {t_nfxp:.1f}s")
+    print(result_nfxp.summary())
 
-    result = estimator.estimate(
-        panel=panel,
-        utility=utility,
-        problem=problem,
-        transitions=transitions,
-    )
+    # Convert to Rust parameterization
+    op_cost = result_nfxp.parameters[0].item()
+    rc = result_nfxp.parameters[1].item()
+    rust_c = op_cost / 0.001
+    print(f"  Rust parameterization: c = {rust_c:.4f}, RC = {rc:.4f}")
+    print(f"  (cost function: c * 0.001 * mileage_bin)")
 
     # =========================================================================
-    # Step 5: Display Results
+    # Step 4: Cross-Validate with NPL
     # =========================================================================
-    print("\nStep 5: Estimation Results")
-    print("-" * 40)
+    print_section("Step 4: Cross-Validate with CCP-NPL (Aguirregabiria-Mira)")
 
-    # Full summary (StatsModels-style)
-    print(result.summary())
+    t0 = time.time()
+    result_npl = run_npl(panel, utility, problem, transitions)
+    t_npl = time.time() - t0
 
-    # Parameter comparison
-    print("\nParameter Recovery:")
-    print("-" * 40)
-    true_params = env.get_true_parameter_vector()
+    npl_op = result_npl.parameters[0].item()
+    npl_rc = result_npl.parameters[1].item()
 
-    for i, name in enumerate(result.parameter_names):
-        true_val = true_params[i].item()
-        est_val = result.parameters[i].item()
-        se = result.standard_errors[i].item()
-        error = est_val - true_val
-        t_stat = error / se if se > 0 else float('inf')
-
-        print(f"{name}:")
-        print(f"  True:      {true_val:.6f}")
-        print(f"  Estimated: {est_val:.6f} (SE: {se:.6f})")
-        print(f"  Error:     {error:.6f} ({error/true_val*100:.1f}%)")
-        print(f"  t-stat:    {t_stat:.2f}")
-        print()
+    print(f"  NPL:  operating_cost = {npl_op:.6f}, RC = {npl_rc:.4f}, LL = {result_npl.log_likelihood:.4f}  ({t_npl:.1f}s)")
+    print(f"  NFXP: operating_cost = {op_cost:.6f}, RC = {rc:.4f}, LL = {result_nfxp.log_likelihood:.4f}  ({t_nfxp:.1f}s)")
+    print(f"  Agreement: |dLL| = {abs(result_nfxp.log_likelihood - result_npl.log_likelihood):.4f}")
 
     # =========================================================================
-    # Step 6: Counterfactual Analysis
+    # Step 5: Per-Group Estimation
     # =========================================================================
-    print("\nStep 6: Counterfactual Analysis")
-    print("-" * 40)
+    print_section("Step 5: Per-Group NFXP Estimation")
 
-    # What if replacement cost increases by 50%?
-    print("Scenario: Replacement cost increases by 50%")
+    print(f"\n  {'Group':<8} {'Name':<16} {'Buses':>5} {'Obs':>6} {'Repl':>5} {'op_cost':>10} {'RC':>10} {'c':>8} {'LL':>10}")
+    print("  " + "-" * 90)
 
-    new_params = result.parameters.clone()
-    new_params[1] *= 1.5  # replacement_cost
+    for group_id in sorted(df["group"].unique()):
+        group_df = df[df["group"] == group_id]
+        group_panel = load_rust_bus(original=True, group=group_id, as_panel=True)
+        group_trans = estimate_transitions_from_panel(group_panel, num_states=90, max_increment=2)
 
-    cf = counterfactual_policy(
-        result=result,
-        new_parameters=new_params,
-        utility=utility,
-        problem=problem,
-        transitions=transitions,
-    )
-
-    # Policy changes
-    baseline_replace_avg = cf.baseline_policy[:, 1].mean().item()
-    cf_replace_avg = cf.counterfactual_policy[:, 1].mean().item()
-
-    print(f"\nAverage replacement probability:")
-    print(f"  Baseline:       {baseline_replace_avg:.4f}")
-    print(f"  Counterfactual: {cf_replace_avg:.4f}")
-    print(f"  Change:         {cf_replace_avg - baseline_replace_avg:.4f}")
-
-    # Welfare effects
-    welfare = compute_welfare_effect(cf, transitions, use_stationary=True)
-    print(f"\nWelfare effects:")
-    print(f"  Baseline EV:       {welfare['baseline_expected_value']:.2f}")
-    print(f"  Counterfactual EV: {welfare['counterfactual_expected_value']:.2f}")
-    print(f"  Total change:      {welfare['total_welfare_change']:.2f}")
+        try:
+            result_g = run_nfxp(group_panel, utility, problem, group_trans)
+            g_op = result_g.parameters[0].item()
+            g_rc = result_g.parameters[1].item()
+            g_c = g_op / 0.001
+            g_ll = result_g.log_likelihood
+            n_repl = group_df["replaced"].sum()
+            print(
+                f"  {group_id:<8} {group_names.get(group_id, '?'):<16} "
+                f"{group_df['bus_id'].nunique():>5} {len(group_df):>6} {n_repl:>5} "
+                f"{g_op:>10.6f} {g_rc:>10.4f} {g_c:>8.4f} {g_ll:>10.2f}"
+            )
+        except Exception as e:
+            print(f"  {group_id:<8} {group_names.get(group_id, '?'):<16}  FAILED: {e}")
 
     # =========================================================================
-    # Step 7: Visualization
+    # Step 6: Cross-Validate with ruspy (if installed)
     # =========================================================================
-    print("\nStep 7: Generating Visualizations")
-    print("-" * 40)
+    print_section("Step 6: Cross-Validate with ruspy")
 
-    # Create output directory
-    import os
-    os.makedirs("output", exist_ok=True)
+    try:
+        from ruspy.model_code.fix_point_alg import calc_fixp
+        from ruspy.model_code.choice_probabilities import choice_prob_gumbel
+        from ruspy.model_code.cost_functions import calc_obs_costs, lin_cost
 
-    # 1. Choice probabilities
-    fig = plot_choice_probabilities(
-        result,
-        action_labels=["Keep", "Replace"],
-        xlabel="Mileage (bins)",
-        title="Estimated Choice Probabilities",
-    )
-    fig.savefig("output/choice_probabilities.png", dpi=150, bbox_inches="tight")
-    print("Saved: output/choice_probabilities.png")
-    plt.close(fig)
+        # Build ruspy transition matrix
+        n = 90
+        tm = np.zeros((n, n))
+        for i in range(n):
+            for j in range(len(trans_probs)):
+                tm[i, min(i + j, n - 1)] += trans_probs[j]
 
-    # 2. Model fit
-    fig = plot_empirical_vs_predicted(
-        panel,
-        result,
-        action_idx=1,
-        action_label="Replace",
-        xlabel="Mileage (bins)",
-        title="Model Fit: Empirical vs Predicted",
-    )
-    fig.savefig("output/model_fit.png", dpi=150, bbox_inches="tight")
-    print("Saved: output/model_fit.png")
-    plt.close(fig)
+        # Evaluate at our NFXP estimates
+        params_rust_fmt = np.array([rc, rust_c])
+        costs = calc_obs_costs(n, lin_cost, params_rust_fmt, 0.001)
 
-    # 3. Counterfactual comparison
-    fig = plot_counterfactual_comparison(
-        cf,
-        action_labels=["Keep", "Replace"],
-        xlabel="Mileage (bins)",
-    )
-    fig.savefig("output/counterfactual.png", dpi=150, bbox_inches="tight")
-    print("Saved: output/counterfactual.png")
-    plt.close(fig)
+        ev_result = calc_fixp(tm, costs, 0.9999)
+        ev = ev_result[0] if isinstance(ev_result, tuple) else ev_result
+        probs = choice_prob_gumbel(ev, costs, 0.9999)
 
-    # 4. Value function summary
-    fig = create_value_summary_figure(
-        result,
-        utility,
-        problem,
-        transitions,
-        action_labels=["Keep", "Replace"],
-    )
-    fig.savefig("output/value_summary.png", dpi=150, bbox_inches="tight")
-    print("Saved: output/value_summary.png")
-    plt.close(fig)
+        # Compute LL
+        ruspy_ll = 0.0
+        for bus_id in sorted(df["bus_id"].unique()):
+            bus = df[df["bus_id"] == bus_id].sort_values("period")
+            for _, row in bus.iterrows():
+                s = int(row["mileage_bin"])
+                d = int(row["replaced"])  # 0=keep, 1=replace
+                ruspy_ll += np.log(max(probs[s, d], 1e-300))
 
-    # =========================================================================
-    # Step 8: Export Results
-    # =========================================================================
-    print("\nStep 8: Exporting Results")
-    print("-" * 40)
+        print(f"  ruspy LL at our params:  {ruspy_ll:.4f}")
+        print(f"  econirl LL:              {result_nfxp.log_likelihood:.4f}")
+        print(f"  |difference|:            {abs(ruspy_ll - result_nfxp.log_likelihood):.6f}")
+        print("  Status: MATCH" if abs(ruspy_ll - result_nfxp.log_likelihood) < 0.01 else "  Status: MISMATCH")
 
-    # LaTeX table
-    result.to_latex("output/estimation_results.tex", caption="Rust (1987) Replication")
-    print("Saved: output/estimation_results.tex")
-
-    # DataFrame
-    df = result.to_dataframe()
-    df.to_csv("output/estimation_results.csv")
-    print("Saved: output/estimation_results.csv")
+    except ImportError:
+        print("  ruspy not installed. Install with: pip install git+https://github.com/OpenSourceEconomics/ruspy.git")
 
     # =========================================================================
     # Summary
     # =========================================================================
-    print("\n" + "=" * 70)
-    print("Replication Complete!")
-    print("=" * 70)
-    print(f"\nKey findings:")
-    print(f"  - Operating cost: {result.parameters[0]:.6f} (true: {TRUE_OPERATING_COST})")
-    print(f"  - Replacement cost: {result.parameters[1]:.4f} (true: {TRUE_REPLACEMENT_COST})")
-    print(f"  - Log-likelihood: {result.log_likelihood:,.2f}")
-    print(f"  - Prediction accuracy: {result.goodness_of_fit.prediction_accuracy:.1%}")
-    print(f"\nOutput files saved to: output/")
+    print_header("Replication Summary")
+
+    print(f"""
+  Model: Rust (1987) Table IX, Model 11 (linear cost, beta=0.9999)
+  Data:  {n_obs:,} observations, {n_buses} buses, {n_groups} groups
+
+  Pooled Estimates (NFXP + BHHH + analytical gradient):
+    operating_cost = {op_cost:.6f}  (SE {result_nfxp.standard_errors[0]:.6f})
+    replacement_cost = {rc:.4f}  (SE {result_nfxp.standard_errors[1]:.4f})
+    Log-likelihood = {result_nfxp.log_likelihood:.4f}
+
+  Rust parameterization: c = {rust_c:.4f}, RC = {rc:.4f}
+  (cost = c * 0.001 * mileage_bin, where each bin = 5,000 miles)
+
+  Cross-validation:
+    NFXP vs NPL: |dLL| = {abs(result_nfxp.log_likelihood - result_npl.log_likelihood):.4f}
+
+  Algorithm: Iskhakov et al. (2016) SA→NK polyalgorithm
+    Inner solver: Policy iteration (9 iters at beta=0.9999)
+    Outer solver: BHHH with analytical gradient
+    Precision: float64 for inner solver (cond(I-beta*P) ~ 10^5)
+""")
 
 
 if __name__ == "__main__":
