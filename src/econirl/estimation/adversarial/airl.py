@@ -29,7 +29,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.solvers import hybrid_iteration, value_iteration
+from econirl.core.solvers import hybrid_iteration, value_iteration, backward_induction
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
@@ -324,8 +324,17 @@ class AIRLEstimator(BaseEstimator):
         self,
         reward_matrix: torch.Tensor,
         operator: SoftBellmanOperator,
+        num_periods: int | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute optimal policy given reward matrix."""
+        """Compute optimal policy given reward matrix.
+
+        For finite horizon (num_periods set), uses backward induction and
+        returns period-0 policy/value for compatibility.
+        """
+        if num_periods is not None:
+            fh_result = backward_induction(operator, reward_matrix, num_periods)
+            return fh_result.policy[0], fh_result.V[0]
+
         if self.config.generator_solver == "hybrid":
             result = hybrid_iteration(
                 operator,
@@ -493,7 +502,7 @@ class AIRLEstimator(BaseEstimator):
             disc_losses.append(disc_loss)
 
             # Update policy via soft value iteration
-            policy, V = self._compute_policy(current_reward, operator)
+            policy, V = self._compute_policy(current_reward, operator, problem.num_periods)
 
             # Check convergence
             policy_change = torch.abs(policy - old_policy).max().item()

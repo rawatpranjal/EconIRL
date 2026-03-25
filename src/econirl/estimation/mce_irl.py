@@ -42,7 +42,7 @@ from scipy import optimize
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.solvers import hybrid_iteration, value_iteration
+from econirl.core.solvers import hybrid_iteration, value_iteration, backward_induction
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.preferences.action_reward import ActionDependentReward
@@ -159,14 +159,12 @@ class MCEIRLEstimator(BaseEstimator):
         self,
         operator: SoftBellmanOperator,
         reward_matrix: torch.Tensor,
+        num_periods: int | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Run soft value iteration (backward pass).
 
-        Computes the soft value function and policy using the soft Bellman
-        equation, which is the backward pass in MCE IRL.
-
-        Uses either pure value iteration or hybrid (contraction + Newton-Kantorovich)
-        based on config.inner_solver setting. Hybrid is typically 5-7x faster.
+        For infinite horizon: uses contraction/hybrid iteration.
+        For finite horizon: uses backward induction (deterministic, no convergence needed).
 
         Parameters
         ----------
@@ -174,16 +172,25 @@ class MCEIRLEstimator(BaseEstimator):
             Bellman operator with problem and transitions.
         reward_matrix : torch.Tensor
             Reward matrix R(s,a), shape (n_states, n_actions).
+        num_periods : int, optional
+            If set, use finite-horizon backward induction.
 
         Returns
         -------
         V : torch.Tensor
-            Soft value function, shape (n_states,).
+            Soft value function, shape (n_states,) for infinite horizon,
+            or shape (num_periods, n_states) for finite horizon.
         policy : torch.Tensor
-            Soft policy π(a|s), shape (n_states, n_actions).
+            Soft policy π(a|s), shape (n_states, n_actions) for infinite horizon,
+            or shape (num_periods, n_states, n_actions) for finite horizon.
         converged : bool
-            Whether the iteration converged.
+            Whether the iteration converged (always True for finite horizon).
         """
+        if num_periods is not None:
+            # Finite horizon: backward induction (deterministic, no convergence needed)
+            fh_result = backward_induction(operator, reward_matrix, num_periods)
+            return fh_result.V, fh_result.policy, True
+
         if self.config.inner_solver == "hybrid":
             result = hybrid_iteration(
                 operator,
@@ -405,6 +412,55 @@ class MCEIRLEstimator(BaseEstimator):
                     return feature_sum / total_obs
                 return feature_sum
 
+    def _compute_expected_features_finite_horizon(
+        self,
+        panel: Panel,
+        policy: torch.Tensor,
+        reward_fn: BaseUtilityFunction,
+        num_periods: int,
+    ) -> torch.Tensor:
+        """Compute expected features under time-indexed policy for finite horizon.
+
+        For each observation (s_it, t), uses the period-specific policy π_t(a|s)
+        to compute expected features: (1/N) Σ_{i,t} Σ_a π_t(a|s_{it}) φ(s_{it}, a)
+
+        Parameters
+        ----------
+        policy : torch.Tensor
+            Time-indexed policy, shape (num_periods, n_states, n_actions).
+        """
+        if hasattr(reward_fn, 'feature_matrix'):
+            feature_matrix = reward_fn.feature_matrix
+        elif hasattr(reward_fn, 'state_features'):
+            feature_matrix = reward_fn.state_features
+        else:
+            raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
+
+        total_obs = sum(len(traj) for traj in panel.trajectories)
+
+        if feature_matrix.ndim == 3:
+            # Action-dependent: (n_states, n_actions, n_features)
+            n_features = feature_matrix.shape[2]
+            feature_sum = torch.zeros(n_features)
+
+            for traj in panel.trajectories:
+                for t in range(len(traj.states)):
+                    period = min(t, num_periods - 1)
+                    s = traj.states[t].item()
+                    # Σ_a π_t(a|s) * φ(s, a, k)
+                    feature_sum += (policy[period, s].unsqueeze(-1) * feature_matrix[s]).sum(dim=0)
+
+            if total_obs > 0:
+                return feature_sum / total_obs
+            return feature_sum
+        else:
+            # State-only features: same as infinite horizon (no time dependence in features)
+            all_states = panel.get_all_states()
+            feature_sum = feature_matrix[all_states, :].sum(dim=0)
+            if total_obs > 0:
+                return feature_sum / total_obs
+            return feature_sum
+
     def _compute_initial_distribution(
         self,
         panel: Panel,
@@ -487,19 +543,31 @@ class MCEIRLEstimator(BaseEstimator):
             leave=True,
         )
 
+        finite_horizon = problem.num_periods is not None
+        num_periods = problem.num_periods
+
         for i in pbar:
             # Forward and backward passes
             reward_matrix = reward_fn.compute(params)
-            V, policy, inner_converged = self._soft_value_iteration(operator, reward_matrix)
+            V, policy, inner_converged = self._soft_value_iteration(
+                operator, reward_matrix, num_periods=num_periods
+            )
             if not inner_converged:
                 inner_not_converged += 1
 
-            expected_features = self._compute_expected_features(
-                panel, policy, reward_fn,
-                transitions=transitions,
-                initial_dist=initial_dist,
-                discount=problem.discount_factor,
-            )
+            if finite_horizon:
+                # For finite horizon, compute expected features using time-indexed policy
+                # Average policy across periods weighted by empirical period distribution
+                expected_features = self._compute_expected_features_finite_horizon(
+                    panel, policy, reward_fn, num_periods
+                )
+            else:
+                expected_features = self._compute_expected_features(
+                    panel, policy, reward_fn,
+                    transitions=transitions,
+                    initial_dist=initial_dist,
+                    discount=problem.discount_factor,
+                )
 
             # Feature matching gradient: μ_D - μ_π
             # We want to INCREASE params in direction where μ_D > μ_π
@@ -564,16 +632,39 @@ class MCEIRLEstimator(BaseEstimator):
 
         # Final solution
         reward_matrix = reward_fn.compute(final_params)
-        V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
-        D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
+        V, policy, _ = self._soft_value_iteration(
+            operator, reward_matrix, num_periods=num_periods
+        )
 
-        # Feature difference for diagnostics
-        final_expected = self._compute_expected_features(panel, policy, reward_fn)
+        if finite_horizon:
+            final_expected = self._compute_expected_features_finite_horizon(
+                panel, policy, reward_fn, num_periods
+            )
+            D = torch.zeros(problem.num_states)
+
+            # Finite-horizon LL: use period-specific policies
+            sigma = problem.scale_parameter
+            import torch.nn.functional as Func
+            fh_result = backward_induction(operator, reward_matrix, num_periods)
+            log_policy = Func.log_softmax(fh_result.Q / sigma, dim=-1)  # (T, S, A)
+            ll = 0.0
+            for traj in panel.trajectories:
+                for t in range(len(traj.states)):
+                    period = min(t, num_periods - 1)
+                    s = traj.states[t].item()
+                    a = traj.actions[t].item()
+                    ll += log_policy[period, s, a].item()
+
+            # Flatten to period-0 for EstimationResult (base class expects 2D)
+            V = V[0] if V.dim() > 1 else V
+            policy = policy[0] if policy.dim() > 2 else policy
+        else:
+            D = self._compute_state_visitation(policy, transitions, problem, initial_dist)
+            final_expected = self._compute_expected_features(panel, policy, reward_fn)
+            log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
+            ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+
         feature_diff = torch.norm(empirical_features - final_expected).item()
-
-        # Log-likelihood
-        log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
-        ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
 
         # Inference
         hessian = None
