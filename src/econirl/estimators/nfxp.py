@@ -40,10 +40,12 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import torch
+from scipy.stats import norm as scipy_norm
 
 from econirl.core.bellman import SoftBellmanOperator
+from econirl.core.reward_spec import RewardSpec
 from econirl.core.solvers import value_iteration
-from econirl.core.types import DDCProblem, Panel, Trajectory
+from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.preferences.linear import LinearUtility
 from econirl.transitions import TransitionEstimator
@@ -91,9 +93,10 @@ class NFXP:
         Number of discrete actions (e.g., keep/replace).
     discount : float, default=0.9999
         Time discount factor (beta).
-    utility : str, default="linear_cost"
-        Utility specification. Currently supports "linear_cost" which
-        implements the Rust bus model: u = -theta_c * s * (1-a) - RC * a
+    utility : str or RewardSpec, default="linear_cost"
+        Utility specification.  Pass ``"linear_cost"`` for the classic Rust
+        bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
+        ``RewardSpec`` for custom features.
     se_method : str, default="robust"
         Method for computing standard errors. Options: "robust", "asymptotic".
     verbose : bool, default=False
@@ -110,12 +113,20 @@ class NFXP:
         Coefficients as a numpy array (sklearn convention).
     log_likelihood_ : float
         Maximized log-likelihood value.
+    pvalues_ : dict
+        P-values for each parameter (from Wald t-test).
+    policy_ : numpy.ndarray
+        Estimated choice probabilities P(a|s) of shape (n_states, n_actions).
+    value_ : numpy.ndarray
+        Estimated value function V(s) of shape (n_states,).
     value_function_ : numpy.ndarray
-        Estimated value function V(s) for each state.
+        Alias for ``value_`` (backward compatibility).
     transitions_ : numpy.ndarray
         Transition probability matrix (n_states x n_states).
     converged_ : bool
         Whether the optimization converged.
+    reward_spec_ : RewardSpec
+        The reward specification used for estimation.
 
     Examples
     --------
@@ -138,7 +149,7 @@ class NFXP:
         n_states: int = 90,
         n_actions: int = 2,
         discount: float = 0.9999,
-        utility: Literal["linear_cost"] = "linear_cost",
+        utility: str | RewardSpec = "linear_cost",
         se_method: Literal["robust", "asymptotic"] = "robust",
         verbose: bool = False,
     ):
@@ -152,8 +163,9 @@ class NFXP:
             Number of discrete actions.
         discount : float, default=0.9999
             Time discount factor (beta).
-        utility : str, default="linear_cost"
-            Utility specification to use.
+        utility : str or RewardSpec, default="linear_cost"
+            Utility specification to use.  Pass ``"linear_cost"`` for the
+            classic Rust bus model, or a ``RewardSpec`` for custom features.
         se_method : str, default="robust"
             Method for computing standard errors.
         verbose : bool, default=False
@@ -169,11 +181,15 @@ class NFXP:
         # Fitted attributes (set after fit())
         self.params_: dict[str, float] | None = None
         self.se_: dict[str, float] | None = None
+        self.pvalues_: dict[str, float] | None = None
         self.coef_: np.ndarray | None = None
         self.log_likelihood_: float | None = None
         self.value_function_: np.ndarray | None = None
+        self.policy_: np.ndarray | None = None
+        self.value_: np.ndarray | None = None
         self.transitions_: np.ndarray | None = None
         self.converged_: bool | None = None
+        self.reward_spec_: RewardSpec | None = None
 
         # Internal storage
         self._result = None
@@ -183,36 +199,74 @@ class NFXP:
 
     def fit(
         self,
-        data: pd.DataFrame,
-        state: str,
-        action: str,
-        id: str,
+        data: pd.DataFrame | Panel | TrajectoryPanel,
+        state: str | None = None,
+        action: str | None = None,
+        id: str | None = None,
         transitions: np.ndarray | None = None,
+        reward: RewardSpec | None = None,
     ) -> "NFXP":
         """Fit the NFXP estimator to data.
 
         Parameters
         ----------
-        data : pandas.DataFrame
-            Panel data with observations. Must contain columns for state,
-            action, and individual id.
-        state : str
-            Column name for the state variable.
-        action : str
-            Column name for the action variable.
-        id : str
-            Column name for the individual identifier.
+        data : pandas.DataFrame or Panel or TrajectoryPanel
+            Panel data with observations.  When a DataFrame is passed,
+            ``state``, ``action``, and ``id`` column names are required.
+            When a Panel/TrajectoryPanel is passed, column names are ignored.
+        state : str, optional
+            Column name for the state variable (required for DataFrame input).
+        action : str, optional
+            Column name for the action variable (required for DataFrame input).
+        id : str, optional
+            Column name for the individual identifier (required for DataFrame
+            input).
         transitions : numpy.ndarray, optional
             Pre-estimated transition matrix of shape (n_states, n_states).
             If None, transitions are estimated from the data.
+        reward : RewardSpec, optional
+            Reward/utility specification.  If provided, overrides the
+            ``utility`` parameter passed at construction time.
 
         Returns
         -------
         self : NFXP
             Returns self for method chaining.
         """
-        # Convert DataFrame to Panel
-        self._panel = self._dataframe_to_panel(data, state, action, id)
+        # Resolve reward spec: explicit argument > constructor parameter
+        reward_spec = reward if reward is not None else self.utility
+
+        # --- Handle data: DataFrame or Panel/TrajectoryPanel ---
+        if isinstance(data, pd.DataFrame):
+            if state is None or action is None or id is None:
+                raise ValueError(
+                    "state, action, and id column names are required "
+                    "when data is a DataFrame"
+                )
+            self._panel = TrajectoryPanel.from_dataframe(
+                data, state=state, action=action, id=id
+            )
+        elif isinstance(data, (Panel, TrajectoryPanel)):
+            self._panel = data
+        else:
+            raise TypeError(
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
+                f"got {type(data)}"
+            )
+
+        # --- Handle reward: RewardSpec or string ---
+        if isinstance(reward_spec, RewardSpec):
+            self.reward_spec_ = reward_spec
+            self._utility_fn = reward_spec.to_linear_utility()
+        elif reward_spec == "linear_cost":
+            self._utility_fn = self._create_utility()
+            # Also create RewardSpec from the utility for consistency
+            self.reward_spec_ = RewardSpec(
+                self._utility_fn.feature_matrix,
+                self._utility_fn.parameter_names,
+            )
+        else:
+            raise ValueError(f"Unknown reward/utility specification: {reward_spec}")
 
         # Estimate transitions if not provided
         if transitions is None:
@@ -237,9 +291,6 @@ class NFXP:
             discount_factor=self.discount,
             scale_parameter=1.0,
         )
-
-        # Create utility function
-        self._utility_fn = self._create_utility()
 
         # Create the underlying NFXP estimator
         estimator = NFXPEstimator(
@@ -401,6 +452,25 @@ class NFXP:
 
         if self._result.value_function is not None:
             self.value_function_ = self._result.value_function.numpy()
+            self.value_ = self.value_function_
+
+        # Policy matrix
+        if self._result.policy is not None:
+            self.policy_ = self._result.policy.numpy()
+
+        # p-values from t-statistics
+        if self.se_ is not None:
+            pvalues: dict[str, float] = {}
+            for name in self.params_:
+                se_val = self.se_[name]
+                if se_val and se_val > 0:
+                    t_stat = self.params_[name] / se_val
+                    pvalues[name] = float(
+                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
+                    )
+                else:
+                    pvalues[name] = float("nan")
+            self.pvalues_ = pvalues
 
     def summary(self) -> str:
         """Generate a formatted summary of estimation results.
@@ -414,6 +484,34 @@ class NFXP:
             return "NFXP: Not fitted yet. Call fit() first."
 
         return self._result.summary()
+
+    def conf_int(self, alpha: float = 0.05) -> dict:
+        """Compute confidence intervals for parameters.
+
+        Parameters
+        ----------
+        alpha : float, default=0.05
+            Significance level.  Returns (1 - alpha) confidence intervals.
+
+        Returns
+        -------
+        dict
+            ``{param_name: (lower, upper)}`` confidence intervals.
+
+        Raises
+        ------
+        RuntimeError
+            If the model has not been fitted yet.
+        """
+        if self.params_ is None or self.se_ is None:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        z = scipy_norm.ppf(1 - alpha / 2)
+        intervals: dict[str, tuple[float, float]] = {}
+        for name in self.params_:
+            est = self.params_[name]
+            se = self.se_[name]
+            intervals[name] = (est - z * se, est + z * se)
+        return intervals
 
     def predict_proba(self, states: np.ndarray) -> np.ndarray:
         """Predict choice probabilities for given states.
