@@ -64,7 +64,7 @@ from econirl.estimation.ccp import CCPEstimator
 
 # Sklearn-style Estimators (recommended) — lazy imports to avoid broken deps
 try:
-    from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES
+    from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES, TDCCP
 except ImportError:
     pass
 
@@ -111,6 +111,7 @@ __all__ = [
     "MaxMarginIRL",
     "MCEIRL",
     "NNES",
+    "TDCCP",
     # Core types (new)
     "RewardSpec",
     "TrajectoryPanel",

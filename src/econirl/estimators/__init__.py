@@ -48,6 +48,7 @@ from econirl.estimators.maxent_irl import MaxEntIRL
 from econirl.estimators.mce_irl import MCEIRL
 from econirl.estimators.nfxp import NFXP
 from econirl.estimators.nnes import NNES
+from econirl.estimators.tdccp import TDCCP
 from econirl.estimators.protocol import EstimatorProtocol
 
 try:
@@ -59,6 +60,7 @@ __all__ = [
     "NFXP",
     "NNES",
     "CCP",
+    "TDCCP",
     "MaxEntIRL",
     "MaxMarginIRL",
     "MCEIRL",
