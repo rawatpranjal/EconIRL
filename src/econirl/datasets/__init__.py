@@ -33,6 +33,14 @@ from econirl.datasets.eth_ucy import load_eth_ucy, get_eth_ucy_info
 from econirl.datasets.foursquare import load_foursquare, get_foursquare_info
 from econirl.datasets.ngsim import load_ngsim, get_ngsim_info
 from econirl.datasets.taxi_gridworld import load_taxi_gridworld, get_taxi_gridworld_info
+from econirl.datasets.shanghai_route import (
+    load_shanghai_network,
+    load_shanghai_route,
+    load_shanghai_trajectories,
+    build_transition_matrix,
+    build_edge_features,
+    build_state_action_features,
+)
 
 __all__ = [
     # DDC Datasets
@@ -60,4 +68,11 @@ __all__ = [
     # Benchmark Datasets
     "load_taxi_gridworld",
     "get_taxi_gridworld_info",
+    # Shanghai route-choice
+    "load_shanghai_network",
+    "load_shanghai_route",
+    "load_shanghai_trajectories",
+    "build_transition_matrix",
+    "build_edge_features",
+    "build_state_action_features",
 ]
