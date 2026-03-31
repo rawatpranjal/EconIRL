@@ -198,7 +198,11 @@ $$
 \pi_\theta(a \mid s) = \frac{\exp\!\big(\hat{R}(s,a)^\top \theta + \hat{Q}_\varepsilon(s,a)\big)}{\sum_{a'} \exp\!\big(\hat{R}(s,a')^\top \theta + \hat{Q}_\varepsilon(s,a')\big)},
 $$
 
-where $\hat{R}$ and $\hat{Q}_\varepsilon$ come from a single matrix inversion $(I - \beta F_\pi)^{-1}$ using the empirical choice probabilities.
+where $\hat{R}$ and $\hat{Q}_\varepsilon$ come from a single matrix inversion $(I - \beta F_\pi)^{-1}$ using the empirical choice probabilities. The Hotz-Miller inversion recovers $Q$-value differences directly from observed choices,
+
+$$
+Q(s,a) - Q(s,a') = \sigma \log\!\big(\pi(a \mid s) / \pi(a' \mid s)\big).
+$$
 
 **Pseudocode.**
 
@@ -226,7 +230,11 @@ $$
 (\hat\theta, \hat\alpha) = \arg\max_{\theta, \alpha} \; \ell^f(\theta) - \frac{\lambda}{2} \|\alpha\|^2,
 $$
 
-where $V(s;\alpha) = \Psi(s)^\top \alpha$ is a polynomial or Fourier approximation and the penalty keeps the basis from overfitting.
+where $V(s;\alpha) = \Psi(s)^\top \alpha$ is a polynomial or Fourier approximation and the penalty keeps the basis from overfitting. The action values under this approximation are
+
+$$
+Q(s,a;\theta,\alpha) = r_\theta(s,a) + \beta \sum_{s'} p(s' \mid s,a) \, \Psi(s')^\top \alpha.
+$$
 
 **Pseudocode.**
 
@@ -369,7 +377,11 @@ $$
 \min_r D_f(\rho_E \| \rho_{\pi_r}),
 $$
 
-where $\rho(s,a)$ measures how often state-action pairs are visited under the discounted policy.
+where $\rho(s,a) = E_\pi\{\sum_{t=0}^\infty \beta^t \mathbb{I}(s_t = s, a_t = a)\}$ is the discounted occupancy measure. The gradient on the tabular reward depends on the divergence,
+
+$$
+\nabla_r = \begin{cases} \log(\rho_E / \rho_\pi) & \text{KL} \\ (\rho_E / \rho_\pi) - 1 & \chi^2 \\ \mathrm{sign}(\rho_E - \rho_\pi) & \text{TV} \end{cases}.
+$$
 
 **Pseudocode.**
 
@@ -396,6 +408,18 @@ $$
 \max_{\phi_1} \bigg[\ell^p(\phi_1) - \lambda \, \rho_{BE}(Q_{\phi_1})\bigg].
 $$
 
+The mean squared TD error decomposes into Bellman error and irreducible transition variance,
+
+$$
+\rho_{TD}(Q) = \rho_{BE}(Q) + \beta^2 E_p\big\{[V(s') - EV(s,a)]^2\big\}.
+$$
+
+After training, the reward is recovered from the Bellman identity,
+
+$$
+r(s,a) = Q_{\hat\phi_1}(s,a) - \beta \, EV_{\hat\phi_2}(s,a).
+$$
+
 **Pseudocode.**
 
 ```
@@ -418,6 +442,12 @@ GLADIUS(D, features, beta, sigma, lambda):
 #### BC
 
 **Motivation.** Before trying anything fancy, check whether the data has a signal at all. Behavioral cloning just counts: how often was each action chosen in each state? No model, no optimization, no value function. If a sophisticated estimator cannot beat this, it is not learning anything useful. Ross et al. (2011) showed that BC errors grow as $O(T^2 \varepsilon)$ with horizon length $T$, while methods that recover the true reward achieve $O(\varepsilon)$ regardless of $T$. That gap is why structural estimation matters.
+
+**Objective.**
+
+$$
+\hat\pi(a \mid s) = \frac{N(s,a)}{N(s)}.
+$$
 
 **Pseudocode.**
 
