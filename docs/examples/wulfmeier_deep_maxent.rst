@@ -3,7 +3,13 @@ Deep MaxEnt IRL: Objectworld and Binaryworld
 
 This example replicates the benchmarks from Wulfmeier, Ondruska and Posner (2016) on two synthetic gridworld environments. The paper shows that a neural reward function outperforms linear Maximum Entropy IRL when the true reward has nonlinear feature interactions.
 
-Both environments are 32 by 32 grids with 1024 states and 5 actions. The agent moves in four compass directions or stays in place. Transitions are deterministic.
+.. image:: /_static/wulfmeier_environments.png
+   :alt: Objectworld and Binaryworld environments showing reward maps and optimal policy arrows. Blue cells have reward plus one, red cells minus one, and grey cells zero.
+   :width: 100%
+
+The left panel shows Objectworld where reward depends on distance to colored objects. Circles and squares mark object positions for two colors. Blue cells are within reach of both colors and red cells are near only one. The right panel shows Binaryworld where reward depends on the count of blue neighbors in a 3 by 3 window. The scattered pattern of blue and red reward cells reflects the nonlinear count thresholds that a linear model cannot capture. Arrows show the optimal policy direction at each cell.
+
+Both environments are 16 by 16 grids here for readability. The full benchmark uses 32 by 32 grids with 1024 states and 5 actions. The agent moves in four compass directions or stays in place. Transitions are deterministic.
 
 Objectworld
 -----------
