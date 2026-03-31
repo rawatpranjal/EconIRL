@@ -1,74 +1,51 @@
-econirl: The StatsModels of IRL
-================================
+econirl
+=======
 
-**econirl** bridges Structural Econometrics and Inverse Reinforcement Learning,
-providing economist-friendly APIs for estimating dynamic discrete choice models.
+.. code-block:: bash
+
+   pip install econirl
+
+econirl recovers structural parameters from sequential choice data. Every estimator shares one interface and returns standard errors.
 
 .. code-block:: python
 
-   from econirl import RustBusEnvironment, LinearUtility, NFXPEstimator
-   from econirl.simulation import simulate_panel
+   from econirl import NFXP, CCP
+   from econirl.datasets import load_rust_bus
 
-   # Set up environment and simulate data
-   env = RustBusEnvironment(operating_cost=0.001, replacement_cost=3.0)
-   panel = simulate_panel(env, n_individuals=500, n_periods=100)
+   df = load_rust_bus()
+   nfxp = NFXP(discount=0.9999).fit(df, state="mileage_bin", action="replaced", id="bus_id")
+   ccp  = CCP(discount=0.9999).fit(df, state="mileage_bin", action="replaced", id="bus_id")
+   print(nfxp.params_)  # {'theta_c': 0.001, 'RC': 3.07}
+   print(ccp.params_)   # {'theta_c': 0.001, 'RC': 3.07}  — same answer
 
-   # Estimate parameters
-   utility = LinearUtility.from_environment(env)
-   result = NFXPEstimator().estimate(panel, utility, env.problem_spec, env.transition_matrices)
+Estimators
+----------
 
-   # StatsModels-style output
-   print(result.summary())
+econirl has two families of estimator. Linear reward estimators learn exact structural parameters from a reward function of the form R(s,a) = theta times phi(s,a). Neural reward estimators learn a nonlinear reward function via neural networks and project onto features for approximate theta.
 
-Key Features
-------------
+.. list-table::
+   :header-rows: 1
 
-**Economist-Friendly API**
-   Familiar terminology: utility, preferences, characteristics.
-   StatsModels-style ``summary()`` with standard errors and hypothesis tests.
+   * -
+     - Linear Reward (exact theta)
+     - Neural Reward (projected theta)
+   * - Structural MLE
+     - ``NFXP``, ``NNES``
+     - ``NeuralGLADIUS``
+   * - Reduced-form DDC
+     - ``CCP``, ``TDCCP``
+     - ``NeuralAIRL``
+   * - Maximum Entropy IRL
+     - MCE-IRL (coming soon)
+     -
 
-**Multiple Estimation Methods**
-   NFXP (Nested Fixed Point), CCP estimators, and MaxEnt IRL.
-   Choose the right method for your application.
-
-**Gymnasium Compatible**
-   Environments follow the Gymnasium API.
-   Seamlessly integrate with RL tooling.
-
-**Rich Inference**
-   Standard errors, confidence intervals, hypothesis tests.
-   Counterfactual analysis and welfare calculations.
-
-
-Getting Started
----------------
-
-.. toctree::
-   :maxdepth: 1
-
-   installation
-   quickstart
-
-Tutorials
----------
-
-.. toctree::
-   :maxdepth: 1
-
-   tutorials/index
-
-API Reference
--------------
+Linear reward estimators approximate the value function with neural networks while keeping the reward linear in parameters. The structural parameters are exact and the standard errors are valid. Neural reward estimators approximate the reward function itself. The structural parameters are extracted by least-squares projection, and the projection R-squared tells you how linear the learned reward actually is.
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
+   installation
+   quickstart
+   examples/index
    api/index
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

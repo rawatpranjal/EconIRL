@@ -8,6 +8,7 @@ in econirl.
    :maxdepth: 2
 
    core
+   estimators
    environments
    preferences
    estimation

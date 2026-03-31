@@ -50,3 +50,21 @@ Solvers
    :members:
    :undoc-members:
    :show-inheritance:
+
+Feature Specification
+---------------------
+
+.. autoclass:: econirl.core.reward_spec.RewardSpec
+   :members: compute, compute_gradient, feature_matrix, parameter_names, state_dependent, state_action_dependent, to_linear_utility, to_action_dependent_reward
+   :undoc-members:
+
+Data Container
+--------------
+
+.. autoclass:: econirl.core.types.TrajectoryPanel
+   :members: from_dataframe, sufficient_stats, resample_individuals, iter_transitions, to_dataframe
+   :undoc-members:
+
+.. autoclass:: econirl.core.sufficient_stats.SufficientStats
+   :members:
+   :undoc-members:

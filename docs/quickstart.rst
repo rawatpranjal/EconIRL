@@ -1,144 +1,57 @@
 Quickstart
 ==========
 
-This guide walks through a complete estimation workflow using the classic
-Rust (1987) bus engine replacement model.
+This page shows how to fit a structural model in three steps. It assumes you know what dynamic discrete choice models and inverse reinforcement learning are.
 
-The Problem
------------
+Fitting a model
+---------------
 
-Harold Zurcher manages a fleet of buses and must decide when to replace engines.
-Each period, he observes the mileage and chooses to either:
-
-- **Keep** the current engine (action 0)
-- **Replace** the engine (action 1)
-
-The utility functions are:
-
-- Keep: :math:`u(s, \text{keep}) = -\theta_c \cdot \text{mileage}(s) + \varepsilon_0`
-- Replace: :math:`u(s, \text{replace}) = -RC + \varepsilon_1`
-
-where :math:`\theta_c` is the operating cost parameter, :math:`RC` is the
-replacement cost, and :math:`\varepsilon` are i.i.d. Type I Extreme Value shocks.
-
-Step 1: Create the Environment
-------------------------------
+Load the Rust bus engine replacement dataset and fit two estimators.
 
 .. code-block:: python
 
-   from econirl import RustBusEnvironment
+   from econirl import NFXP, CCP
+   from econirl.datasets import load_rust_bus
 
-   # Create environment with true parameters
-   env = RustBusEnvironment(
-       operating_cost=0.001,    # Cost per mileage unit
-       replacement_cost=3.0,    # Fixed replacement cost
-       num_mileage_bins=90,     # State space discretization
-       discount_factor=0.9999,  # High discount factor (patient agent)
-   )
+   df = load_rust_bus()
 
-   print(env.describe())
+   nfxp = NFXP(discount=0.9999).fit(df, state="mileage_bin", action="replaced", id="bus_id")
+   ccp  = CCP(discount=0.9999, num_policy_iterations=5).fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
-Step 2: Simulate Panel Data
----------------------------
-
-Generate synthetic data from the model:
+Both estimators recover the same parameters. NFXP uses nested fixed-point maximum likelihood. CCP uses Hotz-Miller inversion with nested pseudo-likelihood iterations. CCP is faster on this problem because it avoids the inner Bellman loop.
 
 .. code-block:: python
 
-   from econirl.simulation import simulate_panel
+   print(nfxp.summary())
+   print(ccp.summary())
+   print(nfxp.params_)   # {'theta_c': 0.001, 'RC': 3.07}
+   print(nfxp.se_)        # {'theta_c': 0.00003, 'RC': 0.12}
+   print(nfxp.conf_int()) # {'theta_c': (0.00094, 0.00106), 'RC': (2.83, 3.31)}
 
-   panel = simulate_panel(
-       env,
-       n_individuals=500,   # Number of buses
-       n_periods=100,       # Periods per bus
-       seed=42,
-   )
+Predicting choices
+------------------
 
-   print(f"Observations: {panel.num_observations:,}")
-   print(f"Replacement rate: {panel.get_all_actions().float().mean():.2%}")
-
-Step 3: Set Up Estimation
--------------------------
-
-Define the utility specification and create an estimator:
+Every fitted estimator can predict choice probabilities for new states.
 
 .. code-block:: python
 
-   from econirl import LinearUtility, NFXPEstimator
+   import numpy as np
+   proba = nfxp.predict_proba(np.array([0, 30, 60, 89]))
+   # proba[i, 0] = P(keep | mileage=i), proba[i, 1] = P(replace | mileage=i)
 
-   # Utility specification (matches environment structure)
-   utility = LinearUtility.from_environment(env)
+Custom features
+---------------
 
-   # NFXP estimator with asymptotic standard errors
-   estimator = NFXPEstimator(
-       se_method="asymptotic",
-       verbose=True,
-   )
-
-Step 4: Estimate Parameters
----------------------------
-
-Run the estimation:
+To use your own data with custom features, create a RewardSpec.
 
 .. code-block:: python
 
-   result = estimator.estimate(
-       panel=panel,
-       utility=utility,
-       problem=env.problem_spec,
-       transitions=env.transition_matrices,
-   )
+   import torch
+   from econirl import NFXP, RewardSpec
 
-Step 5: View Results
---------------------
+   features = torch.randn(50, 3, 4)  # 50 states, 3 actions, 4 features
+   spec = RewardSpec(features, names=["price", "quality", "distance", "brand"])
 
-Get StatsModels-style output:
-
-.. code-block:: python
-
-   print(result.summary())
-
-Output::
-
-   ================================================================================
-                      Dynamic Discrete Choice Estimation Results
-   ================================================================================
-   Method:                    NFXP (Nested Fixed Point)
-   No. Observations:          50,000
-   Log-Likelihood:            -9,500.37
-   --------------------------------------------------------------------------------
-                              coef    std err        t    P>|t|   [0.025   0.975]
-   --------------------------------------------------------------------------------
-   operating_cost           0.0010     0.0001    10.23    0.000   0.0008   0.0012
-   replacement_cost         2.9854     0.0523    57.12    0.000   2.8829   3.0879
-   --------------------------------------------------------------------------------
-
-Step 6: Counterfactual Analysis
--------------------------------
-
-Analyze policy changes under different scenarios:
-
-.. code-block:: python
-
-   from econirl.simulation import counterfactual_policy
-
-   # What if replacement cost increased 50%?
-   new_params = result.parameters.clone()
-   new_params[1] *= 1.5
-
-   cf = counterfactual_policy(
-       result=result,
-       new_parameters=new_params,
-       utility=utility,
-       problem=env.problem_spec,
-       transitions=env.transition_matrices,
-   )
-
-   print(f"Baseline avg replacement rate: {cf.baseline_policy[:, 1].mean():.4f}")
-   print(f"Counterfactual avg replacement rate: {cf.counterfactual_policy[:, 1].mean():.4f}")
-
-Next Steps
-----------
-
-- See :doc:`tutorials/index` for in-depth examples
-- Explore the :doc:`api/index` for detailed documentation
+   model = NFXP(n_states=50, n_actions=3, discount=0.95)
+   model.fit(panel, reward=spec, transitions=transitions)
+   print(model.params_)
