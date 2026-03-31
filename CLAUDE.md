@@ -116,6 +116,16 @@ Controlled simulated experiments use in-sample, out-of-sample, and out-of-transf
 
 MCE IRL and NFXP converge to the same answer with enough data and proper features — with 2000 trajectories on a 5x5 gridworld both achieve cosine similarity 0.9999 to true parameters and identical policy performance across in-sample, out-of-sample, and all three transfer scenarios. Features MUST be action-dependent (vary across the choice set) for NFXP identification; state-only features that are identical across actions make R(s,a) constant across actions, collapsing the likelihood surface and causing parameter blowup. IRL rewards are identified only up to additive constants and scale (Kim et al. 2021), so evaluate on cosine similarity and policy quality rather than raw RMSE. MaxEnt IRL underperforms MCE IRL even in deterministic environments because it doesn't account for causal structure in the state visitation computation. For the `imitation` library comparison: econirl's infinite-horizon formulation with action-dependent features is more general; the main borrowed improvement is the direct linear solve for occupancy measures in `core/occupancy.py`.
 
+## ReadTheDocs
+
+The documentation is hosted at https://econirl.readthedocs.io. The Sphinx config lives in `docs/conf.py` and the RTD config in `.readthedocs.yaml`. RTD builds automatically on push to main via a GitHub webhook.
+
+After pushing documentation changes, RTD takes 2 to 3 minutes to build. The CDN can cache old pages for several minutes after the build finishes. Hard refresh (Cmd+Shift+R) or appending `?v=X` to the URL busts the browser cache. If the site still shows stale content, check the build status at https://app.readthedocs.org/projects/econirl/builds/ before debugging further.
+
+Every example page in `docs/examples/` must have a hero image at the top via an `.. image::` directive pointing to `docs/_static/`. Do not create example pages without a domain illustration.
+
+Keep `docs/conf.py` release version in sync with `pyproject.toml` and `src/econirl/__init__.py`.
+
 ## Key References
 
 - Rust (1987): Optimal Replacement of GMC Bus Engines
