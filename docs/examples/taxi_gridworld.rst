@@ -43,6 +43,13 @@ True parameters: ``move_cost=-0.5, goal_approach=2.0, northward=0.1, eastward=0.
 Small Grid (5x5 = 25 states)
 -----------------------------
 
+.. image:: /_static/taxi_gridworld_policy.png
+   :alt: Optimal policy and value function on a 5x5 gridworld. Arrows show the greedy action at each cell, and color intensity shows the value function.
+   :width: 60%
+   :align: center
+
+The figure shows the optimal policy under the true parameters. Each cell is colored by its value function, with warmer colors indicating higher expected discounted utility. The arrows show the greedy action at each state. The agent moves right and down toward the goal at cell (4,4), marked with a star. Near the goal the value function is highest because the agent reaches the absorbing terminal state with fewer costly moves. The slight preference for eastward over downward movement reflects the small positive weight on the eastward feature.
+
 On a 5x5 grid, three tabular estimators all recover the parameters exactly::
 
     Parameter Recovery (5x5 Grid)

@@ -57,17 +57,22 @@ NFXP, CCP, and MCE-IRL recover identical parameters. CCP avoids the inner Bellma
 Counterfactual analysis
 -----------------------
 
-NFXP supports counterfactual policy simulation. The question is what happens to replacement behavior if the replacement cost doubles.
+Structural estimation enables counterfactual policy simulation. Once we have estimated the operating cost and replacement cost parameters, we can ask what happens to replacement behavior under different economic conditions.
 
 .. code-block:: python
 
-   cf = nfxp.counterfactual(RC=6.0)
+   from econirl.simulation.counterfactual import counterfactual_policy
+
+   # What if replacement cost doubles?
+   new_params = result.parameters.clone()
+   new_params[1] *= 2  # replacement_cost
+   cf = counterfactual_policy(result, new_params, utility, problem, transitions)
    print(cf.policy[50, :])  # P(keep|mileage=50), P(replace|mileage=50)
 
-With the higher replacement cost, the manager keeps engines running longer. The probability of replacement at mileage 50 drops from 12 percent to 3 percent.
-
 .. image:: /_static/rust_bus_counterfactual.png
-   :alt: Counterfactual analysis showing replacement probability and value function under different replacement costs.
+   :alt: Counterfactual analysis showing replacement probability and relative value function under varying replacement cost and operating cost.
    :width: 100%
 
-The left panel shows how the replacement probability shifts across mileage levels when the replacement cost changes. Halving the cost makes the manager replace earlier. Doubling it makes the manager delay replacement until higher mileage. The right panel shows the corresponding value function. A lower replacement cost raises the value at every mileage level because the manager has a cheaper exit option.
+The top row shows how replacement probability changes across mileage levels under two types of parameter variation. The top-left panel varies the replacement cost RC. Halving the replacement cost to 1.5 raises the replacement probability at every mileage level because the manager can afford to replace engines more freely. Tripling it to 9.0 suppresses replacement almost entirely, forcing the manager to run engines at high mileage. The top-right panel varies the per-mile operating cost. Doubling the operating cost makes high-mileage operation expensive, so the manager replaces earlier. Halving it makes running the engine cheap, so the manager holds off on replacement.
+
+The bottom row shows the relative value function V(s) minus V(0) under each scenario. Plotting relative to mileage bin zero reveals the shape that is hidden when looking at the raw value function, where the absolute level with discount factor 0.9999 dominates the scale. The value function declines with mileage in every scenario because higher mileage means higher cumulative operating costs ahead. The decline is steepest when the replacement cost is high or the operating cost is high, because the manager faces larger losses from running a worn engine and has fewer attractive exit options.

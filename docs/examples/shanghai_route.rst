@@ -21,6 +21,14 @@ This example applies five estimators to taxi route-choice data from Shanghai (Zh
 
 The features describe each road segment. The length feature captures how long the segment is. The remaining six features are indicator variables for the road type.
 
+.. image:: /_static/shanghai_network.png
+   :alt: Shanghai road network colored by road type with sample taxi routes, and edge popularity heatmap from training data.
+   :width: 100%
+
+The road network covers roughly 5 by 4 kilometers in central Shanghai near the former French Concession. The left panel shows the network colored by road type. Primary roads in red carry the most traffic and form the arterial corridors. Secondary and tertiary roads in orange and yellow provide cross-connections. Residential streets in blue fill the blocks between arterials. Five sample taxi routes of varying length are overlaid to illustrate typical path diversity across the network.
+
+The right panel shows edge popularity computed from the 1000 training routes. The darkest segments are traversed by over 200 routes, revealing the dominant corridors that most drivers use regardless of their origin and destination. The concentration of traffic on a few primary road segments is consistent with the structural parameter estimates, which show that drivers strongly prefer shorter segments and avoid residential streets.
+
 .. list-table:: Benchmark Results (1000 training routes, 4893 test routes)
    :header-rows: 1
 
