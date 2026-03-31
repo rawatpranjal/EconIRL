@@ -47,7 +47,7 @@ All estimators in the R(s,a) row accept a feature tensor of shape (S, A, K) wher
 
    installation
    quickstart
-   unified_formulations
+   estimators
    examples/index
    api/index
    references

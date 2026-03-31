@@ -137,13 +137,13 @@ To pin down $\theta$, Rust and Rawat (2026) use two rules. First, the average re
 
 ### Equivalence Theorem
 
-All estimators on this page share the same soft Bellman foundation. Rust and Rawat (2026, Theorem A.6) show that, with proper identification restrictions, it does not matter what kind of data you start from. Maximum likelihood on choice data (NFXP), feature matching on demonstrations (MCE-IRL), and preference learning on pairwise comparisons (RLHF) all converge to the same policy as the sample grows,
+All estimators on this page share the same soft Bellman foundation. Rust and Rawat (2026, Theorem A.6) show that, with proper identification restrictions, it does not matter what kind of data you start from. Maximum likelihood on choice data (NFXP) and feature matching on demonstrations (MCE-IRL) both converge to the same policy as the sample grows,
 
 $$
-\pi^*_{\hat\theta_{\mathrm{NFXP}}} = \pi^*_{\hat\theta_{\mathrm{IRL}}} = \pi^*_{\hat\theta_{\mathrm{RLHF}}} \;\longrightarrow\; \pi^*_{\theta^\star}.
+\pi^*_{\hat\theta_{\mathrm{NFXP}}} = \pi^*_{\hat\theta_{\mathrm{IRL}}} \;\longrightarrow\; \pi^*_{\theta^\star}.
 $$
 
-This is the central result connecting structural econometrics, inverse RL, and RLHF.
+This is the central result connecting structural econometrics and inverse reinforcement learning.
 
 ---
 
