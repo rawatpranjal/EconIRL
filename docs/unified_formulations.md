@@ -1,4 +1,4 @@
-# Unified Estimator Formulations
+# Estimators
 
 This page presents the mathematical formulations of all econirl estimators using common notation from Rust and Rawat (2026). For guidance on choosing an estimator, see the [estimator guide](estimator_guide.md). For worked code examples, see the [examples](examples/index.rst).
 
