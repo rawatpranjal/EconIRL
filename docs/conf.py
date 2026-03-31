@@ -82,4 +82,5 @@ nbsphinx_allow_errors = True
 myst_enable_extensions = [
     "colon_fence",
     "deflist",
+    "dollarmath",
 ]
