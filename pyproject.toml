@@ -1,12 +1,12 @@
 [project]
 name = "econirl"
-version = "0.1.0"
-description = "The StatsModels of IRL - Bridging Structural Econometrics and Inverse Reinforcement Learning"
+version = "0.0.1"
+description = "Behavioral inference. IRL and DDC with standard errors."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "econirl contributors" }
+    { name = "Pranjal Rawat" }
 ]
 keywords = [
     "econometrics",
@@ -50,6 +50,12 @@ docs = [
     "myst-parser>=2.0",
     "ipykernel",
 ]
+
+[project.urls]
+Homepage = "https://github.com/rawatpranjal/econirl"
+Documentation = "https://econirl.readthedocs.io"
+Repository = "https://github.com/rawatpranjal/econirl"
+Issues = "https://github.com/rawatpranjal/econirl/issues"
 
 [build-system]
 requires = ["hatchling"]
