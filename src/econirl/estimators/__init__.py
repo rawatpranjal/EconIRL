@@ -66,6 +66,11 @@ try:
 except ImportError:
     NeuralAIRL = None
 
+try:
+    from econirl.estimators.mceirl_neural import MCEIRLNeural
+except ImportError:
+    MCEIRLNeural = None
+
 __all__ = [
     "NFXP",
     "NNES",
@@ -76,5 +81,6 @@ __all__ = [
     "MCEIRL",
     "NeuralGLADIUS",
     "NeuralAIRL",
+    "MCEIRLNeural",
     "EstimatorProtocol",
 ]

@@ -78,6 +78,11 @@ try:
 except ImportError:
     pass
 
+try:
+    from econirl.estimators import MCEIRLNeural
+except ImportError:
+    pass
+
 # Sklearn-style Utilities
 try:
     from econirl.utilities import Utility, LinearCost, make_utility
@@ -124,6 +129,7 @@ __all__ = [
     "TDCCP",
     "NeuralGLADIUS",
     "NeuralAIRL",
+    "MCEIRLNeural",
     # Core types (new)
     "RewardSpec",
     "TrajectoryPanel",

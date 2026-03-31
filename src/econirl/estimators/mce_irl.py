@@ -10,9 +10,11 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import torch
+from scipy.stats import norm as scipy_norm
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.types import DDCProblem, Panel, Trajectory
+from econirl.core.reward_spec import RewardSpec
+from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
 from econirl.preferences.reward import LinearReward
 from econirl.transitions import TransitionEstimator
@@ -119,14 +121,17 @@ class MCEIRL:
         # Fitted attributes
         self.params_: dict | None = None
         self.se_: dict | None = None
+        self.pvalues_: dict | None = None
         self.coef_: np.ndarray | None = None
         self.reward_: np.ndarray | None = None
         self.policy_: np.ndarray | None = None
         self.value_function_: np.ndarray | None = None
+        self.value_: np.ndarray | None = None
         self.state_visitation_: np.ndarray | None = None
         self.transitions_: np.ndarray | None = None
         self.log_likelihood_: float | None = None
         self.converged_: bool | None = None
+        self.reward_spec_: RewardSpec | None = None
 
         # Internal
         self._result = None
@@ -136,35 +141,60 @@ class MCEIRL:
 
     def fit(
         self,
-        data: pd.DataFrame,
-        state: str,
-        action: str,
-        id: str,
+        data: pd.DataFrame | Panel | TrajectoryPanel,
+        state: str | None = None,
+        action: str | None = None,
+        id: str | None = None,
         transitions: np.ndarray | None = None,
+        reward: RewardSpec | None = None,
     ) -> "MCEIRL":
         """Fit the MCE IRL estimator.
 
         Parameters
         ----------
-        data : pandas.DataFrame
-            Panel data with demonstrations.
-        state : str
-            Column name for state variable.
-        action : str
-            Column name for action variable.
-        id : str
-            Column name for individual/trajectory identifier.
+        data : pandas.DataFrame or Panel or TrajectoryPanel
+            Panel data with demonstrations.  When a DataFrame is passed,
+            ``state``, ``action``, and ``id`` column names are required.
+            When a Panel/TrajectoryPanel is passed, column names are ignored.
+        state : str, optional
+            Column name for state variable (required for DataFrame input).
+        action : str, optional
+            Column name for action variable (required for DataFrame input).
+        id : str, optional
+            Column name for individual/trajectory identifier (required for
+            DataFrame input).
         transitions : numpy.ndarray, optional
             Pre-estimated transition matrix (n_states, n_states).
             If None, estimated from data.
+        reward : RewardSpec, optional
+            Reward/utility specification.  If provided, overrides the
+            ``feature_matrix`` and ``feature_names`` parameters passed at
+            construction time.
 
         Returns
         -------
         self : MCEIRL
             Fitted estimator.
         """
-        # Convert to Panel
-        self._panel = self._dataframe_to_panel(data, state, action, id)
+        # --- Handle reward spec ---
+        if reward is not None:
+            self.reward_spec_ = reward
+
+        # --- Handle data: DataFrame or Panel/TrajectoryPanel ---
+        if isinstance(data, pd.DataFrame):
+            if state is None or action is None or id is None:
+                raise ValueError(
+                    "state, action, and id column names are required "
+                    "when data is a DataFrame"
+                )
+            self._panel = self._dataframe_to_panel(data, state, action, id)
+        elif isinstance(data, (Panel, TrajectoryPanel)):
+            self._panel = data
+        else:
+            raise TypeError(
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
+                f"got {type(data)}"
+            )
 
         # Estimate transitions
         if transitions is None:
@@ -185,8 +215,11 @@ class MCEIRL:
             scale_parameter=1.0,
         )
 
-        # Create reward function
-        self._reward_fn = self._create_reward()
+        # Create reward function (RewardSpec overrides feature_matrix)
+        if self.reward_spec_ is not None:
+            self._reward_fn = self.reward_spec_.to_linear_reward()
+        else:
+            self._reward_fn = self._create_reward()
 
         # Create estimator with config
         config = MCEIRLConfig(
@@ -303,6 +336,20 @@ class MCEIRL:
             se = self._result.standard_errors.numpy()
             self.se_ = {name: float(val) for name, val in zip(param_names, se)}
 
+        # P-values from t-statistics (Wald test)
+        if self.se_ is not None:
+            pvalues: dict[str, float] = {}
+            for name in self.params_:
+                se_val = self.se_[name]
+                if se_val and se_val > 0 and np.isfinite(se_val):
+                    t_stat = self.params_[name] / se_val
+                    pvalues[name] = float(
+                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
+                    )
+                else:
+                    pvalues[name] = float("nan")
+            self.pvalues_ = pvalues
+
         # Reward function R(s)
         reward_params = torch.tensor(params, dtype=torch.float32)
         reward_matrix = self._reward_fn.compute(reward_params)
@@ -315,6 +362,7 @@ class MCEIRL:
         # Value function
         if self._result.value_function is not None:
             self.value_function_ = self._result.value_function.numpy()
+            self.value_ = self.value_function_
 
         # State visitation
         if self._result.metadata and "state_visitation" in self._result.metadata:
@@ -341,6 +389,34 @@ class MCEIRL:
 
         states = np.asarray(states, dtype=np.int64)
         return self.policy_[states]
+
+    def conf_int(self, alpha: float = 0.05) -> dict:
+        """Compute confidence intervals for parameters.
+
+        Parameters
+        ----------
+        alpha : float, default=0.05
+            Significance level.  Returns (1 - alpha) confidence intervals.
+
+        Returns
+        -------
+        dict
+            ``{param_name: (lower, upper)}`` confidence intervals.
+
+        Raises
+        ------
+        RuntimeError
+            If the model has not been fitted yet.
+        """
+        if self.params_ is None or self.se_ is None:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        z = scipy_norm.ppf(1 - alpha / 2)
+        intervals: dict[str, tuple[float, float]] = {}
+        for name in self.params_:
+            est = self.params_[name]
+            se = self.se_[name]
+            intervals[name] = (est - z * se, est + z * se)
+        return intervals
 
     def summary(self) -> str:
         """Generate formatted summary of results."""
