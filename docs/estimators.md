@@ -464,13 +464,6 @@ BC(D):
 
 This section helps you choose the right estimator.
 
-### Decision Flowchart
-
-```{image} _static/estimator_flowchart.png
-:alt: Estimator selection flowchart
-:width: 100%
-```
-
 ### Quick Reference
 
 | Estimator | Direction | Reward Type | Needs Transitions | Standard Errors | Scales Beyond Tabular | Transfer |
