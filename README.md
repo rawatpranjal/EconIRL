@@ -5,19 +5,32 @@ Benchmarking dynamic discrete choice and inverse RL algorithms on a variety of M
 ## Install
 
 ```bash
-uv pip install -e .
+pip install econirl
 ```
 
 ## Try It
 
+Load a bundled dataset and fit one estimator in under a second.
+
+```python
+from econirl.datasets import load_rust_bus
+from econirl.estimation import BehavioralCloningEstimator
+
+df = load_rust_bus()
+print(df.head())
+print(f"{len(df)} observations, {df['bus_id'].nunique()} buses")
+```
+
+## Benchmark
+
+Compare 10 estimators on a simulated 5-state bus engine replacement MDP. This runs each estimator sequentially and takes a few minutes.
+
 ```python
 from econirl.evaluation.benchmark import BenchmarkDGP, run_single, get_default_estimator_specs
 
-# 5-state bus engine replacement MDP (Rust 1987)
 dgp = BenchmarkDGP(n_states=5, discount_factor=0.95)
 specs = get_default_estimator_specs()
 
-# Run all 18 estimators with benchmark-tuned defaults
 for spec in specs:
     result = run_single(dgp, spec, n_agents=100, n_periods=50, seed=42)
     print(f"{result.estimator:12s}  {result.pct_optimal:6.1f}%  {result.time_seconds:5.1f}s")
@@ -26,6 +39,8 @@ for spec in specs:
 ![5-State Bus Engine Replacement MDP](docs/mdp_data_generation.gif)
 
 ### Results
+
+The table below shows all 18 algorithms (10 default from `get_default_estimator_specs()` plus 8 additional from `econirl.contrib`).
 
 | Estimator   | Category    | Recovers Params | Recovers Reward | % Optimal | % Transfer | Time   |
 |-------------|-------------|:---------------:|:---------------:|----------:|-----------:|-------:|

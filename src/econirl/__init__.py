@@ -45,7 +45,7 @@ Legacy API (deprecated, for backward compatibility):
     >>> print(result.summary())
 """
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 # Core types
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
