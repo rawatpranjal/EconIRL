@@ -1,14 +1,15 @@
 """Rust Bus Engine: Complete Post-Estimation Showcase
 
-Demonstrates every post-estimation capability in econirl on the Rust (1987)
-bus engine replacement problem using three estimators spanning structural
-econometrics and inverse reinforcement learning: NFXP (nested fixed point),
-CCP (conditional choice probability), and MCE-IRL (maximum causal entropy
-inverse reinforcement learning). All three produce full inference,
-validation, and counterfactual analysis through the same unified pipeline.
+Demonstrates every post-estimation capability in econirl on the real
+Rust (1987) bus engine replacement data using three estimators spanning
+structural econometrics and inverse reinforcement learning: NFXP
+(nested fixed point), CCP (conditional choice probability), and MCE-IRL
+(maximum causal entropy inverse reinforcement learning). All three produce
+full inference, validation, and counterfactual analysis through the same
+unified pipeline.
 
 Sections:
-    1. Setup and data generation (environment, train/test split, transfer env)
+    1. Load real data, estimate transitions, train/test split
     2. Estimation (3 estimators on training data)
     3. Inference and diagnostics (SEs, CIs, Wald test, identification)
     4. Validation (in-sample, out-of-sample, transfer)
@@ -25,12 +26,13 @@ import numpy as np
 import torch
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.solvers import _policy_evaluation_matrix, value_iteration
-from econirl.core.types import Panel
+from econirl.core.solvers import value_iteration
+from econirl.core.types import DDCProblem, Panel
+from econirl.datasets import load_rust_bus
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.estimation.ccp import CCPEstimator
 from econirl.estimation.mce_irl import MCEIRLEstimator
-from econirl.estimation.nfxp import NFXPEstimator
+from econirl.estimation.nfxp import NFXPEstimator, estimate_transitions_from_panel
 from econirl.inference.identification import diagnose_identification_issues
 from econirl.preferences.linear import LinearUtility
 from econirl.simulation.counterfactual import (
@@ -39,7 +41,6 @@ from econirl.simulation.counterfactual import (
     elasticity_analysis,
     simulate_counterfactual,
 )
-from econirl.simulation.synthetic import simulate_panel
 
 
 # ---------------------------------------------------------------------------
@@ -74,52 +75,6 @@ def evaluate_policy(result, panel, utility, problem, transitions):
     return ll, acc
 
 
-def compute_transfer_pct_optimal(
-    result, utility, problem, baseline_transitions, transfer_transitions, true_params
-):
-    """Compute percent optimal under transfer dynamics.
-
-    Solves the MDP with estimated parameters under transfer transitions,
-    then compares the resulting value to the true optimal and random baselines.
-    Uses proper policy evaluation via matrix solve (I - beta P^pi)^{-1} r^pi.
-    """
-    transfer_operator = SoftBellmanOperator(problem, transfer_transitions)
-    true_flow_u = utility.compute(true_params)
-
-    # Estimated policy under transfer dynamics
-    est_flow_u = utility.compute(result.parameters)
-    est_sol = value_iteration(transfer_operator, est_flow_u, tol=1e-12, max_iter=100_000)
-
-    # Evaluate estimated policy using true utility under transfer transitions
-    v_learned = _policy_evaluation_matrix(
-        true_flow_u, est_sol.policy, transfer_transitions,
-        beta=problem.discount_factor, sigma=problem.scale_parameter,
-    )
-
-    # True optimal under transfer dynamics
-    true_sol = value_iteration(transfer_operator, true_flow_u, tol=1e-12, max_iter=100_000)
-    v_star = _policy_evaluation_matrix(
-        true_flow_u, true_sol.policy, transfer_transitions,
-        beta=problem.discount_factor, sigma=problem.scale_parameter,
-    )
-
-    # Uniform random baseline
-    uniform_policy = torch.ones(problem.num_states, problem.num_actions) / problem.num_actions
-    v_random = _policy_evaluation_matrix(
-        true_flow_u, uniform_policy, transfer_transitions,
-        beta=problem.discount_factor, sigma=problem.scale_parameter,
-    )
-
-    mean_v_star = v_star.mean().item()
-    mean_v_learned = v_learned.mean().item()
-    mean_v_random = v_random.mean().item()
-
-    denom = mean_v_star - mean_v_random
-    if abs(denom) < 1e-10:
-        return 100.0
-    return 100.0 * (mean_v_learned - mean_v_random) / denom
-
-
 def print_header(title: str) -> None:
     print(f"\n{'=' * 78}")
     print(f"  {title}")
@@ -131,66 +86,81 @@ def print_subheader(title: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Section 1: Setup and Data
+# Section 1: Load Real Data
 # ---------------------------------------------------------------------------
 
 def main():
-    print_header("SECTION 1: SETUP AND DATA")
+    print_header("SECTION 1: LOAD REAL DATA")
 
-    # Create the Rust bus environment with known true parameters.
-    env = RustBusEnvironment(
-        operating_cost=0.001,
-        replacement_cost=3.0,
-        discount_factor=0.999,
-        seed=42,
-    )
-    utility = LinearUtility.from_environment(env)
-    problem = env.problem_spec
-    transitions = env.transition_matrices
-    true_params_dict = env.true_parameters
-    true_params = torch.tensor(
-        [true_params_dict[n] for n in env.parameter_names], dtype=torch.float32
-    )
+    # Load the original Rust (1987) bus engine data
+    df = load_rust_bus(original=True)
+    print(f"Loaded Rust (1987) data: {len(df):,} observations, "
+          f"{df['bus_id'].nunique()} buses, {df['group'].nunique()} groups")
+    print(f"Replacement rate: {df['replaced'].mean():.2%}")
+    print(f"Mileage range: [{df['mileage_bin'].min()}, {df['mileage_bin'].max()}]")
 
-    print(f"Environment: {problem.num_states} states, {problem.num_actions} actions")
-    print(f"True parameters: {', '.join(f'{k}={v:.4f}' for k, v in true_params_dict.items())}")
-    print(f"Discount factor: {problem.discount_factor}")
-
-    # Simulate panel data
-    panel = simulate_panel(env, n_individuals=200, n_periods=100, seed=42)
+    # Convert to Panel
+    panel = load_rust_bus(original=True, as_panel=True)
     train_panel, test_panel = split_panel(panel, train_frac=0.8)
-    print(f"\nSimulated {panel.num_observations:,} observations "
-          f"({panel.num_individuals} individuals x 100 periods)")
-    print(f"Train: {train_panel.num_observations:,} obs "
-          f"({train_panel.num_individuals} individuals)")
+    print(f"\nTrain: {train_panel.num_observations:,} obs "
+          f"({train_panel.num_individuals} buses)")
     print(f"Test:  {test_panel.num_observations:,} obs "
-          f"({test_panel.num_individuals} individuals)")
+          f"({test_panel.num_individuals} buses)")
 
-    # Transfer environment: faster bus wear
+    # Estimate transitions from training data (cast to float32 for consistency
+    # with utility computation and counterfactual functions)
+    transitions = estimate_transitions_from_panel(
+        train_panel, num_states=90, max_increment=2
+    ).float()
+
+    # Count mileage increments for display
+    counts = np.zeros(3)
+    for traj in train_panel.trajectories:
+        for t in range(len(traj.states) - 1):
+            if traj.actions[t].item() == 0:
+                inc = traj.states[t + 1].item() - traj.states[t].item()
+                if 0 <= inc <= 2:
+                    counts[int(inc)] += 1
+    probs = counts / counts.sum()
+    print(f"\nEstimated transition probs: P(+0)={probs[0]:.4f}, "
+          f"P(+1)={probs[1]:.4f}, P(+2)={probs[2]:.4f}")
+
+    # Build utility and problem from the RustBusEnvironment template
+    # (just for the feature matrix and problem spec, not for data)
+    env = RustBusEnvironment(num_mileage_bins=90, discount_factor=0.9999)
+    utility = LinearUtility.from_environment(env)
+    problem = DDCProblem(
+        num_states=90,
+        num_actions=2,
+        discount_factor=0.9999,
+        scale_parameter=1.0,
+    )
+    print(f"Problem: {problem.num_states} states, {problem.num_actions} actions, "
+          f"beta={problem.discount_factor}")
+
+    # Transfer environment: faster bus wear (counterfactual dynamics)
     transfer_env = RustBusEnvironment(
-        operating_cost=0.001,
-        replacement_cost=3.0,
         mileage_transition_probs=(0.5, 0.4, 0.1),
-        discount_factor=0.999,
-        seed=42,
+        discount_factor=0.9999,
     )
     transfer_transitions = transfer_env.transition_matrices
-    print(f"\nTransfer env: mileage_transition_probs=(0.5, 0.4, 0.1) "
-          f"[faster wear]")
+    print(f"Transfer env: mileage_transition_probs=(0.5, 0.4, 0.1) [faster wear]")
 
     # -----------------------------------------------------------------------
     # Section 2: Estimation
     # -----------------------------------------------------------------------
 
-    print_header("SECTION 2: ESTIMATION (NFXP, NNES, SEES)")
+    print_header("SECTION 2: ESTIMATION (NFXP, CCP, MCE-IRL)")
 
     estimators = {
         "NFXP": NFXPEstimator(
             optimizer="BHHH",
-            inner_solver="hybrid",
+            inner_solver="policy",
+            inner_tol=1e-12,
+            inner_max_iter=200,
             compute_hessian=True,
             se_method="asymptotic",
-            inner_tol=1e-10,
+            outer_tol=1e-3,
         ),
         "CCP": CCPEstimator(
             num_policy_iterations=20,
@@ -222,16 +192,16 @@ def main():
 
     # Parameter comparison table
     print_subheader("Parameter Estimates")
-    print(f"{'Parameter':<18} {'True':>10} ", end="")
+    print(f"{'Parameter':<18} ", end="")
     for name in estimators:
         print(f"{name:>12}", end="")
     print()
-    print("-" * 66)
+    print("-" * 54)
 
     for i, pname in enumerate(results["NFXP"].parameter_names):
-        print(f"{pname:<18} {true_params[i].item():>10.4f} ", end="")
+        print(f"{pname:<18} ", end="")
         for name in estimators:
-            print(f"{results[name].parameters[i].item():>12.4f}", end="")
+            print(f"{results[name].parameters[i].item():>12.6f}", end="")
         print()
 
     # -----------------------------------------------------------------------
@@ -305,10 +275,12 @@ def main():
     print("Running NFXP with robust (sandwich) standard errors...")
     nfxp_robust = NFXPEstimator(
         optimizer="BHHH",
-        inner_solver="hybrid",
+        inner_solver="policy",
+        inner_tol=1e-12,
+        inner_max_iter=200,
         compute_hessian=True,
         se_method="robust",
-        inner_tol=1e-10,
+        outer_tol=1e-3,
     )
     result_robust = nfxp_robust.estimate(
         panel=train_panel,
@@ -339,15 +311,11 @@ def main():
     for name, r in results.items():
         in_ll, in_acc = evaluate_policy(r, train_panel, utility, problem, transitions)
         oos_ll, oos_acc = evaluate_policy(r, test_panel, utility, problem, transitions)
-        transfer_pct = compute_transfer_pct_optimal(
-            r, utility, problem, transitions, transfer_transitions, true_params
-        )
         val_results[name] = {
             "in_ll": in_ll,
             "in_acc": in_acc,
             "oos_ll": oos_ll,
             "oos_acc": oos_acc,
-            "transfer_pct": transfer_pct,
         }
 
     print(f"{'Metric':<24}", end="")
@@ -361,15 +329,12 @@ def main():
         ("oos_ll", "Out-of-sample LL"),
         ("in_acc", "In-sample Accuracy"),
         ("oos_acc", "OOS Accuracy"),
-        ("transfer_pct", "Transfer % Optimal"),
     ]:
         print(f"{label:<24}", end="")
         for name in estimators:
             v = val_results[name][metric]
             if "ll" in metric.lower():
                 print(f"{v:>14.1f}", end="")
-            elif "pct" in metric.lower():
-                print(f"{v:>13.1f}%", end="")
             else:
                 print(f"{v:>14.4f}", end="")
         print()
@@ -405,7 +370,7 @@ def main():
     cf_trans = counterfactual_transitions(
         nfxp_result, transfer_transitions, utility, problem, transitions,
     )
-    print(f"Scenario: mileage transition probs (0.39, 0.60, 0.01) -> (0.50, 0.40, 0.10)")
+    print(f"Scenario: estimated transition probs -> (0.50, 0.40, 0.10) [faster wear]")
     print(f"Welfare change (mean value): {cf_trans.welfare_change:+.4f}")
     print(f"Max absolute policy change:  {cf_trans.policy_change.abs().max().item():.4f}")
     print(f"\nReplacement probability shift under faster wear:")
@@ -468,12 +433,6 @@ def main():
         for name in estimators:
             print(f"{results[name].parameters[i].item():>14.6f}", end="")
         print()
-    # RMSE
-    print(f"  {'Param RMSE':<28}", end="")
-    for name in estimators:
-        rmse = torch.sqrt(((results[name].parameters - true_params) ** 2).mean()).item()
-        print(f"{rmse:>14.6f}", end="")
-    print()
 
     print()
     print("STANDARD ERRORS")
@@ -512,15 +471,12 @@ def main():
         ("oos_ll", "Out-of-sample LL"),
         ("in_acc", "In-sample Accuracy"),
         ("oos_acc", "OOS Accuracy"),
-        ("transfer_pct", "Transfer % Optimal"),
     ]:
         print(f"  {label:<28}", end="")
         for name in estimators:
             v = val_results[name][metric]
             if "ll" in metric:
                 print(f"{v:>14.1f}", end="")
-            elif "pct" in metric:
-                print(f"{v:>13.1f}%", end="")
             else:
                 print(f"{v:>14.4f}", end="")
         print()
@@ -537,10 +493,9 @@ def main():
     print()
 
     print("=" * 72)
-    print("\nThree estimators, one problem, identical diagnostics.")
-    print("Every estimator in econirl produces the same post-estimation pipeline:")
+    print("\nThree estimators, one dataset, identical diagnostics.")
+    print("Real Rust (1987) bus engine data through the same unified pipeline:")
     print("inference, validation, and counterfactual simulation.")
-    print("NNES, TD-CCP, GLADIUS, and AIRL all use the same interface.")
 
 
 if __name__ == "__main__":
