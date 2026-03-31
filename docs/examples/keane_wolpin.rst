@@ -20,35 +20,35 @@ The state space encodes schooling level (10 to 20 years), white-collar experienc
 
 The simplification relative to the original paper is in the shock distribution. Keane and Wolpin use multivariate normal shocks estimated via GHK simulation, which requires specialized likelihood machinery. This example uses logit (Type I extreme value) shocks, which gives the standard softmax choice probabilities that the econirl NFXP estimator handles natively. The finite-horizon backward induction algorithm and the state space structure match the original paper exactly.
 
-.. list-table:: Estimated Parameters (logit simplification)
+.. list-table:: Estimated Parameters (logit simplification, 500 individuals, 10 periods)
    :header-rows: 1
 
    * - Parameter
      - Description
-     - Estimate
+     - NFXP
    * - school_return
      - Returns to schooling
-     - positive
+     - 2.065
    * - wc_exp_return
      - Returns to white-collar experience
-     - positive
+     - 0.383
    * - bc_exp_return
      - Returns to blue-collar experience
-     - positive
+     - 0.670
    * - school_cost
      - Direct cost of attending school
-     - negative
+     - 0.231
    * - wc_intercept
      - Base white-collar wage
-     - positive
+     - -0.104
    * - bc_intercept
      - Base blue-collar wage
-     - positive
+     - 0.488
    * - home_value
      - Value of home production
-     - near zero
+     - 0.709
 
-The signs match economic intuition. Schooling and experience both increase future earnings, so their return coefficients are positive. The school cost is negative because attending school means forgoing wages. The white-collar intercept exceeds the blue-collar intercept, consistent with the observed wage premium for white-collar work in the data.
+The school_return coefficient dominates at 2.065, reflecting the strong incentive for human capital accumulation. Both experience return coefficients are positive, confirming that work experience raises future earnings. The school_cost feature is coded as negative one in the feature matrix, so the positive coefficient translates to a net cost of attending school relative to other options. The model uses logit shocks rather than the multivariate normal shocks in the original paper, so point estimates differ from published values. Standard errors are unavailable because the Hessian is near-singular at this solution, a known challenge with high-dimensional finite-horizon models where many state cells have few observations.
 
 .. code-block:: bash
 

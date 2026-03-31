@@ -1,6 +1,14 @@
 Shanghai Route Choice
 =====================
 
+.. image:: /_static/shanghai_network.png
+   :alt: Shanghai road network colored by road type with sample taxi routes, and edge popularity heatmap from training data.
+   :width: 100%
+
+The road network covers roughly 5 by 4 kilometers in central Shanghai near the former French Concession. The left panel shows the network colored by road type. Primary roads in red carry the most traffic and form the arterial corridors. Secondary and tertiary roads in orange and yellow provide cross-connections. Residential streets in blue fill the blocks between arterials. Five sample taxi routes of varying length are overlaid to illustrate typical path diversity across the network.
+
+The right panel shows edge popularity computed from the 1000 training routes. The darkest segments are traversed by over 200 routes, revealing the dominant corridors that most drivers use regardless of their origin and destination. The concentration of traffic on a few primary road segments is consistent with the structural parameter estimates, which show that drivers strongly prefer shorter segments and avoid residential streets.
+
 This example applies five estimators to taxi route-choice data from Shanghai (Zhao and Liang 2022). Drivers choose which road segment to traverse at each intersection, trading off road length against road type. The dataset has 714 road segments, 8 compass directions, and 10,000 observed routes.
 
 .. code-block:: python
@@ -20,14 +28,6 @@ This example applies five estimators to taxi route-choice data from Shanghai (Zh
    )
 
 The features describe each road segment. The length feature captures how long the segment is. The remaining six features are indicator variables for the road type.
-
-.. image:: /_static/shanghai_network.png
-   :alt: Shanghai road network colored by road type with sample taxi routes, and edge popularity heatmap from training data.
-   :width: 100%
-
-The road network covers roughly 5 by 4 kilometers in central Shanghai near the former French Concession. The left panel shows the network colored by road type. Primary roads in red carry the most traffic and form the arterial corridors. Secondary and tertiary roads in orange and yellow provide cross-connections. Residential streets in blue fill the blocks between arterials. Five sample taxi routes of varying length are overlaid to illustrate typical path diversity across the network.
-
-The right panel shows edge popularity computed from the 1000 training routes. The darkest segments are traversed by over 200 routes, revealing the dominant corridors that most drivers use regardless of their origin and destination. The concentration of traffic on a few primary road segments is consistent with the structural parameter estimates, which show that drivers strongly prefer shorter segments and avoid residential streets.
 
 .. list-table:: Benchmark Results (1000 training routes, 4893 test routes)
    :header-rows: 1
@@ -58,3 +58,12 @@ The right panel shows edge popularity computed from the 1000 training routes. Th
      - 29s
 
 Behavioral cloning wins on pure prediction because 714 states with 18,000 training transitions gives enough data to memorize the empirical choice probabilities. The structural estimators sacrifice in-sample fit for interpretable parameters. All four structural methods agree that drivers prefer shorter road segments and avoid residential streets in favor of primary roads.
+
+.. code-block:: bash
+
+   python examples/shanghai_route_choice.py
+
+Reference
+---------
+
+Zhao, Z. and Liang, Y. (2022). Deep Inverse Reinforcement Learning for Route Choice Modeling. arXiv:2206.10598.

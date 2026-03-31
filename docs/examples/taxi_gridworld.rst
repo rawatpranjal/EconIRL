@@ -13,12 +13,7 @@ The figure shows the optimal policy under the true parameters. Each cell is colo
 Setup
 -----
 
-The gridworld environment provides N by N states with 5 actions (Left, Right, Up, Down, Stay) and deterministic transitions. The action-dependent features ensure parameter identification:
-
-- **move_cost**: negative one if the agent actually moves, zero if it stays
-- **goal_approach**: positive one if the action moves closer to the goal, negative one if farther
-- **northward**: positive one for Up, negative one for Down, zero otherwise
-- **eastward**: positive one for Right, negative one for Left, zero otherwise
+The gridworld environment provides N by N states with 5 actions (Left, Right, Up, Down, Stay) and deterministic transitions. The four action-dependent features ensure parameter identification. The move_cost feature is negative one when the agent moves and zero when it stays. The goal_approach feature is positive one when the action brings the agent closer to the goal and negative one when it moves farther away. The directional features northward and eastward encode compass direction as positive one for movement along the axis and negative one for movement against it.
 
 .. code-block:: python
 

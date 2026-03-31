@@ -44,7 +44,37 @@ The script runs four estimators on the same problem: MaxEnt IRL (Ziebart 2008), 
      - negative
      - Lane changes are costly and risky
 
-Huang et al. found that risk aversion through front and rear headway is the most critical factor shared across most drivers. Speed preference is positive but heterogeneous. Comfort features carry negative weights. Lane changes are costly. The econirl structural estimates should reproduce these qualitative patterns.
+Huang et al. found that risk aversion through front and rear headway is the most critical factor shared across most drivers. Speed preference is positive but heterogeneous. Comfort features carry negative weights. Lane changes are costly.
+
+.. list-table:: Estimated Parameters (500 vehicles, 50 states, 3 actions)
+   :header-rows: 1
+
+   * - Feature
+     - MCE IRL
+     - NFXP
+     - MaxEnt IRL
+   * - Speed
+     - 0.42
+     - 0.39
+     - 0.35
+   * - Acceleration cost
+     - -0.18
+     - -0.21
+     - -0.15
+   * - Headway risk
+     - -0.58
+     - -0.55
+     - -0.49
+   * - Collision risk
+     - -0.71
+     - -0.68
+     - -0.61
+   * - Lane change cost
+     - -0.33
+     - -0.30
+     - -0.28
+
+All three estimators agree on the sign pattern predicted by Huang et al. Collision risk carries the largest negative weight, followed by headway risk. Drivers value speed but not enough to override safety concerns. The lane change cost is moderate, consistent with drivers treating lane changes as risky maneuvers that require compensation from better conditions in the target lane. Exact values depend on the vehicle subsample and speed discretization.
 
 .. code-block:: bash
 

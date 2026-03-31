@@ -40,3 +40,14 @@ The reward function depends on both the state and the action. Browsing costs tim
      - 1.79
 
 The refine parameter is positive. This means filtering and sorting reduces effective search cost rather than adding to it. A platform design team would read this as evidence that investing in better filter tools pays off more than adding more hotel images.
+
+The script also runs behavioral cloning as a non-structural baseline and compares test log-likelihood across all three estimators.
+
+.. code-block:: bash
+
+   python examples/trivago_search_ddc.py
+
+Reference
+---------
+
+RecSys Challenge 2019. Session-Based Hotel Recommendations. https://recsys.trivago.cloud/

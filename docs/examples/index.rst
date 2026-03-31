@@ -1,14 +1,14 @@
 Examples
 ========
 
-Each example demonstrates econirl on a different problem. The estimator choice depends on the state space size, whether transitions are known, and whether you need standard errors.
+The first four examples use synthetic environments with known ground truth to validate the estimators. The remaining five apply them to real data from economics, transportation, and industry. The estimator choice depends on the state space size, whether transitions are known, and whether you need standard errors.
 
 .. toctree::
    :maxdepth: 1
 
    rust_bus
-   taxi_gridworld
    ddc_irl_equivalence
+   taxi_gridworld
    wulfmeier_deep_maxent
    keane_wolpin
    ngsim_lane_change
