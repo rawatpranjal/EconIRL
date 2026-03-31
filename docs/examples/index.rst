@@ -7,7 +7,6 @@ The first four examples use synthetic environments with known ground truth to va
    :maxdepth: 1
 
    rust_bus
-   ddc_irl_equivalence
    taxi_gridworld
    wulfmeier_deep_maxent
    keane_wolpin
