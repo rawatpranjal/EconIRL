@@ -124,6 +124,10 @@ After pushing documentation changes, RTD takes 2 to 3 minutes to build. The CDN 
 
 Every example page in `docs/examples/` must have a hero image at the top via an `.. image::` directive pointing to `docs/_static/`. Do not create example pages without a domain illustration.
 
+Example page titles must follow a consistent "Subject Problem" pattern with no colons, semicolons, parentheses, or subtitles. Write "Objectworld Deep MaxEnt IRL" not "Deep MaxEnt IRL: Objectworld and Binaryworld".
+
+Tables in documentation must show actual numbers from running the code. Do not use qualitative placeholders like "positive" or "near zero" when you can run the script and report the estimate.
+
 Keep `docs/conf.py` release version in sync with `pyproject.toml` and `src/econirl/__init__.py`.
 
 ## Key References
