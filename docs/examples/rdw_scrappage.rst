@@ -5,11 +5,16 @@ Every year in the Netherlands each passenger vehicle over three years old must p
 
 The dataset contains 170,852 Volkswagen Golf vehicles registered between 2005 and 2015, observed annually from age 3 through either scrappage or right-censoring at the current date. The 2,009,144 vehicle-year observations include 17,106 exit events (scrappage or export). Defect severity comes from 447,296 individual defect records downloaded from the RDW geconstateerde gebreken dataset.
 
+The data
+--------
+
+The scrappage hazard rises from near zero at age 3 to 8.2 percent at age 20. The observation count declines at older ages because later cohorts (registered 2010 to 2015) have not yet reached age 20.
+
 .. image:: /_static/rdw_scrappage_by_age.png
    :alt: Bar chart showing annual scrappage rate rising from near zero at age 3 to 8.2 percent at age 20, with a line showing the number of vehicles observed declining at older ages.
    :width: 100%
 
-The scrappage hazard rises from near zero at age 3 to 8.2 percent at age 20. Major defects like structural rust and braking failures roughly double the exit probability conditional on age.
+Defect severity increases with age. At age 5 virtually all vehicles pass the APK inspection. By age 20 only 51 percent pass, 30 percent have minor defects, and 19 percent have major defects. Major defects like structural rust and braking failures roughly double the exit probability conditional on age.
 
 .. image:: /_static/rdw_defect_by_age.png
    :alt: Grouped bar chart showing APK inspection defect distribution by vehicle age. At age 5 all vehicles pass. By age 20 only 51 percent pass, 30 percent have minor defects, and 19 percent have major defects.

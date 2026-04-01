@@ -146,7 +146,7 @@ The documentation is hosted at https://econirl.readthedocs.io. The Sphinx config
 
 After triggering a build, RTD takes 2 to 3 minutes to finish. The CDN can cache old pages for several minutes after the build finishes. Hard refresh (Cmd+Shift+R) or appending `?v=X` to the URL busts the browser cache. If the site still shows stale content, check the build status at https://app.readthedocs.org/projects/econirl/builds/ before debugging further.
 
-Every example page in `docs/examples/` must have a hero image at the top via an `.. image::` directive pointing to `docs/_static/`. Do not create example pages without a domain illustration.
+Place figures where they logically belong in the narrative flow, not at the top as hero images. Each figure should appear immediately after the prose that motivates it, so the reader sees the explanation first and the visualization second. Do not front-load pages with decorative images.
 
 Example page titles must follow a consistent "Subject Problem" pattern with no colons, semicolons, parentheses, or subtitles. Write "Objectworld Deep MaxEnt IRL" not "Deep MaxEnt IRL: Objectworld and Binaryworld".
 
