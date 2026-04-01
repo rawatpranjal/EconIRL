@@ -396,9 +396,9 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             panel = TrajectoryPanel.from_dataframe(
                 data, state=state, action=action, id=id
             )
-            all_states = panel.all_states
-            all_actions = panel.all_actions
-            all_next = panel.all_next_states
+            all_states = torch.tensor(np.asarray(panel.all_states), dtype=torch.long)
+            all_actions = torch.tensor(np.asarray(panel.all_actions), dtype=torch.long)
+            all_next = torch.tensor(np.asarray(panel.all_next_states), dtype=torch.long)
 
             if isinstance(context, str):
                 all_contexts = self._extract_context_from_df(
@@ -414,9 +414,9 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 all_contexts = torch.zeros(len(all_states), dtype=torch.long)
 
         elif isinstance(data, (Panel, TrajectoryPanel)):
-            all_states = data.get_all_states()
-            all_actions = data.get_all_actions()
-            all_next = data.get_all_next_states()
+            all_states = torch.tensor(np.asarray(data.get_all_states()), dtype=torch.long)
+            all_actions = torch.tensor(np.asarray(data.get_all_actions()), dtype=torch.long)
+            all_next = torch.tensor(np.asarray(data.get_all_next_states()), dtype=torch.long)
 
             if context is not None and isinstance(context, torch.Tensor):
                 all_contexts = context
@@ -669,6 +669,8 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             rewards = q_vals - self.discount * ev_vals
 
         # Get features for observed (s, a) pairs
+        if not isinstance(feat_matrix, torch.Tensor):
+            feat_matrix = torch.tensor(np.asarray(feat_matrix), dtype=torch.float32)
         phi = feat_matrix[states.long(), actions.long(), :]  # (N, K)
 
         # Use float32 for projection

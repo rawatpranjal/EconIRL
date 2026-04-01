@@ -110,6 +110,59 @@ NFXP and NNES agree on the replacement cost (8.51 versus 8.18) but disagree on t
 
 The Hessian condition number for NFXP is :math:`4.9 \times 10^7`, indicating that the likelihood surface is elongated along the direction that trades off :math:`\theta_c` against :math:`RC`. This is typical of replacement models where the two cost parameters are only separately identified through the curvature of the replacement probability as a function of degradation.
 
+Counterfactual analysis
+-----------------------
+
+Once the structural parameters are estimated, the model can answer counterfactual questions. What would the fleet manager do if the replacement cost were halved or doubled? The table below shows the replacement probability at selected degradation bins under the baseline estimate (:math:`\widehat{RC} = 8.31`) and two counterfactual scenarios, estimated on a 2,000-vehicle subset.
+
+.. code-block:: python
+
+   cf_half = nfxp.counterfactual(RC=rc_est / 2)
+   cf_double = nfxp.counterfactual(RC=rc_est * 2)
+
+.. list-table::
+   :header-rows: 1
+
+   * - Degradation bin
+     - Baseline
+     - RC / 2
+     - RC * 2
+   * - 0
+     - 0.0002
+     - 0.0154
+     - 0.0000
+   * - 10
+     - 0.0006
+     - 0.0233
+     - 0.0000
+   * - 20
+     - 0.0014
+     - 0.0325
+     - 0.0000
+   * - 30
+     - 0.0027
+     - 0.0426
+     - 0.0000
+   * - 40
+     - 0.0040
+     - 0.0527
+     - 0.0000
+   * - 49
+     - 0.0047
+     - 0.0583
+     - 0.0000
+
+Halving the replacement cost increases the replacement probability at every degradation level by an order of magnitude. At degradation bin 40, the probability rises from 0.40 percent to 5.27 percent. The manager replaces more frequently because the cost of resetting the component is lower, which dominates the forward-looking calculation. Doubling the replacement cost suppresses replacement almost entirely. No vehicles are replaced because the one-time cost exceeds the expected present value of future operating savings from a fresh component at any observed degradation level.
+
+The welfare elasticity of replacement cost is negative 5.3. A 10 percent increase in replacement cost reduces expected lifetime utility by roughly 0.34 utils on average, with most of the welfare loss concentrated at high degradation states where the manager would otherwise have replaced.
+
+GLADIUS
+-------
+
+GLADIUS is a model-free estimator that learns Q-values and expected continuation values via neural networks trained on observed transitions. It does not require a transition matrix, which makes it applicable to problems where the state dynamics are too complex to estimate. On the SCANIA data (2,000-vehicle subset), GLADIUS converges in 55 epochs but the linear feature projection yields an R-squared of negative 0.02. The neural reward surface does not project onto the two-parameter linear specification.
+
+This failure is informative. With a per-period replacement rate of 0.20 percent, the Q-network has almost no supervised signal for the replace action. NFXP succeeds because its Bellman fixed-point structure propagates information from rare replacement events backward through the value function. GLADIUS has no such structural assumption and cannot overcome the data sparsity. On problems with higher event rates or richer action variation, GLADIUS would be expected to perform better.
+
 Running the example
 -------------------
 
