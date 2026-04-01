@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import torch
+import jax
+import jax.numpy as jnp
 from typing import Optional
 
 from econirl.environments.rust_bus import RustBusEnvironment

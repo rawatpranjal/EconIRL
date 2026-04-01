@@ -11,7 +11,8 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -50,7 +51,7 @@ def plot_value_function(
     else:
         fig = ax.get_figure()
 
-    ax.plot(states, V.numpy(), linewidth=2, color="blue")
+    ax.plot(states, V, linewidth=2, color="blue")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
@@ -62,8 +63,8 @@ def plot_value_function(
 def plot_q_values(
     utility: UtilityFunction,
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    parameters: torch.Tensor,
+    transitions: jnp.ndarray,
+    parameters: jnp.ndarray,
     action_labels: list[str] | None = None,
     xlabel: str = "State",
     ylabel: str = "Q-Value",
@@ -108,7 +109,7 @@ def plot_q_values(
         fig = ax.get_figure()
 
     for a in range(num_actions):
-        ax.plot(states, Q[:, a].numpy(), label=action_labels[a], linewidth=2)
+        ax.plot(states, Q[:, a], label=action_labels[a], linewidth=2)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -122,8 +123,8 @@ def plot_q_values(
 def plot_value_decomposition(
     utility: UtilityFunction,
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    parameters: torch.Tensor,
+    transitions: jnp.ndarray,
+    parameters: jnp.ndarray,
     action_idx: int = 0,
     action_label: str | None = None,
     xlabel: str = "State",
@@ -166,9 +167,9 @@ def plot_value_decomposition(
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    ax.plot(states, U.numpy(), label="Flow Utility U(s,a)", linewidth=2)
-    ax.plot(states, continuation.numpy(), label=f"β E[V(s')|s,a]", linewidth=2)
-    ax.plot(states, Q.numpy(), label="Q(s,a) = U + βEV", linewidth=2, linestyle="--")
+    ax.plot(states, U, label="Flow Utility U(s,a)", linewidth=2)
+    ax.plot(states, continuation, label=f"β E[V(s')|s,a]", linewidth=2)
+    ax.plot(states, Q, label="Q(s,a) = U + βEV", linewidth=2, linestyle="--")
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Value")
@@ -180,7 +181,7 @@ def plot_value_decomposition(
 
 
 def plot_value_comparison(
-    values: list[torch.Tensor],
+    values: list[jnp.ndarray],
     labels: list[str],
     xlabel: str = "State",
     ylabel: str = "Value",
@@ -217,7 +218,7 @@ def plot_value_comparison(
         fig = ax.get_figure()
 
     for V, label in zip(values, labels):
-        ax.plot(states, V.numpy(), label=label, linewidth=2)
+        ax.plot(states, V, label=label, linewidth=2)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -231,8 +232,8 @@ def plot_value_comparison(
 def plot_advantage_function(
     utility: UtilityFunction,
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    parameters: torch.Tensor,
+    transitions: jnp.ndarray,
+    parameters: jnp.ndarray,
     action_labels: list[str] | None = None,
     xlabel: str = "State",
     ylabel: str = "Advantage",
@@ -280,7 +281,7 @@ def plot_advantage_function(
         fig = ax.get_figure()
 
     for a in range(num_actions):
-        ax.plot(states, advantage[:, a].numpy(), label=action_labels[a], linewidth=2)
+        ax.plot(states, advantage[:, a], label=action_labels[a], linewidth=2)
 
     ax.axhline(y=0, color="black", linestyle="-", linewidth=0.5)
     ax.set_xlabel(xlabel)
@@ -294,7 +295,7 @@ def plot_advantage_function(
 
 def plot_flow_utility(
     utility: UtilityFunction,
-    parameters: torch.Tensor,
+    parameters: jnp.ndarray,
     action_labels: list[str] | None = None,
     xlabel: str = "State",
     ylabel: str = "Flow Utility",
@@ -330,7 +331,7 @@ def plot_flow_utility(
         fig = ax.get_figure()
 
     for a in range(num_actions):
-        ax.plot(states, U[:, a].numpy(), label=action_labels[a], linewidth=2)
+        ax.plot(states, U[:, a], label=action_labels[a], linewidth=2)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -344,8 +345,8 @@ def plot_flow_utility(
 def plot_value_iteration_convergence(
     utility: UtilityFunction,
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    parameters: torch.Tensor,
+    transitions: jnp.ndarray,
+    parameters: jnp.ndarray,
     max_iter: int = 100,
     figsize: tuple[float, float] = (10, 6),
 ) -> plt.Figure:
@@ -368,12 +369,12 @@ def plot_value_iteration_convergence(
     flow_utility = utility.compute(parameters)
 
     # Track convergence
-    V = torch.zeros(problem.num_states)
+    V = jnp.zeros(problem.num_states)
     errors = []
 
     for i in range(max_iter):
         result = operator.apply(flow_utility, V)
-        error = torch.abs(result.V - V).max().item()
+        error = jnp.abs(result.V - V).max().item()
         errors.append(error)
 
         if error < 1e-12:
@@ -395,7 +396,7 @@ def create_value_summary_figure(
     result: EstimationSummary,
     utility: UtilityFunction,
     problem: DDCProblem,
-    transitions: torch.Tensor,
+    transitions: jnp.ndarray,
     action_labels: list[str] | None = None,
     figsize: tuple[float, float] = (14, 10),
 ) -> plt.Figure:

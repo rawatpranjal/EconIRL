@@ -20,7 +20,8 @@ References:
 
 from __future__ import annotations
 
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem
 
@@ -29,11 +30,11 @@ _SVF_MAX_ITER = 1000
 
 
 def compute_state_visitation(
-    policy: torch.Tensor,
-    transitions: torch.Tensor,
+    policy: jnp.ndarray,
+    transitions: jnp.ndarray,
     problem: DDCProblem,
-    initial_dist: torch.Tensor | None = None,
-) -> torch.Tensor:
+    initial_dist: jnp.ndarray | None = None,
+) -> jnp.ndarray:
     """Compute discounted state visitation frequencies.
 
     Solves D = (I - gamma * P_pi^T)^{-1} rho_0 via direct linear solve.
@@ -45,19 +46,19 @@ def compute_state_visitation(
 
     Parameters
     ----------
-    policy : torch.Tensor
+    policy : jnp.ndarray
         Choice probabilities pi(a|s), shape (n_states, n_actions).
-    transitions : torch.Tensor
+    transitions : jnp.ndarray
         Transition matrices P(s'|s,a), shape (n_actions, n_states, n_states).
     problem : DDCProblem
         Problem specification providing num_states and discount_factor.
-    initial_dist : torch.Tensor, optional
+    initial_dist : jnp.ndarray, optional
         Initial state distribution rho_0, shape (n_states,).
         If None, uses uniform distribution.
 
     Returns
     -------
-    D : torch.Tensor
+    D : jnp.ndarray
         Normalized state visitation frequencies, shape (n_states,).
         Sums to 1.
     """
@@ -65,67 +66,73 @@ def compute_state_visitation(
     gamma = problem.discount_factor
 
     if initial_dist is None:
-        rho0 = torch.ones(n_states, dtype=policy.dtype) / n_states
+        rho0 = jnp.ones(n_states, dtype=jnp.float64) / n_states
     else:
-        rho0 = initial_dist.clone().to(policy.dtype)
+        rho0 = jnp.array(initial_dist, dtype=jnp.float64)
 
     # Policy-weighted transition: P_pi[s, s'] = sum_a pi(a|s) P(s'|s, a)
-    # transitions: (n_actions, n_states, n_states) = [a, from_s, to_s]
-    P_pi = torch.einsum("sa,ast->st", policy, transitions)
+    P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
     # Try direct linear solve: (I - gamma * P_pi^T) D = rho_0
-    try:
-        A = torch.eye(n_states, dtype=policy.dtype) - gamma * P_pi.T
-        D = torch.linalg.solve(A, rho0)
-        if torch.isfinite(D).all() and (D >= -1e-6).all():
-            D = D.clamp(min=0.0)
-            total = D.sum()
-            if total > 0:
-                return D / total
-    except Exception:
-        pass
+    A = jnp.eye(n_states, dtype=jnp.float64) - gamma * P_pi.T
+    D = jnp.linalg.solve(A, rho0)
+
+    # Check if solve succeeded
+    solve_ok = jnp.isfinite(D).all() & (D >= -1e-6).all()
+
+    if solve_ok:
+        D = jnp.maximum(D, 0.0)
+        total = D.sum()
+        if total > 0:
+            return D / total
 
     # Fallback: fixed-point iteration D = rho_0 + gamma * P_pi^T @ D
-    D = rho0.clone()
-    for _ in range(_SVF_MAX_ITER):
+    D = rho0
+
+    def body_fn(carry):
+        D, error, k = carry
         D_new = rho0 + gamma * (P_pi.T @ D)
-        if torch.abs(D_new - D).max().item() < _SVF_TOL:
-            D = D_new
-            break
-        D = D_new
+        error = jnp.max(jnp.abs(D_new - D))
+        return D_new, error, k + 1
+
+    def cond_fn(carry):
+        _, error, k = carry
+        return jnp.logical_and(error > _SVF_TOL, k < _SVF_MAX_ITER)
+
+    D, _, _ = jax.lax.while_loop(
+        cond_fn, body_fn, (D, jnp.float64(_SVF_TOL + 1.0), jnp.int32(0))
+    )
 
     total = D.sum()
-    if total > 0:
-        return D / total
-    return D
+    return jnp.where(total > 0, D / total, D)
 
 
 def compute_state_action_visitation(
-    policy: torch.Tensor,
-    transitions: torch.Tensor,
+    policy: jnp.ndarray,
+    transitions: jnp.ndarray,
     problem: DDCProblem,
-    initial_dist: torch.Tensor | None = None,
-) -> torch.Tensor:
+    initial_dist: jnp.ndarray | None = None,
+) -> jnp.ndarray:
     """Compute discounted state-action visitation frequencies.
 
     D_sa[s, a] = D[s] * pi(a|s), where D is the discounted state visitation
-    from :func:`compute_state_visitation`.
+    from compute_state_visitation.
 
     Parameters
     ----------
-    policy : torch.Tensor
+    policy : jnp.ndarray
         Choice probabilities pi(a|s), shape (n_states, n_actions).
-    transitions : torch.Tensor
+    transitions : jnp.ndarray
         Transition matrices P(s'|s,a), shape (n_actions, n_states, n_states).
     problem : DDCProblem
         Problem specification.
-    initial_dist : torch.Tensor, optional
+    initial_dist : jnp.ndarray, optional
         Initial state distribution rho_0. If None, uses uniform.
 
     Returns
     -------
-    D_sa : torch.Tensor
+    D_sa : jnp.ndarray
         State-action visitation frequencies, shape (n_states, n_actions).
     """
     D = compute_state_visitation(policy, transitions, problem, initial_dist)
-    return D.unsqueeze(1) * policy
+    return D[:, None] * policy

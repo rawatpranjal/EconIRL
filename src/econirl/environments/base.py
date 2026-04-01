@@ -17,8 +17,8 @@ from abc import ABC, abstractmethod
 from typing import Any, SupportsFloat
 
 import gymnasium as gym
+import jax.numpy as jnp
 import numpy as np
-import torch
 from gymnasium import spaces
 
 from econirl.core.types import DDCProblem
@@ -102,18 +102,18 @@ class DDCEnvironment(gym.Env, ABC):
         """Dimensionality of the continuous state representation."""
         return 1
 
-    def encode_states(self, states: torch.Tensor) -> torch.Tensor:
+    def encode_states(self, states: jnp.ndarray) -> jnp.ndarray:
         """Encode flat state indices to continuous features.
 
         Default: normalized scalar s/(S-1) with shape (batch, 1).
         Override for multi-dimensional environments.
         """
         denom = max(self.num_states - 1, 1)
-        return (states.float() / denom).unsqueeze(-1)
+        return jnp.expand_dims(states.astype(jnp.float32) / denom, axis=-1)
 
     @property
     @abstractmethod
-    def transition_matrices(self) -> torch.Tensor:
+    def transition_matrices(self) -> jnp.ndarray:
         """Return transition probability matrices.
 
         Returns:
@@ -124,7 +124,7 @@ class DDCEnvironment(gym.Env, ABC):
 
     @property
     @abstractmethod
-    def feature_matrix(self) -> torch.Tensor:
+    def feature_matrix(self) -> jnp.ndarray:
         """Return feature matrix for utility computation.
 
         Features are the observable characteristics that enter the
@@ -151,11 +151,11 @@ class DDCEnvironment(gym.Env, ABC):
         """Return names of utility parameters in order."""
         ...
 
-    def get_true_parameter_vector(self) -> torch.Tensor:
+    def get_true_parameter_vector(self) -> jnp.ndarray:
         """Return true parameters as a tensor in canonical order."""
         params = self.true_parameters
-        return torch.tensor(
-            [params[name] for name in self.parameter_names], dtype=torch.float32
+        return jnp.array(
+            [params[name] for name in self.parameter_names], dtype=jnp.float32
         )
 
     @property
@@ -265,7 +265,7 @@ class DDCEnvironment(gym.Env, ABC):
         # DDC models are infinite horizon, so never terminated
         return self._state, utility, False, False, info
 
-    def compute_utility_matrix(self, parameters: torch.Tensor | None = None) -> torch.Tensor:
+    def compute_utility_matrix(self, parameters: jnp.ndarray | None = None) -> jnp.ndarray:
         """Compute the full utility matrix for all state-action pairs.
 
         Args:
@@ -278,7 +278,7 @@ class DDCEnvironment(gym.Env, ABC):
             parameters = self.get_true_parameter_vector()
 
         features = self.feature_matrix
-        return torch.einsum("sak,k->sa", features, parameters)
+        return jnp.einsum("sak,k->sa", features, parameters)
 
     def render(self) -> None:
         """Render the current state (optional)."""

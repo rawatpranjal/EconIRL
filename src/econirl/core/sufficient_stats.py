@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import torch
+import jax.numpy as jnp
 
 
 @dataclass
@@ -20,19 +20,19 @@ class SufficientStats:
     not individual trajectories. This makes estimation O(1) in dataset size.
 
     Attributes:
-        state_action_counts: Tensor of shape (S, A) with raw observation counts.
-        transitions: Tensor of shape (A, S, S) with estimated P(s'|s,a).
-        empirical_ccps: Tensor of shape (S, A) with empirical P(a|s).
-        initial_distribution: Tensor of shape (S,) with empirical starting
+        state_action_counts: Array of shape (S, A) with raw observation counts.
+        transitions: Array of shape (A, S, S) with estimated P(s'|s,a).
+        empirical_ccps: Array of shape (S, A) with empirical P(a|s).
+        initial_distribution: Array of shape (S,) with empirical starting
             state distribution across individuals.
         n_observations: Total number of (s, a, s') observations.
         n_individuals: Number of distinct individuals in the panel.
     """
 
-    state_action_counts: torch.Tensor  # (S, A)
-    transitions: torch.Tensor  # (A, S, S)
-    empirical_ccps: torch.Tensor  # (S, A)
-    initial_distribution: torch.Tensor  # (S,)
+    state_action_counts: jnp.ndarray  # (S, A)
+    transitions: jnp.ndarray  # (A, S, S)
+    empirical_ccps: jnp.ndarray  # (S, A)
+    initial_distribution: jnp.ndarray  # (S,)
     n_observations: int
     n_individuals: int
 

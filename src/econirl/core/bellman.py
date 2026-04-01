@@ -5,10 +5,10 @@ discrete choice estimation. The soft (logit) Bellman operator accounts
 for the extreme value distribution of preference shocks.
 
 Key equations (following Rust 1987):
-- Q(s,a) = u(s,a) + β Σ_{s'} P(s'|s,a) V(s')
-- V(s) = σ log(Σ_a exp(Q(s,a)/σ))  [log-sum-exp / social surplus]
+- Q(s,a) = u(s,a) + beta * sum_s' P(s'|s,a) V(s')
+- V(s) = sigma * log(sum_a exp(Q(s,a)/sigma))  [log-sum-exp / social surplus]
 
-The operator Λ_σ is a contraction with modulus β, guaranteeing
+The operator is a contraction with modulus beta, guaranteeing
 convergence of value iteration.
 """
 
@@ -17,8 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NamedTuple
 
-import torch
-import torch.nn.functional as F
+import jax
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem
 
@@ -32,9 +32,9 @@ class BellmanResult(NamedTuple):
         policy: Choice probabilities, shape (num_states, num_actions)
     """
 
-    Q: torch.Tensor
-    V: torch.Tensor
-    policy: torch.Tensor
+    Q: jnp.ndarray
+    V: jnp.ndarray
+    policy: jnp.ndarray
 
 
 @dataclass
@@ -46,24 +46,19 @@ class SoftBellmanOperator:
     inner loop of NFXP estimation.
 
     The operator computes:
-        Q(s,a) = u(s,a) + β Σ_{s'} P(s'|s,a) V(s')
-        V(s) = σ log(Σ_a exp(Q(s,a)/σ))
+        Q(s,a) = u(s,a) + beta * sum_s' P(s'|s,a) V(s')
+        V(s) = sigma * log(sum_a exp(Q(s,a)/sigma))
 
-    where σ is the scale parameter of the extreme value distribution.
+    where sigma is the scale parameter of the extreme value distribution.
 
     Attributes:
         problem: DDCProblem specification
         transitions: Transition probability matrices, shape (num_actions, num_states, num_states)
                     where transitions[a, s, s'] = P(s' | s, a)
-
-    Example:
-        >>> operator = SoftBellmanOperator(problem, transitions)
-        >>> result = operator.solve(utility_matrix)
-        >>> print(result.policy)  # Optimal choice probabilities
     """
 
     problem: DDCProblem
-    transitions: torch.Tensor
+    transitions: jnp.ndarray
 
     def __post_init__(self) -> None:
         expected_shape = (
@@ -77,7 +72,7 @@ class SoftBellmanOperator:
                 f"got {self.transitions.shape}"
             )
 
-    def apply(self, utility: torch.Tensor, V: torch.Tensor) -> BellmanResult:
+    def apply(self, utility: jnp.ndarray, V: jnp.ndarray) -> BellmanResult:
         """Apply the Bellman operator once.
 
         Args:
@@ -90,24 +85,21 @@ class SoftBellmanOperator:
         beta = self.problem.discount_factor
         sigma = self.problem.scale_parameter
 
-        # Q(s,a) = u(s,a) + β Σ_{s'} P(s'|s,a) V(s')
-        # transitions[a, s, t] @ V[t] gives expected continuation value
-        # where t indexes the next state s'
-        # Result shape: (num_actions, num_states)
-        EV = torch.einsum("ast,t->as", self.transitions, V)
+        # Q(s,a) = u(s,a) + beta * sum_s' P(s'|s,a) V(s')
+        EV = jnp.einsum("ast,t->as", self.transitions, V)
 
         # Q shape: (num_states, num_actions)
         Q = utility + beta * EV.T
 
-        # V(s) = σ log(Σ_a exp(Q(s,a)/σ)) using log-sum-exp for stability
-        V_new = sigma * torch.logsumexp(Q / sigma, dim=1)
+        # V(s) = sigma * log(sum_a exp(Q(s,a)/sigma)) using log-sum-exp
+        V_new = sigma * jax.scipy.special.logsumexp(Q / sigma, axis=1)
 
         # Choice probabilities via softmax
-        policy = F.softmax(Q / sigma, dim=1)
+        policy = jax.nn.softmax(Q / sigma, axis=1)
 
         return BellmanResult(Q=Q, V=V_new, policy=policy)
 
-    def compute_expected_value(self, V: torch.Tensor) -> torch.Tensor:
+    def compute_expected_value(self, V: jnp.ndarray) -> jnp.ndarray:
         """Compute expected continuation value E[V(s') | s, a].
 
         Args:
@@ -116,18 +108,13 @@ class SoftBellmanOperator:
         Returns:
             Expected values, shape (num_states, num_actions)
         """
-        # transitions[a, s, t] @ V[t] -> (num_actions, num_states)
-        # where t indexes the next state s'
-        EV = torch.einsum("ast,t->as", self.transitions, V)
-        return EV.T  # (num_states, num_actions)
+        EV = jnp.einsum("ast,t->as", self.transitions, V)
+        return EV.T
 
     def compute_choice_probabilities(
-        self, utility: torch.Tensor, V: torch.Tensor
-    ) -> torch.Tensor:
-        """Compute choice probabilities given utility and value function.
-
-        This implements the logit choice rule:
-            P(a|s) = exp(Q(s,a)/σ) / Σ_{a'} exp(Q(s,a')/σ)
+        self, utility: jnp.ndarray, V: jnp.ndarray
+    ) -> jnp.ndarray:
+        """Compute choice probabilities P(a|s).
 
         Args:
             utility: Flow utility matrix, shape (num_states, num_actions)
@@ -140,9 +127,9 @@ class SoftBellmanOperator:
         return result.policy
 
     def compute_log_choice_probabilities(
-        self, utility: torch.Tensor, V: torch.Tensor
-    ) -> torch.Tensor:
-        """Compute log choice probabilities (numerically stable).
+        self, utility: jnp.ndarray, V: jnp.ndarray
+    ) -> jnp.ndarray:
+        """Compute log choice probabilities log P(a|s).
 
         Args:
             utility: Flow utility matrix, shape (num_states, num_actions)
@@ -153,49 +140,66 @@ class SoftBellmanOperator:
         """
         beta = self.problem.discount_factor
         sigma = self.problem.scale_parameter
+        EV = jnp.einsum("ast,t->as", self.transitions, V)
+        Q = utility + beta * EV.T
+        return jax.nn.log_softmax(Q / sigma, axis=1)
 
-        EV = self.compute_expected_value(V)
-        Q = utility + beta * EV
+    def compute_social_surplus(
+        self, utility: jnp.ndarray, V: jnp.ndarray
+    ) -> jnp.ndarray:
+        """Compute expected max utility (inclusive value / social surplus).
 
-        # log P(a|s) = Q(s,a)/σ - log(Σ_{a'} exp(Q(s,a')/σ))
-        return F.log_softmax(Q / sigma, dim=1)
+        Args:
+            utility: Flow utility matrix, shape (num_states, num_actions)
+            V: Value function, shape (num_states,)
+
+        Returns:
+            Social surplus, shape (num_states,)
+        """
+        result = self.apply(utility, V)
+        return result.V
 
 
 def compute_flow_utility(
-    utility_params: torch.Tensor,
-    feature_matrix: torch.Tensor,
-) -> torch.Tensor:
-    """Compute flow utility from parameters and features.
+    params: jnp.ndarray, feature_matrix: jnp.ndarray
+) -> jnp.ndarray:
+    """Compute flow utility matrix from parameters and features.
 
-    Implements the linear utility specification:
-        u(s,a) = θ · φ(s,a)
-
-    where θ are the utility parameters and φ(s,a) are the features.
+    U(s,a) = sum_k theta_k * phi(s,a,k)
 
     Args:
-        utility_params: Parameter vector, shape (num_params,)
-        feature_matrix: Feature tensor, shape (num_states, num_actions, num_params)
+        params: Parameter vector, shape (K,)
+        feature_matrix: Feature tensor, shape (S, A, K)
 
     Returns:
-        Flow utility matrix, shape (num_states, num_actions)
+        Flow utility, shape (S, A)
     """
-    return torch.einsum("sak,k->sa", feature_matrix, utility_params)
+    return jnp.einsum("sak,k->sa", feature_matrix, params)
 
 
-def compute_social_surplus(Q: torch.Tensor, sigma: float = 1.0) -> torch.Tensor:
-    """Compute the social surplus (expected max utility) at each state.
+# ---------------------------------------------------------------------------
+# Standalone Bellman function for optimistix.fixed_point
+# ---------------------------------------------------------------------------
 
-    The social surplus is the expected value of the maximum utility
-    across actions, accounting for the preference shocks:
-        W(s) = E[max_a {Q(s,a) + σε_a}] = σ log(Σ_a exp(Q(s,a)/σ))
+def bellman_operator_fn(V: jnp.ndarray, args: tuple) -> jnp.ndarray:
+    """Bellman fixed-point map V -> T(V) for use with optimistix.
 
-    This is also known as the "inclusive value" in discrete choice.
+    This standalone function is compatible with optimistix.fixed_point,
+    enabling implicit differentiation through the Bellman fixed point
+    via the implicit function theorem.
 
     Args:
-        Q: Action-value function, shape (num_states, num_actions)
-        sigma: Scale parameter of extreme value distribution
+        V: Current value function, shape (num_states,)
+        args: Tuple of (utility, transitions, beta, sigma) where
+            utility: (S, A) flow utility matrix
+            transitions: (A, S, S) transition matrices
+            beta: discount factor
+            sigma: scale parameter
 
     Returns:
-        Social surplus, shape (num_states,)
+        Updated value function T(V), shape (num_states,)
     """
-    return sigma * torch.logsumexp(Q / sigma, dim=1)
+    utility, transitions, beta, sigma = args
+    EV = jnp.einsum("ast,t->as", transitions, V)
+    Q = utility + beta * EV.T
+    return sigma * jax.scipy.special.logsumexp(Q / sigma, axis=1)

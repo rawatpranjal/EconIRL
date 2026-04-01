@@ -20,13 +20,13 @@ from dataclasses import dataclass
 from typing import Callable, Literal
 
 import numpy as np
-import torch
+import jax.numpy as jnp
 
 from econirl.inference.results import IdentificationDiagnostics
 
 
 def check_identification(
-    hessian: torch.Tensor,
+    hessian: jnp.ndarray,
     parameter_names: list[str] | None = None,
     tol: float = 1e-6,
 ) -> IdentificationDiagnostics:
@@ -51,16 +51,16 @@ def check_identification(
 
     # Compute eigenvalues of negative Hessian (should be positive for well-identified)
     neg_hessian = -hessian
-    eigenvalues = torch.linalg.eigvalsh(neg_hessian)
+    eigenvalues = jnp.linalg.eigvalsh(neg_hessian)
 
     # Sort eigenvalues
-    eigenvalues_sorted = torch.sort(eigenvalues).values
+    eigenvalues_sorted = jnp.sort(eigenvalues)
 
-    min_eigenvalue = eigenvalues_sorted[0].item()
-    max_eigenvalue = eigenvalues_sorted[-1].item()
+    min_eigenvalue = float(eigenvalues_sorted[0])
+    max_eigenvalue = float(eigenvalues_sorted[-1])
 
     # Numerical rank
-    rank = (eigenvalues.abs() > tol).sum().item()
+    rank = int((jnp.abs(eigenvalues) > tol).sum())
 
     # Condition number (ratio of largest to smallest eigenvalue)
     if min_eigenvalue > tol:
@@ -109,8 +109,8 @@ class SensitivityAnalysis:
 
 
 def analyze_parameter_sensitivity(
-    hessian: torch.Tensor,
-    parameters: torch.Tensor,
+    hessian: jnp.ndarray,
+    parameters: jnp.ndarray,
     parameter_names: list[str],
 ) -> list[SensitivityAnalysis]:
     """Analyze sensitivity of estimates to each parameter.
@@ -136,8 +136,8 @@ def analyze_parameter_sensitivity(
 
     # Compute variance-covariance matrix
     try:
-        var_cov = torch.linalg.inv(-hessian)
-    except RuntimeError:
+        var_cov = jnp.linalg.inv(-hessian)
+    except Exception:
         # Hessian not invertible
         return [
             SensitivityAnalysis(
@@ -149,8 +149,8 @@ def analyze_parameter_sensitivity(
         ]
 
     # Correlation matrix
-    std_devs = torch.sqrt(torch.diag(var_cov))
-    corr_matrix = var_cov / (std_devs.unsqueeze(0) * std_devs.unsqueeze(1))
+    std_devs = jnp.sqrt(jnp.diag(var_cov))
+    corr_matrix = var_cov / (std_devs[None, :] * std_devs[:, None])
 
     for i, name_i in enumerate(parameter_names):
         elasticities = {}
@@ -159,10 +159,10 @@ def analyze_parameter_sensitivity(
             if i != j:
                 # Elasticity: how much j changes per unit change in i
                 # Use correlation as a proxy
-                elasticities[name_j] = corr_matrix[i, j].item()
+                elasticities[name_j] = float(corr_matrix[i, j])
 
         # Influence score: average absolute correlation with other parameters
-        other_corrs = [abs(corr_matrix[i, j].item()) for j in range(n_params) if j != i]
+        other_corrs = [abs(float(corr_matrix[i, j])) for j in range(n_params) if j != i]
         influence_score = np.mean(other_corrs) if other_corrs else 0.0
 
         results.append(
@@ -177,8 +177,8 @@ def analyze_parameter_sensitivity(
 
 
 def check_local_identification(
-    log_likelihood_fn: Callable[[torch.Tensor], torch.Tensor],
-    parameters: torch.Tensor,
+    log_likelihood_fn: Callable[[jnp.ndarray], jnp.ndarray],
+    parameters: jnp.ndarray,
     parameter_names: list[str],
     eps: float = 1e-5,
     n_directions: int = 100,
@@ -208,14 +208,14 @@ def check_local_identification(
     rng = np.random.default_rng(seed)
     n_params = len(parameters)
 
-    ll_at_opt = log_likelihood_fn(parameters).item()
+    ll_at_opt = float(log_likelihood_fn(parameters))
 
     # Sample random directions on unit sphere
-    directions = torch.tensor(
+    directions = jnp.array(
         rng.standard_normal((n_directions, n_params)),
         dtype=parameters.dtype,
     )
-    directions = directions / torch.norm(directions, dim=1, keepdim=True)
+    directions = directions / jnp.linalg.norm(directions, axis=1, keepdims=True)
 
     # Check likelihood in each direction
     ll_increases = 0
@@ -223,8 +223,8 @@ def check_local_identification(
     decrease_magnitudes = []
 
     for d in directions:
-        ll_plus = log_likelihood_fn(parameters + eps * d).item()
-        ll_minus = log_likelihood_fn(parameters - eps * d).item()
+        ll_plus = float(log_likelihood_fn(parameters + eps * d))
+        ll_minus = float(log_likelihood_fn(parameters - eps * d))
 
         # Check if likelihood increases in either direction
         if ll_plus > ll_at_opt + 1e-10 or ll_minus > ll_at_opt + 1e-10:
@@ -263,8 +263,8 @@ def check_local_identification(
 
 
 def compute_information_matrix_equality_test(
-    hessian: torch.Tensor,
-    outer_product_gradient: torch.Tensor,
+    hessian: jnp.ndarray,
+    outer_product_gradient: jnp.ndarray,
     n_observations: int,
 ) -> dict:
     """Test equality of information matrices (White's test).
@@ -295,7 +295,7 @@ def compute_information_matrix_equality_test(
     diff_vec = []
     for i in range(n_params):
         for j in range(i + 1):
-            diff_vec.append(diff[i, j].item())
+            diff_vec.append(float(diff[i, j]))
 
     diff_vec = np.array(diff_vec)
 
@@ -317,7 +317,7 @@ def compute_information_matrix_equality_test(
 
 
 def diagnose_identification_issues(
-    hessian: torch.Tensor,
+    hessian: jnp.ndarray,
     parameter_names: list[str],
     threshold: float = 0.01,
 ) -> list[str]:
@@ -338,11 +338,11 @@ def diagnose_identification_issues(
     n_params = len(parameter_names)
 
     # Eigendecomposition
-    eigenvalues, eigenvectors = torch.linalg.eigh(-hessian)
+    eigenvalues, eigenvectors = jnp.linalg.eigh(-hessian)
 
     # Check for near-zero eigenvalues
-    near_zero_mask = eigenvalues.abs() < threshold
-    n_near_zero = near_zero_mask.sum().item()
+    near_zero_mask = jnp.abs(eigenvalues) < threshold
+    n_near_zero = int(near_zero_mask.sum())
 
     if n_near_zero > 0:
         messages.append(
@@ -353,8 +353,8 @@ def diagnose_identification_issues(
         for i, is_near_zero in enumerate(near_zero_mask):
             if is_near_zero:
                 # The eigenvector shows which parameters are in the null space
-                ev = eigenvectors[:, i].abs()
-                top_params = torch.argsort(ev, descending=True)[:3]
+                ev = jnp.abs(eigenvectors[:, i])
+                top_params = jnp.argsort(ev)[::-1][:3]
 
                 involved = [parameter_names[j] for j in top_params]
                 messages.append(
@@ -362,7 +362,7 @@ def diagnose_identification_issues(
                 )
 
     # Check diagonal elements (individual parameter curvature)
-    diag = torch.diag(-hessian)
+    diag = jnp.diag(-hessian)
     for i, name in enumerate(parameter_names):
         if diag[i] < threshold:
             messages.append(
@@ -371,9 +371,9 @@ def diagnose_identification_issues(
 
     # Check for high correlations
     try:
-        var_cov = torch.linalg.inv(-hessian)
-        std_devs = torch.sqrt(torch.diag(var_cov))
-        corr_matrix = var_cov / (std_devs.unsqueeze(0) * std_devs.unsqueeze(1))
+        var_cov = jnp.linalg.inv(-hessian)
+        std_devs = jnp.sqrt(jnp.diag(var_cov))
+        corr_matrix = var_cov / (std_devs[None, :] * std_devs[:, None])
 
         for i in range(n_params):
             for j in range(i + 1, n_params):
@@ -382,7 +382,7 @@ def diagnose_identification_issues(
                         f"High correlation ({corr_matrix[i, j]:.3f}) between "
                         f"'{parameter_names[i]}' and '{parameter_names[j]}'."
                     )
-    except RuntimeError:
+    except Exception:
         messages.append("Could not compute correlations (Hessian not invertible).")
 
     if not messages:

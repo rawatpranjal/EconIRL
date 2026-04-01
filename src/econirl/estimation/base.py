@@ -14,7 +14,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol, runtime_checkable
 
-import torch
+import numpy as np
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.inference.results import EstimationSummary
@@ -40,12 +41,12 @@ class EstimationResult:
         message: Convergence message from optimizer
     """
 
-    parameters: torch.Tensor
+    parameters: jnp.ndarray
     log_likelihood: float
-    value_function: torch.Tensor
-    policy: torch.Tensor
-    hessian: torch.Tensor | None = None
-    gradient_contributions: torch.Tensor | None = None
+    value_function: jnp.ndarray
+    policy: jnp.ndarray
+    hessian: jnp.ndarray | None = None
+    gradient_contributions: jnp.ndarray | None = None
     converged: bool = True
     num_iterations: int = 0
     num_function_evals: int = 0
@@ -77,7 +78,7 @@ class Estimator(Protocol):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
+        transitions: jnp.ndarray,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate utility parameters from panel data.
@@ -131,8 +132,8 @@ class BaseEstimator(ABC):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Core optimization routine. Must be implemented by subclasses.
@@ -155,8 +156,8 @@ class BaseEstimator(ABC):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate utility parameters from panel data.
@@ -201,7 +202,7 @@ class BaseEstimator(ABC):
             # For bootstrap, create a function that re-estimates on a new panel
             estimate_fn = None
             if self._se_method == "bootstrap":
-                def _bootstrap_estimate_fn(bootstrap_panel: Panel) -> torch.Tensor:
+                def _bootstrap_estimate_fn(bootstrap_panel: Panel) -> jnp.ndarray:
                     """Re-estimate on bootstrap sample (silent, fast settings)."""
                     bootstrap_result = self._optimize(
                         panel=bootstrap_panel,
@@ -224,7 +225,7 @@ class BaseEstimator(ABC):
             standard_errors = se_result.standard_errors
             variance_covariance = se_result.variance_covariance
         else:
-            standard_errors = torch.full_like(result.parameters, float("nan"))
+            standard_errors = jnp.full_like(result.parameters, float("nan"))
             variance_covariance = None
 
         # Identification diagnostics
@@ -245,7 +246,7 @@ class BaseEstimator(ABC):
             num_parameters=n_params,
             num_observations=n_obs,
             aic=-2 * ll + 2 * n_params,
-            bic=-2 * ll + n_params * torch.log(torch.tensor(n_obs)).item(),
+            bic=-2 * ll + n_params * float(jnp.log(jnp.array(n_obs))),
             prediction_accuracy=self._compute_prediction_accuracy(
                 panel, result.policy
             ),
@@ -278,7 +279,7 @@ class BaseEstimator(ABC):
         )
 
     def _compute_prediction_accuracy(
-        self, panel: Panel, policy: torch.Tensor
+        self, panel: Panel, policy: jnp.ndarray
     ) -> float:
         """Compute fraction of correctly predicted choices.
 
@@ -291,9 +292,9 @@ class BaseEstimator(ABC):
         """
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
-        predicted = policy[all_states].argmax(dim=1)
+        predicted = jnp.argmax(policy[all_states], axis=1)
         total = all_states.shape[0]
-        correct = (predicted == all_actions).sum().item()
+        correct = int((predicted == all_actions).sum())
         return correct / total if total > 0 else 0.0
 
     def _log(self, message: str) -> None:

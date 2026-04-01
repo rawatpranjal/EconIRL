@@ -9,8 +9,14 @@ from __future__ import annotations
 
 from typing import Literal
 
-import torch
-import torch.nn.functional as F
+import jax
+import jax.numpy as jnp
+import numpy as np
+
+
+def _bce_with_logits(logits, labels):
+    """Binary cross-entropy with logits (numerically stable)."""
+    return jnp.mean(jnp.logaddexp(0.0, logits) - labels * logits)
 
 
 class TabularDiscriminator:
@@ -30,6 +36,7 @@ class TabularDiscriminator:
         n_states: int,
         n_actions: int,
         init: Literal["zeros", "uniform", "small_positive"] = "zeros",
+        key: jax.Array | None = None,
     ):
         """Initialize tabular discriminator.
 
@@ -37,20 +44,23 @@ class TabularDiscriminator:
             n_states: Number of states in the MDP
             n_actions: Number of actions
             init: Initialization method for logits
+            key: PRNG key (required for "uniform" init)
         """
         self.n_states = n_states
         self.n_actions = n_actions
 
         if init == "zeros":
-            self.logits = torch.zeros(n_states, n_actions)
+            self.logits = jnp.zeros((n_states, n_actions))
         elif init == "uniform":
-            self.logits = torch.rand(n_states, n_actions) * 2 - 1  # [-1, 1]
+            if key is None:
+                key = jax.random.key(0)
+            self.logits = jax.random.uniform(key, (n_states, n_actions)) * 2 - 1
         elif init == "small_positive":
-            self.logits = torch.ones(n_states, n_actions) * 0.1
+            self.logits = jnp.ones((n_states, n_actions)) * 0.1
         else:
             raise ValueError(f"Unknown init method: {init}")
 
-    def forward(self, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    def forward(self, states: jnp.ndarray, actions: jnp.ndarray) -> jnp.ndarray:
         """Compute discriminator logits for state-action pairs.
 
         Args:
@@ -62,7 +72,7 @@ class TabularDiscriminator:
         """
         return self.logits[states, actions]
 
-    def probability(self, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    def probability(self, states: jnp.ndarray, actions: jnp.ndarray) -> jnp.ndarray:
         """Compute probability that (s,a) is from expert.
 
         Args:
@@ -73,14 +83,14 @@ class TabularDiscriminator:
             P(expert | s, a) = sigmoid(D(s,a)), shape (batch_size,)
         """
         logits = self.forward(states, actions)
-        return torch.sigmoid(logits)
+        return jax.nn.sigmoid(logits)
 
     def update(
         self,
-        expert_states: torch.Tensor,
-        expert_actions: torch.Tensor,
-        policy_states: torch.Tensor,
-        policy_actions: torch.Tensor,
+        expert_states: jnp.ndarray,
+        expert_actions: jnp.ndarray,
+        policy_states: jnp.ndarray,
+        policy_actions: jnp.ndarray,
         learning_rate: float = 0.01,
     ) -> float:
         """Update discriminator with binary cross-entropy gradient.
@@ -99,35 +109,41 @@ class TabularDiscriminator:
         """
         # Expert samples: want D(s,a) to be high (label = 1)
         expert_logits = self.forward(expert_states, expert_actions)
-        expert_loss = F.binary_cross_entropy_with_logits(
-            expert_logits, torch.ones_like(expert_logits)
-        )
+        expert_loss = _bce_with_logits(expert_logits, jnp.ones_like(expert_logits))
 
         # Policy samples: want D(s,a) to be low (label = 0)
         policy_logits = self.forward(policy_states, policy_actions)
-        policy_loss = F.binary_cross_entropy_with_logits(
-            policy_logits, torch.zeros_like(policy_logits)
-        )
+        policy_loss = _bce_with_logits(policy_logits, jnp.zeros_like(policy_logits))
 
         total_loss = expert_loss + policy_loss
 
         # Compute gradients manually (tabular, so gradient is simple)
         # For BCE: dL/d(logit) = sigmoid(logit) - label
-        expert_grad = torch.sigmoid(expert_logits) - 1.0  # Want to increase
-        policy_grad = torch.sigmoid(policy_logits) - 0.0  # Want to decrease
+        expert_grad = jax.nn.sigmoid(expert_logits) - 1.0
+        policy_grad = jax.nn.sigmoid(policy_logits) - 0.0
 
-        # Apply gradients
-        for i, (s, a) in enumerate(zip(expert_states, expert_actions)):
-            self.logits[s, a] -= learning_rate * expert_grad[i]
+        # Apply gradients functionally (JAX arrays are immutable)
+        new_logits = jnp.array(self.logits)
+        # Build gradient update via numpy for the scatter loop
+        grad_update = np.zeros((self.n_states, self.n_actions))
+        es_np = np.asarray(expert_states)
+        ea_np = np.asarray(expert_actions)
+        eg_np = np.asarray(expert_grad)
+        for i in range(len(es_np)):
+            grad_update[es_np[i], ea_np[i]] += eg_np[i]
+        ps_np = np.asarray(policy_states)
+        pa_np = np.asarray(policy_actions)
+        pg_np = np.asarray(policy_grad)
+        for i in range(len(ps_np)):
+            grad_update[ps_np[i], pa_np[i]] += pg_np[i]
 
-        for i, (s, a) in enumerate(zip(policy_states, policy_actions)):
-            self.logits[s, a] -= learning_rate * policy_grad[i]
+        self.logits = new_logits - learning_rate * jnp.array(grad_update)
 
-        return total_loss.item()
+        return float(total_loss)
 
     def get_reward_matrix(
         self, reward_type: Literal["gail", "airl"] = "gail"
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Convert discriminator to reward matrix.
 
         Args:
@@ -139,11 +155,9 @@ class TabularDiscriminator:
             Reward matrix R(s,a), shape (n_states, n_actions)
         """
         if reward_type == "gail":
-            # R = -log(1 - sigmoid(D)) = log(1 + exp(D)) = softplus(D)
-            return F.softplus(self.logits)
+            return jax.nn.softplus(self.logits)
         elif reward_type == "airl":
-            # For AIRL, the reward is directly the logit
-            return self.logits.clone()
+            return jnp.array(self.logits)
         else:
             raise ValueError(f"Unknown reward_type: {reward_type}")
 
@@ -161,14 +175,16 @@ class LinearDiscriminator:
 
     def __init__(
         self,
-        feature_matrix: torch.Tensor,
+        feature_matrix: jnp.ndarray,
         init: Literal["zeros", "uniform", "ones"] = "zeros",
+        key: jax.Array | None = None,
     ):
         """Initialize linear discriminator.
 
         Args:
             feature_matrix: State-action features, shape (n_states, n_actions, n_features)
             init: Initialization for weights
+            key: PRNG key (required for "uniform" init)
         """
         if feature_matrix.ndim != 3:
             raise ValueError(
@@ -180,15 +196,17 @@ class LinearDiscriminator:
         self.n_states, self.n_actions, self.n_features = feature_matrix.shape
 
         if init == "zeros":
-            self.weights = torch.zeros(self.n_features)
+            self.weights = jnp.zeros(self.n_features)
         elif init == "uniform":
-            self.weights = torch.rand(self.n_features) * 2 - 1
+            if key is None:
+                key = jax.random.key(0)
+            self.weights = jax.random.uniform(key, (self.n_features,)) * 2 - 1
         elif init == "ones":
-            self.weights = torch.ones(self.n_features)
+            self.weights = jnp.ones(self.n_features)
         else:
             raise ValueError(f"Unknown init method: {init}")
 
-    def forward(self, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    def forward(self, states: jnp.ndarray, actions: jnp.ndarray) -> jnp.ndarray:
         """Compute discriminator logits as linear combination of features.
 
         D(s,a) = w^T * phi(s,a)
@@ -200,21 +218,20 @@ class LinearDiscriminator:
         Returns:
             Discriminator logits, shape (batch_size,)
         """
-        # Get features for requested state-action pairs
-        features = self.feature_matrix[states, actions, :]  # (batch, n_features)
-        return features @ self.weights  # (batch,)
+        features = self.feature_matrix[states, actions, :]
+        return features @ self.weights
 
-    def probability(self, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    def probability(self, states: jnp.ndarray, actions: jnp.ndarray) -> jnp.ndarray:
         """Compute probability that (s,a) is from expert."""
         logits = self.forward(states, actions)
-        return torch.sigmoid(logits)
+        return jax.nn.sigmoid(logits)
 
     def update(
         self,
-        expert_states: torch.Tensor,
-        expert_actions: torch.Tensor,
-        policy_states: torch.Tensor,
-        policy_actions: torch.Tensor,
+        expert_states: jnp.ndarray,
+        expert_actions: jnp.ndarray,
+        policy_states: jnp.ndarray,
+        policy_actions: jnp.ndarray,
         learning_rate: float = 0.01,
     ) -> float:
         """Update discriminator weights with BCE gradient.
@@ -231,33 +248,29 @@ class LinearDiscriminator:
         """
         # Expert: want high probability
         expert_logits = self.forward(expert_states, expert_actions)
-        expert_probs = torch.sigmoid(expert_logits)
+        expert_probs = jax.nn.sigmoid(expert_logits)
         expert_features = self.feature_matrix[expert_states, expert_actions, :]
 
         # Policy: want low probability
         policy_logits = self.forward(policy_states, policy_actions)
-        policy_probs = torch.sigmoid(policy_logits)
+        policy_probs = jax.nn.sigmoid(policy_logits)
         policy_features = self.feature_matrix[policy_states, policy_actions, :]
 
-        # Gradient: dL/dw = sum(sigmoid(logit) - label) * features
-        expert_grad = ((expert_probs - 1.0).unsqueeze(1) * expert_features).mean(dim=0)
-        policy_grad = ((policy_probs - 0.0).unsqueeze(1) * policy_features).mean(dim=0)
+        # Gradient: dL/dw = mean((sigmoid(logit) - label) * features)
+        expert_grad = ((expert_probs - 1.0)[:, None] * expert_features).mean(axis=0)
+        policy_grad = ((policy_probs - 0.0)[:, None] * policy_features).mean(axis=0)
 
-        self.weights -= learning_rate * (expert_grad + policy_grad)
+        self.weights = self.weights - learning_rate * (expert_grad + policy_grad)
 
         # Compute loss for monitoring
-        expert_loss = F.binary_cross_entropy_with_logits(
-            expert_logits, torch.ones_like(expert_logits)
-        )
-        policy_loss = F.binary_cross_entropy_with_logits(
-            policy_logits, torch.zeros_like(policy_logits)
-        )
+        expert_loss = _bce_with_logits(expert_logits, jnp.ones_like(expert_logits))
+        policy_loss = _bce_with_logits(policy_logits, jnp.zeros_like(policy_logits))
 
-        return (expert_loss + policy_loss).item()
+        return float(expert_loss + policy_loss)
 
     def get_reward_matrix(
         self, reward_type: Literal["gail", "airl"] = "gail"
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Convert discriminator to full reward matrix.
 
         Args:
@@ -266,12 +279,10 @@ class LinearDiscriminator:
         Returns:
             Reward matrix R(s,a), shape (n_states, n_actions)
         """
-        # Compute D(s,a) for all state-action pairs
-        # D(s,a) = phi(s,a) @ w
-        logits = torch.einsum("sak,k->sa", self.feature_matrix, self.weights)
+        logits = jnp.einsum("sak,k->sa", self.feature_matrix, self.weights)
 
         if reward_type == "gail":
-            return F.softplus(logits)
+            return jax.nn.softplus(logits)
         elif reward_type == "airl":
             return logits
         else:

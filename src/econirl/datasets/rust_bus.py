@@ -99,7 +99,7 @@ def load_rust_bus(
 
     if as_panel:
         from econirl.core.types import Panel, Trajectory
-        import torch
+        import jax.numpy as jnp
 
         # Convert to Panel format
         bus_ids = df["bus_id"].unique()
@@ -107,10 +107,10 @@ def load_rust_bus(
 
         for bus_id in bus_ids:
             bus_data = df[df["bus_id"] == bus_id].sort_values("period")
-            states = torch.tensor(bus_data["mileage_bin"].values, dtype=torch.long)
-            actions = torch.tensor(bus_data["replaced"].values, dtype=torch.long)
+            states = jnp.array(bus_data["mileage_bin"].values, dtype=jnp.int32)
+            actions = jnp.array(bus_data["replaced"].values, dtype=jnp.int32)
             # Compute next_states (shift states by 1, use 0 for last period)
-            next_states = torch.cat([states[1:], torch.tensor([0])])
+            next_states = jnp.concatenate([states[1:], jnp.array([0])])
 
             traj = Trajectory(
                 states=states,

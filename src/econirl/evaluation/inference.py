@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import torch
+import jax
+import jax.numpy as jnp
 
 
 @dataclass
@@ -26,18 +27,18 @@ class InferenceMetrics:
     mse: float
     rmse: float
     mae: float
-    bias: torch.Tensor
+    bias: jnp.ndarray
     correlation: float
     cosine_similarity: float
-    relative_error: torch.Tensor
+    relative_error: jnp.ndarray
     coverage_90: float | None = None
     coverage_95: float | None = None
 
 
 def inference_metrics(
-    theta_true: torch.Tensor,
-    theta_hat: torch.Tensor,
-    standard_errors: torch.Tensor | None = None,
+    theta_true: jnp.ndarray,
+    theta_hat: jnp.ndarray,
+    standard_errors: jnp.ndarray | None = None,
     mask: list[bool] | None = None,
     normalize: bool = False,
 ) -> InferenceMetrics:
@@ -54,12 +55,12 @@ def inference_metrics(
         InferenceMetrics with all computed values
     """
     # Ensure tensors
-    theta_true = torch.as_tensor(theta_true, dtype=torch.float32)
-    theta_hat = torch.as_tensor(theta_hat, dtype=torch.float32)
+    theta_true = torch.as_tensor(theta_true, dtype=jnp.float32)
+    theta_hat = torch.as_tensor(theta_hat, dtype=jnp.float32)
 
     # Apply mask if provided
     if mask is not None:
-        mask_tensor = torch.tensor(mask, dtype=torch.bool)
+        mask_tensor = jnp.array(mask, dtype=torch.bool)
         theta_true = theta_true[mask_tensor]
         theta_hat = theta_hat[mask_tensor]
         if standard_errors is not None:
@@ -82,7 +83,7 @@ def inference_metrics(
     relative_error = torch.where(
         theta_true.abs() > 1e-10,
         (theta_hat - theta_true).abs() / theta_true.abs(),
-        torch.zeros_like(theta_true),
+        jnp.zeros_like(theta_true),
     )
 
     # Correlation (Pearson)
@@ -114,7 +115,7 @@ def inference_metrics(
     coverage_90 = None
     coverage_95 = None
     if standard_errors is not None:
-        standard_errors = torch.as_tensor(standard_errors, dtype=torch.float32)
+        standard_errors = torch.as_tensor(standard_errors, dtype=jnp.float32)
         # z-scores for 90% and 95% CI
         z_90 = 1.645
         z_95 = 1.96
@@ -123,12 +124,12 @@ def inference_metrics(
         lower_90 = theta_hat - z_90 * standard_errors
         upper_90 = theta_hat + z_90 * standard_errors
         covered_90 = (theta_true >= lower_90) & (theta_true <= upper_90)
-        coverage_90 = covered_90.float().mean().item()
+        coverage_90 = covered_90.astype(jnp.float32).mean().item()
 
         lower_95 = theta_hat - z_95 * standard_errors
         upper_95 = theta_hat + z_95 * standard_errors
         covered_95 = (theta_true >= lower_95) & (theta_true <= upper_95)
-        coverage_95 = covered_95.float().mean().item()
+        coverage_95 = covered_95.astype(jnp.float32).mean().item()
 
     return InferenceMetrics(
         mse=mse,

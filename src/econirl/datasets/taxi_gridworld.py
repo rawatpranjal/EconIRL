@@ -29,7 +29,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.environments.gridworld import GridworldEnvironment
@@ -97,9 +98,9 @@ def load_taxi_gridworld(
     records = []
     for traj in panel.trajectories:
         tid = traj.individual_id
-        states = traj.states.numpy()
-        actions = traj.actions.numpy()
-        next_states = traj.next_states.numpy()
+        states = traj.states
+        actions = traj.actions
+        next_states = traj.next_states
 
         for t in range(len(states)):
             s = int(states[t])

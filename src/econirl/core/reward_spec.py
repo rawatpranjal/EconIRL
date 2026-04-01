@@ -2,18 +2,18 @@
 
 RewardSpec replaces the three separate classes (LinearUtility, LinearReward,
 ActionDependentReward) with a single, clean interface. Internally it always
-stores features as a (S, A, K) tensor and exposes the same compute/gradient/
+stores features as a (S, A, K) array and exposes the same compute/gradient/
 hessian interface that estimators rely on.
 
 Backward-compatibility adapters (.to_linear_utility(), etc.) allow gradual
 migration without breaking existing code.
 
 Usage:
-    >>> features_sak = torch.randn(10, 2, 3)
+    >>> features_sak = jnp.zeros((10, 2, 3))
     >>> spec = RewardSpec(features_sak, names=["cost", "benefit", "distance"])
-    >>> R = spec.compute(torch.tensor([1.0, -0.5, 0.3]))  # shape (10, 2)
+    >>> R = spec.compute(jnp.array([1.0, -0.5, 0.3]))  # shape (10, 2)
 
-    >>> features_sk = torch.randn(10, 3)
+    >>> features_sk = jnp.zeros((10, 3))
     >>> spec = RewardSpec(features_sk, names=["a", "b", "c"], n_actions=4)
 
     >>> spec = RewardSpec.state_dependent(features_sk, names=["a", "b", "c"], n_actions=4)
@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import torch
+import jax.numpy as jnp
 
 if TYPE_CHECKING:
     pass
@@ -33,12 +33,12 @@ if TYPE_CHECKING:
 class RewardSpec:
     """Unified feature specification for structural estimation and IRL.
 
-    Stores features as a (S, A, K) tensor and provides compute, gradient,
+    Stores features as a (S, A, K) array and provides compute, gradient,
     and hessian methods compatible with the BaseUtilityFunction protocol.
 
     Parameters
     ----------
-    features : torch.Tensor
+    features : jnp.ndarray
         Either (S, A, K) for action-dependent features, or (S, K) for
         state-only features (broadcast to all actions).
     names : list[str]
@@ -50,7 +50,7 @@ class RewardSpec:
 
     def __init__(
         self,
-        features: torch.Tensor,
+        features: jnp.ndarray,
         names: list[str],
         n_actions: int | None = None,
     ):
@@ -62,7 +62,7 @@ class RewardSpec:
                     f"features already have {A} actions on axis 1 "
                     f"but n_actions={n_actions} was also provided"
                 )
-            self._feature_matrix = features.clone()
+            self._feature_matrix = jnp.array(features)
             self._is_state_only = False
 
         elif features.ndim == 2:
@@ -74,9 +74,9 @@ class RewardSpec:
                 )
             if n_actions < 1:
                 raise ValueError(f"n_actions must be >= 1, got {n_actions}")
-            self._feature_matrix = (
-                features.unsqueeze(1).expand(-1, n_actions, -1).clone()
-            )
+            self._feature_matrix = jnp.broadcast_to(
+                features[:, None, :], (S, n_actions, K)
+            ).copy()
             self._is_state_only = True
 
         else:
@@ -101,7 +101,7 @@ class RewardSpec:
     @classmethod
     def state_dependent(
         cls,
-        state_features: torch.Tensor,
+        state_features: jnp.ndarray,
         names: list[str],
         n_actions: int,
     ) -> RewardSpec:
@@ -109,7 +109,7 @@ class RewardSpec:
 
         Parameters
         ----------
-        state_features : torch.Tensor
+        state_features : jnp.ndarray
             Shape (S, K).
         names : list[str]
             One name per feature.
@@ -125,14 +125,14 @@ class RewardSpec:
     @classmethod
     def state_action_dependent(
         cls,
-        features: torch.Tensor,
+        features: jnp.ndarray,
         names: list[str],
     ) -> RewardSpec:
         """Create from action-dependent features (S, A, K).
 
         Parameters
         ----------
-        features : torch.Tensor
+        features : jnp.ndarray
             Shape (S, A, K).
         names : list[str]
             One name per feature.
@@ -148,8 +148,8 @@ class RewardSpec:
     # ------------------------------------------------------------------
 
     @property
-    def feature_matrix(self) -> torch.Tensor:
-        """Feature tensor of shape (S, A, K)."""
+    def feature_matrix(self) -> jnp.ndarray:
+        """Feature array of shape (S, A, K)."""
         return self._feature_matrix
 
     @property
@@ -181,23 +181,23 @@ class RewardSpec:
     # Compute interface (matches BaseUtilityFunction protocol)
     # ------------------------------------------------------------------
 
-    def compute(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute reward matrix R(s, a) = sum_k params[k] * features[s, a, k].
 
         Parameters
         ----------
-        parameters : torch.Tensor
+        parameters : jnp.ndarray
             Shape (K,).
 
         Returns
         -------
-        torch.Tensor
+        jnp.ndarray
             Shape (S, A).
         """
         self.validate_parameters(parameters)
-        return torch.einsum("sak,k->sa", self._feature_matrix, parameters)
+        return jnp.einsum("sak,k->sa", self._feature_matrix, parameters)
 
-    def compute_gradient(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_gradient(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Gradient of reward w.r.t. parameters.
 
         For linear specification the gradient is the feature matrix itself,
@@ -205,53 +205,52 @@ class RewardSpec:
 
         Parameters
         ----------
-        parameters : torch.Tensor
+        parameters : jnp.ndarray
             Shape (K,). Unused but kept for protocol compatibility.
 
         Returns
         -------
-        torch.Tensor
+        jnp.ndarray
             Shape (S, A, K).
         """
-        return self._feature_matrix.clone()
+        return jnp.array(self._feature_matrix)
 
-    def compute_hessian(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_hessian(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Hessian of reward w.r.t. parameters.
 
         For linear specification the Hessian is identically zero.
 
         Parameters
         ----------
-        parameters : torch.Tensor
+        parameters : jnp.ndarray
             Shape (K,). Unused.
 
         Returns
         -------
-        torch.Tensor
+        jnp.ndarray
             Shape (S, A, K, K) of zeros.
         """
         K = self.num_parameters
-        return torch.zeros(
+        return jnp.zeros(
             (self.num_states, self.num_actions, K, K),
             dtype=self._feature_matrix.dtype,
-            device=self._feature_matrix.device,
         )
 
     # ------------------------------------------------------------------
     # Parameter helpers
     # ------------------------------------------------------------------
 
-    def get_initial_parameters(self) -> torch.Tensor:
+    def get_initial_parameters(self) -> jnp.ndarray:
         """Return zeros of shape (K,) as a starting point."""
-        return torch.zeros(self.num_parameters, dtype=torch.float32)
+        return jnp.zeros(self.num_parameters, dtype=jnp.float32)
 
     def get_parameter_bounds(
         self,
-    ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+    ) -> tuple[jnp.ndarray | None, jnp.ndarray | None]:
         """Return (None, None) indicating unbounded parameters."""
         return (None, None)
 
-    def validate_parameters(self, parameters: torch.Tensor) -> None:
+    def validate_parameters(self, parameters: jnp.ndarray) -> None:
         """Check that parameters have shape (K,).
 
         Raises
@@ -266,27 +265,19 @@ class RewardSpec:
             )
 
     # ------------------------------------------------------------------
-    # Device / subset utilities
+    # Subset utilities
     # ------------------------------------------------------------------
 
-    def to(self, device: torch.device | str) -> RewardSpec:
-        """Return a new RewardSpec with tensors on the given device."""
-        new = RewardSpec.__new__(RewardSpec)
-        new._feature_matrix = self._feature_matrix.to(device)
-        new._parameter_names = self._parameter_names.copy()
-        new._is_state_only = self._is_state_only
-        return new
-
-    def subset_states(self, indices: torch.Tensor) -> RewardSpec:
+    def subset_states(self, indices: jnp.ndarray) -> RewardSpec:
         """Return a new RewardSpec containing only the specified states.
 
         Parameters
         ----------
-        indices : torch.Tensor
-            1-D integer tensor of state indices to keep.
+        indices : jnp.ndarray
+            1-D integer array of state indices to keep.
         """
         new = RewardSpec.__new__(RewardSpec)
-        new._feature_matrix = self._feature_matrix[indices, :, :].clone()
+        new._feature_matrix = self._feature_matrix[indices, :, :]
         new._parameter_names = self._parameter_names.copy()
         new._is_state_only = self._is_state_only
         return new
@@ -306,7 +297,7 @@ class RewardSpec:
         from econirl.preferences.linear import LinearUtility
 
         return LinearUtility(
-            feature_matrix=self._feature_matrix.clone(),
+            feature_matrix=jnp.array(self._feature_matrix),
             parameter_names=self._parameter_names.copy(),
         )
 
@@ -321,7 +312,7 @@ class RewardSpec:
         from econirl.preferences.action_reward import ActionDependentReward
 
         return ActionDependentReward(
-            feature_matrix=self._feature_matrix.clone(),
+            feature_matrix=jnp.array(self._feature_matrix),
             parameter_names=self._parameter_names.copy(),
         )
 
@@ -346,8 +337,8 @@ class RewardSpec:
 
         # Check that all actions have identical features
         ref = self._feature_matrix[:, 0:1, :]  # (S, 1, K)
-        if not torch.allclose(
-            self._feature_matrix, ref.expand_as(self._feature_matrix)
+        if not jnp.allclose(
+            self._feature_matrix, jnp.broadcast_to(ref, self._feature_matrix.shape)
         ):
             raise ValueError(
                 "Cannot convert to LinearReward: features differ across "
@@ -356,7 +347,7 @@ class RewardSpec:
 
         state_features = self._feature_matrix[:, 0, :]  # (S, K)
         return LinearReward(
-            state_features=state_features.clone(),
+            state_features=jnp.array(state_features),
             parameter_names=self._parameter_names.copy(),
             n_actions=self.num_actions,
         )

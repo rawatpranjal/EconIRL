@@ -1,4 +1,13 @@
-"""Estimation algorithms for dynamic discrete choice models."""
+"""Estimation algorithms for dynamic discrete choice models.
+
+Production estimators (10):
+    NFXP, CCP, MCE-IRL, TD-CCP, NNES, SEES, GLADIUS, AIRL, f-IRL, BC
+
+Contrib estimators (moved to econirl.contrib):
+    MaxEnt IRL, Deep MaxEnt, Max Margin, Max Margin IRL, GAIL, GCL, BIRL, IQ-Learn
+"""
+
+import warnings
 
 from econirl.estimation.base import Estimator, EstimationResult
 from econirl.estimation.categories import (
@@ -10,95 +19,69 @@ from econirl.estimation.categories import (
     get_category,
     get_capabilities,
 )
+
+# Structural
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.ccp import CCPEstimator
-from econirl.estimation.maxent_irl import MaxEntIRLEstimator
-from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
-from econirl.estimation.max_margin_planning import MaxMarginPlanningEstimator, MMPConfig
-from econirl.estimation.max_margin_irl import MaxMarginIRLEstimator
-from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator
-from econirl.estimation.gcl import GCLEstimator, GCLConfig
-from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
-from econirl.estimation.transitions import (
-    estimate_transition_probs,
-    estimate_transition_probs_by_group,
-)
 
-# Adversarial methods
+# Entropy IRL
+from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
+
+# Structural approximation
+from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
+from econirl.estimation.nnes import NNESEstimator
+from econirl.estimation.sees import SEESEstimator
+
+# Q-learning IRL
+from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
+
+# Adversarial IRL
 from econirl.estimation.adversarial import (
-    GAILEstimator,
-    GAILConfig,
     AIRLEstimator,
     AIRLConfig,
     TabularDiscriminator,
     LinearDiscriminator,
 )
 
-# Neural network IRL
-from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
-
-# Bayesian IRL
-from econirl.estimation.bayesian_irl import BayesianIRLEstimator
-
-# Deep MaxEnt IRL
-from econirl.estimation.deep_maxent_irl import DeepMaxEntIRLEstimator
-
-# NNES
-from econirl.estimation.nnes import NNESEstimator
-
-# f-IRL
+# Distribution-matching IRL
 from econirl.estimation.f_irl import FIRLEstimator
 
-# SEES
-from econirl.estimation.sees import SEESEstimator
+# Imitation baseline
+from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator
 
-# IQ-Learn
-from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
+# Utilities
+from econirl.estimation.transitions import (
+    estimate_transition_probs,
+    estimate_transition_probs_by_group,
+)
 
 __all__ = [
     # Base
     "Estimator",
     "EstimationResult",
-    # Forward estimation
+    # Structural
     "NFXPEstimator",
     "CCPEstimator",
-    # IRL methods
-    "MaxEntIRLEstimator",
+    # Entropy IRL
     "MCEIRLEstimator",
     "MCEIRLConfig",
-    "MaxMarginPlanningEstimator",
-    "MMPConfig",
-    "MaxMarginIRLEstimator",
-    "GCLEstimator",
-    "GCLConfig",
-    # Supervised baseline
-    "BehavioralCloningEstimator",
-    # TD-CCP Neural
+    # Structural approximation
     "TDCCPEstimator",
     "TDCCPConfig",
-    # Adversarial methods
-    "GAILEstimator",
-    "GAILConfig",
+    "NNESEstimator",
+    "SEESEstimator",
+    # Q-learning IRL
+    "GLADIUSEstimator",
+    "GLADIUSConfig",
+    # Adversarial IRL
     "AIRLEstimator",
     "AIRLConfig",
     "TabularDiscriminator",
     "LinearDiscriminator",
-    # Neural network IRL
-    "GLADIUSEstimator",
-    "GLADIUSConfig",
-    # Bayesian IRL
-    "BayesianIRLEstimator",
-    # Deep MaxEnt IRL
-    "DeepMaxEntIRLEstimator",
-    # NNES
-    "NNESEstimator",
-    # f-IRL
+    # Distribution-matching IRL
     "FIRLEstimator",
-    # SEES
-    "SEESEstimator",
-    # IQ-Learn
-    "IQLearnEstimator",
-    "IQLearnConfig",
+    # Imitation baseline
+    "BehavioralCloningEstimator",
     # Taxonomy
     "EstimatorCategory",
     "ProblemCapabilities",
@@ -111,3 +94,34 @@ __all__ = [
     "estimate_transition_probs",
     "estimate_transition_probs_by_group",
 ]
+
+# Backward-compatibility shim: moved estimators import from contrib with warning
+_MOVED_TO_CONTRIB = {
+    "MaxEntIRLEstimator": "maxent_irl",
+    "DeepMaxEntIRLEstimator": "deep_maxent_irl",
+    "MaxMarginIRLEstimator": "max_margin_irl",
+    "MaxMarginPlanningEstimator": "max_margin_planning",
+    "MMPConfig": "max_margin_planning",
+    "GCLEstimator": "gcl",
+    "GCLConfig": "gcl",
+    "BayesianIRLEstimator": "bayesian_irl",
+    "IQLearnEstimator": "iq_learn",
+    "IQLearnConfig": "iq_learn",
+    "GAILEstimator": "gail",
+    "GAILConfig": "gail",
+}
+
+
+def __getattr__(name: str):
+    if name in _MOVED_TO_CONTRIB:
+        mod_name = _MOVED_TO_CONTRIB[name]
+        warnings.warn(
+            f"{name} has moved to econirl.contrib.{mod_name}. "
+            f"Update your import to: from econirl.contrib.{mod_name} import {name}",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        import importlib
+        mod = importlib.import_module(f"econirl.contrib.{mod_name}")
+        return getattr(mod, name)
+    raise AttributeError(f"module 'econirl.estimation' has no attribute {name!r}")

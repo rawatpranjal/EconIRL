@@ -23,9 +23,11 @@ Reference:
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 from scipy import optimize
 
 from econirl.core.types import DDCProblem, Panel
@@ -34,23 +36,47 @@ from econirl.inference.standard_errors import SEMethod, compute_numerical_hessia
 from econirl.preferences.base import UtilityFunction
 
 
+@dataclass
+class SEESConfig:
+    """Configuration for SEES estimator.
+
+    Attributes:
+        basis_type: Sieve basis type ("fourier" or "polynomial").
+        basis_dim: Number of basis functions.
+        penalty_lambda: L2 penalty on basis coefficients alpha.
+        max_iter: Maximum L-BFGS-B iterations.
+        tol: Gradient tolerance for convergence.
+        compute_se: Whether to compute standard errors.
+        se_method: Standard error method.
+        verbose: Whether to print progress.
+    """
+
+    basis_type: str = "fourier"
+    basis_dim: int = 8
+    penalty_lambda: float = 0.01
+    max_iter: int = 500
+    tol: float = 1e-6
+    compute_se: bool = True
+    se_method: SEMethod = "asymptotic"
+    verbose: bool = False
+
+
 class SEESEstimator(BaseEstimator):
     """Sieve Estimator for dynamic discrete choice.
 
     Approximates V(s) with basis functions and jointly optimizes
     structural parameters and basis coefficients via penalized MLE.
+    Standard errors use the Schur complement to marginalize out
+    basis coefficients alpha, giving the correct marginal Hessian for theta.
 
-    Attributes:
-        basis_type: Type of sieve basis ("fourier" or "polynomial").
-        basis_dim: Number of basis functions.
-        penalty_lambda: L2 penalty on basis coefficients.
-        max_iter: Maximum L-BFGS-B iterations.
-        tol: Gradient tolerance for convergence.
-        compute_se: Whether to compute standard errors.
+    Args:
+        config: SEESConfig or keyword arguments matching SEESConfig fields.
 
     Example:
         >>> estimator = SEESEstimator(basis_type="fourier", basis_dim=8)
         >>> result = estimator.estimate(panel, utility, problem, transitions)
+        >>> # Access basis coefficients
+        >>> result.metadata["alpha"]
     """
 
     def __init__(
@@ -63,7 +89,18 @@ class SEESEstimator(BaseEstimator):
         compute_se: bool = True,
         se_method: SEMethod = "asymptotic",
         verbose: bool = False,
+        config: SEESConfig | None = None,
     ):
+        if config is not None:
+            basis_type = config.basis_type
+            basis_dim = config.basis_dim
+            penalty_lambda = config.penalty_lambda
+            max_iter = config.max_iter
+            tol = config.tol
+            compute_se = config.compute_se
+            se_method = config.se_method
+            verbose = config.verbose
+
         super().__init__(
             se_method=se_method,
             compute_hessian=compute_se,
@@ -75,12 +112,27 @@ class SEESEstimator(BaseEstimator):
         self._max_iter = max_iter
         self._tol = tol
         self._compute_se = compute_se
+        self._config = SEESConfig(
+            basis_type=basis_type,
+            basis_dim=basis_dim,
+            penalty_lambda=penalty_lambda,
+            max_iter=max_iter,
+            tol=tol,
+            compute_se=compute_se,
+            se_method=se_method,
+            verbose=verbose,
+        )
 
     @property
     def name(self) -> str:
         return f"SEES ({self._basis_type}, Luo & Sang 2024)"
 
-    def _build_basis(self, n_states: int) -> torch.Tensor:
+    @property
+    def config(self) -> SEESConfig:
+        """Return current configuration."""
+        return self._config
+
+    def _build_basis(self, n_states: int) -> jnp.ndarray:
         """Construct sieve basis matrix Psi(s).
 
         Args:
@@ -90,25 +142,25 @@ class SEESEstimator(BaseEstimator):
             Basis matrix, shape (n_states, basis_dim).
         """
         # Normalized state values in [0, 1]
-        s_norm = torch.linspace(0, 1, n_states)
+        s_norm = jnp.linspace(0, 1, n_states)
 
         if self._basis_type == "fourier":
             # Fourier basis: [1, cos(pi*s), sin(pi*s), cos(2pi*s), sin(2pi*s), ...]
-            basis = torch.zeros(n_states, self._basis_dim)
+            basis = jnp.zeros(n_states, self._basis_dim)
             basis[:, 0] = 1.0  # Constant term
             for k in range(1, self._basis_dim):
                 freq = (k + 1) // 2
                 if k % 2 == 1:
-                    basis[:, k] = torch.cos(freq * np.pi * s_norm)
+                    basis[:, k] = jnp.cos(freq * np.pi * s_norm)
                 else:
-                    basis[:, k] = torch.sin(freq * np.pi * s_norm)
+                    basis[:, k] = jnp.sin(freq * np.pi * s_norm)
             return basis
 
         elif self._basis_type == "polynomial":
             # Polynomial basis: [1, s, s^2, s^3, ...]
             # Use Chebyshev-normalized states for numerical stability
             s_cheb = 2 * s_norm - 1  # Map to [-1, 1]
-            basis = torch.zeros(n_states, self._basis_dim)
+            basis = jnp.zeros(n_states, self._basis_dim)
             for k in range(self._basis_dim):
                 basis[:, k] = s_cheb ** k
             return basis
@@ -121,8 +173,8 @@ class SEESEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run sieve estimation."""
@@ -142,7 +194,7 @@ class SEESEstimator(BaseEstimator):
 
         # Precompute E[Psi(s') | s, a] = transitions[a] @ basis
         # Shape: (n_actions, n_states, basis_dim)
-        expected_basis = torch.zeros(n_actions, n_states, n_alpha)
+        expected_basis = jnp.zeros(n_actions, n_states, n_alpha)
         for a in range(n_actions):
             expected_basis[a] = transitions[a] @ basis  # (S, basis_dim)
 
@@ -150,24 +202,24 @@ class SEESEstimator(BaseEstimator):
             initial_params = utility.get_initial_parameters()
 
         # Joint parameter vector: [theta, alpha]
-        initial_alpha = torch.zeros(n_alpha)
-        x0 = torch.cat([initial_params, initial_alpha])
+        initial_alpha = jnp.zeros(n_alpha)
+        x0 = jnp.concatenate([initial_params, initial_alpha])
 
-        def log_likelihood(x: torch.Tensor) -> float:
+        def log_likelihood(x: jnp.ndarray) -> float:
             theta = x[:n_theta]
             alpha = x[n_theta:]
 
             # V(s) ~ basis @ alpha
             # Q(s,a) = u(s,a;theta) + beta * E[basis(s') . alpha | s, a]
-            flow_u = torch.einsum("sak,k->sa", feature_matrix, theta)
+            flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta)
 
             # Continuation: beta * transitions[a] @ (basis @ alpha)
-            continuation = torch.zeros(n_states, n_actions)
+            continuation = jnp.zeros(n_states, n_actions)
             for a in range(n_actions):
                 continuation[:, a] = beta * (expected_basis[a] @ alpha)
 
             q_vals = flow_u + continuation
-            log_probs = torch.nn.functional.log_softmax(q_vals / sigma, dim=1)
+            log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
 
             all_states = panel.get_all_states()
             all_actions = panel.get_all_actions()
@@ -180,7 +232,7 @@ class SEESEstimator(BaseEstimator):
         self._ll_fn = log_likelihood
 
         def objective(x_np):
-            x = torch.tensor(x_np, dtype=torch.float32)
+            x = jnp.array(x_np, dtype=jnp.float32)
             return -log_likelihood(x)
 
         def gradient(x_np):
@@ -197,8 +249,8 @@ class SEESEstimator(BaseEstimator):
 
         # Bounds: theta bounds from utility, alpha unbounded
         lower_theta, upper_theta = utility.get_parameter_bounds()
-        lower = torch.cat([lower_theta, torch.full((n_alpha,), -50.0)])
-        upper = torch.cat([upper_theta, torch.full((n_alpha,), 50.0)])
+        lower = jnp.concatenate([lower_theta, jnp.full((n_alpha,), -50.0)])
+        upper = jnp.concatenate([upper_theta, jnp.full((n_alpha,), 50.0)])
         bounds = list(zip(lower.numpy(), upper.numpy()))
 
         self._log(f"SEES: {n_theta} structural + {n_alpha} basis params")
@@ -215,7 +267,7 @@ class SEESEstimator(BaseEstimator):
             },
         )
 
-        x_opt = torch.tensor(result.x, dtype=torch.float32)
+        x_opt = jnp.array(result.x, dtype=jnp.float32)
         theta_opt = x_opt[:n_theta]
         alpha_opt = x_opt[n_theta:]
         ll_opt = -result.fun
@@ -224,27 +276,39 @@ class SEESEstimator(BaseEstimator):
         self._log(f"alpha: {alpha_opt.numpy()}")
 
         # Compute final policy
-        flow_u = torch.einsum("sak,k->sa", feature_matrix, theta_opt)
-        continuation = torch.zeros(n_states, n_actions)
+        flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta_opt)
+        continuation = jnp.zeros(n_states, n_actions)
         for a in range(n_actions):
             continuation[:, a] = beta * (expected_basis[a] @ alpha_opt)
 
         q_vals = flow_u + continuation
-        policy = torch.nn.functional.softmax(q_vals / sigma, dim=1)
-        V = sigma * torch.logsumexp(q_vals / sigma, dim=1)
+        policy = jax.nn.softmax(q_vals / sigma, axis=1)
+        V = sigma * jax.scipy.special.logsumexp(q_vals / sigma, axis=1)
 
-        # Hessian for theta SEs (marginal over alpha)
+        # Hessian for theta SEs (marginal over alpha via Schur complement)
         hessian = None
         if self._compute_se:
-            self._log("Computing Hessian for standard errors")
+            self._log("Computing Hessian for standard errors (Schur complement)")
 
-            # Hessian over full (theta, alpha) then extract theta block
+            # Full Hessian over [theta, alpha], then marginalize out alpha
+            # via the Schur complement: H_theta = H_tt - H_ta @ H_aa^{-1} @ H_at
+            # This correctly accounts for uncertainty from alpha estimation.
             def full_ll_fn(x):
-                return torch.tensor(log_likelihood(x))
+                return jnp.array(log_likelihood(x))
 
             full_hessian = compute_numerical_hessian(x_opt, full_ll_fn)
-            # Extract theta-theta block
-            hessian = full_hessian[:n_theta, :n_theta]
+
+            H_tt = full_hessian[:n_theta, :n_theta]
+            H_ta = full_hessian[:n_theta, n_theta:]
+            H_at = full_hessian[n_theta:, :n_theta]
+            H_aa = full_hessian[n_theta:, n_theta:]
+
+            try:
+                # Schur complement: H_theta = H_tt - H_ta @ H_aa^{-1} @ H_at
+                hessian = H_tt - H_ta @ jnp.linalg.solve(H_aa, H_at)
+            except RuntimeError:
+                self._log("WARNING: H_aa singular, falling back to H_tt block")
+                hessian = H_tt
 
         elapsed = time.time() - start_time
 

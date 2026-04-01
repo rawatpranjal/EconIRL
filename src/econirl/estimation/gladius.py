@@ -25,9 +25,10 @@ import time
 from dataclasses import dataclass
 
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import jax
+import jax.numpy as jnp
+import equinox as eqx
+import optax
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
@@ -72,93 +73,136 @@ class GLADIUSConfig:
     verbose: bool = False
 
 
-def _build_mlp(input_dim: int, hidden_dim: int, num_layers: int, output_dim: int) -> nn.Sequential:
-    """Build a simple MLP: Linear -> ReLU -> ... -> Linear.
-
-    Args:
-        input_dim: Dimension of input features.
-        hidden_dim: Dimension of hidden layers.
-        num_layers: Number of hidden layers.
-        output_dim: Dimension of output.
-
-    Returns:
-        An nn.Sequential MLP module.
-    """
-    layers: list[nn.Module] = []
-    in_dim = input_dim
-    for _ in range(num_layers):
-        layers.append(nn.Linear(in_dim, hidden_dim))
-        layers.append(nn.ReLU())
-        in_dim = hidden_dim
-    layers.append(nn.Linear(in_dim, output_dim))
-    return nn.Sequential(*layers)
-
-
-class QNetwork(nn.Module):
+class _QNetwork(eqx.Module):
     """MLP that maps (state_features, action_onehot) to a scalar Q value."""
 
-    def __init__(self, state_dim: int, n_actions: int, hidden_dim: int, num_layers: int):
-        super().__init__()
-        self.n_actions = n_actions
-        self.mlp = _build_mlp(state_dim + n_actions, hidden_dim, num_layers, 1)
+    mlp: eqx.nn.MLP
+    n_actions: int = eqx.field(static=True)
 
-    def forward(self, state_features: torch.Tensor, action_onehot: torch.Tensor) -> torch.Tensor:
-        """Compute Q(s, a).
+    def __init__(
+        self,
+        state_dim: int,
+        n_actions: int,
+        hidden_dim: int,
+        num_layers: int,
+        *,
+        key: jax.Array,
+    ):
+        self.n_actions = n_actions
+        self.mlp = eqx.nn.MLP(
+            in_size=state_dim + n_actions,
+            out_size=1,
+            width_size=hidden_dim,
+            depth=num_layers,
+            activation=jax.nn.relu,
+            key=key,
+        )
+
+    def __call__(self, x: jax.Array) -> jax.Array:
+        """Compute Q for a single input vector (state_feat || action_onehot).
 
         Args:
-            state_features: Tensor of shape (batch, state_dim).
-            action_onehot: Tensor of shape (batch, n_actions).
+            x: Input vector of shape (state_dim + n_actions,).
+
+        Returns:
+            Scalar Q value.
+        """
+        return self.mlp(x).squeeze(-1)
+
+    def forward(
+        self, state_features: jax.Array, action_onehot: jax.Array
+    ) -> jax.Array:
+        """Compute Q(s, a) for a batch.
+
+        Args:
+            state_features: Array of shape (batch, state_dim).
+            action_onehot: Array of shape (batch, n_actions).
 
         Returns:
             Q values of shape (batch,).
         """
-        x = torch.cat([state_features, action_onehot], dim=-1)
-        return self.mlp(x).squeeze(-1)
+        x = jnp.concatenate([state_features, action_onehot], axis=-1)
+        return jax.vmap(self)(x)
 
-    def forward_all_actions(self, state_features: torch.Tensor) -> torch.Tensor:
+    def forward_all_actions(self, state_features: jax.Array) -> jax.Array:
         """Compute Q(s, a) for all actions at once.
 
         Args:
-            state_features: Tensor of shape (batch, state_dim).
+            state_features: Array of shape (batch, state_dim).
 
         Returns:
             Q values of shape (batch, n_actions).
         """
         batch_size = state_features.shape[0]
-        q_values = []
-        for a in range(self.n_actions):
-            onehot = torch.zeros(batch_size, self.n_actions, device=state_features.device)
-            onehot[:, a] = 1.0
-            q_values.append(self.forward(state_features, onehot))
-        return torch.stack(q_values, dim=1)
+        eye = jnp.eye(self.n_actions)
+
+        def _q_for_action(a_idx: int) -> jax.Array:
+            onehot = jnp.broadcast_to(eye[a_idx], (batch_size, self.n_actions))
+            return self.forward(state_features, onehot)
+
+        # Stack Q values for each action along axis 1.
+        q_values = jnp.stack(
+            [_q_for_action(a) for a in range(self.n_actions)], axis=1
+        )
+        return q_values
 
 
-class EVNetwork(nn.Module):
-    """MLP that maps (state_features, action_onehot) to a scalar EV = E[V(s')|s,a]."""
+class _EVNetwork(eqx.Module):
+    """MLP that maps (state_features, action_onehot) to scalar EV = E[V(s')|s,a]."""
 
-    def __init__(self, state_dim: int, n_actions: int, hidden_dim: int, num_layers: int):
-        super().__init__()
+    mlp: eqx.nn.MLP
+    n_actions: int = eqx.field(static=True)
+
+    def __init__(
+        self,
+        state_dim: int,
+        n_actions: int,
+        hidden_dim: int,
+        num_layers: int,
+        *,
+        key: jax.Array,
+    ):
         self.n_actions = n_actions
-        self.mlp = _build_mlp(state_dim + n_actions, hidden_dim, num_layers, 1)
+        self.mlp = eqx.nn.MLP(
+            in_size=state_dim + n_actions,
+            out_size=1,
+            width_size=hidden_dim,
+            depth=num_layers,
+            activation=jax.nn.relu,
+            key=key,
+        )
 
-    def forward(self, state_features: torch.Tensor, action_onehot: torch.Tensor) -> torch.Tensor:
-        """Compute EV(s, a).
+    def __call__(self, x: jax.Array) -> jax.Array:
+        """Compute EV for a single input vector (state_feat || action_onehot).
 
         Args:
-            state_features: Tensor of shape (batch, state_dim).
-            action_onehot: Tensor of shape (batch, n_actions).
+            x: Input vector of shape (state_dim + n_actions,).
+
+        Returns:
+            Scalar EV value.
+        """
+        return self.mlp(x).squeeze(-1)
+
+    def forward(
+        self, state_features: jax.Array, action_onehot: jax.Array
+    ) -> jax.Array:
+        """Compute EV(s, a) for a batch.
+
+        Args:
+            state_features: Array of shape (batch, state_dim).
+            action_onehot: Array of shape (batch, n_actions).
 
         Returns:
             EV values of shape (batch,).
         """
-        x = torch.cat([state_features, action_onehot], dim=-1)
-        return self.mlp(x).squeeze(-1)
+        x = jnp.concatenate([state_features, action_onehot], axis=-1)
+        return jax.vmap(self)(x)
 
 
 class GLADIUSEstimator(BaseEstimator):
     """GLADIUS estimator for DDC IRL with neural networks.
 
-    Uses two MLPs -- Q_net and EV_net -- to approximate the Q-function
+    Uses two MLPs (Q_net and EV_net) to approximate the Q-function
     and expected next-period value function. The loss combines negative
     log-likelihood (NLL) with a Bellman consistency penalty. After
     training, structural parameters are recovered by regressing implied
@@ -190,46 +234,49 @@ class GLADIUSEstimator(BaseEstimator):
             verbose=config.verbose,
         )
         self.config = config
-        self.q_net_: QNetwork | None = None
-        self.ev_net_: EVNetwork | None = None
+        self.q_net_: _QNetwork | None = None
+        self.ev_net_: _EVNetwork | None = None
 
     @property
     def name(self) -> str:
         return "GLADIUS"
 
-    def _build_state_features(self, states: torch.Tensor, problem: DDCProblem) -> torch.Tensor:
+    def _build_state_features(
+        self, states: jnp.ndarray, problem: DDCProblem
+    ) -> jnp.ndarray:
         """Build state feature vectors from state indices.
 
         Uses the problem's state_encoder if available, otherwise
         normalizes state index to [0, 1].
 
         Args:
-            states: Tensor of state indices, shape (batch,).
+            states: Array of state indices, shape (batch,).
             problem: Problem specification with optional state_encoder.
 
         Returns:
-            Feature tensor of shape (batch, state_dim).
+            Feature array of shape (batch, state_dim).
         """
         if problem.state_encoder is not None:
             return problem.state_encoder(states)
-        return (states.float() / max(problem.num_states - 1, 1)).unsqueeze(-1)
+        normalized = states.astype(jnp.float32) / max(problem.num_states - 1, 1)
+        return normalized[:, None]
 
-    def _build_state_features_all(self, problem: DDCProblem) -> torch.Tensor:
+    def _build_state_features_all(self, problem: DDCProblem) -> jnp.ndarray:
         """Build feature vectors for all states.
 
         Args:
             problem: Problem specification.
 
         Returns:
-            Feature tensor of shape (n_states, state_dim).
+            Feature array of shape (n_states, state_dim).
         """
-        return self._build_state_features(torch.arange(problem.num_states), problem)
+        return self._build_state_features(jnp.arange(problem.num_states), problem)
 
     def _compute_log_likelihood(
         self,
-        q_net: QNetwork,
-        states: torch.Tensor,
-        actions: torch.Tensor,
+        q_net: _QNetwork,
+        states: jnp.ndarray,
+        actions: jnp.ndarray,
         problem: DDCProblem,
         sigma: float,
     ) -> float:
@@ -245,11 +292,12 @@ class GLADIUSEstimator(BaseEstimator):
         Returns:
             Total log-likelihood (scalar).
         """
-        with torch.no_grad():
-            state_feat = self._build_state_features(states, problem)
-            q_all = q_net.forward_all_actions(state_feat)  # (N, n_actions)
-            log_probs = q_all / sigma - torch.logsumexp(q_all / sigma, dim=1, keepdim=True)
-            ll = log_probs[torch.arange(len(actions)), actions].sum().item()
+        state_feat = self._build_state_features(states, problem)
+        q_all = q_net.forward_all_actions(state_feat)  # (N, n_actions)
+        log_probs = q_all / sigma - jax.scipy.special.logsumexp(
+            q_all / sigma, axis=1, keepdims=True
+        )
+        ll = float(log_probs[jnp.arange(len(actions)), actions].sum())
         return ll
 
     def estimate(
@@ -257,8 +305,8 @@ class GLADIUSEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate utility parameters from panel data.
@@ -274,9 +322,9 @@ class GLADIUSEstimator(BaseEstimator):
             Utility function specification.
         problem : DDCProblem
             Problem specification.
-        transitions : torch.Tensor
+        transitions : jnp.ndarray
             Transition matrices P(s'|s,a).
-        initial_params : torch.Tensor, optional
+        initial_params : jnp.ndarray, optional
             Not used (networks have their own initialization).
 
         Returns
@@ -295,7 +343,7 @@ class GLADIUSEstimator(BaseEstimator):
         )
 
         # Standard errors not directly available from NN; fill with NaN
-        standard_errors = torch.full_like(result.parameters, float("nan"))
+        standard_errors = jnp.full_like(result.parameters, float("nan"))
 
         # Goodness of fit
         n_obs = panel.num_observations
@@ -342,8 +390,8 @@ class GLADIUSEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Core GLADIUS optimization routine.
@@ -372,15 +420,100 @@ class GLADIUSEstimator(BaseEstimator):
 
         # --- Step 2: Build networks ---
         state_dim = problem.state_dim or 1
-        q_net = QNetwork(state_dim, n_actions, self.config.q_hidden_dim, self.config.q_num_layers)
-        ev_net = EVNetwork(state_dim, n_actions, self.config.v_hidden_dim, self.config.v_num_layers)
 
-        q_optimizer = torch.optim.Adam(
-            q_net.parameters(), lr=self.config.q_lr, weight_decay=self.config.weight_decay
+        key = jax.random.PRNGKey(0)
+        q_key, ev_key = jax.random.split(key)
+
+        q_net = _QNetwork(
+            state_dim, n_actions, self.config.q_hidden_dim,
+            self.config.q_num_layers, key=q_key,
         )
-        ev_optimizer = torch.optim.Adam(
-            ev_net.parameters(), lr=self.config.v_lr, weight_decay=self.config.weight_decay
+        ev_net = _EVNetwork(
+            state_dim, n_actions, self.config.v_hidden_dim,
+            self.config.v_num_layers, key=ev_key,
         )
+
+        # Build optimizers with gradient clipping and weight decay
+        q_optimizer = optax.chain(
+            optax.clip_by_global_norm(self.config.gradient_clip),
+            optax.adamw(self.config.q_lr, weight_decay=self.config.weight_decay),
+        )
+        ev_optimizer = optax.chain(
+            optax.clip_by_global_norm(self.config.gradient_clip),
+            optax.adamw(self.config.v_lr, weight_decay=self.config.weight_decay),
+        )
+
+        q_opt_state = q_optimizer.init(eqx.filter(q_net, eqx.is_array))
+        ev_opt_state = ev_optimizer.init(eqx.filter(ev_net, eqx.is_array))
+
+        bellman_weight = self.config.bellman_penalty_weight
+
+        # --- Define the training step ---
+        @eqx.filter_jit
+        def train_step(
+            q_net: _QNetwork,
+            ev_net: _EVNetwork,
+            q_opt_state: optax.OptState,
+            ev_opt_state: optax.OptState,
+            s_feat: jax.Array,
+            a_batch: jax.Array,
+            sp_feat: jax.Array,
+        ):
+            """Single training step: compute loss, update both networks."""
+
+            def loss_fn(nets):
+                q_net_inner, ev_net_inner = nets
+
+                # Action one-hot encoding
+                a_onehot = jax.nn.one_hot(a_batch, n_actions)
+
+                # Q(s, a) for the taken action
+                q_sa = q_net_inner.forward(s_feat, a_onehot)
+
+                # Q(s, all a) for NLL computation
+                q_all = q_net_inner.forward_all_actions(s_feat)  # (batch, n_actions)
+
+                # NLL loss: -log P(a|s) = -[Q(s,a)/sigma - logsumexp(Q(s,:)/sigma)]
+                log_probs = q_all / sigma - jax.scipy.special.logsumexp(
+                    q_all / sigma, axis=1, keepdims=True
+                )
+                nll = -log_probs[jnp.arange(len(a_batch)), a_batch].mean()
+
+                # Bellman penalty
+                # EV(s, a)
+                ev_sa = ev_net_inner.forward(s_feat, a_onehot)
+
+                # V(s') = sigma * logsumexp(Q(s', :) / sigma)
+                q_sp_all = q_net_inner.forward_all_actions(sp_feat)  # (batch, n_actions)
+                v_sp = sigma * jax.scipy.special.logsumexp(
+                    q_sp_all / sigma, axis=1
+                )
+
+                # TD error: beta * (EV(s,a) - V(s'))
+                # Stop gradient on V(s') to stabilize learning
+                td_error = beta * (ev_sa - jax.lax.stop_gradient(v_sp))
+                bellman_loss = jnp.mean(td_error ** 2)
+
+                total_loss = nll + bellman_weight * bellman_loss
+                return total_loss, (nll, bellman_loss)
+
+            (loss, aux), grads = eqx.filter_value_and_grad(
+                loss_fn, has_aux=True
+            )((q_net, ev_net))
+
+            q_grads, ev_grads = grads
+
+            q_updates, new_q_opt = q_optimizer.update(
+                q_grads, q_opt_state, eqx.filter(q_net, eqx.is_array)
+            )
+            ev_updates, new_ev_opt = ev_optimizer.update(
+                ev_grads, ev_opt_state, eqx.filter(ev_net, eqx.is_array)
+            )
+
+            q_net = eqx.apply_updates(q_net, q_updates)
+            ev_net = eqx.apply_updates(ev_net, ev_updates)
+
+            return q_net, ev_net, new_q_opt, new_ev_opt, loss, aux
 
         # --- Step 3: Training loop ---
         best_loss = float("inf")
@@ -389,10 +522,12 @@ class GLADIUSEstimator(BaseEstimator):
         converged = False
 
         loss_history: list[float] = []
+        rng_key = jax.random.PRNGKey(42)
 
         for epoch in range(self.config.max_epochs):
             # Shuffle data
-            perm = torch.randperm(n_obs)
+            rng_key, perm_key = jax.random.split(rng_key)
+            perm = jax.random.permutation(perm_key, n_obs)
             epoch_loss = 0.0
             n_batches = 0
 
@@ -408,48 +543,12 @@ class GLADIUSEstimator(BaseEstimator):
                 s_feat = self._build_state_features(s_batch, problem)
                 sp_feat = self._build_state_features(sp_batch, problem)
 
-                # Action one-hot
-                a_onehot = F.one_hot(a_batch.long(), n_actions).float()
+                q_net, ev_net, q_opt_state, ev_opt_state, loss, _aux = train_step(
+                    q_net, ev_net, q_opt_state, ev_opt_state,
+                    s_feat, a_batch, sp_feat,
+                )
 
-                # Forward pass: Q(s, a)
-                q_sa = q_net(s_feat, a_onehot)
-
-                # Forward pass: Q(s, all a) for NLL
-                q_all = q_net.forward_all_actions(s_feat)  # (batch, n_actions)
-
-                # NLL loss: -log P(a|s) = -[Q(s,a)/sigma - logsumexp(Q(s,:)/sigma)]
-                log_probs = q_all / sigma - torch.logsumexp(q_all / sigma, dim=1, keepdim=True)
-                nll = -log_probs[torch.arange(len(a_batch)), a_batch.long()].mean()
-
-                # Bellman penalty
-                # EV(s, a)
-                ev_sa = ev_net(s_feat, a_onehot)
-
-                # V(s') = sigma * logsumexp(Q(s', :) / sigma)
-                q_sp_all = q_net.forward_all_actions(sp_feat)  # (batch, n_actions)
-                v_sp = sigma * torch.logsumexp(q_sp_all / sigma, dim=1)
-
-                # TD error: beta * (EV(s,a) - V(s'))
-                td_error = beta * (ev_sa - v_sp)
-                bellman_loss = (td_error ** 2).mean()
-
-                # Total loss
-                loss = nll + self.config.bellman_penalty_weight * bellman_loss
-
-                # Backward and optimize
-                q_optimizer.zero_grad()
-                ev_optimizer.zero_grad()
-                loss.backward()
-
-                # Gradient clipping
-                if self.config.gradient_clip > 0:
-                    nn.utils.clip_grad_norm_(q_net.parameters(), self.config.gradient_clip)
-                    nn.utils.clip_grad_norm_(ev_net.parameters(), self.config.gradient_clip)
-
-                q_optimizer.step()
-                ev_optimizer.step()
-
-                epoch_loss += loss.item()
+                epoch_loss += float(loss)
                 n_batches += 1
 
             avg_loss = epoch_loss / max(n_batches, 1)
@@ -457,7 +556,10 @@ class GLADIUSEstimator(BaseEstimator):
 
             if self._verbose:
                 if (epoch + 1) % 50 == 0 or epoch == 0:
-                    self._log(f"Epoch {epoch + 1}/{self.config.max_epochs}: loss={avg_loss:.6f}")
+                    self._log(
+                        f"Epoch {epoch + 1}/{self.config.max_epochs}: "
+                        f"loss={avg_loss:.6f}"
+                    )
 
             # Early stopping
             if avg_loss < best_loss - 1e-6:
@@ -477,28 +579,29 @@ class GLADIUSEstimator(BaseEstimator):
             converged = True  # Reached max epochs
 
         # --- Step 4: Extract parameters ---
-        q_net.eval()
-        ev_net.eval()
+        all_state_feat = self._build_state_features_all(problem)
 
-        with torch.no_grad():
-            all_state_feat = self._build_state_features_all(problem)
+        # Compute Q(s, a) for all (s, a)
+        q_table = q_net.forward_all_actions(all_state_feat)  # (n_states, n_actions)
 
-            # Compute Q(s, a) and EV(s, a) for all (s, a)
-            q_table = q_net.forward_all_actions(all_state_feat)  # (n_states, n_actions)
-            ev_table = torch.zeros(n_states, n_actions)
-            for a in range(n_actions):
-                a_oh = torch.zeros(n_states, n_actions)
-                a_oh[:, a] = 1.0
-                ev_table[:, a] = ev_net(all_state_feat, a_oh)
+        # Compute EV(s, a) for all (s, a)
+        eye = jnp.eye(n_actions)
+        ev_columns = []
+        for a in range(n_actions):
+            a_oh = jnp.broadcast_to(eye[a], (n_states, n_actions))
+            ev_columns.append(ev_net.forward(all_state_feat, a_oh))
+        ev_table = jnp.stack(ev_columns, axis=1)  # (n_states, n_actions)
 
-            # Implied reward: r(s, a) = Q(s, a) - beta * EV(s, a)
-            reward_table = q_table - beta * ev_table
+        # Implied reward: r(s, a) = Q(s, a) - beta * EV(s, a)
+        reward_table = q_table - beta * ev_table
 
-            # Policy: softmax of Q values
-            policy = F.softmax(q_table / sigma, dim=1)
+        # Policy: softmax of Q values
+        policy = jax.nn.softmax(q_table / sigma, axis=1)
 
-            # Value function: V(s) = sigma * logsumexp(Q(s, :) / sigma)
-            value_function = sigma * torch.logsumexp(q_table / sigma, dim=1)
+        # Value function: V(s) = sigma * logsumexp(Q(s, :) / sigma)
+        value_function = sigma * jax.scipy.special.logsumexp(
+            q_table / sigma, axis=1
+        )
 
         # Regress implied rewards onto feature matrix if available
         parameters = self._extract_parameters(utility, reward_table)
@@ -530,17 +633,17 @@ class GLADIUSEstimator(BaseEstimator):
             message=message,
             optimization_time=optimization_time,
             metadata={
-                "reward_table": reward_table.numpy().tolist(),
-                "q_table": q_table.numpy().tolist(),
-                "ev_table": ev_table.numpy().tolist(),
+                "reward_table": np.asarray(reward_table).tolist(),
+                "q_table": np.asarray(q_table).tolist(),
+                "ev_table": np.asarray(ev_table).tolist(),
                 "loss_history": loss_history,
                 "final_loss": loss_history[-1] if loss_history else float("nan"),
             },
         )
 
     def _extract_parameters(
-        self, utility: UtilityFunction, reward_table: torch.Tensor
-    ) -> torch.Tensor:
+        self, utility: UtilityFunction, reward_table: jnp.ndarray
+    ) -> jnp.ndarray:
         """Extract structural parameters by regressing rewards onto features.
 
         If the utility has a feature_matrix attribute (linear utility), solves
@@ -563,13 +666,11 @@ class GLADIUSEstimator(BaseEstimator):
             n_states, n_actions, n_features = feature_matrix.shape
 
             # Flatten to (n_states * n_actions, n_features) and (n_states * n_actions,)
-            X = feature_matrix.reshape(-1, n_features)
+            X = jnp.asarray(feature_matrix).reshape(-1, n_features)
             y = reward_table.reshape(-1)
 
             # Least-squares: theta = (X^T X)^{-1} X^T y
-            # Use torch.linalg.lstsq for numerical stability
-            result = torch.linalg.lstsq(X, y)
-            parameters = result.solution
+            parameters, _residuals, _rank, _sv = jnp.linalg.lstsq(X, y)
             return parameters
         else:
             # No feature matrix: return flattened rewards

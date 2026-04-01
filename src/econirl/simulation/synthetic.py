@@ -21,7 +21,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -35,7 +36,7 @@ def simulate_panel(
     n_periods: int = 100,
     seed: int | None = None,
     use_optimal_policy: bool = True,
-    policy: torch.Tensor | None = None,
+    policy: jnp.ndarray | None = None,
 ) -> Panel:
     """Simulate panel data from a DDC environment.
 
@@ -94,7 +95,7 @@ def simulate_panel(
     )
 
 
-def _compute_optimal_policy(env: DDCEnvironment) -> torch.Tensor:
+def _compute_optimal_policy(env: DDCEnvironment) -> jnp.ndarray:
     """Compute the optimal choice probabilities for an environment.
 
     Args:
@@ -115,7 +116,7 @@ def _compute_optimal_policy(env: DDCEnvironment) -> torch.Tensor:
 
 def _simulate_trajectory(
     env: DDCEnvironment,
-    policy: torch.Tensor,
+    policy: jnp.ndarray,
     n_periods: int,
     individual_id: int | str,
     rng: np.random.Generator,
@@ -150,7 +151,7 @@ def _simulate_trajectory(
         states.append(state)
 
         # Sample action from policy
-        action_probs = policy[state].numpy()
+        action_probs = policy[state]
         action = rng.choice(num_actions, p=action_probs)
         actions.append(action)
 
@@ -161,18 +162,18 @@ def _simulate_trajectory(
         state = next_state
 
     return Trajectory(
-        states=torch.tensor(states, dtype=torch.long),
-        actions=torch.tensor(actions, dtype=torch.long),
-        next_states=torch.tensor(next_states, dtype=torch.long),
+        states=jnp.array(states, dtype=jnp.int32),
+        actions=jnp.array(actions, dtype=jnp.int32),
+        next_states=jnp.array(next_states, dtype=jnp.int32),
         individual_id=individual_id,
     )
 
 
 def simulate_panel_from_policy(
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    policy: torch.Tensor,
-    initial_distribution: torch.Tensor,
+    transitions: jnp.ndarray,
+    policy: jnp.ndarray,
+    initial_distribution: jnp.ndarray,
     n_individuals: int = 100,
     n_periods: int = 100,
     seed: int | None = None,
@@ -207,27 +208,27 @@ def simulate_panel_from_policy(
         next_states = []
 
         # Sample initial state
-        state = rng.choice(num_states, p=initial_distribution.numpy())
+        state = rng.choice(num_states, p=initial_distribution)
 
         for t in range(n_periods):
             states.append(state)
 
             # Sample action
-            action_probs = policy[state].numpy()
+            action_probs = policy[state]
             action = rng.choice(num_actions, p=action_probs)
             actions.append(action)
 
             # Sample next state
-            trans_probs = transitions[action, state].numpy()
+            trans_probs = transitions[action, state]
             next_state = rng.choice(num_states, p=trans_probs)
             next_states.append(next_state)
 
             state = next_state
 
         traj = Trajectory(
-            states=torch.tensor(states, dtype=torch.long),
-            actions=torch.tensor(actions, dtype=torch.long),
-            next_states=torch.tensor(next_states, dtype=torch.long),
+            states=jnp.array(states, dtype=jnp.int32),
+            actions=jnp.array(actions, dtype=jnp.int32),
+            next_states=jnp.array(next_states, dtype=jnp.int32),
             individual_id=i,
         )
         trajectories.append(traj)
@@ -320,8 +321,8 @@ def run_monte_carlo(
         # Estimate
         result = estimator.estimate(panel, utility, problem, transitions)
 
-        estimates[rep] = result.parameters.numpy()
-        standard_errors[rep] = result.standard_errors.numpy()
+        estimates[rep] = result.parameters
+        standard_errors[rep] = result.standard_errors
 
     # Compute summary statistics
     true_vec = np.array([true_params[name] for name in param_names])

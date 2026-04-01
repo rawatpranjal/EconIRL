@@ -11,7 +11,8 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.types import Panel
 from econirl.inference.results import EstimationSummary
@@ -65,7 +66,7 @@ def plot_choice_probabilities(
         fig = ax.get_figure()
 
     for a in range(num_actions):
-        ax.plot(states, policy[:, a].numpy(), label=action_labels[a], linewidth=2)
+        ax.plot(states, policy[:, a], label=action_labels[a], linewidth=2)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -78,8 +79,8 @@ def plot_choice_probabilities(
 
 
 def plot_policy_comparison(
-    baseline_policy: torch.Tensor,
-    counterfactual_policy: torch.Tensor,
+    baseline_policy: jnp.ndarray,
+    counterfactual_policy: jnp.ndarray,
     action_idx: int = 0,
     baseline_label: str = "Baseline",
     counterfactual_label: str = "Counterfactual",
@@ -123,14 +124,14 @@ def plot_policy_comparison(
 
     ax.plot(
         states,
-        baseline_policy[:, action_idx].numpy(),
+        baseline_policy[:, action_idx],
         label=baseline_label,
         linewidth=2,
         linestyle="-",
     )
     ax.plot(
         states,
-        counterfactual_policy[:, action_idx].numpy(),
+        counterfactual_policy[:, action_idx],
         label=counterfactual_label,
         linewidth=2,
         linestyle="--",
@@ -179,7 +180,7 @@ def plot_counterfactual_comparison(
     # Top left: Baseline policy
     ax = axes[0, 0]
     for a in range(num_actions):
-        ax.plot(states, counterfactual.baseline_policy[:, a].numpy(),
+        ax.plot(states, counterfactual.baseline_policy[:, a],
                 label=action_labels[a], linewidth=2)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Probability")
@@ -191,7 +192,7 @@ def plot_counterfactual_comparison(
     # Top right: Counterfactual policy
     ax = axes[0, 1]
     for a in range(num_actions):
-        ax.plot(states, counterfactual.counterfactual_policy[:, a].numpy(),
+        ax.plot(states, counterfactual.counterfactual_policy[:, a],
                 label=action_labels[a], linewidth=2)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Probability")
@@ -202,9 +203,9 @@ def plot_counterfactual_comparison(
 
     # Bottom left: Value functions
     ax = axes[1, 0]
-    ax.plot(states, counterfactual.baseline_value.numpy(),
+    ax.plot(states, counterfactual.baseline_value,
             label="Baseline", linewidth=2)
-    ax.plot(states, counterfactual.counterfactual_value.numpy(),
+    ax.plot(states, counterfactual.counterfactual_value,
             label="Counterfactual", linewidth=2, linestyle="--")
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Value")
@@ -215,7 +216,7 @@ def plot_counterfactual_comparison(
     # Bottom right: Policy change
     ax = axes[1, 1]
     for a in range(num_actions):
-        ax.plot(states, counterfactual.policy_change[:, a].numpy(),
+        ax.plot(states, counterfactual.policy_change[:, a],
                 label=action_labels[a], linewidth=2)
     ax.axhline(y=0, color="black", linestyle="-", linewidth=0.5)
     ax.set_xlabel(xlabel)
@@ -278,14 +279,14 @@ def plot_empirical_vs_predicted(
 
     ax.scatter(
         states,
-        empirical[:, action_idx].numpy(),
+        empirical[:, action_idx],
         label="Empirical",
         alpha=0.6,
         s=30,
     )
     ax.plot(
         states,
-        predicted[:, action_idx].numpy(),
+        predicted[:, action_idx],
         label="Predicted",
         linewidth=2,
         color="red",
@@ -302,7 +303,7 @@ def plot_empirical_vs_predicted(
 
 
 def plot_policy_heatmap(
-    policy: torch.Tensor,
+    policy: jnp.ndarray,
     action_labels: list[str] | None = None,
     xlabel: str = "Action",
     ylabel: str = "State",
@@ -333,7 +334,7 @@ def plot_policy_heatmap(
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    im = ax.imshow(policy.numpy(), aspect="auto", cmap=cmap, vmin=0, vmax=1)
+    im = ax.imshow(policy, aspect="auto", cmap=cmap, vmin=0, vmax=1)
 
     ax.set_xticks(range(num_actions))
     ax.set_xticklabels(action_labels)
@@ -382,7 +383,7 @@ def plot_action_threshold(
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    probs = policy[:, action_idx].numpy()
+    probs = policy[:, action_idx]
     ax.plot(states, probs, linewidth=2, label=f"P({action_label})")
 
     # Mark threshold

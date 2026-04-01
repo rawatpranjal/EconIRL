@@ -140,15 +140,15 @@ def load_ngsim(
 
     if as_panel:
         from econirl.core.types import Panel, Trajectory
-        import torch
+        import jax.numpy as jnp
 
         trajectories = []
         for vid in result["vehicle_id"].unique():
             vdata = result[result["vehicle_id"] == vid].sort_values("period")
             traj = Trajectory(
-                states=torch.tensor(vdata["state"].values, dtype=torch.long),
-                actions=torch.tensor(vdata["action"].values, dtype=torch.long),
-                next_states=torch.tensor(vdata["next_state"].values, dtype=torch.long),
+                states=jnp.array(vdata["state"].values, dtype=jnp.int32),
+                actions=jnp.array(vdata["action"].values, dtype=jnp.int32),
+                next_states=jnp.array(vdata["next_state"].values, dtype=jnp.int32),
                 individual_id=int(vid),
             )
             trajectories.append(traj)

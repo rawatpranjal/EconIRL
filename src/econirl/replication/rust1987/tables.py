@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 from typing import Optional
 
 from econirl.datasets import load_rust_bus
@@ -137,11 +138,11 @@ def _df_to_panel(df: pd.DataFrame) -> Panel:
     for bus_id in df['bus_id'].unique():
         bus_data = df[df['bus_id'] == bus_id].sort_values('period')
 
-        states = torch.tensor(bus_data['mileage_bin'].values, dtype=torch.long)
-        actions = torch.tensor(bus_data['replaced'].values, dtype=torch.long)
+        states = jnp.array(bus_data['mileage_bin'].values, dtype=jnp.int32)
+        actions = jnp.array(bus_data['replaced'].values, dtype=jnp.int32)
 
         # Compute next_states: shift states by 1, last one is 0 (placeholder)
-        next_states = torch.cat([states[1:], torch.tensor([0])])
+        next_states = jnp.concatenate([states[1:], jnp.array([0])])
 
         traj = Trajectory(
             states=states,

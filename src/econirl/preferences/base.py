@@ -15,7 +15,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Protocol, runtime_checkable
 
-import torch
+import jax.numpy as jnp
 
 
 @runtime_checkable
@@ -57,7 +57,7 @@ class UtilityFunction(Protocol):
         """Number of actions in the model."""
         ...
 
-    def compute(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute flow utility matrix for given parameters.
 
         Args:
@@ -69,7 +69,7 @@ class UtilityFunction(Protocol):
         """
         ...
 
-    def compute_gradient(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_gradient(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute gradient of utility w.r.t. parameters.
 
         For linear utility U = θ·φ, the gradient is simply the
@@ -136,24 +136,24 @@ class BaseUtilityFunction(ABC):
         return self._anchor_action
 
     @abstractmethod
-    def compute(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute utility matrix. Must be implemented by subclasses."""
         ...
 
     @abstractmethod
-    def compute_gradient(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_gradient(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute gradient tensor. Must be implemented by subclasses."""
         ...
 
-    def get_initial_parameters(self) -> torch.Tensor:
+    def get_initial_parameters(self) -> jnp.ndarray:
         """Return reasonable initial parameter values for optimization.
 
         Default implementation returns zeros. Subclasses may override
         with better starting points.
         """
-        return torch.zeros(self.num_parameters, dtype=torch.float32)
+        return jnp.zeros(self.num_parameters, dtype=jnp.float32)
 
-    def get_parameter_bounds(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_parameter_bounds(self) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Return lower and upper bounds for parameters.
 
         Default implementation returns (-inf, inf) for all parameters.
@@ -162,11 +162,11 @@ class BaseUtilityFunction(ABC):
         Returns:
             Tuple of (lower_bounds, upper_bounds), each of shape (num_parameters,)
         """
-        lower = torch.full((self.num_parameters,), float("-inf"))
-        upper = torch.full((self.num_parameters,), float("inf"))
+        lower = jnp.full((self.num_parameters,), float("-inf"))
+        upper = jnp.full((self.num_parameters,), float("inf"))
         return lower, upper
 
-    def validate_parameters(self, parameters: torch.Tensor) -> None:
+    def validate_parameters(self, parameters: jnp.ndarray) -> None:
         """Validate that parameters have correct shape.
 
         Args:

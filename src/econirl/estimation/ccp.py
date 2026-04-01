@@ -27,7 +27,9 @@ import math
 import time
 from typing import Literal
 
-import torch
+import jax
+import jax.numpy as jnp
+import numpy as np
 from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -123,7 +125,7 @@ class CCPEstimator(BaseEstimator):
         panel: Panel,
         num_states: int,
         num_actions: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Estimate CCPs from data using frequency estimator.
 
         P̂(a|s) = N(s,a) / N(s)
@@ -140,28 +142,29 @@ class CCPEstimator(BaseEstimator):
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
         idx = all_states * num_actions + all_actions
-        counts = torch.zeros(num_states * num_actions, dtype=torch.float32).scatter_add_(
-            0, idx.long(), torch.ones(idx.shape[0])
-        ).reshape(num_states, num_actions)
+        counts = jnp.zeros(num_states * num_actions, dtype=jnp.float32).at[
+            idx.astype(jnp.int32)
+        ].add(jnp.ones(idx.shape[0])).reshape(num_states, num_actions)
 
         # Get state counts
-        state_counts = counts.sum(dim=1)
+        state_counts = counts.sum(axis=1)
 
         # Compute CCPs with smoothing
-        ccps = torch.zeros((num_states, num_actions), dtype=torch.float32)
+        ccps = jnp.zeros((num_states, num_actions), dtype=jnp.float32)
         for s in range(num_states):
             if state_counts[s] >= self._ccp_min_count:
                 # Use empirical frequencies with smoothing
-                ccps[s] = (counts[s] + self._ccp_smoothing) / (
-                    state_counts[s] + num_actions * self._ccp_smoothing
+                ccps = ccps.at[s].set(
+                    (counts[s] + self._ccp_smoothing)
+                    / (state_counts[s] + num_actions * self._ccp_smoothing)
                 )
             else:
                 # Not enough data: use uniform distribution
-                ccps[s] = 1.0 / num_actions
+                ccps = ccps.at[s].set(1.0 / num_actions)
 
         return ccps
 
-    def _compute_emax_correction(self, ccps: torch.Tensor) -> torch.Tensor:
+    def _compute_emax_correction(self, ccps: jnp.ndarray) -> jnp.ndarray:
         """Compute emax correction for logit errors.
 
         e(a,x) = γ - log(P(a|x))
@@ -175,14 +178,14 @@ class CCPEstimator(BaseEstimator):
             Emax correction matrix of shape (num_states, num_actions)
         """
         # Clamp CCPs to avoid log(0)
-        ccps_safe = torch.clamp(ccps, min=self._ccp_smoothing)
-        return EULER_GAMMA - torch.log(ccps_safe)
+        ccps_safe = jnp.maximum(ccps, self._ccp_smoothing)
+        return EULER_GAMMA - jnp.log(ccps_safe)
 
     def _compute_policy_weighted_transitions(
         self,
-        ccps: torch.Tensor,
-        transitions: torch.Tensor,
-    ) -> torch.Tensor:
+        ccps: jnp.ndarray,
+        transitions: jnp.ndarray,
+    ) -> jnp.ndarray:
         """Compute policy-weighted transition matrix F_π.
 
         F_π[s, s'] = Σ_a P(a|s) * P(s'|s,a)
@@ -198,23 +201,23 @@ class CCPEstimator(BaseEstimator):
         num_actions = ccps.shape[1]
 
         dtype = transitions.dtype
-        F_pi = torch.zeros((num_states, num_states), dtype=dtype)
+        F_pi = jnp.zeros((num_states, num_states), dtype=dtype)
         for a in range(num_actions):
             # transitions[a] has shape (num_states, num_states)
             # ccps[:, a] has shape (num_states,)
             # We want F_pi[s, s'] += P(a|s) * P(s'|s,a)
-            F_pi += ccps[:, a:a+1].to(dtype) * transitions[a]
+            F_pi = F_pi + ccps[:, a:a+1].astype(dtype) * transitions[a]
 
         return F_pi
 
     def _compute_valuation_matrix(
         self,
-        ccps: torch.Tensor,
-        transitions: torch.Tensor,
+        ccps: jnp.ndarray,
+        transitions: jnp.ndarray,
         utility: UtilityFunction,
-        parameters: torch.Tensor,
+        parameters: jnp.ndarray,
         problem: DDCProblem,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute valuation matrix W^P via matrix inversion.
 
         W^P = (I - β·F_π)⁻¹ · Σ_a P(a) ⊙ [u(a), e(a)]
@@ -242,15 +245,15 @@ class CCPEstimator(BaseEstimator):
 
         # Compute (I - β·F_π)⁻¹
         dtype = F_pi.dtype
-        I = torch.eye(num_states, dtype=dtype)
-        inv_matrix = torch.linalg.inv(I - beta * F_pi)
+        I = jnp.eye(num_states, dtype=dtype)
+        inv_matrix = jnp.linalg.inv(I - beta * F_pi)
 
         # Compute emax corrections
         e = self._compute_emax_correction(ccps)
 
         # Compute Σ_a P(a) ⊙ e(a) for each state
         # This gives expected emax correction under current policy
-        expected_e = (ccps * e).sum(dim=1).to(inv_matrix.dtype)  # shape (num_states,)
+        expected_e = (ccps * e).sum(axis=1).astype(inv_matrix.dtype)  # shape (num_states,)
 
         # W_e = (I - β·F_π)⁻¹ · expected_e
         W_e = inv_matrix @ expected_e
@@ -264,27 +267,27 @@ class CCPEstimator(BaseEstimator):
             # Compute Σ_a P(a|s) · φ(s,a) for each state
             # expected_features[s, k] = Σ_a P(a|s) · φ(s,a,k)
             dtype = inv_matrix.dtype
-            expected_features = torch.einsum('sa,sak->sk', ccps.to(dtype), features.to(dtype))
+            expected_features = jnp.einsum('sa,sak->sk', ccps.astype(dtype), features.astype(dtype))
 
             # W_z = (I - β·F_π)⁻¹ · expected_features
             W_z = inv_matrix @ expected_features
         else:
             # Fallback: compute utility directly
             flow_utility = utility.compute(parameters)  # shape (num_states, num_actions)
-            expected_utility = (ccps * flow_utility).sum(dim=1)  # shape (num_states,)
+            expected_utility = (ccps * flow_utility).sum(axis=1)  # shape (num_states,)
             W_z = inv_matrix @ expected_utility
-            W_z = W_z.unsqueeze(1)  # shape (num_states, 1)
+            W_z = W_z[:, None]  # shape (num_states, 1)
 
         return W_z, W_e
 
     def _compute_choice_specific_values(
         self,
-        ccps: torch.Tensor,
-        transitions: torch.Tensor,
+        ccps: jnp.ndarray,
+        transitions: jnp.ndarray,
         utility: UtilityFunction,
-        parameters: torch.Tensor,
+        parameters: jnp.ndarray,
         problem: DDCProblem,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute choice-specific value functions using CCP representation.
 
         For linear utility u(a,x) = z(a,x)'θ, the Hotz-Miller representation is:
@@ -321,31 +324,31 @@ class CCPEstimator(BaseEstimator):
 
             # Compute E[W_z(x') | x, a] for each (x, a)
             # transitions[a, s, s'] = P(s'|s,a), W_z has shape (num_states, num_features)
-            E_W_z = torch.zeros((num_states, num_actions, num_features), dtype=transitions.dtype)
+            E_W_z = jnp.zeros((num_states, num_actions, num_features), dtype=transitions.dtype)
             for a in range(num_actions):
-                E_W_z[:, a, :] = transitions[a] @ W_z  # (num_states, num_features)
+                E_W_z = E_W_z.at[:, a, :].set(transitions[a] @ W_z)  # (num_states, num_features)
 
             # Compute E[W_e(x') | x, a]
-            E_W_e = torch.zeros((num_states, num_actions), dtype=transitions.dtype)
+            E_W_e = jnp.zeros((num_states, num_actions), dtype=transitions.dtype)
             for a in range(num_actions):
-                E_W_e[:, a] = transitions[a] @ W_e
+                E_W_e = E_W_e.at[:, a].set(transitions[a] @ W_e)
 
             # z̃(a,x) = z(a,x) + β·E[W_z(x') | x, a]
-            z_tilde = features.to(E_W_z.dtype) + beta * E_W_z  # (num_states, num_actions, num_features)
+            z_tilde = features.astype(E_W_z.dtype) + beta * E_W_z  # (num_states, num_actions, num_features)
 
             # ẽ(a,x) = β·E[W_e(x') | x, a]
             e_tilde = beta * E_W_e  # (num_states, num_actions)
 
             # v(a,x) = z̃(a,x)'θ + ẽ(a,x)
-            v = torch.einsum('sak,k->sa', z_tilde, parameters.to(z_tilde.dtype)) + e_tilde
+            v = jnp.einsum('sak,k->sa', z_tilde, parameters.astype(z_tilde.dtype)) + e_tilde
         else:
             # Fallback for non-linear utility
             flow_utility = utility.compute(parameters)
             W = W_z.squeeze(1) + W_e
 
-            EW = torch.zeros((num_states, num_actions), dtype=transitions.dtype)
+            EW = jnp.zeros((num_states, num_actions), dtype=transitions.dtype)
             for a in range(num_actions):
-                EW[:, a] = transitions[a] @ W
+                EW = EW.at[:, a].set(transitions[a] @ W)
 
             v = flow_utility + beta * EW
 
@@ -353,11 +356,11 @@ class CCPEstimator(BaseEstimator):
 
     def _compute_log_likelihood(
         self,
-        parameters: torch.Tensor,
+        parameters: jnp.ndarray,
         panel: Panel,
         utility: UtilityFunction,
-        ccps: torch.Tensor,
-        transitions: torch.Tensor,
+        ccps: jnp.ndarray,
+        transitions: jnp.ndarray,
         problem: DDCProblem,
     ) -> float:
         """Compute pseudo-log-likelihood given CCPs.
@@ -381,20 +384,20 @@ class CCPEstimator(BaseEstimator):
         )
 
         # Compute log choice probabilities via softmax
-        log_probs = torch.nn.functional.log_softmax(v / sigma, dim=1)
+        log_probs = jax.nn.log_softmax(v / sigma, axis=1)
 
         # Sum log-likelihood over observations
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
-        ll = log_probs[all_states, all_actions].sum().item()
+        ll = float(log_probs[all_states, all_actions].sum())
 
         return ll
 
     def _update_ccps_from_values(
         self,
-        v: torch.Tensor,
+        v: jnp.ndarray,
         sigma: float,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Update CCPs from choice-specific values.
 
         P(a|x) = exp(v(a,x)/σ) / Σ_{a'} exp(v(a',x)/σ)
@@ -406,14 +409,14 @@ class CCPEstimator(BaseEstimator):
         Returns:
             Updated CCPs of shape (num_states, num_actions)
         """
-        return torch.nn.functional.softmax(v / sigma, dim=1)
+        return jax.nn.softmax(v / sigma, axis=1)
 
     def _estimate_initial_params(
         self,
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Estimate rough starting values from data."""
         n_params = utility.num_parameters
         total_obs = 0
@@ -424,8 +427,8 @@ class CCPEstimator(BaseEstimator):
         all_actions = panel.get_all_actions()
         total_obs = all_states.shape[0]
         replace_mask = all_actions == 1
-        n_replace = replace_mask.sum().item()
-        mileage_at_replace = all_states[replace_mask].float().sum().item()
+        n_replace = int(replace_mask.sum())
+        mileage_at_replace = float(all_states[replace_mask].astype(jnp.float32).sum())
 
         if n_replace > 0 and total_obs > 0 and n_params == 2:
             replace_rate = n_replace / total_obs
@@ -433,17 +436,17 @@ class CCPEstimator(BaseEstimator):
             n_states = problem.num_states
             op_cost_init = 1.0 / n_states
             rc_init = max(0.5, op_cost_init * avg_mileage / max(replace_rate, 0.01))
-            return torch.tensor([op_cost_init, rc_init], dtype=torch.float32)
+            return jnp.array([op_cost_init, rc_init], dtype=jnp.float32)
 
-        return torch.full((n_params,), 0.01, dtype=torch.float32)
+        return jnp.full((n_params,), 0.01, dtype=jnp.float32)
 
     def _optimize(
         self,
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run CCP/NPL optimization.
@@ -463,7 +466,7 @@ class CCPEstimator(BaseEstimator):
         # Use float64 for high discount factors (condition number ≈ 1/(1-β))
         beta = problem.discount_factor
         if beta > 0.99:
-            transitions = transitions.double()
+            transitions = transitions.astype(jnp.float64)
 
         # Initialize parameters — use data-driven starting values if zeros
         if initial_params is None:
@@ -473,7 +476,7 @@ class CCPEstimator(BaseEstimator):
                     panel, utility, problem
                 )
 
-        current_params = initial_params.clone()
+        current_params = jnp.array(initial_params)
 
         # Step 1: Estimate initial CCPs from data
         self._log("Estimating CCPs from data")
@@ -493,11 +496,11 @@ class CCPEstimator(BaseEstimator):
             num_policy_iterations = k + 1
             self._log(f"Policy iteration {k + 1}")
 
-            prev_params = current_params.clone()
+            prev_params = jnp.array(current_params)
 
             # Define objective function for this iteration's CCPs
             def objective(params_np):
-                params = torch.tensor(params_np, dtype=torch.float32)
+                params = jnp.array(params_np, dtype=jnp.float32)
                 ll = self._compute_log_likelihood(
                     params, panel, utility, ccps, transitions, problem
                 )
@@ -505,7 +508,7 @@ class CCPEstimator(BaseEstimator):
 
             # Gradient via finite differences (adaptive step size)
             def gradient(params_np):
-                grad = torch.zeros(len(params_np))
+                grad = np.zeros(len(params_np))
                 for i in range(len(params_np)):
                     eps_i = max(1e-5, abs(params_np[i]) * 1e-4)
                     params_plus = params_np.copy()
@@ -513,15 +516,15 @@ class CCPEstimator(BaseEstimator):
                     params_plus[i] += eps_i
                     params_minus[i] -= eps_i
                     grad[i] = (objective(params_plus) - objective(params_minus)) / (2 * eps_i)
-                return grad.numpy()
+                return grad
 
             # Maximize pseudo-likelihood
             lower, upper = utility.get_parameter_bounds()
-            bounds = list(zip(lower.numpy(), upper.numpy()))
+            bounds = list(zip(np.asarray(lower), np.asarray(upper)))
 
             result = optimize.minimize(
                 objective,
-                current_params.numpy(),
+                np.asarray(current_params),
                 method="L-BFGS-B",
                 jac=gradient,
                 bounds=bounds,
@@ -532,14 +535,14 @@ class CCPEstimator(BaseEstimator):
                 },
             )
 
-            current_params = torch.tensor(result.x, dtype=torch.float32)
+            current_params = jnp.array(result.x, dtype=jnp.float32)
             current_ll = -result.fun
 
-            self._log(f"  Parameters: {current_params.numpy()}")
+            self._log(f"  Parameters: {np.asarray(current_params)}")
             self._log(f"  Log-likelihood: {current_ll:.4f}")
 
             # Check convergence for NPL
-            param_change = torch.norm(current_params - prev_params).item()
+            param_change = float(jnp.linalg.norm(current_params - prev_params))
             self._log(f"  Parameter change: {param_change:.6f}")
 
             if param_change < self._convergence_tol:
@@ -566,7 +569,7 @@ class CCPEstimator(BaseEstimator):
 
         # Compute value function V(s) = σ·log(Σ_a exp(v(a,s)/σ))
         sigma = problem.scale_parameter
-        V = sigma * torch.logsumexp(v / sigma, dim=1)
+        V = sigma * jax.scipy.special.logsumexp(v / sigma, axis=1)
 
         # Compute final log-likelihood
         final_ll = self._compute_log_likelihood(
@@ -587,7 +590,7 @@ class CCPEstimator(BaseEstimator):
             operator = SoftBellmanOperator(problem, transitions)
 
             def ll_fn(params):
-                flow_u = utility.compute(params).to(transitions.dtype)
+                flow_u = utility.compute(params).astype(transitions.dtype)
                 from econirl.core.solvers import value_iteration
                 sol = value_iteration(operator, flow_u, tol=1e-12, max_iter=100_000)
                 log_probs = operator.compute_log_choice_probabilities(flow_u, sol.V)
@@ -625,50 +628,48 @@ class CCPEstimator(BaseEstimator):
 
     def _compute_gradient_contributions(
         self,
-        params: torch.Tensor,
+        params: jnp.ndarray,
         panel: Panel,
         utility: UtilityFunction,
-        ccps: torch.Tensor,
-        transitions: torch.Tensor,
+        ccps: jnp.ndarray,
+        transitions: jnp.ndarray,
         problem: DDCProblem,
         eps: float = 1e-5,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute per-observation gradient contributions for robust SEs."""
         n_obs = panel.num_observations
         n_params = len(params)
 
-        gradients = torch.zeros((n_obs, n_params))
+        gradients = jnp.zeros((n_obs, n_params))
         sigma = problem.scale_parameter
 
         # Pre-compute log probabilities at current params
         v_base = self._compute_choice_specific_values(
             ccps, transitions, utility, params, problem
         )
-        log_probs_base = torch.nn.functional.log_softmax(v_base / sigma, dim=1)
+        log_probs_base = jax.nn.log_softmax(v_base / sigma, axis=1)
 
         # Compute gradient for each parameter
         for k in range(n_params):
-            params_plus = params.clone()
-            params_plus[k] += eps
-
-            params_minus = params.clone()
-            params_minus[k] -= eps
+            params_plus = params.at[k].add(eps)
+            params_minus = params.at[k].add(-eps)
 
             v_plus = self._compute_choice_specific_values(
                 ccps, transitions, utility, params_plus, problem
             )
-            log_probs_plus = torch.nn.functional.log_softmax(v_plus / sigma, dim=1)
+            log_probs_plus = jax.nn.log_softmax(v_plus / sigma, axis=1)
 
             v_minus = self._compute_choice_specific_values(
                 ccps, transitions, utility, params_minus, problem
             )
-            log_probs_minus = torch.nn.functional.log_softmax(v_minus / sigma, dim=1)
+            log_probs_minus = jax.nn.log_softmax(v_minus / sigma, axis=1)
 
             # Compute gradients for all observations
             all_states = panel.get_all_states()
             all_actions = panel.get_all_actions()
-            gradients[:, k] = (
-                log_probs_plus[all_states, all_actions] - log_probs_minus[all_states, all_actions]
-            ) / (2 * eps)
+            gradients = gradients.at[:, k].set(
+                (log_probs_plus[all_states, all_actions] - log_probs_minus[all_states, all_actions])
+                / (2 * eps)
+            )
 
         return gradients

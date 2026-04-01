@@ -27,7 +27,12 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch>=2.0",
+    "jax>=0.4.30",
+    "jaxlib>=0.4.30",
+    "equinox>=0.11",
+    "optax>=0.2",
+    "optimistix>=0.0.7",
+    "lineax>=0.0.5",
     "gymnasium>=0.29",
     "numpy>=1.24",
     "pandas>=2.0",

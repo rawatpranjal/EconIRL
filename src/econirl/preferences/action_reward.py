@@ -14,7 +14,7 @@ This specification bridges the gap between:
 """
 from __future__ import annotations
 
-import torch
+import jax.numpy as jnp
 
 from econirl.preferences.base import BaseUtilityFunction
 
@@ -29,7 +29,7 @@ class ActionDependentReward(BaseUtilityFunction):
 
     Parameters
     ----------
-    feature_matrix : torch.Tensor
+    feature_matrix : jnp.ndarray
         Shape (num_states, num_actions, num_features).
     parameter_names : list[str]
         Names for each parameter.
@@ -38,19 +38,19 @@ class ActionDependentReward(BaseUtilityFunction):
     -------
     >>> # Create Rust-style features
     >>> n_states = 90
-    >>> features = torch.zeros((n_states, 2, 2))
+    >>> features = jnp.zeros((n_states, 2, 2))
     >>> for s in range(n_states):
     ...     features[s, 0, 0] = -s  # Keep: operating cost
     ...     features[s, 1, 1] = -1  # Replace: fixed cost
     >>>
     >>> reward = ActionDependentReward(features, ["theta_c", "RC"])
-    >>> params = torch.tensor([0.001, 3.0])
+    >>> params = jnp.array([0.001, 3.0])
     >>> R = reward.compute(params)  # shape (90, 2)
     """
 
     def __init__(
         self,
-        feature_matrix: torch.Tensor,
+        feature_matrix: jnp.ndarray,
         parameter_names: list[str],
     ):
         if feature_matrix.ndim != 3:
@@ -74,14 +74,14 @@ class ActionDependentReward(BaseUtilityFunction):
             anchor_action=None,
         )
 
-        self._feature_matrix = feature_matrix.clone()
+        self._feature_matrix = jnp.array(feature_matrix)
 
     @property
-    def feature_matrix(self) -> torch.Tensor:
+    def feature_matrix(self) -> jnp.ndarray:
         """Return the feature matrix."""
         return self._feature_matrix
 
-    def compute(self, params: torch.Tensor) -> torch.Tensor:
+    def compute(self, params: jnp.ndarray) -> jnp.ndarray:
         """Compute reward matrix R(s,a).
 
         Args:
@@ -92,9 +92,9 @@ class ActionDependentReward(BaseUtilityFunction):
         """
         self.validate_parameters(params)
         # R[s, a] = sum_k params[k] * features[s, a, k]
-        return torch.einsum("sak,k->sa", self._feature_matrix, params)
+        return jnp.einsum("sak,k->sa", self._feature_matrix, params)
 
-    def compute_gradient(self, params: torch.Tensor) -> torch.Tensor:
+    def compute_gradient(self, params: jnp.ndarray) -> jnp.ndarray:
         """Compute gradient dR/dtheta.
 
         For linear reward R = theta * phi, the gradient is the feature matrix.
@@ -106,9 +106,9 @@ class ActionDependentReward(BaseUtilityFunction):
             Gradient tensor of shape (num_states, num_actions, num_features).
         """
         # Gradient is just the feature matrix
-        return self._feature_matrix.clone()
+        return jnp.array(self._feature_matrix)
 
-    def compute_hessian(self, params: torch.Tensor) -> torch.Tensor:
+    def compute_hessian(self, params: jnp.ndarray) -> jnp.ndarray:
         """Compute Hessian d^2R/dtheta^2.
 
         For linear reward, the Hessian is zero.
@@ -119,27 +119,12 @@ class ActionDependentReward(BaseUtilityFunction):
         Returns:
             Zero tensor of shape (num_states, num_actions, num_params, num_params).
         """
-        return torch.zeros(
+        return jnp.zeros(
             (self.num_states, self.num_actions, self.num_parameters, self.num_parameters),
             dtype=self._feature_matrix.dtype,
-            device=self._feature_matrix.device,
         )
 
-    def to(self, device: torch.device | str) -> "ActionDependentReward":
-        """Move feature matrix to specified device.
-
-        Args:
-            device: Target device (e.g., "cuda", "cpu").
-
-        Returns:
-            New ActionDependentReward with tensors on specified device.
-        """
-        return ActionDependentReward(
-            feature_matrix=self._feature_matrix.to(device),
-            parameter_names=self._parameter_names.copy(),
-        )
-
-    def subset_states(self, state_indices: torch.Tensor) -> "ActionDependentReward":
+    def subset_states(self, state_indices: jnp.ndarray) -> "ActionDependentReward":
         """Create a new reward function for a subset of states.
 
         Args:

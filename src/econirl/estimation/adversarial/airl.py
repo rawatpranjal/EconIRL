@@ -24,8 +24,8 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-import torch
-import torch.nn.functional as F
+import jax
+import jax.numpy as jnp
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -65,7 +65,7 @@ class AIRLConfig:
     generator_solver: Literal["value", "hybrid"] = "hybrid"
     generator_tol: float = 1e-8
     generator_max_iter: int = 5000
-    max_rounds: int = 100
+    max_rounds: int = 200
     use_shaping: bool = True
     shaping_coef: float | None = None  # If None, uses discount_factor
     convergence_tol: float = 1e-4
@@ -131,8 +131,8 @@ class AIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate reward function using AIRL.
@@ -175,7 +175,7 @@ class AIRLEstimator(BaseEstimator):
             ]
 
         # Create standard errors (NaN for adversarial methods)
-        standard_errors = torch.full_like(result.parameters, float("nan"))
+        standard_errors = jnp.full_like(result.parameters, float("nan"))
 
         # Goodness of fit
         n_obs = panel.num_observations
@@ -187,7 +187,7 @@ class AIRLEstimator(BaseEstimator):
             num_parameters=n_params,
             num_observations=n_obs,
             aic=-2 * ll + 2 * n_params,
-            bic=-2 * ll + n_params * torch.log(torch.tensor(n_obs)).item(),
+            bic=-2 * ll + n_params * jnp.log(jnp.array(n_obs)).item(),
             prediction_accuracy=self._compute_prediction_accuracy(
                 panel, result.policy
             ),
@@ -222,7 +222,7 @@ class AIRLEstimator(BaseEstimator):
     def _sample_transitions_from_panel(
         self,
         panel: Panel,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         """Sample (s, a, s') transitions from expert demonstrations.
 
         Returns:
@@ -234,52 +234,18 @@ class AIRLEstimator(BaseEstimator):
             panel.get_all_next_states(),
         )
 
-    def _sample_transitions_from_policy(
-        self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
-        n_samples: int,
-        initial_dist: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Sample (s, a, s') transitions from current policy.
-
-        Returns:
-            Tuple of (states, actions, next_states) tensors
-        """
-        n_states, n_actions = policy.shape
-        states = []
-        actions = []
-        next_states_list = []
-
-        state = torch.multinomial(initial_dist, 1).item()
-
-        for _ in range(n_samples):
-            action = torch.multinomial(policy[state], 1).item()
-            next_state_dist = transitions[action, state, :]
-            next_state = torch.multinomial(next_state_dist, 1).item()
-
-            states.append(state)
-            actions.append(action)
-            next_states_list.append(next_state)
-
-            state = next_state
-
-        return (
-            torch.tensor(states, dtype=torch.long),
-            torch.tensor(actions, dtype=torch.long),
-            torch.tensor(next_states_list, dtype=torch.long),
-        )
+    # Uses _sample_transitions_from_policy from AdversarialEstimatorBase (lax.scan)
 
     def _compute_airl_logits(
         self,
-        states: torch.Tensor,
-        actions: torch.Tensor,
-        next_states: torch.Tensor,
-        reward_matrix: torch.Tensor,
-        V: torch.Tensor,
-        policy: torch.Tensor,
+        states: jnp.ndarray,
+        actions: jnp.ndarray,
+        next_states: jnp.ndarray,
+        reward_matrix: jnp.ndarray,
+        V: jnp.ndarray,
+        policy: jnp.ndarray,
         gamma: float,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute AIRL discriminator logits.
 
         D(s,a,s') = sigmoid(f - log pi(a|s))
@@ -298,7 +264,7 @@ class AIRLEstimator(BaseEstimator):
             f = r_sa
 
         # log pi(a|s)
-        log_pi = torch.log(policy[states, actions] + 1e-10)
+        log_pi = jnp.log(policy[states, actions] + 1e-10)
 
         # AIRL logit
         return f - log_pi
@@ -307,25 +273,25 @@ class AIRLEstimator(BaseEstimator):
         self,
         panel: Panel,
         n_states: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute initial state distribution from data."""
-        counts = torch.zeros(n_states, dtype=torch.float32)
-        init_states = torch.tensor(
+        counts = jnp.zeros(n_states, dtype=jnp.float32)
+        init_states = jnp.array(
             [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
-            dtype=torch.long,
+            dtype=jnp.int32,
         )
-        counts.scatter_add_(0, init_states, torch.ones_like(init_states, dtype=torch.float32))
+        counts.scatter_add_(0, init_states, jnp.ones_like(init_states, dtype=jnp.float32))
 
         if counts.sum() > 0:
             return counts / counts.sum()
-        return torch.ones(n_states) / n_states
+        return jnp.ones(n_states) / n_states
 
     def _compute_policy(
         self,
-        reward_matrix: torch.Tensor,
+        reward_matrix: jnp.ndarray,
         operator: SoftBellmanOperator,
         num_periods: int | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute optimal policy given reward matrix.
 
         For finite horizon (num_periods set), uses backward induction and
@@ -356,8 +322,8 @@ class AIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run AIRL optimization.
@@ -379,33 +345,43 @@ class AIRLEstimator(BaseEstimator):
         gamma = problem.discount_factor
         operator = SoftBellmanOperator(problem, transitions)
 
-        # Initialize reward matrix
+        import optax
+
+        # Initialize reward parameters with optax Adam
         if self.config.reward_type == "linear":
             if isinstance(utility, ActionDependentReward):
                 feature_matrix = utility.feature_matrix
                 n_features = feature_matrix.shape[2]
             elif isinstance(utility, LinearReward):
                 sf = utility.state_features
-                feature_matrix = sf.unsqueeze(1).expand(-1, n_actions, -1).clone()
+                feature_matrix = jnp.broadcast_to(
+                    sf[:, None, :], (sf.shape[0], n_actions, sf.shape[1])
+                ).copy()
                 n_features = sf.shape[1]
             else:
                 raise TypeError(f"Unsupported utility type: {type(utility)}")
 
             if initial_params is not None:
-                reward_weights = initial_params.clone()
+                reward_params = jnp.array(initial_params, dtype=jnp.float32)
             else:
-                reward_weights = torch.zeros(n_features)
+                reward_params = jnp.zeros(n_features)
 
-            def get_reward_matrix():
-                return torch.einsum("sak,k->sa", feature_matrix, reward_weights)
+            optimizer = optax.adam(self.config.reward_lr)
+            opt_state = optimizer.init(reward_params)
+
+            def get_reward_matrix(params):
+                return jnp.einsum("sak,k->sa", feature_matrix, params)
 
         else:
             # Tabular reward
-            reward_matrix = torch.zeros(n_states, n_actions)
-            reward_weights = None
+            reward_params = jnp.zeros((n_states, n_actions))
+            feature_matrix = None
 
-            def get_reward_matrix():
-                return reward_matrix
+            optimizer = optax.adam(self.config.reward_lr)
+            opt_state = optimizer.init(reward_params)
+
+            def get_reward_matrix(params):
+                return params
 
         # Initial state distribution
         initial_dist = self._compute_initial_distribution(panel, n_states)
@@ -417,14 +393,42 @@ class AIRLEstimator(BaseEstimator):
         n_expert = len(expert_states)
 
         # Initialize policy
-        policy = torch.ones(n_states, n_actions) / n_actions
-        V = torch.zeros(n_states)
+        policy = jnp.ones((n_states, n_actions)) / n_actions
+        V = jnp.zeros(n_states)
+
+        # AIRL discriminator loss (differentiable w.r.t. reward_params)
+        use_shaping = self.config.use_shaping
+        shaping_coef = self.config.shaping_coef
+
+        def disc_loss_fn(rw_params, V_fixed, policy_fixed,
+                         exp_s, exp_a, exp_ns, pol_s, pol_a, pol_ns):
+            reward_matrix = get_reward_matrix(rw_params)
+
+            def logits(states, actions, next_states):
+                r_sa = reward_matrix[states, actions]
+                if use_shaping:
+                    sc = shaping_coef if shaping_coef else gamma
+                    f = r_sa + sc * V_fixed[next_states] - V_fixed[states]
+                else:
+                    f = r_sa
+                log_pi = jnp.log(policy_fixed[states, actions] + 1e-10)
+                return f - log_pi
+
+            e_logits = logits(exp_s, exp_a, exp_ns)
+            p_logits = logits(pol_s, pol_a, pol_ns)
+
+            e_loss = jnp.mean(jnp.logaddexp(0.0, -e_logits))
+            p_loss = jnp.mean(jnp.logaddexp(0.0, p_logits))
+            return e_loss + p_loss
+
+        disc_loss_and_grad = jax.value_and_grad(disc_loss_fn)
 
         # Training metrics
         disc_losses = []
         policy_changes = []
         converged = False
         round_idx = 0
+        key = jax.random.key(42)
 
         pbar = tqdm(
             range(self.config.max_rounds),
@@ -433,79 +437,36 @@ class AIRLEstimator(BaseEstimator):
         )
 
         for round_idx in pbar:
-            old_policy = policy.clone()
-            current_reward = get_reward_matrix()
+            old_policy = jnp.array(policy)
 
-            # Sample from current policy
+            # Sample from current policy using lax.scan
+            key, subkey = jax.random.split(key)
             policy_states, policy_actions, policy_next_states = (
                 self._sample_transitions_from_policy(
-                    policy, transitions, n_expert, initial_dist
+                    policy, transitions, n_expert, initial_dist, subkey
                 )
             )
 
-            # Update reward (discriminator) with gradient
+            # Update reward via optax Adam with jax.value_and_grad
             disc_loss = 0.0
             for _ in range(self.config.discriminator_steps):
-                # Expert: want D to be high (label = 1)
-                expert_logits = self._compute_airl_logits(
-                    expert_states,
-                    expert_actions,
-                    expert_next_states,
-                    current_reward,
-                    V,
-                    policy,
-                    gamma,
+                loss, grads = disc_loss_and_grad(
+                    reward_params, V, policy,
+                    expert_states, expert_actions, expert_next_states,
+                    policy_states, policy_actions, policy_next_states,
                 )
-
-                # Policy: want D to be low (label = 0)
-                policy_logits = self._compute_airl_logits(
-                    policy_states,
-                    policy_actions,
-                    policy_next_states,
-                    current_reward,
-                    V,
-                    policy,
-                    gamma,
-                )
-
-                # BCE loss
-                expert_loss = F.binary_cross_entropy_with_logits(
-                    expert_logits, torch.ones_like(expert_logits)
-                )
-                policy_loss = F.binary_cross_entropy_with_logits(
-                    policy_logits, torch.zeros_like(policy_logits)
-                )
-                disc_loss = (expert_loss + policy_loss).item()
-
-                # Gradient update for reward
-                # d(logit)/d(r) = 1 for the (s,a) pair
-                # d(BCE)/d(logit) = sigmoid(logit) - label
-                expert_grad = torch.sigmoid(expert_logits) - 1.0
-                policy_grad = torch.sigmoid(policy_logits) - 0.0
-
-                if self.config.reward_type == "linear":
-                    # Gradient w.r.t. weights
-                    expert_features = feature_matrix[expert_states, expert_actions, :]
-                    policy_features = feature_matrix[policy_states, policy_actions, :]
-                    grad = (expert_grad.unsqueeze(1) * expert_features).mean(dim=0)
-                    grad += (policy_grad.unsqueeze(1) * policy_features).mean(dim=0)
-                    reward_weights = reward_weights - self.config.reward_lr * grad
-                else:
-                    # Direct update to reward matrix
-                    for i, (s, a) in enumerate(zip(expert_states, expert_actions)):
-                        reward_matrix[s, a] -= self.config.reward_lr * expert_grad[i]
-                    for i, (s, a) in enumerate(zip(policy_states, policy_actions)):
-                        reward_matrix[s, a] -= self.config.reward_lr * policy_grad[i]
-
-                current_reward = get_reward_matrix()
+                updates, opt_state = optimizer.update(grads, opt_state)
+                reward_params = optax.apply_updates(reward_params, updates)
+                disc_loss = float(loss)
 
             disc_losses.append(disc_loss)
 
             # Update policy via soft value iteration
+            current_reward = get_reward_matrix(reward_params)
             policy, V = self._compute_policy(current_reward, operator, problem.num_periods)
 
             # Check convergence
-            policy_change = torch.abs(policy - old_policy).max().item()
+            policy_change = float(jnp.abs(policy - old_policy).max())
             policy_changes.append(policy_change)
 
             pbar.set_postfix(
@@ -522,17 +483,17 @@ class AIRLEstimator(BaseEstimator):
         pbar.close()
 
         # Final values
-        final_reward = get_reward_matrix()
+        final_reward = get_reward_matrix(reward_params)
 
         # Compute log-likelihood
         log_probs = operator.compute_log_choice_probabilities(final_reward, V)
-        ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+        ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
 
         # Extract parameters
         if self.config.reward_type == "linear":
-            parameters = reward_weights.clone()
+            parameters = jnp.array(reward_params)
         else:
-            parameters = reward_matrix.flatten()
+            parameters = reward_params.flatten()
 
         optimization_time = time.time() - start_time
 
@@ -553,6 +514,6 @@ class AIRLEstimator(BaseEstimator):
                 "final_disc_loss": disc_losses[-1] if disc_losses else None,
                 "disc_losses": disc_losses,
                 "policy_changes": policy_changes,
-                "reward_matrix": final_reward.tolist(),
+                "reward_matrix": np.asarray(final_reward).tolist(),
             },
         )

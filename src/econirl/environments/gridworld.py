@@ -23,8 +23,8 @@ Utility specification:
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
-import torch
 from gymnasium import spaces
 
 from econirl.environments.base import DDCEnvironment
@@ -132,11 +132,11 @@ class GridworldEnvironment(DDCEnvironment):
         return 5
 
     @property
-    def transition_matrices(self) -> torch.Tensor:
+    def transition_matrices(self) -> jnp.ndarray:
         return self._transition_matrices
 
     @property
-    def feature_matrix(self) -> torch.Tensor:
+    def feature_matrix(self) -> jnp.ndarray:
         return self._feature_matrix
 
     @property
@@ -199,7 +199,7 @@ class GridworldEnvironment(DDCEnvironment):
 
         return self._rowcol_to_state(row, col)
 
-    def _build_transition_matrices(self) -> torch.Tensor:
+    def _build_transition_matrices(self) -> jnp.ndarray:
         """Build deterministic transition matrices P(s'|s,a).
 
         Returns:
@@ -210,8 +210,9 @@ class GridworldEnvironment(DDCEnvironment):
         n_actions = 5
         n_states = self._n_states
 
-        transitions = torch.zeros(
-            (n_actions, n_states, n_states), dtype=torch.float32
+        # Build with numpy then convert (JAX arrays are immutable)
+        transitions = np.zeros(
+            (n_actions, n_states, n_states), dtype=np.float32
         )
 
         for a in range(n_actions):
@@ -219,9 +220,9 @@ class GridworldEnvironment(DDCEnvironment):
                 s_next = self._get_next_state(s, a)
                 transitions[a, s, s_next] = 1.0
 
-        return transitions
+        return jnp.array(transitions)
 
-    def _build_feature_matrix(self) -> torch.Tensor:
+    def _build_feature_matrix(self) -> jnp.ndarray:
         """Build feature matrix for utility computation.
 
         Features are structured so that:
@@ -244,7 +245,8 @@ class GridworldEnvironment(DDCEnvironment):
         n_actions = 5
         N = self._grid_size
 
-        features = torch.zeros((n_states, n_actions, 3), dtype=torch.float32)
+        # Build with numpy then convert (JAX arrays are immutable)
+        features = np.zeros((n_states, n_actions, 3), dtype=np.float32)
 
         for s in range(n_states):
             is_terminal = s == self._terminal_state
@@ -265,7 +267,7 @@ class GridworldEnvironment(DDCEnvironment):
                     dist = self._manhattan_distance_to_terminal(s)
                     features[s, a, 2] = -dist / (2.0 * N)
 
-        return features
+        return jnp.array(features)
 
     def _get_initial_state_distribution(self) -> np.ndarray:
         """Return initial state distribution (start at top-left corner)."""

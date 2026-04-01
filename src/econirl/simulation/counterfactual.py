@@ -20,7 +20,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -44,12 +45,12 @@ class CounterfactualResult:
         description: Description of the counterfactual
     """
 
-    baseline_policy: torch.Tensor
-    counterfactual_policy: torch.Tensor
-    baseline_value: torch.Tensor
-    counterfactual_value: torch.Tensor
-    policy_change: torch.Tensor
-    value_change: torch.Tensor
+    baseline_policy: jnp.ndarray
+    counterfactual_policy: jnp.ndarray
+    baseline_value: jnp.ndarray
+    counterfactual_value: jnp.ndarray
+    policy_change: jnp.ndarray
+    value_change: jnp.ndarray
     welfare_change: float
     description: str
     metadata: dict[str, Any]
@@ -57,10 +58,10 @@ class CounterfactualResult:
 
 def counterfactual_policy(
     result: EstimationSummary,
-    new_parameters: torch.Tensor | dict[str, float],
+    new_parameters: jnp.ndarray | dict[str, float],
     utility: UtilityFunction,
     problem: DDCProblem,
-    transitions: torch.Tensor,
+    transitions: jnp.ndarray,
 ) -> CounterfactualResult:
     """Compute optimal policy under different parameters.
 
@@ -81,16 +82,16 @@ def counterfactual_policy(
 
     Example:
         >>> # What if replacement cost doubles?
-        >>> new_params = result.parameters.clone()
+        >>> new_params = result.parameters.copy()
         >>> new_params[1] *= 2  # replacement_cost
         >>> cf = counterfactual_policy(result, new_params, utility, problem, trans)
         >>> print(f"Welfare change: {cf.welfare_change:.2f}")
     """
     # Convert dict to tensor if needed
     if isinstance(new_parameters, dict):
-        new_params = torch.tensor(
+        new_params = jnp.array(
             [new_parameters[name] for name in utility.parameter_names],
-            dtype=torch.float32,
+            dtype=jnp.float32,
         )
     else:
         new_params = new_parameters
@@ -133,10 +134,10 @@ def counterfactual_policy(
 
 def counterfactual_transitions(
     result: EstimationSummary,
-    new_transitions: torch.Tensor,
+    new_transitions: jnp.ndarray,
     utility: UtilityFunction,
     problem: DDCProblem,
-    baseline_transitions: torch.Tensor,
+    baseline_transitions: jnp.ndarray,
 ) -> CounterfactualResult:
     """Compute optimal policy under different transition dynamics.
 
@@ -183,8 +184,8 @@ def simulate_counterfactual(
     result: EstimationSummary,
     counterfactual: CounterfactualResult,
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    initial_distribution: torch.Tensor | None = None,
+    transitions: jnp.ndarray,
+    initial_distribution: jnp.ndarray | None = None,
     n_individuals: int = 1000,
     n_periods: int = 100,
     seed: int | None = None,
@@ -211,7 +212,7 @@ def simulate_counterfactual(
 
     if initial_distribution is None:
         # Uniform initial distribution
-        initial_distribution = torch.ones(problem.num_states) / problem.num_states
+        initial_distribution = jnp.ones(problem.num_states) / problem.num_states
 
     # Simulate under baseline
     baseline_panel = simulate_panel_from_policy(
@@ -244,20 +245,20 @@ def simulate_counterfactual(
     cf_states = cf_panel.get_all_states()
 
     # Action frequencies
-    baseline_action_freq = torch.zeros(problem.num_actions)
-    cf_action_freq = torch.zeros(problem.num_actions)
+    baseline_action_freq = jnp.zeros(problem.num_actions)
+    cf_action_freq = jnp.zeros(problem.num_actions)
 
     for a in range(problem.num_actions):
-        baseline_action_freq[a] = (baseline_actions == a).float().mean()
-        cf_action_freq[a] = (cf_actions == a).float().mean()
+        baseline_action_freq[a] = (baseline_actions == a).astype(jnp.float32).mean()
+        cf_action_freq[a] = (cf_actions == a).astype(jnp.float32).mean()
 
     # State frequencies
-    baseline_state_freq = torch.zeros(problem.num_states)
-    cf_state_freq = torch.zeros(problem.num_states)
+    baseline_state_freq = jnp.zeros(problem.num_states)
+    cf_state_freq = jnp.zeros(problem.num_states)
 
     for s in range(problem.num_states):
-        baseline_state_freq[s] = (baseline_states == s).float().mean()
-        cf_state_freq[s] = (cf_states == s).float().mean()
+        baseline_state_freq[s] = (baseline_states == s).astype(jnp.float32).mean()
+        cf_state_freq[s] = (cf_states == s).astype(jnp.float32).mean()
 
     return {
         "baseline_action_frequencies": baseline_action_freq,
@@ -266,17 +267,17 @@ def simulate_counterfactual(
         "baseline_state_frequencies": baseline_state_freq,
         "counterfactual_state_frequencies": cf_state_freq,
         "state_frequency_change": cf_state_freq - baseline_state_freq,
-        "baseline_mean_state": baseline_states.float().mean().item(),
-        "counterfactual_mean_state": cf_states.float().mean().item(),
+        "baseline_mean_state": baseline_states.astype(jnp.float32).mean().item(),
+        "counterfactual_mean_state": cf_states.astype(jnp.float32).mean().item(),
         "n_individuals": n_individuals,
         "n_periods": n_periods,
     }
 
 
 def compute_stationary_distribution(
-    policy: torch.Tensor,
-    transitions: torch.Tensor,
-) -> torch.Tensor:
+    policy: jnp.ndarray,
+    transitions: jnp.ndarray,
+) -> jnp.ndarray:
     """Compute the stationary state distribution under a policy.
 
     The stationary distribution μ satisfies:
@@ -294,18 +295,18 @@ def compute_stationary_distribution(
     # Policy-weighted transition matrix P^π(s,s') = Σ_a π(a|s) P(s'|s,a)
     # transitions shape: (num_actions, num_states, num_states) = [a, from_s, to_s]
     # policy shape: (num_states, num_actions) = [from_s, a]
-    P_pi = torch.einsum("sa,ast->st", policy, transitions)
+    P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
     # Find stationary distribution as left eigenvector with eigenvalue 1
     # Solve μ P = μ, or equivalently (P' - I) μ = 0 with Σ μ = 1
     # Use power iteration for simplicity
-    mu = torch.ones(num_states) / num_states
+    mu = jnp.ones(num_states) / num_states
 
     for _ in range(1000):
         mu_new = P_pi.T @ mu
         mu_new = mu_new / mu_new.sum()
 
-        if torch.abs(mu_new - mu).max() < 1e-10:
+        if jnp.abs(mu_new - mu).max() < 1e-10:
             break
         mu = mu_new
 
@@ -314,7 +315,7 @@ def compute_stationary_distribution(
 
 def compute_welfare_effect(
     counterfactual: CounterfactualResult,
-    transitions: torch.Tensor,
+    transitions: jnp.ndarray,
     use_stationary: bool = True,
 ) -> dict[str, float]:
     """Compute welfare effects of a counterfactual.
@@ -368,7 +369,7 @@ def elasticity_analysis(
     result: EstimationSummary,
     utility: UtilityFunction,
     problem: DDCProblem,
-    transitions: torch.Tensor,
+    transitions: jnp.ndarray,
     parameter_name: str,
     pct_changes: list[float] = [-0.1, -0.05, 0.05, 0.1],
 ) -> dict[str, Any]:
@@ -400,7 +401,7 @@ def elasticity_analysis(
     }
 
     for pct in pct_changes:
-        new_params = result.parameters.clone()
+        new_params = result.parameters.copy()
         new_params[param_idx] = baseline_value * (1 + pct)
 
         cf = counterfactual_policy(

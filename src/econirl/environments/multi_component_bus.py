@@ -23,8 +23,8 @@ For K >= 4 this is prohibitively large and raises ValueError.
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
-import torch
 from gymnasium import spaces
 
 from econirl.environments.base import DDCEnvironment
@@ -168,11 +168,11 @@ class MultiComponentBusEnvironment(DDCEnvironment):
         return 2
 
     @property
-    def transition_matrices(self) -> torch.Tensor:
+    def transition_matrices(self) -> jnp.ndarray:
         return self._transition_matrices
 
     @property
-    def feature_matrix(self) -> torch.Tensor:
+    def feature_matrix(self) -> jnp.ndarray:
         return self._feature_matrix
 
     @property
@@ -192,7 +192,7 @@ class MultiComponentBusEnvironment(DDCEnvironment):
         """Number of continuous state dimensions (one per component)."""
         return self._K
 
-    def encode_states(self, states: torch.Tensor) -> torch.Tensor:
+    def encode_states(self, states: jnp.ndarray) -> jnp.ndarray:
         """Decode flat state indices to per-component normalized mileage.
 
         Args:
@@ -201,12 +201,13 @@ class MultiComponentBusEnvironment(DDCEnvironment):
         Returns:
             Tensor of shape (batch, K) with values in [0, 1].
         """
-        s = states.clone()
-        components = torch.zeros(len(s), self._K, dtype=torch.float32)
+        # Work with numpy for the loop, then convert back
+        s = np.array(states)
+        components = np.zeros((len(s), self._K), dtype=np.float32)
         for k in range(self._K):
-            components[:, k] = (s % self._M).float() / max(self._M - 1, 1)
+            components[:, k] = (s % self._M).astype(np.float32) / max(self._M - 1, 1)
             s = s // self._M
-        return components
+        return jnp.array(components)
 
     # ------------------------------------------------------------------
     # Build methods
@@ -227,7 +228,7 @@ class MultiComponentBusEnvironment(DDCEnvironment):
                 T[m, next_m] += prob
         return T
 
-    def _build_transition_matrices(self) -> torch.Tensor:
+    def _build_transition_matrices(self) -> jnp.ndarray:
         """Build transition matrices P(s'|s,a).
 
         Returns:
@@ -235,9 +236,9 @@ class MultiComponentBusEnvironment(DDCEnvironment):
         """
         N = self._n_states
         K = self._K
-        M = self._M
 
-        transitions = torch.zeros((2, N, N), dtype=torch.float32)
+        # Build with numpy then convert (JAX arrays are immutable)
+        transitions = np.zeros((2, N, N), dtype=np.float32)
 
         # ------- Keep action -------
         # Each component evolves independently, so the joint transition
@@ -252,9 +253,7 @@ class MultiComponentBusEnvironment(DDCEnvironment):
         for _ in range(1, K):
             joint_keep = np.kron(T1, joint_keep)
 
-        transitions[self.KEEP] = torch.from_numpy(
-            joint_keep.astype(np.float32)
-        )
+        transitions[self.KEEP] = joint_keep.astype(np.float32)
 
         # ------- Replace action -------
         # Reset to state 0 (all components at mileage 0), then apply one
@@ -262,11 +261,13 @@ class MultiComponentBusEnvironment(DDCEnvironment):
         # So the replace row for every source state s equals the keep row
         # for state 0.
         keep_from_zero = transitions[self.KEEP, 0, :]  # shape (N,)
-        transitions[self.REPLACE] = keep_from_zero.unsqueeze(0).expand(N, -1)
+        transitions[self.REPLACE] = np.broadcast_to(
+            keep_from_zero[np.newaxis, :], (N, N)
+        ).copy()
 
-        return transitions
+        return jnp.array(transitions)
 
-    def _build_feature_matrix(self) -> torch.Tensor:
+    def _build_feature_matrix(self) -> jnp.ndarray:
         """Build feature matrix phi(s, a).
 
         Returns:
@@ -274,7 +275,9 @@ class MultiComponentBusEnvironment(DDCEnvironment):
             Features: [replacement_cost_indicator, operating_cost, quadratic_cost]
         """
         N = self._n_states
-        features = torch.zeros((N, 2, 3), dtype=torch.float32)
+
+        # Build with numpy then convert (JAX arrays are immutable)
+        features = np.zeros((N, 2, 3), dtype=np.float32)
 
         for s in range(N):
             x = self._state_feature(s)
@@ -289,7 +292,7 @@ class MultiComponentBusEnvironment(DDCEnvironment):
             features[s, self.REPLACE, 1] = 0.0
             features[s, self.REPLACE, 2] = 0.0
 
-        return features
+        return jnp.array(features)
 
     # ------------------------------------------------------------------
     # Abstract method implementations

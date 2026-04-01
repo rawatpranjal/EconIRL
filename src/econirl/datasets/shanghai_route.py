@@ -20,7 +20,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import torch
+import jax
+import jax.numpy as jnp
 
 DEFAULT_DATA_DIR = "/Volumes/Expansion/datasets/shanghai_taxi_rcm_airl/data"
 
@@ -112,7 +113,7 @@ def build_transition_matrix(
     transit: np.ndarray,
     n_states: int = N_STATES,
     n_actions: int = N_ACTIONS,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Build deterministic transition matrix from transit triples.
 
     For each ``(from_state, direction, to_state)`` row in ``transit``, sets
@@ -130,17 +131,17 @@ def build_transition_matrix(
 
     Returns
     -------
-    torch.Tensor of shape (n_actions, n_states, n_states)
+    jnp.ndarray of shape (n_actions, n_states, n_states)
         Deterministic transition matrix with rows summing to 1.
     """
-    T = torch.zeros(n_actions, n_states, n_states)
+    T = jnp.zeros(n_actions, n_states, n_states)
 
     for row in transit:
         from_s, action, to_s = int(row[0]), int(row[1]), int(row[2])
         T[action, from_s, to_s] = 1.0
 
     # For (state, action) pairs not in transit, add self-loop
-    row_sums = T.sum(dim=2)  # (n_actions, n_states)
+    row_sums = T.sum(axis=2)  # (n_actions, n_states)
     missing = row_sums == 0.0
     # Set self-loop for missing (s, a) pairs
     for a in range(n_actions):
@@ -149,7 +150,7 @@ def build_transition_matrix(
                 T[a, s, s] = 1.0
 
     # Normalize rows to sum to 1 (already 1 for deterministic, but safe)
-    row_sums = T.sum(dim=2, keepdim=True)
+    row_sums = T.sum(axis=2, keepdims=True)
     T = T / row_sums.clamp(min=1e-12)
 
     return T
@@ -174,7 +175,7 @@ def _classify_highway(highway_str: str) -> int:
 def build_edge_features(
     edges_df: pd.DataFrame,
     n_states: int = N_STATES,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Build per-edge feature matrix.
 
     Features:
@@ -190,9 +191,9 @@ def build_edge_features(
 
     Returns
     -------
-    torch.Tensor of shape (n_states, 7)
+    jnp.ndarray of shape (n_states, 7)
     """
-    features = torch.zeros(n_states, 7)
+    features = jnp.zeros(n_states, 7)
 
     max_length = edges_df["length"].max()
 
@@ -208,11 +209,11 @@ def build_edge_features(
 
 
 def build_state_action_features(
-    edge_features: torch.Tensor,
+    edge_features: jnp.ndarray,
     transit: np.ndarray,
     n_states: int = N_STATES,
     n_actions: int = N_ACTIONS,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Build state-action feature matrix.
 
     For each ``(from_state, action, to_state)`` triple, the feature vector
@@ -223,7 +224,7 @@ def build_state_action_features(
 
     Parameters
     ----------
-    edge_features : torch.Tensor of shape (n_states, n_features)
+    edge_features : jnp.ndarray of shape (n_states, n_features)
         Per-edge features.
     transit : ndarray of shape (K, 3)
         Each row is ``[from_n_id, direction_id, to_n_id]``.
@@ -234,10 +235,10 @@ def build_state_action_features(
 
     Returns
     -------
-    torch.Tensor of shape (n_states, n_actions, n_features)
+    jnp.ndarray of shape (n_states, n_actions, n_features)
     """
     n_features = edge_features.shape[1]
-    features = torch.zeros(n_states, n_actions, n_features)
+    features = jnp.zeros(n_states, n_actions, n_features)
 
     for row in transit:
         from_s, action, to_s = int(row[0]), int(row[1]), int(row[2])
@@ -257,11 +258,11 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def add_destination_feature(
-    features: torch.Tensor,
+    features: jnp.ndarray,
     nodes_df: pd.DataFrame,
     edges_df: pd.DataFrame,
     destination_nid: int,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Append a normalized distance-to-destination feature.
 
     Computes the straight-line (haversine) distance from each edge's
@@ -270,7 +271,7 @@ def add_destination_feature(
 
     Parameters
     ----------
-    features : torch.Tensor
+    features : jnp.ndarray
         Either edge features of shape ``(S, F)`` or state-action features
         of shape ``(S, A, F)``.
     nodes_df : pd.DataFrame
@@ -282,7 +283,7 @@ def add_destination_feature(
 
     Returns
     -------
-    torch.Tensor
+    jnp.ndarray
         Features with an appended distance column: shape ``(S, F+1)``
         or ``(S, A, F+1)``.
     """
@@ -304,7 +305,7 @@ def add_destination_feature(
 
     # Compute distances
     n_states = features.shape[0]
-    distances = torch.zeros(n_states)
+    distances = jnp.zeros(n_states)
     for s in range(n_states):
         if s in edge_endpoints:
             lat, lon = edge_endpoints[s]
@@ -317,12 +318,12 @@ def add_destination_feature(
 
     if features.dim() == 2:
         # (S, F) -> (S, F+1)
-        return torch.cat([features, distances.unsqueeze(1)], dim=1)
+        return jnp.concatenate([features, distances.unsqueeze(1)], axis=1)
     elif features.dim() == 3:
         # (S, A, F) -> (S, A, F+1)
         n_actions = features.shape[1]
         dist_expanded = distances.unsqueeze(1).unsqueeze(2).expand(-1, n_actions, 1)
-        return torch.cat([features, dist_expanded], dim=2)
+        return jnp.concatenate([features, dist_expanded], axis=2)
     else:
         raise ValueError(f"Expected 2D or 3D features, got {features.dim()}D")
 
@@ -385,9 +386,9 @@ def parse_trajectories_to_panel(
             actions.append(action)
 
         traj = Trajectory(
-            states=torch.tensor(states, dtype=torch.long),
-            actions=torch.tensor(actions, dtype=torch.long),
-            next_states=torch.tensor(next_states, dtype=torch.long),
+            states=jnp.array(states, dtype=jnp.int32),
+            actions=jnp.array(actions, dtype=jnp.int32),
+            next_states=jnp.array(next_states, dtype=jnp.int32),
             individual_id=idx,
         )
         trajectories.append(traj)

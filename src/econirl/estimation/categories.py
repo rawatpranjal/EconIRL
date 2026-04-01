@@ -10,9 +10,9 @@ Usage:
     ...     EstimatorCategory, get_estimators_by_category, get_estimators_with_capability
     ... )
     >>> get_estimators_by_category(EstimatorCategory.ADVERSARIAL_IRL)
-    ['GAIL', 'AIRL', 'GCL']
+    ['AIRL']
     >>> get_estimators_with_capability(has_inner_bellman_solve=False)
-    ['CCP', 'SEES', 'IQ-Learn', 'GLADIUS', 'BC']
+    ['CCP', 'SEES', 'NNES', 'TD-CCP', 'GLADIUS', 'BC']
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class EstimatorCategory(str, Enum):
 
     MARGIN_IRL = "margin_irl"
     """Margin-based IRL. Recovers reward that makes expert behavior optimal
-    with maximum margin over alternatives."""
+    with maximum margin over alternatives. (Contrib only.)"""
 
     ADVERSARIAL_IRL = "adversarial_irl"
     """Adversarial IRL. Uses a discriminator to distinguish expert from
@@ -48,7 +48,7 @@ class EstimatorCategory(str, Enum):
 
     BAYESIAN_IRL = "bayesian_irl"
     """Bayesian IRL. Places a prior over reward parameters and computes
-    the posterior via MCMC sampling."""
+    the posterior via MCMC sampling. (Contrib only.)"""
 
     DISTRIBUTION_IRL = "distribution_irl"
     """Distribution-matching IRL. Minimizes statistical divergence between
@@ -72,15 +72,15 @@ class ProblemCapabilities:
 
     Attributes:
         reward_type: Form of reward function the estimator uses.
-            "linear" = R(s,a) = θ·φ(s,a), parametric with features.
+            "linear" = R(s,a) = theta dot phi(s,a), parametric with features.
             "tabular" = R(s,a) free matrix, no parametric structure.
             "neural" = R(s,a) from a neural network.
             "none" = no reward modeling.
         requires_transitions: Whether known P(s'|s,a) is needed.
-        recovers_structural_params: Whether interpretable θ is returned.
+        recovers_structural_params: Whether interpretable theta is returned.
         recovers_reward: Whether an R(s,a) matrix is produced.
         has_inner_bellman_solve: Whether a full Bellman solve runs inside.
-        supports_finite_horizon: Whether finite-horizon (T < ∞) works.
+        supports_finite_horizon: Whether finite-horizon (T < inf) works.
         supports_continuous_states: Whether function approximation enables
             scalability to large/continuous state spaces.
     """
@@ -95,7 +95,7 @@ class ProblemCapabilities:
 
 
 # ---------------------------------------------------------------------------
-# Registry: maps estimator benchmark name -> (category, capabilities)
+# Production registry: 10 estimators in the main API
 # ---------------------------------------------------------------------------
 
 ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
@@ -120,6 +120,18 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
             recovers_reward=True,
             has_inner_bellman_solve=False,
             supports_finite_horizon=False,
+            supports_continuous_states=False,
+        ),
+    ),
+    "MCE IRL": (
+        EstimatorCategory.ENTROPY_IRL,
+        ProblemCapabilities(
+            reward_type="linear",
+            requires_transitions=True,
+            recovers_structural_params=True,
+            recovers_reward=True,
+            has_inner_bellman_solve=True,
+            supports_finite_horizon=True,
             supports_continuous_states=False,
         ),
     ),
@@ -159,18 +171,62 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
             supports_continuous_states=True,
         ),
     ),
-    "MCE IRL": (
-        EstimatorCategory.ENTROPY_IRL,
+    "GLADIUS": (
+        EstimatorCategory.Q_LEARNING_IRL,
+        ProblemCapabilities(
+            reward_type="neural",
+            requires_transitions=True,
+            recovers_structural_params=True,
+            recovers_reward=True,
+            has_inner_bellman_solve=False,
+            supports_finite_horizon=False,
+            supports_continuous_states=True,
+        ),
+    ),
+    "AIRL": (
+        EstimatorCategory.ADVERSARIAL_IRL,
         ProblemCapabilities(
             reward_type="linear",
             requires_transitions=True,
-            recovers_structural_params=True,
+            recovers_structural_params=False,
             recovers_reward=True,
             has_inner_bellman_solve=True,
             supports_finite_horizon=True,
             supports_continuous_states=False,
         ),
     ),
+    "f-IRL": (
+        EstimatorCategory.DISTRIBUTION_IRL,
+        ProblemCapabilities(
+            reward_type="tabular",
+            requires_transitions=True,
+            recovers_structural_params=False,
+            recovers_reward=True,
+            has_inner_bellman_solve=True,
+            supports_finite_horizon=False,
+            supports_continuous_states=False,
+        ),
+    ),
+    "BC": (
+        EstimatorCategory.IMITATION,
+        ProblemCapabilities(
+            reward_type="none",
+            requires_transitions=False,
+            recovers_structural_params=False,
+            recovers_reward=False,
+            has_inner_bellman_solve=False,
+            supports_finite_horizon=False,
+            supports_continuous_states=False,
+        ),
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
+# Contrib registry: estimators moved to econirl.contrib
+# ---------------------------------------------------------------------------
+
+CONTRIB_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
     "MaxEnt IRL": (
         EstimatorCategory.ENTROPY_IRL,
         ProblemCapabilities(
@@ -231,18 +287,6 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
             supports_continuous_states=False,
         ),
     ),
-    "AIRL": (
-        EstimatorCategory.ADVERSARIAL_IRL,
-        ProblemCapabilities(
-            reward_type="linear",
-            requires_transitions=True,
-            recovers_structural_params=False,
-            recovers_reward=True,
-            has_inner_bellman_solve=True,
-            supports_finite_horizon=True,
-            supports_continuous_states=False,
-        ),
-    ),
     "GCL": (
         EstimatorCategory.ADVERSARIAL_IRL,
         ProblemCapabilities(
@@ -267,18 +311,6 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
             supports_continuous_states=False,
         ),
     ),
-    "f-IRL": (
-        EstimatorCategory.DISTRIBUTION_IRL,
-        ProblemCapabilities(
-            reward_type="tabular",
-            requires_transitions=True,
-            recovers_structural_params=False,
-            recovers_reward=True,
-            has_inner_bellman_solve=True,
-            supports_finite_horizon=False,
-            supports_continuous_states=False,
-        ),
-    ),
     "IQ-Learn": (
         EstimatorCategory.Q_LEARNING_IRL,
         ProblemCapabilities(
@@ -286,30 +318,6 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
             requires_transitions=True,
             recovers_structural_params=False,
             recovers_reward=True,
-            has_inner_bellman_solve=False,
-            supports_finite_horizon=False,
-            supports_continuous_states=False,
-        ),
-    ),
-    "GLADIUS": (
-        EstimatorCategory.Q_LEARNING_IRL,
-        ProblemCapabilities(
-            reward_type="neural",
-            requires_transitions=True,
-            recovers_structural_params=True,
-            recovers_reward=True,
-            has_inner_bellman_solve=False,
-            supports_finite_horizon=False,
-            supports_continuous_states=True,
-        ),
-    ),
-    "BC": (
-        EstimatorCategory.IMITATION,
-        ProblemCapabilities(
-            reward_type="none",
-            requires_transitions=False,
-            recovers_structural_params=False,
-            recovers_reward=False,
             has_inner_bellman_solve=False,
             supports_finite_horizon=False,
             supports_continuous_states=False,
@@ -324,19 +332,19 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
 
 
 def get_estimators_by_category(category: EstimatorCategory) -> list[str]:
-    """Return estimator names belonging to a category.
+    """Return production estimator names belonging to a category.
 
     >>> get_estimators_by_category(EstimatorCategory.ADVERSARIAL_IRL)
-    ['GAIL', 'AIRL', 'GCL']
+    ['AIRL']
     """
     return [name for name, (cat, _) in ESTIMATOR_REGISTRY.items() if cat == category]
 
 
 def get_estimators_with_capability(**kwargs) -> list[str]:
-    """Return estimator names matching all given capability filters.
+    """Return production estimator names matching all given capability filters.
 
     >>> get_estimators_with_capability(has_inner_bellman_solve=False)
-    ['CCP', 'SEES', 'NNES', 'TD-CCP', 'IQ-Learn', 'GLADIUS', 'BC']
+    ['CCP', 'SEES', 'NNES', 'TD-CCP', 'GLADIUS', 'BC']
     >>> get_estimators_with_capability(recovers_structural_params=True, supports_continuous_states=True)
     ['SEES', 'NNES', 'TD-CCP', 'GLADIUS']
     """
@@ -348,10 +356,18 @@ def get_estimators_with_capability(**kwargs) -> list[str]:
 
 
 def get_category(estimator_name: str) -> EstimatorCategory:
-    """Get the category of an estimator by name."""
-    return ESTIMATOR_REGISTRY[estimator_name][0]
+    """Get the category of an estimator by name (production or contrib)."""
+    if estimator_name in ESTIMATOR_REGISTRY:
+        return ESTIMATOR_REGISTRY[estimator_name][0]
+    if estimator_name in CONTRIB_REGISTRY:
+        return CONTRIB_REGISTRY[estimator_name][0]
+    raise KeyError(f"Unknown estimator: {estimator_name!r}")
 
 
 def get_capabilities(estimator_name: str) -> ProblemCapabilities:
-    """Get the capabilities of an estimator by name."""
-    return ESTIMATOR_REGISTRY[estimator_name][1]
+    """Get the capabilities of an estimator by name (production or contrib)."""
+    if estimator_name in ESTIMATOR_REGISTRY:
+        return ESTIMATOR_REGISTRY[estimator_name][1]
+    if estimator_name in CONTRIB_REGISTRY:
+        return CONTRIB_REGISTRY[estimator_name][1]
+    raise KeyError(f"Unknown estimator: {estimator_name!r}")

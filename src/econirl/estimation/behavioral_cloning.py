@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import time
 
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
@@ -70,8 +71,8 @@ class BehavioralCloningEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Count state-action frequencies from demonstrations.
@@ -95,20 +96,20 @@ class BehavioralCloningEstimator(BaseEstimator):
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
         idx = all_states * n_actions + all_actions
-        counts = torch.zeros(n_states * n_actions).scatter_add_(
-            0, idx.long(), torch.ones(idx.shape[0])
+        counts = jnp.zeros(n_states * n_actions).scatter_add_(
+            0, idx.long(), jnp.ones(idx.shape[0])
         ).reshape(n_states, n_actions)
 
         # Laplace smoothing
         counts = counts + self._smoothing
 
         # Normalize to P(a|s)
-        row_sums = counts.sum(dim=1, keepdim=True)
-        row_sums = torch.clamp(row_sums, min=1e-10)
+        row_sums = counts.sum(axis=1, keepdims=True)
+        row_sums = jnp.clip(row_sums, min=1e-10)
         policy = counts / row_sums
 
         # Log-likelihood of observed data under the empirical policy
-        ll = torch.log(policy[all_states, all_actions] + 1e-10).sum().item()
+        ll = jnp.log(policy[all_states, all_actions] + 1e-10).sum().item()
 
         elapsed = time.time() - start
         self._log(f"Computed empirical policy in {elapsed:.3f}s, LL={ll:.2f}")
@@ -116,7 +117,7 @@ class BehavioralCloningEstimator(BaseEstimator):
         return EstimationResult(
             parameters=policy.flatten(),
             log_likelihood=ll,
-            value_function=torch.zeros(n_states),
+            value_function=jnp.zeros(n_states),
             policy=policy,
             hessian=None,
             converged=True,
@@ -130,8 +131,8 @@ class BehavioralCloningEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate empirical policy from panel data.
@@ -168,7 +169,7 @@ class BehavioralCloningEstimator(BaseEstimator):
             num_observations=n_obs,
             aic=-2 * result.log_likelihood + 2 * n_params,
             bic=-2 * result.log_likelihood
-            + n_params * torch.log(torch.tensor(n_obs)).item(),
+            + n_params * jnp.log(jnp.array(n_obs)).item(),
             prediction_accuracy=self._compute_prediction_accuracy(
                 panel, result.policy
             ),
@@ -184,7 +185,7 @@ class BehavioralCloningEstimator(BaseEstimator):
         return EstimationSummary(
             parameters=result.parameters,
             parameter_names=param_names,
-            standard_errors=torch.full_like(result.parameters, float("nan")),
+            standard_errors=jnp.full_like(result.parameters, float("nan")),
             hessian=None,
             variance_covariance=None,
             method=self.name,

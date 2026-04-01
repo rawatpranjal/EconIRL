@@ -30,8 +30,11 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-import torch
-import torch.nn as nn
+import numpy as np
+import jax
+import jax.numpy as jnp
+import equinox as eqx
+import optax
 from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -42,23 +45,24 @@ from econirl.inference.standard_errors import SEMethod, compute_numerical_hessia
 from econirl.preferences.base import UtilityFunction
 
 
-class _ValueNetwork(nn.Module):
+class _ValueNetwork(eqx.Module):
     """MLP that maps state features to a scalar value V(s)."""
 
-    def __init__(self, input_dim: int, hidden_dim: int, num_layers: int = 2):
-        super().__init__()
-        layers: list[nn.Module] = []
-        layers.append(nn.Linear(input_dim, hidden_dim))
-        layers.append(nn.ReLU())
-        for _ in range(num_layers - 1):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.ReLU())
-        layers.append(nn.Linear(hidden_dim, 1))
-        self.net = nn.Sequential(*layers)
+    mlp: eqx.nn.MLP
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass. Input (batch, input_dim), output (batch,)."""
-        return self.net(x).squeeze(-1)
+    def __init__(self, input_dim: int, hidden_dim: int, num_layers: int = 2, *, key: jax.random.PRNGKey):
+        self.mlp = eqx.nn.MLP(
+            in_size=input_dim,
+            out_size=1,
+            width_size=hidden_dim,
+            depth=num_layers,
+            activation=jax.nn.relu,
+            key=key,
+        )
+
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        """Forward pass. Input shape (input_dim,), output scalar."""
+        return self.mlp(x).squeeze(-1)
 
 
 @dataclass
@@ -80,6 +84,7 @@ class NNESConfig:
             Neyman orthogonality (Nguyen 2025, Propositions 3-4): the score is
             orthogonal to V-approximation error, so no bias correction is needed.
         verbose: Whether to print progress.
+        seed: PRNG seed for reproducibility.
     """
 
     hidden_dim: int = 32
@@ -93,6 +98,7 @@ class NNESConfig:
     compute_se: bool = True
     se_method: SEMethod = "asymptotic"
     verbose: bool = False
+    seed: int = 0
 
 
 class NNESEstimator(BaseEstimator):
@@ -131,6 +137,7 @@ class NNESEstimator(BaseEstimator):
         compute_se: bool = True,
         se_method: SEMethod = "asymptotic",
         verbose: bool = False,
+        seed: int = 0,
         config: NNESConfig | None = None,
     ):
         if config is not None:
@@ -145,6 +152,7 @@ class NNESEstimator(BaseEstimator):
             compute_se = config.compute_se
             se_method = config.se_method
             verbose = config.verbose
+            seed = config.seed
 
         super().__init__(
             se_method=se_method,
@@ -160,6 +168,7 @@ class NNESEstimator(BaseEstimator):
         self._outer_tol = outer_tol
         self._n_outer_iterations = n_outer_iterations
         self._compute_se = compute_se
+        self._seed = seed
         self._config = NNESConfig(
             hidden_dim=hidden_dim,
             num_layers=num_layers,
@@ -172,6 +181,7 @@ class NNESEstimator(BaseEstimator):
             compute_se=compute_se,
             se_method=se_method,
             verbose=verbose,
+            seed=seed,
         )
 
     @property
@@ -188,14 +198,14 @@ class NNESEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
+        transitions: jnp.ndarray,
         sigma: float,
         beta: float,
-        feature_matrix: torch.Tensor,
+        feature_matrix: jnp.ndarray,
         n_states: int,
         n_actions: int,
         bounds: list,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Estimate initial params from data CCPs via Hotz-Miller inversion.
 
         Uses CCP frequencies to compute the EV matrix-inversion closed form,
@@ -205,71 +215,72 @@ class NNESEstimator(BaseEstimator):
         all_actions = panel.get_all_actions()
 
         # Estimate CCPs from data
-        counts = torch.zeros(n_states, n_actions)
-        for s, a in zip(all_states, all_actions):
-            counts[s, a] += 1
-        state_counts = counts.sum(dim=1, keepdim=True).clamp(min=1)
+        counts = jnp.zeros((n_states, n_actions))
+        for s, a in zip(np.asarray(all_states), np.asarray(all_actions)):
+            counts = counts.at[int(s), int(a)].add(1.0)
+        state_counts = jnp.maximum(counts.sum(axis=1, keepdims=True), 1.0)
         ccps = (counts + 0.01) / (state_counts + n_actions * 0.01)
 
         # Hotz-Miller: compute EV via matrix inversion
         # P_pi[s, s'] = sum_a pi(a|s) P(s'|s,a)
-        P_pi = torch.einsum("sa,ast->st", ccps, transitions)
+        P_pi = jnp.einsum("sa,ast->st", ccps, transitions)
 
         # Expected flow per-feature: flow_k[s] = sum_a pi(a|s) * phi(s,a,k)
-        flow_features = torch.einsum("sa,sak->sk", ccps, feature_matrix)
+        flow_features = jnp.einsum("sa,sak->sk", ccps, feature_matrix)
 
         # Entropy: H(s) = -sum_a p(a|s) log p(a|s)
-        safe_ccps = ccps.clamp(min=1e-10)
-        entropy = -(ccps * safe_ccps.log()).sum(dim=1)
+        safe_ccps = jnp.maximum(ccps, 1e-10)
+        entropy = -(ccps * jnp.log(safe_ccps)).sum(axis=1)
 
         # Solve for EV components: ev_k = (I - beta * P_pi)^{-1} flow_k
         # Use float64 for numerical stability at high discount factors
         # (condition number of I - beta*P_pi ~ 1/(1-beta) ~ 10,000 at beta=0.9999)
-        I = torch.eye(n_states, dtype=torch.float64)
+        I = jnp.eye(n_states, dtype=jnp.float64)
         try:
-            M = I - beta * P_pi.double()
-            ev_features = torch.linalg.solve(M, flow_features.double()).float()  # (S, K)
-            ev_entropy = torch.linalg.solve(M, entropy.double()).float()  # (S,)
-        except RuntimeError:
+            M = I - beta * P_pi.astype(jnp.float64)
+            ev_features = jnp.linalg.solve(M, flow_features.astype(jnp.float64)).astype(jnp.float32)  # (S, K)
+            ev_entropy = jnp.linalg.solve(M, entropy.astype(jnp.float64)).astype(jnp.float32)  # (S,)
+        except Exception:
             # Fallback: return small positive values
-            return torch.full((feature_matrix.shape[2],), 0.01)
+            return jnp.full((feature_matrix.shape[2],), 0.01)
 
         # Partial MLE with exact EV
         def objective(params_np):
-            params = torch.tensor(params_np, dtype=torch.float32)
-            flow_u = torch.einsum("sak,k->sa", feature_matrix, params)
-            continuation = torch.zeros(n_states, n_actions)
+            params = jnp.array(params_np, dtype=jnp.float32)
+            flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
+            continuation = jnp.zeros((n_states, n_actions))
             for a in range(n_actions):
                 ev_next = transitions[a] @ ev_features  # (S, K)
-                feat_part = torch.einsum("sk,k->s", ev_next, params)
+                feat_part = jnp.einsum("sk,k->s", ev_next, params)
                 ent_part = transitions[a] @ ev_entropy
-                continuation[:, a] = beta * (feat_part + sigma * ent_part)
+                continuation = continuation.at[:, a].set(beta * (feat_part + sigma * ent_part))
             v = flow_u + continuation
-            log_probs = torch.nn.functional.log_softmax(v / sigma, dim=1)
-            return -log_probs[all_states, all_actions].sum().item()
+            log_probs = jax.nn.log_softmax(v / sigma, axis=1)
+            return -float(log_probs[all_states, all_actions].sum())
 
         # Start slightly above zero to avoid boundary stall
-        x0 = torch.full((feature_matrix.shape[2],), 0.01).numpy()
+        x0 = np.full(feature_matrix.shape[2], 0.01)
         result = optimize.minimize(
             objective, x0, method="L-BFGS-B",
             bounds=bounds, options={"maxiter": 100},
         )
-        return torch.tensor(result.x, dtype=torch.float32)
+        return jnp.array(result.x, dtype=jnp.float32)
 
-    def _build_state_features(self, states: torch.Tensor, problem: DDCProblem) -> torch.Tensor:
+    def _build_state_features(self, states: jnp.ndarray, problem: DDCProblem) -> jnp.ndarray:
         """Build state features from state indices using problem's encoder."""
         if problem.state_encoder is not None:
             return problem.state_encoder(states)
         denom = max(problem.num_states - 1, 1)
-        return (states.float() / denom).unsqueeze(-1)
+        return (states.astype(jnp.float32) / denom)[:, None]
 
     def _train_value_network(
         self,
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        init_params: torch.Tensor,
+        transitions: jnp.ndarray,
+        init_params: jnp.ndarray,
+        key: jax.random.PRNGKey,
     ) -> tuple[_ValueNetwork, list[float]]:
         """Phase 1: Train V(s) network via Bellman residual minimization.
 
@@ -284,11 +295,17 @@ class NNESEstimator(BaseEstimator):
         sigma = problem.scale_parameter
         beta = problem.discount_factor
 
-        v_net = _ValueNetwork(problem.state_dim or 1, self._hidden_dim, self._num_layers)
-        optimizer = torch.optim.Adam(v_net.parameters(), lr=self._v_lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.5, patience=50, min_lr=1e-6,
+        key, init_key = jax.random.split(key)
+        v_net = _ValueNetwork(
+            problem.state_dim or 1, self._hidden_dim, self._num_layers, key=init_key,
         )
+
+        # Set up optimizer with gradient clipping
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(1.0),
+            optax.adam(self._v_lr),
+        )
+        opt_state = optimizer.init(eqx.filter(v_net, eqx.is_array))
 
         # Get all transitions from data
         all_states = panel.get_all_states()
@@ -300,23 +317,49 @@ class NNESEstimator(BaseEstimator):
 
         # Compute flow utility at initial params
         feature_matrix = utility.feature_matrix  # (S, A, K)
-        flow_u = torch.einsum("sak,k->sa", feature_matrix, init_params)
+        flow_u = jnp.einsum("sak,k->sa", feature_matrix, init_params)
 
         # Pre-compute all state features for EV calculation
-        all_state_feats = self._build_state_features(torch.arange(n_states), problem)
+        all_state_feats = self._build_state_features(jnp.arange(n_states), problem)
 
         n_samples = len(all_states)
 
         self._log(f"Phase 1: Training V-network for {self._v_epochs} epochs")
 
+        # Define the training step using Equinox functional patterns
+        @eqx.filter_jit
+        def train_step(model, opt_state, batch_feat_s, batch_s_idx, all_st_feats, flow_u_mat):
+            def loss_fn(model):
+                # V(s) prediction for batch
+                v_s = jax.vmap(model)(batch_feat_s)
+
+                # Compute V for all states (for EV calculation)
+                v_all = jax.vmap(model)(all_st_feats)
+
+                # EV[batch_i, a] = sum_s' P(s'|s_idx[i], a) * V(s')
+                # transitions shape: (A, S, S), s_idx indexes into S dimension
+                ev = jnp.einsum("abs,s->ba", transitions[:, batch_s_idx, :], v_all)
+                q_vals = flow_u_mat[batch_s_idx] + beta * ev
+
+                # Bellman target: sigma * logsumexp(Q / sigma)
+                target = sigma * jax.scipy.special.logsumexp(q_vals / sigma, axis=1)
+
+                return jnp.mean((v_s - jax.lax.stop_gradient(target)) ** 2)
+
+            loss, grads = eqx.filter_value_and_grad(loss_fn)(model)
+            updates, new_opt_state = optimizer.update(grads, opt_state, model)
+            new_model = eqx.apply_updates(model, updates)
+            return new_model, new_opt_state, loss
+
         loss_history: list[float] = []
         best_loss = float("inf")
-        best_state_dict = None
+        best_params = eqx.filter(v_net, eqx.is_array)
         patience_counter = 0
         max_patience = 100
 
         for epoch in range(self._v_epochs):
-            perm = torch.randperm(n_samples)
+            key, perm_key = jax.random.split(key)
+            perm = jax.random.permutation(perm_key, n_samples)
             epoch_loss = 0.0
             n_batches = 0
 
@@ -324,41 +367,24 @@ class NNESEstimator(BaseEstimator):
                 end = min(start + self._v_batch_size, n_samples)
                 idx = perm[start:end]
 
-                # V(s) prediction
-                v_s = v_net(feat_s[idx])
+                batch_feat_s = feat_s[idx]
+                batch_s_idx = all_states[idx]
 
-                # Build Q-values for all actions at observed states
-                # Q(s,a) = u(s,a;theta) + beta * sum_s' P(s'|s,a) V(s')
-                s_idx = all_states[idx]
-                with torch.no_grad():
-                    v_all = v_net(all_state_feats).detach()
-                # EV[batch_i, a] = sum_s' P(s'|s_idx[i], a) * V(s')
-                # transitions[:, s_idx, :] has shape (A, batch, S)
-                ev = torch.einsum("abs,s->ba", transitions[:, s_idx, :], v_all)
-                q_vals = flow_u[s_idx] + beta * ev
+                v_net, opt_state, loss = train_step(
+                    v_net, opt_state, batch_feat_s, batch_s_idx,
+                    all_state_feats, flow_u,
+                )
 
-                # Bellman target
-                target = sigma * torch.logsumexp(q_vals / sigma, dim=1)
-
-                loss = nn.functional.mse_loss(v_s, target.detach())
-
-                optimizer.zero_grad()
-                loss.backward()
-                # Gradient clipping to prevent divergence
-                torch.nn.utils.clip_grad_norm_(v_net.parameters(), 1.0)
-                optimizer.step()
-
-                epoch_loss += loss.item()
+                epoch_loss += float(loss)
                 n_batches += 1
 
             avg_loss = epoch_loss / max(n_batches, 1)
             loss_history.append(avg_loss)
-            scheduler.step(avg_loss)
 
             # Early stopping with best model checkpoint
             if avg_loss < best_loss - 1e-8:
                 best_loss = avg_loss
-                best_state_dict = {k: v.clone() for k, v in v_net.state_dict().items()}
+                best_params = eqx.filter(v_net, eqx.is_array)
                 patience_counter = 0
             else:
                 patience_counter += 1
@@ -374,9 +400,12 @@ class NNESEstimator(BaseEstimator):
                 self._log(f"  V-net divergence detected at epoch {epoch+1}, reverting to best")
                 break
 
-        # Restore best model
-        if best_state_dict is not None:
-            v_net.load_state_dict(best_state_dict)
+        # Restore best model by replacing array leaves
+        v_net = eqx.tree_at(
+            lambda m: eqx.filter(m, eqx.is_array),
+            v_net,
+            best_params,
+        )
 
         return v_net, loss_history
 
@@ -385,8 +414,8 @@ class NNESEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run NNES estimation with outer iterations.
@@ -403,82 +432,85 @@ class NNESEstimator(BaseEstimator):
         beta = problem.discount_factor
 
         feature_matrix = utility.feature_matrix  # (S, A, K)
-        all_state_feat = self._build_state_features(torch.arange(n_states), problem)
+        all_state_feat = self._build_state_features(jnp.arange(n_states), problem)
         lower, upper = utility.get_parameter_bounds()
-        bounds = list(zip(lower.numpy(), upper.numpy()))
+        bounds = list(zip(np.asarray(lower), np.asarray(upper)))
 
         if initial_params is None:
             initial_params = utility.get_initial_parameters()
 
         # If initial params are all zeros, bootstrap from CCP-based estimate.
         # A V-network trained with zero rewards learns nothing useful.
-        if torch.all(initial_params == 0):
+        if bool(jnp.all(initial_params == 0)):
             self._log("Bootstrapping initial params from CCP-based MLE")
             initial_params = self._bootstrap_params_from_ccp(
                 panel, utility, problem, transitions, sigma, beta,
                 feature_matrix, n_states, n_actions, bounds,
             )
-            self._log(f"  Bootstrap params: {initial_params.numpy()}")
+            self._log(f"  Bootstrap params: {np.asarray(initial_params)}")
 
-        current_params = initial_params.clone()
+        current_params = initial_params.copy()
         total_nit = 0
         total_nfev = 0
         last_result = None
         v_loss_per_outer: list[float] = []
         all_v_loss_history: list[list[float]] = []
 
+        key = jax.random.PRNGKey(self._seed)
+
         for outer_iter in range(self._n_outer_iterations):
             self._log(f"Outer iteration {outer_iter + 1}/{self._n_outer_iterations}")
 
             # Phase 1: Train V-network with current params
+            key, train_key = jax.random.split(key)
             v_net, v_loss_history = self._train_value_network(
-                panel, utility, problem, transitions, current_params,
+                panel, utility, problem, transitions, current_params, train_key,
             )
             v_loss_per_outer.append(v_loss_history[-1] if v_loss_history else float("nan"))
             all_v_loss_history.append(v_loss_history)
 
-            # Extract V(s) for all states
-            with torch.no_grad():
-                v_all = v_net(all_state_feat)  # (S,)
+            # Extract V(s) for all states (no autograd context needed in JAX)
+            v_all = jax.vmap(v_net)(all_state_feat)  # (S,)
 
             # Precompute E[V(s') | s, a] = transitions[a] @ V
-            ev_sa = torch.zeros(n_states, n_actions)
+            ev_sa = jnp.zeros((n_states, n_actions))
             for a in range(n_actions):
-                ev_sa[:, a] = transitions[a] @ v_all  # (S,)
+                ev_sa = ev_sa.at[:, a].set(transitions[a] @ v_all)  # (S,)
 
             # Phase 2: Structural MLE
-            self._log(f"  Phase 2: Structural MLE over theta")
+            self._log("  Phase 2: Structural MLE over theta")
 
             # Need closure over current ev_sa
             _ev_sa = ev_sa
 
-            def log_likelihood(params: torch.Tensor) -> float:
-                flow_u = torch.einsum("sak,k->sa", feature_matrix, params)
+            all_states_data = panel.get_all_states()
+            all_actions_data = panel.get_all_actions()
+
+            def log_likelihood(params: jnp.ndarray) -> float:
+                flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
                 q_vals = flow_u + beta * _ev_sa
-                log_probs = torch.nn.functional.log_softmax(q_vals / sigma, dim=1)
-                all_states = panel.get_all_states()
-                all_actions = panel.get_all_actions()
-                return log_probs[all_states, all_actions].sum().item()
+                log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
+                return float(log_probs[all_states_data, all_actions_data].sum())
 
             def objective(params_np):
-                params = torch.tensor(params_np, dtype=torch.float32)
+                params = jnp.array(params_np, dtype=jnp.float32)
                 return -log_likelihood(params)
 
             def gradient(params_np):
                 eps = 1e-5
                 n = len(params_np)
-                grad = torch.zeros(n)
+                grad = np.zeros(n)
                 for i in range(n):
                     p_plus = params_np.copy()
                     p_minus = params_np.copy()
                     p_plus[i] += eps
                     p_minus[i] -= eps
                     grad[i] = (objective(p_plus) - objective(p_minus)) / (2 * eps)
-                return grad.numpy()
+                return grad
 
             last_result = optimize.minimize(
                 objective,
-                current_params.numpy(),
+                np.asarray(current_params),
                 method="L-BFGS-B",
                 jac=gradient,
                 bounds=bounds,
@@ -488,10 +520,10 @@ class NNESEstimator(BaseEstimator):
                 },
             )
 
-            current_params = torch.tensor(last_result.x, dtype=torch.float32)
+            current_params = jnp.array(last_result.x, dtype=jnp.float32)
             total_nit += last_result.nit
             total_nfev += last_result.nfev
-            self._log(f"  Params: {current_params.numpy()}, LL: {-last_result.fun:.2f}")
+            self._log(f"  Params: {np.asarray(current_params)}, LL: {-last_result.fun:.2f}")
 
         # Store final ll function for Hessian
         self._ll_fn = log_likelihood
@@ -500,23 +532,23 @@ class NNESEstimator(BaseEstimator):
         ll_opt = -last_result.fun
 
         # Compute final policy using last ev_sa
-        flow_u = torch.einsum("sak,k->sa", feature_matrix, params_opt)
+        flow_u = jnp.einsum("sak,k->sa", feature_matrix, params_opt)
         q_vals = flow_u + beta * ev_sa
-        policy = torch.nn.functional.softmax(q_vals / sigma, dim=1)
-        V = sigma * torch.logsumexp(q_vals / sigma, dim=1)
+        policy = jax.nn.softmax(q_vals / sigma, axis=1)
+        V = sigma * jax.scipy.special.logsumexp(q_vals / sigma, axis=1)
 
         # Hessian for standard errors.
         # By Nguyen (2025) Propositions 3-4 (Neyman orthogonality), the score
         # of the Phase 2 pseudo-likelihood is orthogonal to V-approximation
-        # error. Therefore the Hessian of ℓ(θ | V̂_fixed) is the correct
-        # semiparametrically efficient variance estimator — no bias correction
+        # error. Therefore the Hessian of l(theta | V_hat_fixed) is the correct
+        # semiparametrically efficient variance estimator -- no bias correction
         # needed despite using an approximate V-network.
         hessian = None
         if self._compute_se:
             self._log("Computing Hessian (semiparametrically efficient via orthogonality)")
 
             def ll_fn(params):
-                return torch.tensor(log_likelihood(params))
+                return jnp.array(log_likelihood(params))
 
             hessian = compute_numerical_hessian(params_opt, ll_fn)
 

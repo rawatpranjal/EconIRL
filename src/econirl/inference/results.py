@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
-import torch
+import jax.numpy as jnp
 from scipy import stats
 
 
@@ -92,13 +92,13 @@ class EstimationSummary:
     """
 
     # Core estimates
-    parameters: torch.Tensor
+    parameters: jnp.ndarray
     parameter_names: list[str]
-    standard_errors: torch.Tensor
+    standard_errors: jnp.ndarray
 
     # Inference components
-    hessian: torch.Tensor | None = None
-    variance_covariance: torch.Tensor | None = None
+    hessian: jnp.ndarray | None = None
+    variance_covariance: jnp.ndarray | None = None
 
     # Model info
     method: str = "Unknown"
@@ -121,8 +121,8 @@ class EstimationSummary:
     convergence_message: str = ""
 
     # Solution
-    value_function: torch.Tensor | None = None
-    policy: torch.Tensor | None = None
+    value_function: jnp.ndarray | None = None
+    policy: jnp.ndarray | None = None
 
     # Metadata
     estimation_time: float = 0.0
@@ -140,8 +140,8 @@ class EstimationSummary:
         # Compute variance-covariance from Hessian if not provided
         if self.variance_covariance is None and self.hessian is not None:
             try:
-                self.variance_covariance = torch.linalg.inv(-self.hessian)
-            except RuntimeError:
+                self.variance_covariance = jnp.linalg.inv(-self.hessian)
+            except Exception:
                 pass  # Hessian not invertible
 
     @property
@@ -150,21 +150,21 @@ class EstimationSummary:
         return len(self.parameters)
 
     @property
-    def t_statistics(self) -> torch.Tensor:
+    def t_statistics(self) -> jnp.ndarray:
         """T-statistics for each parameter (H0: θ = 0)."""
         return self.parameters / self.standard_errors
 
     @property
-    def p_values(self) -> torch.Tensor:
+    def p_values(self) -> jnp.ndarray:
         """Two-sided p-values for t-tests (H0: θ = 0)."""
-        t_stats = self.t_statistics.numpy()
+        t_stats = np.asarray(self.t_statistics)
         # Large sample: use normal approximation
         p_vals = 2 * (1 - stats.norm.cdf(np.abs(t_stats)))
-        return torch.tensor(p_vals, dtype=torch.float32)
+        return jnp.array(p_vals, dtype=jnp.float32)
 
     def confidence_interval(
         self, alpha: float = 0.05
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute confidence intervals for parameters.
 
         Args:
@@ -192,18 +192,18 @@ class EstimationSummary:
         lower, upper = self.confidence_interval()
 
         return {
-            "estimate": self.parameters[idx].item(),
-            "std_error": self.standard_errors[idx].item(),
-            "t_statistic": self.t_statistics[idx].item(),
-            "p_value": self.p_values[idx].item(),
-            "ci_lower": lower[idx].item(),
-            "ci_upper": upper[idx].item(),
+            "estimate": float(self.parameters[idx]),
+            "std_error": float(self.standard_errors[idx]),
+            "t_statistic": float(self.t_statistics[idx]),
+            "p_value": float(self.p_values[idx]),
+            "ci_lower": float(lower[idx]),
+            "ci_upper": float(upper[idx]),
         }
 
     def wald_test(
         self,
-        R: torch.Tensor,
-        r: torch.Tensor | None = None,
+        R: jnp.ndarray,
+        r: jnp.ndarray | None = None,
     ) -> dict[str, float]:
         """Perform a Wald test for linear restrictions.
 
@@ -217,7 +217,7 @@ class EstimationSummary:
             Dictionary with test statistic, degrees of freedom, and p-value
         """
         if r is None:
-            r = torch.zeros(R.shape[0])
+            r = jnp.zeros(R.shape[0])
 
         if self.variance_covariance is None:
             raise ValueError("Variance-covariance matrix required for Wald test")
@@ -225,7 +225,7 @@ class EstimationSummary:
         # Wald statistic: (Rθ - r)' [R V R']^{-1} (Rθ - r)
         diff = R @ self.parameters - r
         middle = R @ self.variance_covariance @ R.T
-        wald_stat = (diff @ torch.linalg.inv(middle) @ diff).item()
+        wald_stat = float(diff @ jnp.linalg.inv(middle) @ diff)
 
         df = R.shape[0]
         p_value = 1 - stats.chi2.cdf(wald_stat, df)
@@ -245,12 +245,12 @@ class EstimationSummary:
         lower, upper = self.confidence_interval()
 
         return pd.DataFrame({
-            "estimate": self.parameters.numpy(),
-            "std_error": self.standard_errors.numpy(),
-            "t_statistic": self.t_statistics.numpy(),
-            "p_value": self.p_values.numpy(),
-            "ci_lower": lower.numpy(),
-            "ci_upper": upper.numpy(),
+            "estimate": np.asarray(self.parameters),
+            "std_error": np.asarray(self.standard_errors),
+            "t_statistic": np.asarray(self.t_statistics),
+            "p_value": np.asarray(self.p_values),
+            "ci_lower": np.asarray(lower),
+            "ci_upper": np.asarray(upper),
         }, index=self.parameter_names)
 
     def summary(self, alpha: float = 0.05) -> str:
@@ -300,12 +300,12 @@ class EstimationSummary:
         # Parameter rows
         lower, upper = self.confidence_interval(alpha)
         for i, name in enumerate(self.parameter_names):
-            coef = self.parameters[i].item()
-            se = self.standard_errors[i].item()
-            t = self.t_statistics[i].item()
-            p = self.p_values[i].item()
-            lo = lower[i].item()
-            hi = upper[i].item()
+            coef = float(self.parameters[i])
+            se = float(self.standard_errors[i])
+            t = float(self.t_statistics[i])
+            p = float(self.p_values[i])
+            lo = float(lower[i])
+            hi = float(upper[i])
 
             # Format p-value
             if p < 0.001:

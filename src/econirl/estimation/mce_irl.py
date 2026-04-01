@@ -36,8 +36,9 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+import jax
+import jax.numpy as jnp
 import numpy as np
-import torch
 from scipy import optimize
 from tqdm import tqdm
 
@@ -158,10 +159,10 @@ class MCEIRLEstimator(BaseEstimator):
     def _soft_value_iteration(
         self,
         operator: SoftBellmanOperator,
-        reward_matrix: torch.Tensor,
+        reward_matrix: jnp.ndarray,
         num_periods: int | None = None,
-        V_init: torch.Tensor | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, bool]:
+        V_init: jnp.ndarray | None = None,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, bool]:
         """Run soft value iteration (backward pass).
 
         For infinite horizon: uses contraction/hybrid iteration.
@@ -171,17 +172,17 @@ class MCEIRLEstimator(BaseEstimator):
         ----------
         operator : SoftBellmanOperator
             Bellman operator with problem and transitions.
-        reward_matrix : torch.Tensor
+        reward_matrix : jnp.ndarray
             Reward matrix R(s,a), shape (n_states, n_actions).
         num_periods : int, optional
             If set, use finite-horizon backward induction.
 
         Returns
         -------
-        V : torch.Tensor
+        V : jnp.ndarray
             Soft value function, shape (n_states,) for infinite horizon,
             or shape (num_periods, n_states) for finite horizon.
-        policy : torch.Tensor
+        policy : jnp.ndarray
             Soft policy π(a|s), shape (n_states, n_actions) for infinite horizon,
             or shape (num_periods, n_states, n_actions) for finite horizon.
         converged : bool
@@ -225,11 +226,11 @@ class MCEIRLEstimator(BaseEstimator):
 
     def _compute_state_visitation(
         self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
         problem: DDCProblem,
-        initial_dist: torch.Tensor | None = None,
-    ) -> torch.Tensor:
+        initial_dist: jnp.ndarray | None = None,
+    ) -> jnp.ndarray:
         """Compute expected state visitation frequencies (forward pass).
 
         Uses forward message passing to compute the expected number of times
@@ -237,42 +238,42 @@ class MCEIRLEstimator(BaseEstimator):
 
         Parameters
         ----------
-        policy : torch.Tensor
+        policy : jnp.ndarray
             Policy π(a|s), shape (n_states, n_actions).
-        transitions : torch.Tensor
+        transitions : jnp.ndarray
             Transition matrices P(s'|s,a), shape (n_actions, n_states, n_states).
         problem : DDCProblem
             Problem specification.
-        initial_dist : torch.Tensor, optional
+        initial_dist : jnp.ndarray, optional
             Initial state distribution ρ₀. If None, uses uniform.
 
         Returns
         -------
-        D : torch.Tensor
+        D : jnp.ndarray
             State visitation frequencies, shape (n_states,).
         """
         n_states = problem.num_states
         gamma = problem.discount_factor
 
         if initial_dist is None:
-            D = torch.ones(n_states, dtype=policy.dtype) / n_states
+            D = jnp.ones(n_states, dtype=policy.dtype) / n_states
         else:
-            D = initial_dist.clone()
+            D = jnp.array(initial_dist)
 
         # Compute policy-weighted transition: P_π(s'|s) = Σ_a π(a|s) P(s'|s,a)
         # transitions: (n_actions, n_states, n_states) = [a, from_s, to_s]
         # policy: (n_states, n_actions) = [s, a]
-        P_pi = torch.einsum("sa,ast->st", policy, transitions)
+        P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
         # Fixed point iteration: D = ρ₀ + γ P_π^T D
         # Equivalently: D = (I - γ P_π^T)^{-1} ρ₀
         # But we use iteration for numerical stability
 
-        rho0 = D.clone()
+        rho0 = jnp.array(D)
         for i in range(self.config.svf_max_iter):
             D_new = rho0 + gamma * (P_pi.T @ D)
 
-            delta = torch.abs(D_new - D).max().item()
+            delta = float(jnp.abs(D_new - D).max())
             D = D_new
 
             if delta < self.config.svf_tol:
@@ -288,7 +289,7 @@ class MCEIRLEstimator(BaseEstimator):
         panel: Panel,
         n_states: int,
         n_actions: int,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute empirical state and state-action occupancy from demonstrations.
 
         Following Ziebart (2008) and the imitation library: count how often
@@ -297,27 +298,31 @@ class MCEIRLEstimator(BaseEstimator):
 
         Returns
         -------
-        D_demo : torch.Tensor
+        D_demo : jnp.ndarray
             State occupancy, shape (n_states,). Sums to 1.
-        D_demo_sa : torch.Tensor
+        D_demo_sa : jnp.ndarray
             State-action occupancy, shape (n_states, n_actions). Sums to 1.
         """
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
         total_obs = len(all_states)
 
-        D_s = torch.zeros(n_states, dtype=torch.float32)
-        D_sa = torch.zeros(n_states, n_actions, dtype=torch.float32)
+        # Use numpy for scatter-add operations, then convert to JAX
+        all_states_np = np.asarray(all_states)
+        all_actions_np = np.asarray(all_actions)
 
-        D_s.scatter_add_(0, all_states, torch.ones(total_obs))
-        idx_flat = all_states * n_actions + all_actions
-        D_sa.view(-1).scatter_add_(0, idx_flat, torch.ones(total_obs))
+        D_s_np = np.zeros(n_states, dtype=np.float32)
+        D_sa_np = np.zeros((n_states, n_actions), dtype=np.float32)
+
+        np.add.at(D_s_np, all_states_np, 1.0)
+        idx_flat = all_states_np * n_actions + all_actions_np
+        np.add.at(D_sa_np.ravel(), idx_flat, 1.0)
 
         if total_obs > 0:
-            D_s = D_s / total_obs
-            D_sa = D_sa / total_obs
+            D_s_np = D_s_np / total_obs
+            D_sa_np = D_sa_np / total_obs
 
-        return D_s, D_sa
+        return jnp.array(D_s_np), jnp.array(D_sa_np)
 
     def _compute_empirical_features(
         self,
@@ -325,7 +330,7 @@ class MCEIRLEstimator(BaseEstimator):
         reward_fn: BaseUtilityFunction,
         n_states: int | None = None,
         n_actions: int | None = None,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute empirical feature expectations using state-action occupancy.
 
         Uses the empirical state-action occupancy measure D_demo(s,a):
@@ -353,27 +358,29 @@ class MCEIRLEstimator(BaseEstimator):
                 panel, n_states or _ns, n_actions or _na
             )
             # μ_D = Σ_s Σ_a D_demo(s,a) φ(s,a,k)
-            return torch.einsum("sa,sak->k", D_sa, feature_matrix)
+            return jnp.einsum("sa,sak->k", D_sa, feature_matrix)
         else:
             _ns = feature_matrix.shape[0]
             # For state-only features, compute state occupancy directly
             all_states = panel.get_all_states()
             total_obs = len(all_states)
-            D_s = torch.zeros(_ns, dtype=torch.float32)
-            D_s.scatter_add_(0, all_states, torch.ones(total_obs))
+            all_states_np = np.asarray(all_states)
+            D_s_np = np.zeros(_ns, dtype=np.float32)
+            np.add.at(D_s_np, all_states_np, 1.0)
             if total_obs > 0:
-                D_s = D_s / total_obs
+                D_s_np = D_s_np / total_obs
+            D_s = jnp.array(D_s_np)
             return D_s @ feature_matrix
 
     def _compute_expected_features(
         self,
         panel: Panel,
-        policy: torch.Tensor,
+        policy: jnp.ndarray,
         reward_fn: BaseUtilityFunction,
-        transitions: torch.Tensor | None = None,
-        initial_dist: torch.Tensor | None = None,
+        transitions: jnp.ndarray | None = None,
+        initial_dist: jnp.ndarray | None = None,
         discount: float = 0.9,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute expected feature expectations under the learned policy.
 
         Uses the occupancy-measure approach from Ziebart (2010) Algorithm 1
@@ -393,20 +400,20 @@ class MCEIRLEstimator(BaseEstimator):
         ----------
         panel : Panel
             Panel data (used only as fallback if transitions unavailable).
-        policy : torch.Tensor
+        policy : jnp.ndarray
             Policy probabilities π(a|s), shape (n_states, n_actions).
         reward_fn : BaseUtilityFunction
             Reward function with feature matrix.
-        transitions : torch.Tensor, optional
+        transitions : jnp.ndarray, optional
             Transition matrices, shape (n_actions, n_states, n_states).
-        initial_dist : torch.Tensor, optional
+        initial_dist : jnp.ndarray, optional
             Initial state distribution.
         discount : float
             Discount factor for state visitation computation.
 
         Returns
         -------
-        torch.Tensor
+        jnp.ndarray
             Expected features, shape (n_features,).
         """
         # Get feature matrix - handle both 2D and 3D cases
@@ -434,11 +441,11 @@ class MCEIRLEstimator(BaseEstimator):
             d = self._compute_state_visitation(policy, transitions, problem, initial_dist)
 
             # Promote feature_matrix to match computation dtype (float64 for high gamma)
-            fm = feature_matrix.to(dtype=d.dtype)
-            pol = policy.to(dtype=d.dtype)
+            fm = feature_matrix.astype(d.dtype)
+            pol = policy.astype(d.dtype)
             if fm.ndim == 3:
                 # E_π[φ] = Σ_s D_π(s) Σ_a π(a|s) φ(s,a,k)
-                return torch.einsum("s,sa,sak->k", d, pol, fm)
+                return jnp.einsum("s,sa,sak->k", d, pol, fm)
             else:
                 # E_π[φ] = Σ_s D_π(s) φ(s,k)
                 return d @ fm
@@ -447,14 +454,16 @@ class MCEIRLEstimator(BaseEstimator):
         total_obs = sum(len(traj) for traj in panel.trajectories)
 
         if feature_matrix.ndim == 3:
-            all_states = torch.cat([traj.states for traj in panel.trajectories])
-            feature_sum = (policy[all_states].unsqueeze(-1) * feature_matrix[all_states]).sum(dim=(0, 1))
+            all_states_np = np.asarray(panel.get_all_states()) if hasattr(panel.get_all_states(), '__len__') else np.concatenate([np.asarray(traj.states) for traj in panel.trajectories])
+            all_states_idx = jnp.array(all_states_np)
+            feature_sum = (policy[all_states_idx][:, :, None] * feature_matrix[all_states_idx]).sum(axis=(0, 1))
             if total_obs > 0:
                 return feature_sum / total_obs
             return feature_sum
         else:
             all_states = panel.get_all_states()
-            feature_sum = feature_matrix[all_states, :].sum(dim=0)
+            all_states_idx = jnp.array(np.asarray(all_states))
+            feature_sum = feature_matrix[all_states_idx, :].sum(axis=0)
             if total_obs > 0:
                 return feature_sum / total_obs
             return feature_sum
@@ -462,13 +471,13 @@ class MCEIRLEstimator(BaseEstimator):
     def _compute_expected_features_finite_horizon(
         self,
         panel: Panel,
-        policy: torch.Tensor,
+        policy: jnp.ndarray,
         reward_fn: BaseUtilityFunction,
         num_periods: int,
-        transitions: torch.Tensor | None = None,
-        initial_dist: torch.Tensor | None = None,
+        transitions: jnp.ndarray | None = None,
+        initial_dist: jnp.ndarray | None = None,
         discount: float = 0.95,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute expected features using finite-horizon occupancy measures.
 
         Uses forward-pass state visitation with time-indexed policies:
@@ -478,11 +487,11 @@ class MCEIRLEstimator(BaseEstimator):
 
         Parameters
         ----------
-        policy : torch.Tensor
+        policy : jnp.ndarray
             Time-indexed policy, shape (num_periods, n_states, n_actions).
-        transitions : torch.Tensor, optional
+        transitions : jnp.ndarray, optional
             Transition matrices, shape (n_actions, n_states, n_states).
-        initial_dist : torch.Tensor, optional
+        initial_dist : jnp.ndarray, optional
             Initial state distribution ρ_0, shape (n_states,).
         discount : float
             Discount factor γ.
@@ -498,26 +507,26 @@ class MCEIRLEstimator(BaseEstimator):
         n_actions = policy.shape[2]
 
         if initial_dist is None:
-            D_t = torch.ones(n_states) / n_states
+            D_t = jnp.ones(n_states) / n_states
         else:
-            D_t = initial_dist.clone()
+            D_t = jnp.array(initial_dist)
 
         # Forward pass: accumulate discounted occupancy measures
-        feature_sum = torch.zeros(feature_matrix.shape[-1])
+        feature_sum = jnp.zeros(feature_matrix.shape[-1])
 
         for t in range(num_periods):
             if feature_matrix.ndim == 3:
                 # E_π[φ]_t = γ^t Σ_s D_t(s) Σ_a π_t(a|s) φ(s,a,k)
-                feature_sum += (discount ** t) * torch.einsum(
+                feature_sum = feature_sum + (discount ** t) * jnp.einsum(
                     "s,sa,sak->k", D_t, policy[t], feature_matrix
                 )
             else:
                 # State-only: E_π[φ]_t = γ^t Σ_s D_t(s) φ(s,k)
-                feature_sum += (discount ** t) * (D_t @ feature_matrix)
+                feature_sum = feature_sum + (discount ** t) * (D_t @ feature_matrix)
 
             # Advance state distribution: D_{t+1}(s') = Σ_s Σ_a D_t(s) π_t(a|s) P(s'|s,a)
             if transitions is not None and t < num_periods - 1:
-                P_pi_t = torch.einsum("sa,ast->st", policy[t], transitions)
+                P_pi_t = jnp.einsum("sa,ast->st", policy[t], transitions)
                 D_t = P_pi_t.T @ D_t
 
         # Normalize by total discounted weight
@@ -528,34 +537,35 @@ class MCEIRLEstimator(BaseEstimator):
         self,
         panel: Panel,
         n_states: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute initial state distribution from data."""
-        counts = torch.zeros(n_states, dtype=torch.float32)
-        init_states = torch.tensor(
-            [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
-            dtype=torch.long,
-        )
-        counts.scatter_add_(0, init_states, torch.ones_like(init_states, dtype=torch.float32))
+        init_states_list = [
+            int(traj.states[0]) for traj in panel.trajectories if len(traj) > 0
+        ]
+        counts_np = np.zeros(n_states, dtype=np.float32)
+        init_states_np = np.array(init_states_list, dtype=np.int64)
+        np.add.at(counts_np, init_states_np, 1.0)
 
-        if counts.sum() > 0:
+        counts = jnp.array(counts_np)
+        if float(counts.sum()) > 0:
             return counts / counts.sum()
-        return torch.ones(n_states) / n_states
+        return jnp.ones(n_states) / n_states
 
     def _optimize(
         self,
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
-        true_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
+        true_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run MCE IRL optimization.
 
         Parameters
         ----------
-        true_params : torch.Tensor, optional
+        true_params : jnp.ndarray, optional
             True parameters for debugging. If provided, RMSE is shown in progress bar.
         """
         start_time = time.time()
@@ -564,21 +574,21 @@ class MCEIRLEstimator(BaseEstimator):
         # Use float64 for the Bellman operator to handle high discount factors
         # (condition number of (I - beta*P) ~ 1/(1-beta), so float32 is insufficient
         # for beta > 0.99)
-        transitions_f64 = transitions.double()
+        transitions_f64 = transitions.astype(jnp.float64)
         operator = SoftBellmanOperator(problem, transitions_f64)
 
         # Initialize parameters
         if initial_params is None:
             params = reward_fn.get_initial_parameters()
         else:
-            params = initial_params.clone()
+            params = jnp.array(initial_params)
 
         # Compute empirical features (constant) — all in float64 for precision
-        empirical_features = self._compute_empirical_features(panel, reward_fn).double()
-        initial_dist = self._compute_initial_distribution(panel, problem.num_states).double()
+        empirical_features = self._compute_empirical_features(panel, reward_fn).astype(jnp.float64)
+        initial_dist = self._compute_initial_distribution(panel, problem.num_states).astype(jnp.float64)
 
         self._log(f"Empirical features: {empirical_features}")
-        self._log(f"Initial distribution entropy: {-(initial_dist * torch.log(initial_dist + 1e-10)).sum():.3f}")
+        self._log(f"Initial distribution entropy: {-(initial_dist * jnp.log(initial_dist + 1e-10)).sum():.3f}")
 
         # Tracking
         n_function_evals = 0
@@ -598,52 +608,52 @@ class MCEIRLEstimator(BaseEstimator):
             def neg_ll_and_grad(theta_np):
                 nonlocal n_function_evals, inner_not_converged
                 n_function_evals += 1
-                theta = torch.tensor(theta_np, dtype=torch.float64)
+                theta = jnp.array(theta_np, dtype=jnp.float64)
                 # Compute reward in float64 for numerical precision with high discount factors
-                reward_matrix = reward_fn.compute(theta.float()).double()
+                reward_matrix = reward_fn.compute(theta.astype(jnp.float32)).astype(jnp.float64)
                 V, policy, converged = self._soft_value_iteration(
                     operator, reward_matrix, V_init=prev_V[0],
                 )
-                prev_V[0] = V.clone()
+                prev_V[0] = jnp.array(V)
                 if not converged:
                     inner_not_converged += 1
                 # Log-likelihood: LL = Σ_t log π(a_t|s_t)
                 log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
-                ll = log_probs[all_states, all_actions].sum().item()
+                ll = float(log_probs[all_states, all_actions].sum())
                 # Analytical gradient via implicit differentiation (same as NFXP):
                 # dV/dθ_k = (I - γ P_π)^{-1} [Σ_a π(a|s) φ(s,a,k)]
                 # dLL/dθ_k = (1/σ) Σ_t [dQ_k(s_t,a_t) - dV_k(s_t)]
-                fm = reward_fn.feature_matrix.double() if hasattr(reward_fn, 'feature_matrix') else reward_fn.state_features.double()
+                fm = reward_fn.feature_matrix.astype(jnp.float64) if hasattr(reward_fn, 'feature_matrix') else reward_fn.state_features.astype(jnp.float64)
                 n_params = fm.shape[-1]
                 n_states = problem.num_states
                 # Build P_π: policy-weighted transition matrix
-                P_pi = torch.einsum("sa,asn->sn", policy, transitions_f64)
+                P_pi = jnp.einsum("sa,asn->sn", policy, transitions_f64)
                 # Solve for dV/dθ (one linear system per parameter)
-                A = torch.eye(n_states, dtype=torch.float64) - gamma * P_pi
+                A = jnp.eye(n_states, dtype=jnp.float64) - gamma * P_pi
                 grad_ll = np.zeros(n_params, dtype=np.float64)
                 for k in range(n_params):
                     if fm.ndim == 3:
-                        pi_phi_k = (policy * fm[:, :, k]).sum(dim=1)  # (S,)
+                        pi_phi_k = (policy * fm[:, :, k]).sum(axis=1)  # (S,)
                     else:
                         pi_phi_k = fm[:, k]  # (S,)
-                    dV_k = torch.linalg.solve(A, pi_phi_k)
+                    dV_k = jnp.linalg.solve(A, pi_phi_k)
                     # dQ_k(s,a) = φ(s,a,k) + γ Σ_s' P(s'|s,a) dV_k(s')
-                    EV_k = torch.einsum("asn,n->sa", transitions_f64, dV_k)  # (S, A)
+                    EV_k = jnp.einsum("asn,n->sa", transitions_f64, dV_k)  # (S, A)
                     if fm.ndim == 3:
                         dQ_k = fm[:, :, k] + gamma * EV_k  # (S, A)
                     else:
-                        dQ_k = fm[:, k].unsqueeze(1) + gamma * EV_k  # (S, A)
+                        dQ_k = fm[:, k][:, None] + gamma * EV_k  # (S, A)
                     # ∂LL/∂θ_k = (1/σ) Σ_t [dQ_k(s_t,a_t) - Σ_a π(a|s_t) dQ_k(s_t,a)]
                     dQ_obs = dQ_k[all_states, all_actions]  # (N,)
-                    dV_obs = (policy[all_states] * dQ_k[all_states]).sum(dim=1)  # (N,)
-                    grad_ll[k] = ((dQ_obs - dV_obs) / sigma).sum().item()
+                    dV_obs = (policy[all_states] * dQ_k[all_states]).sum(axis=1)  # (N,)
+                    grad_ll[k] = float(((dQ_obs - dV_obs) / sigma).sum())
                 if n_function_evals % 10 == 0:
                     self._log(f"Eval {n_function_evals}: NLL={-ll:.2f}, ||grad||={np.linalg.norm(grad_ll):.6f}")
                 return -ll, -grad_ll
 
             result_scipy = optimize.minimize(
                 neg_ll_and_grad,
-                params.numpy().astype(np.float64),
+                np.asarray(params).astype(np.float64),
                 method=self.config.optimizer,
                 jac=True,
                 options={
@@ -653,11 +663,11 @@ class MCEIRLEstimator(BaseEstimator):
                     "disp": False,
                 },
             )
-            final_params = torch.tensor(result_scipy.x, dtype=torch.float32)
+            final_params = jnp.array(result_scipy.x, dtype=jnp.float32)
             converged = result_scipy.success
 
             # Final solution
-            reward_matrix = reward_fn.compute(final_params).double()
+            reward_matrix = reward_fn.compute(final_params).astype(jnp.float64)
             V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
             D = self._compute_state_visitation(policy, transitions_f64, problem, initial_dist)
             final_expected = self._compute_expected_features(
@@ -665,9 +675,9 @@ class MCEIRLEstimator(BaseEstimator):
                 transitions=transitions_f64, initial_dist=initial_dist,
                 discount=problem.discount_factor,
             )
-            feature_diff = torch.norm(empirical_features - final_expected).item()
+            feature_diff = float(jnp.linalg.norm(empirical_features - final_expected))
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
-            ll = log_probs[all_states, all_actions].sum().item()
+            ll = float(log_probs[all_states, all_actions].sum())
 
             self._log(f"L-BFGS-B complete: NLL={-ll:.2f}, ||grad||={np.linalg.norm(result_scipy.jac):.6f}, converged={converged}")
             if inner_not_converged > 0:
@@ -697,8 +707,8 @@ class MCEIRLEstimator(BaseEstimator):
                 optimization_time=optimization_time,
                 metadata={
                     "optimizer": self.config.optimizer,
-                    "empirical_features": empirical_features.tolist(),
-                    "final_expected_features": final_expected.tolist(),
+                    "empirical_features": np.asarray(empirical_features).tolist(),
+                    "final_expected_features": np.asarray(final_expected).tolist(),
                     "feature_diff": feature_diff,
                 },
             )
@@ -706,8 +716,8 @@ class MCEIRLEstimator(BaseEstimator):
         # ── Adam/SGD path (gradient ascent) ──
         # Adam optimizer state
         if self.config.use_adam:
-            m = torch.zeros_like(params)  # First moment
-            v = torch.zeros_like(params)  # Second moment
+            m = jnp.zeros_like(params)  # First moment
+            v = jnp.zeros_like(params)  # Second moment
             optimizer_name = "Adam"
         else:
             m = v = None
@@ -718,7 +728,7 @@ class MCEIRLEstimator(BaseEstimator):
         self._log(f"Starting MCE IRL with {optimizer_name} (lr={self.config.learning_rate})")
 
         best_obj = float('inf')
-        best_params = params.clone()
+        best_params = jnp.array(params)
         patience_counter = 0
         max_patience = 20
 
@@ -737,12 +747,12 @@ class MCEIRLEstimator(BaseEstimator):
 
         for i in pbar:
             # Forward and backward passes
-            reward_matrix = reward_fn.compute(params).double()
+            reward_matrix = reward_fn.compute(params).astype(jnp.float64)
             V, policy, inner_converged = self._soft_value_iteration(
                 operator, reward_matrix, num_periods=num_periods,
                 V_init=prev_V_grad,
             )
-            prev_V_grad = V.clone() if not finite_horizon else None
+            prev_V_grad = jnp.array(V) if not finite_horizon else None
             if not inner_converged:
                 inner_not_converged += 1
 
@@ -767,18 +777,18 @@ class MCEIRLEstimator(BaseEstimator):
             gradient = empirical_features - expected_features  # Gradient ascent direction
 
             # Gradient clipping (prevents divergence when rewards approach zero)
-            grad_norm = torch.norm(gradient).item()
+            grad_norm = float(jnp.linalg.norm(gradient))
             if self.config.gradient_clip > 0 and grad_norm > self.config.gradient_clip:
                 gradient = gradient * (self.config.gradient_clip / grad_norm)
                 grad_norm = self.config.gradient_clip
 
             # Objective: ||μ_D - μ_π||^2
-            obj = 0.5 * torch.sum((empirical_features - expected_features) ** 2).item()
+            obj = float(0.5 * jnp.sum((empirical_features - expected_features) ** 2))
 
             # Track best
             if obj < best_obj:
                 best_obj = obj
-                best_params = params.clone()
+                best_params = jnp.array(params)
                 patience_counter = 0
             else:
                 patience_counter += 1
@@ -789,7 +799,7 @@ class MCEIRLEstimator(BaseEstimator):
                 "||grad||": f"{grad_norm:.4f}",
             }
             if true_params is not None:
-                rmse = torch.sqrt(torch.mean((params - true_params) ** 2)).item()
+                rmse = float(jnp.sqrt(jnp.mean((params - true_params) ** 2)))
                 postfix["RMSE"] = f"{rmse:.6f}"
             pbar.set_postfix(postfix)
 
@@ -812,7 +822,7 @@ class MCEIRLEstimator(BaseEstimator):
                 m_hat = m / (1 - self.config.adam_beta1 ** t)
                 v_hat = v / (1 - self.config.adam_beta2 ** t)
                 # Update
-                params = params + self.config.learning_rate * m_hat / (torch.sqrt(v_hat) + self.config.adam_eps)
+                params = params + self.config.learning_rate * m_hat / (jnp.sqrt(v_hat) + self.config.adam_eps)
             else:
                 # Simple SGD
                 params = params + self.config.learning_rate * gradient
@@ -824,7 +834,7 @@ class MCEIRLEstimator(BaseEstimator):
         converged = grad_norm < self.config.outer_tol if grad_norm else False
 
         # Final solution
-        reward_matrix = reward_fn.compute(final_params).double()
+        reward_matrix = reward_fn.compute(final_params).astype(jnp.float64)
         V, policy, _ = self._soft_value_iteration(
             operator, reward_matrix, num_periods=num_periods
         )
@@ -835,24 +845,23 @@ class MCEIRLEstimator(BaseEstimator):
                 transitions=transitions_f64, initial_dist=initial_dist,
                 discount=problem.discount_factor,
             )
-            D = torch.zeros(problem.num_states)
+            D = jnp.zeros(problem.num_states)
 
             # Finite-horizon LL: use period-specific policies
             sigma = problem.scale_parameter
-            import torch.nn.functional as Func
             fh_result = backward_induction(operator, reward_matrix, num_periods)
-            log_policy = Func.log_softmax(fh_result.Q / sigma, dim=-1)  # (T, S, A)
+            log_policy = jax.nn.log_softmax(fh_result.Q / sigma, axis=-1)  # (T, S, A)
             ll = 0.0
             for traj in panel.trajectories:
                 for t in range(len(traj.states)):
                     period = min(t, num_periods - 1)
-                    s = traj.states[t].item()
-                    a = traj.actions[t].item()
-                    ll += log_policy[period, s, a].item()
+                    s = int(traj.states[t])
+                    a = int(traj.actions[t])
+                    ll += float(log_policy[period, s, a])
 
             # Flatten to period-0 for EstimationResult (base class expects 2D)
-            V = V[0] if V.dim() > 1 else V
-            policy = policy[0] if policy.dim() > 2 else policy
+            V = V[0] if V.ndim > 1 else V
+            policy = policy[0] if policy.ndim > 2 else policy
         else:
             D = self._compute_state_visitation(policy, transitions_f64, problem, initial_dist)
             final_expected = self._compute_expected_features(
@@ -861,9 +870,9 @@ class MCEIRLEstimator(BaseEstimator):
                 discount=problem.discount_factor,
             )
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
-            ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+            ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
 
-        feature_diff = torch.norm(empirical_features - final_expected).item()
+        feature_diff = float(jnp.linalg.norm(empirical_features - final_expected))
 
         # Inference
         hessian = None
@@ -904,12 +913,12 @@ class MCEIRLEstimator(BaseEstimator):
             optimization_time=optimization_time,
             metadata={
                 "optimizer": self.config.optimizer,
-                "empirical_features": empirical_features.tolist(),
-                "final_expected_features": final_expected.tolist(),
+                "empirical_features": np.asarray(empirical_features).tolist(),
+                "final_expected_features": np.asarray(final_expected).tolist(),
                 "feature_difference": feature_diff,
-                "state_visitation": D.tolist(),
+                "state_visitation": np.asarray(D).tolist(),
                 "inner_not_converged": inner_not_converged,
-                "standard_errors": standard_errors.tolist() if standard_errors is not None else None,
+                "standard_errors": np.asarray(standard_errors).tolist() if standard_errors is not None else None,
             },
         )
 
@@ -918,17 +927,17 @@ class MCEIRLEstimator(BaseEstimator):
         panel: Panel,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        point_estimate: torch.Tensor,
-        initial_dist: torch.Tensor,
-    ) -> torch.Tensor:
+        transitions: jnp.ndarray,
+        point_estimate: jnp.ndarray,
+        initial_dist: jnp.ndarray,
+    ) -> jnp.ndarray:
         """Compute standard errors via bootstrap.
 
         Resamples trajectories and re-estimates parameters to get
         sampling distribution.
         """
         n_params = len(point_estimate)
-        bootstrap_estimates = torch.zeros((self.config.n_bootstrap, n_params))
+        bootstrap_estimates = np.zeros((self.config.n_bootstrap, n_params))
 
         trajectories = panel.trajectories
         n_traj = len(trajectories)
@@ -946,10 +955,10 @@ class MCEIRLEstimator(BaseEstimator):
             boot_initial = self._compute_initial_distribution(boot_panel, problem.num_states)
 
             # Quick optimization from point estimate
-            params = point_estimate.clone()
+            params = jnp.array(point_estimate)
 
             for _ in range(50):  # Fewer iterations for bootstrap
-                reward_matrix = reward_fn.compute(params).double()
+                reward_matrix = reward_fn.compute(params).astype(jnp.float64)
                 V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
                 expected_features = self._compute_expected_features(
                     boot_panel, policy, reward_fn,
@@ -960,29 +969,29 @@ class MCEIRLEstimator(BaseEstimator):
                 gradient = empirical_features - expected_features  # μ_D - μ_π (ascent)
                 params = params + 0.1 * gradient
 
-                if torch.norm(gradient) < 0.01:
+                if float(jnp.linalg.norm(gradient)) < 0.01:
                     break
 
-            bootstrap_estimates[b] = params
+            bootstrap_estimates[b] = np.asarray(params)
 
             if self.config.verbose and (b + 1) % 20 == 0:
                 self._log(f"Bootstrap {b + 1}/{self.config.n_bootstrap}")
 
         # Standard errors = std of bootstrap estimates
-        standard_errors = bootstrap_estimates.std(dim=0)
+        standard_errors = jnp.array(bootstrap_estimates.std(axis=0))
 
         return standard_errors
 
     def _numerical_hessian(
         self,
-        params: torch.Tensor,
+        params: jnp.ndarray,
         panel: Panel,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_dist: torch.Tensor,
+        transitions: jnp.ndarray,
+        initial_dist: jnp.ndarray,
         eps: float = 1e-3,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute numerical Hessian of the log-likelihood.
 
         Uses central differences with adaptive step size for numerical stability.
@@ -992,7 +1001,7 @@ class MCEIRLEstimator(BaseEstimator):
 
         Parameters
         ----------
-        params : torch.Tensor
+        params : jnp.ndarray
             Parameter vector at which to compute Hessian.
         panel : Panel
             Panel data for computing log-likelihood.
@@ -1000,16 +1009,16 @@ class MCEIRLEstimator(BaseEstimator):
             Reward function specification.
         problem : DDCProblem
             Problem specification.
-        transitions : torch.Tensor
+        transitions : jnp.ndarray
             Transition matrices.
-        initial_dist : torch.Tensor
+        initial_dist : jnp.ndarray
             Initial state distribution (unused but kept for API consistency).
         eps : float
             Step size for finite differences. Default 1e-3 for stability.
 
         Returns
         -------
-        torch.Tensor
+        jnp.ndarray
             Hessian matrix, shape (n_params, n_params).
             Guaranteed to be negative semi-definite for valid inference.
 
@@ -1025,69 +1034,73 @@ class MCEIRLEstimator(BaseEstimator):
         """
         operator = SoftBellmanOperator(problem, transitions)
         n_params = len(params)
-        hessian = torch.zeros((n_params, n_params), dtype=params.dtype)
+        hessian_np = np.zeros((n_params, n_params), dtype=np.float64)
+        params_np = np.asarray(params, dtype=np.float64)
 
-        def ll_at(p):
-            reward_matrix = reward_fn.compute(p).double()
+        def ll_at(p_np):
+            p = jnp.array(p_np, dtype=jnp.float32)
+            reward_matrix = reward_fn.compute(p).astype(jnp.float64)
             V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
 
-            ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+            ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
             return ll
 
         # Compute Hessian using central differences
         # Use adaptive step size based on parameter magnitude with bounds
         for i in range(n_params):
             # Adaptive step: larger for larger params, bounded between eps and 0.1
-            h_i = max(eps, min(abs(params[i].item()) * eps, 0.1))
+            h_i = max(eps, min(abs(params_np[i]) * eps, 0.1))
 
             for j in range(i, n_params):
-                h_j = max(eps, min(abs(params[j].item()) * eps, 0.1))
+                h_j = max(eps, min(abs(params_np[j]) * eps, 0.1))
 
                 if i == j:
                     # Diagonal: use standard 2nd derivative formula
                     # f''(x) ≈ (f(x+h) - 2f(x) + f(x-h)) / h^2
-                    p_plus = params.clone()
+                    p_plus = params_np.copy()
                     p_plus[i] += h_i
-                    p_minus = params.clone()
+                    p_minus = params_np.copy()
                     p_minus[i] -= h_i
 
                     ll_plus = ll_at(p_plus)
-                    ll_0 = ll_at(params)
+                    ll_0 = ll_at(params_np)
                     ll_minus = ll_at(p_minus)
 
                     h_ii = (ll_plus - 2 * ll_0 + ll_minus) / (h_i * h_i)
-                    hessian[i, i] = h_ii
+                    hessian_np[i, i] = h_ii
                 else:
                     # Off-diagonal: use 4-point formula for mixed partial
-                    p_pp = params.clone()
+                    p_pp = params_np.copy()
                     p_pp[i] += h_i
                     p_pp[j] += h_j
 
-                    p_pm = params.clone()
+                    p_pm = params_np.copy()
                     p_pm[i] += h_i
                     p_pm[j] -= h_j
 
-                    p_mp = params.clone()
+                    p_mp = params_np.copy()
                     p_mp[i] -= h_i
                     p_mp[j] += h_j
 
-                    p_mm = params.clone()
+                    p_mm = params_np.copy()
                     p_mm[i] -= h_i
                     p_mm[j] -= h_j
 
                     h_ij = (ll_at(p_pp) - ll_at(p_pm) - ll_at(p_mp) + ll_at(p_mm)) / (4 * h_i * h_j)
-                    hessian[i, j] = h_ij
-                    hessian[j, i] = h_ij
+                    hessian_np[i, j] = h_ij
+                    hessian_np[j, i] = h_ij
+
+        hessian = jnp.array(hessian_np)
 
         # Ensure Hessian is negative semi-definite (required at a maximum)
         # If not, project onto negative semi-definite cone
-        eigenvalues, eigenvectors = torch.linalg.eigh(hessian)
-        if (eigenvalues > 0).any():
+        eigenvalues, eigenvectors = jnp.linalg.eigh(hessian)
+        if bool(jnp.any(eigenvalues > 0)):
             # Some eigenvalues are positive - not at a proper maximum
             # Project to negative semi-definite by clamping positive eigenvalues
             self._log("Warning: Hessian not negative semi-definite, projecting")
-            eigenvalues_clamped = torch.clamp(eigenvalues, max=-1e-8)
-            hessian = eigenvectors @ torch.diag(eigenvalues_clamped) @ eigenvectors.T
+            eigenvalues_clamped = jnp.minimum(eigenvalues, -1e-8)
+            hessian = eigenvectors @ jnp.diag(eigenvalues_clamped) @ eigenvectors.T
 
         return hessian

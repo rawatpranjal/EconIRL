@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -10,11 +11,11 @@ from econirl.core.types import DDCProblem
 
 
 def compute_policy(
-    theta: torch.Tensor,
+    theta: jnp.ndarray,
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    feature_matrix: torch.Tensor,
-) -> torch.Tensor:
+    transitions: jnp.ndarray,
+    feature_matrix: jnp.ndarray,
+) -> jnp.ndarray:
     """Compute optimal policy given parameters and environment.
 
     Args:
@@ -27,7 +28,7 @@ def compute_policy(
         Policy tensor of shape (n_states, n_actions)
     """
     # Compute utility matrix
-    utility = torch.einsum("sak,k->sa", feature_matrix, theta)
+    utility = jnp.einsum("sak,k->sa", feature_matrix, theta)
 
     # Create Bellman operator and solve
     operator = SoftBellmanOperator(problem=problem, transitions=transitions)

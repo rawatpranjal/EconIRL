@@ -74,7 +74,7 @@ def load_occupational_choice(
 
     if as_panel:
         from econirl.core.types import Panel, Trajectory
-        import torch
+        import jax.numpy as jnp
 
         # Convert to Panel format
         individual_ids = df["id"].unique()
@@ -82,10 +82,10 @@ def load_occupational_choice(
 
         for ind_id in individual_ids:
             ind_data = df[df["id"] == ind_id].sort_values("period")
-            states = torch.tensor(ind_data["state"].values, dtype=torch.long)
-            actions = torch.tensor(ind_data["action"].values, dtype=torch.long)
+            states = jnp.array(ind_data["state"].values, dtype=jnp.int32)
+            actions = jnp.array(ind_data["action"].values, dtype=jnp.int32)
             # Compute next_states (shift states by 1, use 0 for last period)
-            next_states = torch.cat([states[1:], torch.tensor([0])])
+            next_states = jnp.concatenate([states[1:], jnp.array([0])])
 
             traj = Trajectory(
                 states=states,

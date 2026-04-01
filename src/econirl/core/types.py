@@ -12,8 +12,8 @@ import functools
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterator
 
+import jax.numpy as jnp
 import numpy as np
-import torch
 
 
 @dataclass(frozen=True)
@@ -26,8 +26,8 @@ class DDCProblem:
     Attributes:
         num_states: Number of discrete states |S|
         num_actions: Number of discrete actions |A|
-        discount_factor: Time discount factor β ∈ [0, 1)
-        scale_parameter: Logit scale parameter σ > 0 (extreme value shock scale)
+        discount_factor: Time discount factor beta in [0, 1)
+        scale_parameter: Logit scale parameter sigma > 0 (extreme value shock scale)
 
     Example:
         >>> problem = DDCProblem(
@@ -44,7 +44,7 @@ class DDCProblem:
     scale_parameter: float = 1.0
     num_periods: int | None = None  # None = infinite horizon, int = finite horizon
     state_dim: int | None = None
-    state_encoder: Callable[[torch.Tensor], torch.Tensor] | None = field(
+    state_encoder: Callable | None = field(
         default=None, hash=False, compare=False
     )
 
@@ -72,24 +72,24 @@ class Trajectory:
     observation in dynamic discrete choice estimation.
 
     Attributes:
-        states: Tensor of shape (T,) containing state indices at each period
-        actions: Tensor of shape (T,) containing chosen action at each period
-        next_states: Tensor of shape (T,) containing state after transition
+        states: Array of shape (T,) containing state indices at each period
+        actions: Array of shape (T,) containing chosen action at each period
+        next_states: Array of shape (T,) containing state after transition
         individual_id: Optional identifier for the individual
         metadata: Optional dictionary for additional trajectory-level data
 
     Example:
         >>> traj = Trajectory(
-        ...     states=torch.tensor([0, 5, 12, 18]),
-        ...     actions=torch.tensor([0, 0, 0, 1]),
-        ...     next_states=torch.tensor([5, 12, 18, 0]),
+        ...     states=jnp.array([0, 5, 12, 18]),
+        ...     actions=jnp.array([0, 0, 0, 1]),
+        ...     next_states=jnp.array([5, 12, 18, 0]),
         ...     individual_id="bus_001"
         ... )
     """
 
-    states: torch.Tensor
-    actions: torch.Tensor
-    next_states: torch.Tensor
+    states: jnp.ndarray
+    actions: jnp.ndarray
+    next_states: jnp.ndarray
     individual_id: str | int | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -113,16 +113,6 @@ class Trajectory:
     def num_periods(self) -> int:
         """Number of time periods observed."""
         return len(self.states)
-
-    def to(self, device: torch.device | str) -> Trajectory:
-        """Move trajectory tensors to specified device."""
-        return Trajectory(
-            states=self.states.to(device),
-            actions=self.actions.to(device),
-            next_states=self.next_states.to(device),
-            individual_id=self.individual_id,
-            metadata=self.metadata,
-        )
 
 
 @dataclass
@@ -177,43 +167,35 @@ class Panel:
         """List of number of periods for each individual."""
         return [len(traj) for traj in self.trajectories]
 
-    def get_all_states(self) -> torch.Tensor:
-        """Concatenate all states into a single tensor."""
-        return torch.cat([traj.states for traj in self.trajectories])
+    def get_all_states(self) -> jnp.ndarray:
+        """Concatenate all states into a single array."""
+        return jnp.concatenate([traj.states for traj in self.trajectories])
 
-    def get_all_actions(self) -> torch.Tensor:
-        """Concatenate all actions into a single tensor."""
-        return torch.cat([traj.actions for traj in self.trajectories])
+    def get_all_actions(self) -> jnp.ndarray:
+        """Concatenate all actions into a single array."""
+        return jnp.concatenate([traj.actions for traj in self.trajectories])
 
-    def get_all_next_states(self) -> torch.Tensor:
-        """Concatenate all next_states into a single tensor."""
-        return torch.cat([traj.next_states for traj in self.trajectories])
+    def get_all_next_states(self) -> jnp.ndarray:
+        """Concatenate all next_states into a single array."""
+        return jnp.concatenate([traj.next_states for traj in self.trajectories])
 
-    def to(self, device: torch.device | str) -> Panel:
-        """Move all trajectory tensors to specified device."""
-        return Panel(
-            trajectories=[traj.to(device) for traj in self.trajectories],
-            metadata=self.metadata,
-        )
-
-    def compute_state_frequencies(self, num_states: int) -> torch.Tensor:
+    def compute_state_frequencies(self, num_states: int) -> jnp.ndarray:
         """Compute empirical state visit frequencies.
 
         Args:
             num_states: Total number of possible states
 
         Returns:
-            Tensor of shape (num_states,) with visit counts
+            Array of shape (num_states,) with visit frequencies
         """
         all_states = self.get_all_states()
-        frequencies = torch.zeros(num_states, dtype=torch.float32)
-        for state in all_states:
-            frequencies[state.item()] += 1
+        frequencies = jnp.zeros(num_states, dtype=jnp.float32)
+        frequencies = frequencies.at[all_states].add(1.0)
         return frequencies / frequencies.sum()
 
     def compute_choice_frequencies(
         self, num_states: int, num_actions: int
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute empirical choice frequencies by state.
 
         This gives the empirical conditional choice probabilities (CCPs)
@@ -224,19 +206,18 @@ class Panel:
             num_actions: Total number of possible actions
 
         Returns:
-            Tensor of shape (num_states, num_actions) with empirical CCPs
+            Array of shape (num_states, num_actions) with empirical CCPs
         """
         all_states = self.get_all_states()
         all_actions = self.get_all_actions()
 
-        counts = torch.zeros((num_states, num_actions), dtype=torch.float32)
-        for state, action in zip(all_states, all_actions):
-            counts[state.item(), action.item()] += 1
+        counts = jnp.zeros((num_states, num_actions), dtype=jnp.float32)
+        counts = counts.at[all_states, all_actions].add(1.0)
 
-        # Normalize to get probabilities (add small epsilon to avoid division by zero)
-        row_sums = counts.sum(dim=1, keepdim=True)
-        row_sums = torch.where(row_sums > 0, row_sums, torch.ones_like(row_sums))
-        return counts / row_sums
+        # Normalize to get probabilities
+        row_sums = counts.sum(axis=1, keepdims=True)
+        row_sums_safe = jnp.where(row_sums > 0, row_sums, jnp.ones_like(row_sums))
+        return counts / row_sums_safe
 
     @classmethod
     def from_numpy(
@@ -267,9 +248,9 @@ class Panel:
         for ind_id in unique_ids:
             mask = individual_ids == ind_id
             traj = Trajectory(
-                states=torch.tensor(states[mask], dtype=torch.long),
-                actions=torch.tensor(actions[mask], dtype=torch.long),
-                next_states=torch.tensor(next_states[mask], dtype=torch.long),
+                states=jnp.array(states[mask], dtype=jnp.int32),
+                actions=jnp.array(actions[mask], dtype=jnp.int32),
+                next_states=jnp.array(next_states[mask], dtype=jnp.int32),
                 individual_id=ind_id,
             )
             trajectories.append(traj)
@@ -292,22 +273,22 @@ class TrajectoryPanel(Panel):
     # ------------------------------------------------------------------
 
     @functools.cached_property
-    def all_states(self) -> torch.Tensor:
-        """Concatenated states tensor of shape (N,)."""
+    def all_states(self) -> jnp.ndarray:
+        """Concatenated states array of shape (N,)."""
         return self.get_all_states()
 
     @functools.cached_property
-    def all_actions(self) -> torch.Tensor:
-        """Concatenated actions tensor of shape (N,)."""
+    def all_actions(self) -> jnp.ndarray:
+        """Concatenated actions array of shape (N,)."""
         return self.get_all_actions()
 
     @functools.cached_property
-    def all_next_states(self) -> torch.Tensor:
-        """Concatenated next_states tensor of shape (N,)."""
+    def all_next_states(self) -> jnp.ndarray:
+        """Concatenated next_states array of shape (N,)."""
         return self.get_all_next_states()
 
     @functools.cached_property
-    def offsets(self) -> torch.Tensor:
+    def offsets(self) -> jnp.ndarray:
         """Cumulative individual lengths of shape (I+1,).
 
         ``offsets[i]`` is the start index of individual ``i`` in the
@@ -317,7 +298,7 @@ class TrajectoryPanel(Panel):
         offsets = [0]
         for length in lengths:
             offsets.append(offsets[-1] + length)
-        return torch.tensor(offsets, dtype=torch.long)
+        return jnp.array(offsets, dtype=jnp.int32)
 
     # ------------------------------------------------------------------
     # Classmethods
@@ -346,10 +327,7 @@ class TrajectoryPanel(Panel):
             Column name for individual identifiers.
         next_state : str or None
             Column name for next-state indices.  If ``None``, next states are
-            inferred from sequential rows within each individual: for all but
-            the last row, ``next_state = states[t+1]``.  For the last row,
-            ``next_state = min(state + 1, max_state)`` when ``action == 0``,
-            or ``0`` when ``action == 1``.
+            inferred from sequential rows within each individual.
 
         Returns
         -------
@@ -365,26 +343,28 @@ class TrajectoryPanel(Panel):
 
         for ind_id, group in df.groupby(id, sort=True):
             group = group.sort_index()
-            states_arr = torch.tensor(group[state].values, dtype=torch.long)
-            actions_arr = torch.tensor(group[action].values, dtype=torch.long)
+            states_arr = jnp.array(group[state].values, dtype=jnp.int32)
+            actions_arr = jnp.array(group[action].values, dtype=jnp.int32)
 
             if next_state is not None:
-                next_states_arr = torch.tensor(
-                    group[next_state].values, dtype=torch.long
+                next_states_arr = jnp.array(
+                    group[next_state].values, dtype=jnp.int32
                 )
             else:
                 # Infer next_states from sequential rows
                 n = len(states_arr)
-                next_states_arr = torch.empty(n, dtype=torch.long)
+                # Build as numpy first since JAX arrays are immutable
+                ns = np.empty(n, dtype=np.int32)
                 if n > 1:
-                    next_states_arr[:-1] = states_arr[1:]
+                    ns[:-1] = np.asarray(states_arr[1:])
                 # Last row: heuristic
-                last_s = states_arr[-1].item()
-                last_a = actions_arr[-1].item()
+                last_s = int(states_arr[-1])
+                last_a = int(actions_arr[-1])
                 if last_a == 0:
-                    next_states_arr[-1] = min(last_s + 1, max_state)
+                    ns[-1] = min(last_s + 1, max_state)
                 else:
-                    next_states_arr[-1] = 0
+                    ns[-1] = 0
+                next_states_arr = jnp.array(ns)
 
             trajectories.append(
                 Trajectory(
@@ -439,66 +419,76 @@ class TrajectoryPanel(Panel):
         next_states = self.all_next_states
 
         # --- state-action counts ---
-        state_action_counts = torch.zeros(
-            (n_states, n_actions), dtype=torch.float64
+        state_action_counts = jnp.zeros(
+            (n_states, n_actions), dtype=jnp.float64
         )
-        for s, a in zip(states, actions):
-            state_action_counts[s.item(), a.item()] += 1
+        state_action_counts = state_action_counts.at[states, actions].add(1.0)
 
         # --- empirical CCPs ---
-        row_sums = state_action_counts.sum(dim=1, keepdim=True)
-        # Avoid division by zero: states with no observations get uniform
-        row_sums_safe = torch.where(
-            row_sums > 0, row_sums, torch.ones_like(row_sums)
+        row_sums = state_action_counts.sum(axis=1, keepdims=True)
+        row_sums_safe = jnp.where(
+            row_sums > 0, row_sums, jnp.ones_like(row_sums)
         )
         empirical_ccps = state_action_counts / row_sums_safe
         # States with zero observations: uniform over actions
         zero_mask = (row_sums.squeeze(1) == 0)
-        if zero_mask.any():
-            empirical_ccps[zero_mask] = 1.0 / n_actions
+        empirical_ccps = jnp.where(
+            zero_mask[:, None],
+            jnp.ones((n_states, n_actions)) / n_actions,
+            empirical_ccps,
+        )
 
         # --- transition matrix (A, S, S) ---
-        transition_counts = torch.zeros(
-            (n_actions, n_states, n_states), dtype=torch.float64
+        # Build as numpy for the counting loop, then convert
+        transition_counts_np = np.zeros(
+            (n_actions, n_states, n_states), dtype=np.float64
         )
-        for s, a, sp in zip(states, actions, next_states):
-            transition_counts[a.item(), s.item(), sp.item()] += 1
+        states_np = np.asarray(states)
+        actions_np = np.asarray(actions)
+        next_states_np = np.asarray(next_states)
+        for s, a, sp in zip(states_np, actions_np, next_states_np):
+            transition_counts_np[a, s, sp] += 1
+        transition_counts = jnp.array(transition_counts_np)
 
-        # Normalize rows; add epsilon smoothing for zero-count rows
+        # Normalize rows
         eps = 1e-10
-        transition_row_sums = transition_counts.sum(dim=2, keepdim=True)
-        # For (a, s) pairs with zero observations, fall back to uniform
-        transition_row_sums_safe = torch.where(
+        transition_row_sums = transition_counts.sum(axis=2, keepdims=True)
+        transition_row_sums_safe = jnp.where(
             transition_row_sums > 0,
             transition_row_sums,
-            torch.ones_like(transition_row_sums),
+            jnp.ones_like(transition_row_sums),
         )
         transitions = transition_counts / transition_row_sums_safe
         # Zero-count rows get uniform
         zero_transition_mask = (transition_row_sums.squeeze(2) == 0)
-        if zero_transition_mask.any():
-            transitions[zero_transition_mask] = 1.0 / n_states
+        transitions = jnp.where(
+            zero_transition_mask[:, :, None],
+            jnp.ones((n_actions, n_states, n_states)) / n_states,
+            transitions,
+        )
 
-        # Add epsilon smoothing to all rows, then re-normalize
+        # Add epsilon smoothing, then re-normalize
         transitions = transitions + eps
-        transitions = transitions / transitions.sum(dim=2, keepdim=True)
+        transitions = transitions / transitions.sum(axis=2, keepdims=True)
 
         # --- initial distribution ---
-        initial_dist = torch.zeros(n_states, dtype=torch.float64)
-        for traj in self.trajectories:
-            initial_dist[traj.states[0].item()] += 1
+        initial_dist = jnp.zeros(n_states, dtype=jnp.float64)
+        initial_states = jnp.array(
+            [traj.states[0] for traj in self.trajectories], dtype=jnp.int32
+        )
+        initial_dist = initial_dist.at[initial_states].add(1.0)
         initial_total = initial_dist.sum()
-        if initial_total > 0:
-            initial_dist = initial_dist / initial_total
-        else:
-            initial_dist[:] = 1.0 / n_states
+        initial_dist = jnp.where(
+            initial_total > 0,
+            initial_dist / initial_total,
+            jnp.ones(n_states) / n_states,
+        )
 
-        # Cast to float32 for downstream use
         return SufficientStats(
-            state_action_counts=state_action_counts.float(),
-            transitions=transitions.float(),
-            empirical_ccps=empirical_ccps.float(),
-            initial_distribution=initial_dist.float(),
+            state_action_counts=state_action_counts.astype(jnp.float32),
+            transitions=transitions.astype(jnp.float32),
+            empirical_ccps=empirical_ccps.astype(jnp.float32),
+            initial_distribution=initial_dist.astype(jnp.float32),
             n_observations=int(states.shape[0]),
             n_individuals=len(self.trajectories),
         )
@@ -538,8 +528,8 @@ class TrajectoryPanel(Panel):
     # ------------------------------------------------------------------
 
     def iter_transitions(
-        self, batch_size: int = 512
-    ) -> Iterator[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
+        self, batch_size: int = 512, seed: int = 0
+    ) -> Iterator[tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]]:
         """Iterate over (state, action, next_state) mini-batches.
 
         Shuffles all transitions and yields them in batches for SGD-style
@@ -549,10 +539,12 @@ class TrajectoryPanel(Panel):
         ----------
         batch_size : int
             Number of transitions per batch.
+        seed : int
+            Random seed for shuffling.
 
         Yields
         ------
-        tuple[Tensor, Tensor, Tensor]
+        tuple[Array, Array, Array]
             ``(states, actions, next_states)`` each of shape ``(B,)`` where
             ``B <= batch_size``.
         """
@@ -561,7 +553,8 @@ class TrajectoryPanel(Panel):
         next_states = self.all_next_states
         n = states.shape[0]
 
-        perm = torch.randperm(n)
+        rng = np.random.RandomState(seed)
+        perm = rng.permutation(n)
         for start in range(0, n, batch_size):
             idx = perm[start : start + batch_size]
             yield states[idx], actions[idx], next_states[idx]
@@ -589,23 +582,12 @@ class TrajectoryPanel(Panel):
                     {
                         "id": ind_id,
                         "period": t,
-                        "state": traj.states[t].item(),
-                        "action": traj.actions[t].item(),
-                        "next_state": traj.next_states[t].item(),
+                        "state": int(traj.states[t]),
+                        "action": int(traj.actions[t]),
+                        "next_state": int(traj.next_states[t]),
                     }
                 )
         return pd.DataFrame(rows)
-
-    # ------------------------------------------------------------------
-    # Override to() to return TrajectoryPanel
-    # ------------------------------------------------------------------
-
-    def to(self, device: torch.device | str) -> TrajectoryPanel:
-        """Move all trajectory tensors to specified device."""
-        return TrajectoryPanel(
-            trajectories=[traj.to(device) for traj in self.trajectories],
-            metadata=self.metadata,
-        )
 
 
 # Backward-compatible alias: Panel now points to TrajectoryPanel so new code

@@ -8,9 +8,8 @@ of estimated parameters in dynamic discrete choice models:
 3. Bootstrap: Nonparametric resampling
 4. Clustered: Cluster-robust SEs for panel data
 
-The choice of SE method can significantly affect inference,
-especially with panel data where observations within individuals
-may be correlated.
+With JAX, analytical Hessians via jax.hessian and per-observation scores
+via jax.vmap(jax.grad(...)) can replace the numerical fallbacks.
 """
 
 from __future__ import annotations
@@ -18,8 +17,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Literal
 
+import jax
+import jax.numpy as jnp
 import numpy as np
-import torch
 
 from econirl.core.types import Panel
 
@@ -38,22 +38,22 @@ class StandardErrorResult:
         details: Additional method-specific information
     """
 
-    standard_errors: torch.Tensor
-    variance_covariance: torch.Tensor
+    standard_errors: jnp.ndarray
+    variance_covariance: jnp.ndarray
     method: str
     details: dict
 
 
 def compute_standard_errors(
-    parameters: torch.Tensor,
-    hessian: torch.Tensor | None = None,
-    gradient_contributions: torch.Tensor | None = None,
+    parameters: jnp.ndarray,
+    hessian: jnp.ndarray | None = None,
+    gradient_contributions: jnp.ndarray | None = None,
     panel: Panel | None = None,
-    log_likelihood_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
+    log_likelihood_fn: Callable | None = None,
     method: SEMethod = "asymptotic",
     n_bootstrap: int = 200,
     seed: int | None = None,
-    estimate_fn: Callable[[Panel], torch.Tensor] | None = None,
+    estimate_fn: Callable[[Panel], jnp.ndarray] | None = None,
 ) -> StandardErrorResult:
     """Compute standard errors using specified method.
 
@@ -86,15 +86,15 @@ def compute_standard_errors(
 
 
 def _asymptotic_se(
-    parameters: torch.Tensor,
-    hessian: torch.Tensor | None,
+    parameters: jnp.ndarray,
+    hessian: jnp.ndarray | None,
 ) -> StandardErrorResult:
     """Compute asymptotic standard errors from Hessian.
 
     Uses the inverse of the negative Hessian as the variance-covariance
     matrix, which is the standard MLE result under correct specification.
 
-    Var(θ̂) = [-H(θ̂)]^{-1}
+    Var(theta_hat) = [-H(theta_hat)]^{-1}
     """
     if hessian is None:
         raise ValueError("Hessian required for asymptotic SEs")
@@ -104,21 +104,16 @@ def _asymptotic_se(
     # Variance-covariance is inverse of negative Hessian
     var_cov = None
     for ridge_factor in [0, 1e-8, 1e-6, 1e-4, 1e-2]:
-        try:
-            ridge = ridge_factor * torch.eye(n_params, device=hessian.device, dtype=hessian.dtype)
-            var_cov = torch.linalg.inv(-hessian + ridge)
-            # Check if result is reasonable
-            diag = torch.diag(var_cov)
-            if (diag > 0).all() and torch.isfinite(var_cov).all():
-                break
-            var_cov = None
-        except RuntimeError:
-            continue
+        ridge = ridge_factor * jnp.eye(n_params, dtype=hessian.dtype)
+        candidate = jnp.linalg.inv(-hessian + ridge)
+        diag = jnp.diag(candidate)
+        if bool(jnp.all(diag > 0)) and bool(jnp.all(jnp.isfinite(candidate))):
+            var_cov = candidate
+            break
 
     if var_cov is None:
-        # Return NaN if we can't invert
-        se = torch.full((n_params,), float("nan"), dtype=hessian.dtype)
-        var_cov = torch.full((n_params, n_params), float("nan"), dtype=hessian.dtype)
+        se = jnp.full((n_params,), float("nan"), dtype=hessian.dtype)
+        var_cov = jnp.full((n_params, n_params), float("nan"), dtype=hessian.dtype)
         return StandardErrorResult(
             standard_errors=se,
             variance_covariance=var_cov,
@@ -126,9 +121,8 @@ def _asymptotic_se(
             details={"hessian_used": True, "singular": True},
         )
 
-    # Ensure positive diagonal (numerical issues can cause small negatives)
-    diag = torch.diag(var_cov)
-    se = torch.sqrt(torch.clamp(diag, min=0))
+    diag = jnp.diag(var_cov)
+    se = jnp.sqrt(jnp.maximum(diag, 0.0))
 
     return StandardErrorResult(
         standard_errors=se,
@@ -139,18 +133,18 @@ def _asymptotic_se(
 
 
 def _robust_se(
-    parameters: torch.Tensor,
-    hessian: torch.Tensor | None,
-    gradient_contributions: torch.Tensor | None,
+    parameters: jnp.ndarray,
+    hessian: jnp.ndarray | None,
+    gradient_contributions: jnp.ndarray | None,
 ) -> StandardErrorResult:
     """Compute robust (sandwich) standard errors.
 
     The sandwich estimator is:
-        Var(θ̂) = H^{-1} @ B @ H^{-1}
+        Var(theta_hat) = H^{-1} @ B @ H^{-1}
 
     where:
         H = Hessian (negative expected information)
-        B = Σ_i g_i g_i' (outer product of gradients)
+        B = sum_i g_i g_i' (outer product of gradients)
 
     This is robust to misspecification of the likelihood.
     """
@@ -159,22 +153,18 @@ def _robust_se(
     if gradient_contributions is None:
         raise ValueError("Gradient contributions required for robust SEs")
 
-    # H^{-1} with progressive ridge regularization
     n_params = hessian.shape[0]
     H_inv = None
     for ridge_factor in [0, 1e-8, 1e-6, 1e-4, 1e-2]:
-        try:
-            ridge = ridge_factor * torch.eye(n_params, device=hessian.device, dtype=hessian.dtype)
-            H_inv = torch.linalg.inv(-hessian + ridge)
-            if torch.isfinite(H_inv).all():
-                break
-            H_inv = None
-        except RuntimeError:
-            continue
+        ridge = ridge_factor * jnp.eye(n_params, dtype=hessian.dtype)
+        candidate = jnp.linalg.inv(-hessian + ridge)
+        if bool(jnp.all(jnp.isfinite(candidate))):
+            H_inv = candidate
+            break
 
     if H_inv is None:
-        se = torch.full((n_params,), float("nan"), dtype=hessian.dtype)
-        var_cov = torch.full((n_params, n_params), float("nan"), dtype=hessian.dtype)
+        se = jnp.full((n_params,), float("nan"), dtype=hessian.dtype)
+        var_cov = jnp.full((n_params, n_params), float("nan"), dtype=hessian.dtype)
         return StandardErrorResult(
             standard_errors=se,
             variance_covariance=var_cov,
@@ -182,15 +172,14 @@ def _robust_se(
             details={"n_observations": gradient_contributions.shape[0], "singular": True},
         )
 
-    # B = Σ_i g_i g_i' (outer product of gradients)
-    # gradient_contributions shape: (n_obs, n_params)
+    # B = sum_i g_i g_i'
     B = gradient_contributions.T @ gradient_contributions
 
     # Sandwich: H^{-1} B H^{-1}
     var_cov = H_inv @ B @ H_inv
 
-    diag = torch.diag(var_cov)
-    se = torch.sqrt(torch.clamp(diag, min=0))
+    diag = jnp.diag(var_cov)
+    se = jnp.sqrt(jnp.maximum(diag, 0.0))
 
     return StandardErrorResult(
         standard_errors=se,
@@ -201,29 +190,18 @@ def _robust_se(
 
 
 def _bootstrap_se(
-    parameters: torch.Tensor,
+    parameters: jnp.ndarray,
     panel: Panel | None,
-    log_likelihood_fn: Callable[[torch.Tensor], torch.Tensor] | None,
+    log_likelihood_fn: Callable | None,
     n_bootstrap: int,
     seed: int | None,
-    estimate_fn: Callable[[Panel], torch.Tensor] | None = None,
+    estimate_fn: Callable[[Panel], jnp.ndarray] | None = None,
 ) -> StandardErrorResult:
     """Compute bootstrap standard errors.
 
     Resamples individuals (with replacement) and re-estimates the model
     on each bootstrap sample. The SE is the standard deviation of the
     bootstrap distribution.
-
-    This is nonparametric and does not require distributional assumptions.
-
-    Args:
-        parameters: Point estimates (used as fallback and for shape)
-        panel: Panel data to resample from
-        log_likelihood_fn: Not used (kept for API compatibility)
-        n_bootstrap: Number of bootstrap replications
-        seed: Random seed for reproducibility
-        estimate_fn: Function that takes a Panel and returns parameter estimates.
-                    If None, bootstrap SEs cannot be computed properly.
     """
     if panel is None:
         raise ValueError("Panel required for bootstrap SEs")
@@ -237,32 +215,28 @@ def _bootstrap_se(
     n_individuals = panel.num_individuals
     n_params = len(parameters)
 
-    bootstrap_estimates = torch.zeros((n_bootstrap, n_params))
+    bootstrap_estimates = np.zeros((n_bootstrap, n_params))
     successful_bootstraps = 0
 
     for b in range(n_bootstrap):
-        # Resample individuals with replacement
         indices = rng.choice(n_individuals, size=n_individuals, replace=True)
         resampled_trajectories = [panel.trajectories[i] for i in indices]
         bootstrap_panel = Panel(trajectories=resampled_trajectories)
 
         try:
-            # Re-estimate on bootstrap sample
             bootstrap_params = estimate_fn(bootstrap_panel)
-            bootstrap_estimates[b] = bootstrap_params
+            bootstrap_estimates[b] = np.asarray(bootstrap_params)
             successful_bootstraps += 1
         except Exception:
-            # If estimation fails, use original parameters (conservative)
-            bootstrap_estimates[b] = parameters
+            bootstrap_estimates[b] = np.asarray(parameters)
 
-    # Compute variance from bootstrap distribution
     if successful_bootstraps > 1:
-        var_cov = torch.cov(bootstrap_estimates.T)
-        se = torch.std(bootstrap_estimates, dim=0)
+        boot_jnp = jnp.array(bootstrap_estimates)
+        var_cov = jnp.cov(boot_jnp.T)
+        se = jnp.std(boot_jnp, axis=0)
     else:
-        # Not enough successful bootstraps
-        var_cov = torch.full((n_params, n_params), float("nan"), dtype=parameters.dtype)
-        se = torch.full((n_params,), float("nan"), dtype=parameters.dtype)
+        var_cov = jnp.full((n_params, n_params), float("nan"), dtype=jnp.float64)
+        se = jnp.full((n_params,), float("nan"), dtype=jnp.float64)
 
     return StandardErrorResult(
         standard_errors=se,
@@ -277,9 +251,9 @@ def _bootstrap_se(
 
 
 def _clustered_se(
-    parameters: torch.Tensor,
-    hessian: torch.Tensor | None,
-    gradient_contributions: torch.Tensor | None,
+    parameters: jnp.ndarray,
+    hessian: jnp.ndarray | None,
+    gradient_contributions: jnp.ndarray | None,
     panel: Panel | None,
 ) -> StandardErrorResult:
     """Compute cluster-robust standard errors.
@@ -287,10 +261,10 @@ def _clustered_se(
     Accounts for correlation of observations within individuals
     (clusters). The variance estimator is:
 
-        Var(θ̂) = H^{-1} @ B_cluster @ H^{-1}
+        Var(theta_hat) = H^{-1} @ B_cluster @ H^{-1}
 
     where:
-        B_cluster = Σ_c (Σ_{i∈c} g_i)(Σ_{i∈c} g_i)'
+        B_cluster = sum_c (sum_{i in c} g_i)(sum_{i in c} g_i)'
 
     This sums gradients within clusters before taking outer products.
     """
@@ -301,22 +275,18 @@ def _clustered_se(
     if panel is None:
         raise ValueError("Panel required for clustered SEs")
 
-    # H^{-1} with progressive ridge regularization
     n_params = hessian.shape[0]
     H_inv = None
     for ridge_factor in [0, 1e-8, 1e-6, 1e-4, 1e-2]:
-        try:
-            ridge = ridge_factor * torch.eye(n_params, device=hessian.device, dtype=hessian.dtype)
-            H_inv = torch.linalg.inv(-hessian + ridge)
-            if torch.isfinite(H_inv).all():
-                break
-            H_inv = None
-        except RuntimeError:
-            continue
+        ridge = ridge_factor * jnp.eye(n_params, dtype=hessian.dtype)
+        candidate = jnp.linalg.inv(-hessian + ridge)
+        if bool(jnp.all(jnp.isfinite(candidate))):
+            H_inv = candidate
+            break
 
     if H_inv is None:
-        se = torch.full((n_params,), float("nan"), dtype=hessian.dtype)
-        var_cov = torch.full((n_params, n_params), float("nan"), dtype=hessian.dtype)
+        se = jnp.full((n_params,), float("nan"), dtype=hessian.dtype)
+        var_cov = jnp.full((n_params, n_params), float("nan"), dtype=hessian.dtype)
         return StandardErrorResult(
             standard_errors=se,
             variance_covariance=var_cov,
@@ -324,32 +294,33 @@ def _clustered_se(
             details={"singular": True},
         )
 
-    n_params = len(parameters)
     n_clusters = panel.num_individuals
 
     # Sum gradients within each cluster
-    cluster_gradients = torch.zeros((n_clusters, n_params))
+    cluster_gradients = np.zeros((n_clusters, n_params))
     obs_idx = 0
     for c, traj in enumerate(panel.trajectories):
         n_obs_c = len(traj)
-        cluster_gradients[c] = gradient_contributions[obs_idx : obs_idx + n_obs_c].sum(dim=0)
+        cluster_gradients[c] = np.asarray(
+            gradient_contributions[obs_idx : obs_idx + n_obs_c].sum(axis=0)
+        )
         obs_idx += n_obs_c
 
-    # B_cluster = Σ_c g_c g_c'
+    cluster_gradients = jnp.array(cluster_gradients)
+
+    # B_cluster = sum_c g_c g_c'
     B_cluster = cluster_gradients.T @ cluster_gradients
 
-    # Small sample correction: multiply by G/(G-1) * N/(N-K)
-    # where G = number of clusters, N = total obs, K = number of params
+    # Small sample correction
     G = n_clusters
     N = panel.num_observations
     K = n_params
     correction = (G / (G - 1)) * (N - 1) / (N - K) if G > 1 and N > K else 1.0
 
-    # Sandwich with correction
     var_cov = correction * (H_inv @ B_cluster @ H_inv)
 
-    diag = torch.diag(var_cov)
-    se = torch.sqrt(torch.clamp(diag, min=0))
+    diag = jnp.diag(var_cov)
+    se = jnp.sqrt(jnp.maximum(diag, 0.0))
 
     return StandardErrorResult(
         standard_errors=se,
@@ -364,14 +335,16 @@ def _clustered_se(
 
 
 def compute_numerical_hessian(
-    parameters: torch.Tensor,
-    log_likelihood_fn: Callable[[torch.Tensor], torch.Tensor],
+    parameters: jnp.ndarray,
+    log_likelihood_fn: Callable,
     eps: float = 1e-5,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Compute Hessian numerically via finite differences.
 
     Uses central differences for better accuracy:
-        H[i,j] ≈ (f(x+e_i+e_j) - f(x+e_i-e_j) - f(x-e_i+e_j) + f(x-e_i-e_j)) / (4ε²)
+        H[i,j] = (f(x+e_i+e_j) - f(x+e_i-e_j) - f(x-e_i+e_j) + f(x-e_i-e_j)) / (4*eps^2)
+
+    For most cases, prefer compute_analytical_hessian which uses jax.hessian.
 
     Args:
         parameters: Point at which to compute Hessian
@@ -382,35 +355,56 @@ def compute_numerical_hessian(
         Hessian matrix of shape (n_params, n_params)
     """
     n = len(parameters)
-    hessian = torch.zeros((n, n), dtype=parameters.dtype)
+    params_np = np.asarray(parameters)
+    hessian = np.zeros((n, n))
 
     for i in range(n):
         for j in range(i, n):
-            # Create perturbation vectors
-            e_i = torch.zeros_like(parameters)
-            e_j = torch.zeros_like(parameters)
+            e_i = np.zeros(n)
+            e_j = np.zeros(n)
             e_i[i] = eps
             e_j[j] = eps
 
-            # Four-point formula for mixed partial
-            f_pp = log_likelihood_fn(parameters + e_i + e_j)
-            f_pm = log_likelihood_fn(parameters + e_i - e_j)
-            f_mp = log_likelihood_fn(parameters - e_i + e_j)
-            f_mm = log_likelihood_fn(parameters - e_i - e_j)
+            f_pp = float(log_likelihood_fn(jnp.array(params_np + e_i + e_j)))
+            f_pm = float(log_likelihood_fn(jnp.array(params_np + e_i - e_j)))
+            f_mp = float(log_likelihood_fn(jnp.array(params_np - e_i + e_j)))
+            f_mm = float(log_likelihood_fn(jnp.array(params_np - e_i - e_j)))
 
             hessian[i, j] = (f_pp - f_pm - f_mp + f_mm) / (4 * eps * eps)
-            hessian[j, i] = hessian[i, j]  # Symmetric
+            hessian[j, i] = hessian[i, j]
 
-    return hessian
+    return jnp.array(hessian)
+
+
+def compute_analytical_hessian(
+    parameters: jnp.ndarray,
+    log_likelihood_fn: Callable,
+) -> jnp.ndarray:
+    """Compute Hessian analytically via jax.hessian.
+
+    This uses forward-over-reverse mode autodiff (jacfwd of grad),
+    which is efficient for moderate parameter counts.
+
+    Args:
+        parameters: Point at which to compute Hessian
+        log_likelihood_fn: Differentiable function mapping parameters to scalar
+
+    Returns:
+        Hessian matrix of shape (n_params, n_params)
+    """
+    return jax.hessian(log_likelihood_fn)(parameters)
 
 
 def compute_gradient_contributions(
-    parameters: torch.Tensor,
+    parameters: jnp.ndarray,
     panel: Panel,
-    log_prob_fn: Callable[[torch.Tensor, int, int], torch.Tensor],
+    log_prob_fn: Callable,
     eps: float = 1e-5,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Compute per-observation gradient contributions numerically.
+
+    For analytical computation, use compute_analytical_gradient_contributions
+    which leverages jax.vmap(jax.grad(...)).
 
     Args:
         parameters: Current parameter values
@@ -423,25 +417,53 @@ def compute_gradient_contributions(
     """
     n_obs = panel.num_observations
     n_params = len(parameters)
+    params_np = np.asarray(parameters)
 
-    gradients = torch.zeros((n_obs, n_params))
+    gradients = np.zeros((n_obs, n_params))
 
     obs_idx = 0
     for traj in panel.trajectories:
         for t in range(len(traj)):
-            state = traj.states[t].item()
-            action = traj.actions[t].item()
+            state = int(traj.states[t])
+            action = int(traj.actions[t])
 
-            # Numerical gradient for this observation
             for k in range(n_params):
-                e_k = torch.zeros_like(parameters)
+                e_k = np.zeros(n_params)
                 e_k[k] = eps
 
-                log_p_plus = log_prob_fn(parameters + e_k, state, action)
-                log_p_minus = log_prob_fn(parameters - e_k, state, action)
+                log_p_plus = float(log_prob_fn(jnp.array(params_np + e_k), state, action))
+                log_p_minus = float(log_prob_fn(jnp.array(params_np - e_k), state, action))
 
                 gradients[obs_idx, k] = (log_p_plus - log_p_minus) / (2 * eps)
 
             obs_idx += 1
 
-    return gradients
+    return jnp.array(gradients)
+
+
+def compute_analytical_gradient_contributions(
+    parameters: jnp.ndarray,
+    obs_states: jnp.ndarray,
+    obs_actions: jnp.ndarray,
+    log_prob_fn: Callable,
+) -> jnp.ndarray:
+    """Compute per-observation gradient contributions analytically via jax.vmap.
+
+    This is the JAX-native way to compute per-observation scores for
+    sandwich standard errors and BHHH optimization.
+
+    Args:
+        parameters: Current parameter values, shape (K,)
+        obs_states: Observed states, shape (N,)
+        obs_actions: Observed actions, shape (N,)
+        log_prob_fn: Function(params, state, action) -> scalar log probability.
+                    Must be differentiable w.r.t. params.
+
+    Returns:
+        Gradient contributions of shape (N, K)
+    """
+    per_obs_grad = jax.vmap(
+        jax.grad(log_prob_fn, argnums=0),
+        in_axes=(None, 0, 0),
+    )
+    return per_obs_grad(parameters, obs_states, obs_actions)

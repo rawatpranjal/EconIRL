@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import torch
+import jax
+import jax.numpy as jnp
 
 DEFAULT_DATA_PATH = "/Volumes/Expansion/datasets/trivago-2019/train.csv"
 
@@ -339,9 +340,9 @@ def build_trivago_panel(mdp_dict: dict) -> "Panel":
     trajectories = []
     for sid, indices in session_groups.items():
         traj = Trajectory(
-            states=torch.tensor([states[i] for i in indices], dtype=torch.long),
-            actions=torch.tensor([actions[i] for i in indices], dtype=torch.long),
-            next_states=torch.tensor([next_states[i] for i in indices], dtype=torch.long),
+            states=jnp.array([states[i] for i in indices], dtype=jnp.int32),
+            actions=jnp.array([actions[i] for i in indices], dtype=jnp.int32),
+            next_states=jnp.array([next_states[i] for i in indices], dtype=jnp.int32),
             individual_id=sid,
         )
         trajectories.append(traj)
@@ -352,7 +353,7 @@ def build_trivago_panel(mdp_dict: dict) -> "Panel":
 def build_trivago_features(
     n_states: int = N_STATES,
     n_actions: int = N_ACTIONS,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Build action-dependent feature matrix for Trivago hotel search.
 
     4 features per (state, action) pair:
@@ -370,11 +371,11 @@ def build_trivago_features(
 
     Returns
     -------
-    torch.Tensor
+    jnp.ndarray
         Feature matrix of shape (n_states, n_actions, 4).
     """
     n_features = 4
-    features = torch.zeros(n_states, n_actions, n_features)
+    features = jnp.zeros(n_states, n_actions, n_features)
 
     n_non_absorbing = n_states - 1
 
@@ -405,7 +406,7 @@ def build_trivago_transitions(
     n_states: int = N_STATES,
     n_actions: int = N_ACTIONS,
     smoothing: float = 1e-8,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Build empirical transition matrix P(s'|s,a) from training data.
 
     Parameters
@@ -421,13 +422,13 @@ def build_trivago_transitions(
 
     Returns
     -------
-    torch.Tensor
+    jnp.ndarray
         Transition matrix of shape (n_actions, n_states, n_states).
     """
     absorbing = n_states - 1
 
     # Count transitions
-    counts = torch.zeros(n_actions, n_states, n_states)
+    counts = jnp.zeros(n_actions, n_states, n_states)
     for s, a, ns in zip(
         mdp_dict["all_states"],
         mdp_dict["all_actions"],
@@ -446,7 +447,7 @@ def build_trivago_transitions(
         counts[a, absorbing, absorbing] = 1.0
 
     # Normalize rows; add smoothing for unobserved (s, a) pairs
-    transitions = torch.zeros_like(counts)
+    transitions = jnp.zeros_like(counts)
     for a in range(n_actions):
         for s in range(n_states):
             row_sum = counts[a, s].sum()
@@ -454,7 +455,7 @@ def build_trivago_transitions(
                 transitions[a, s] = counts[a, s] / row_sum
             else:
                 # Unobserved (s, a): uniform distribution with smoothing
-                transitions[a, s] = torch.ones(n_states) / n_states
+                transitions[a, s] = jnp.ones(n_states) / n_states
 
     return transitions
 

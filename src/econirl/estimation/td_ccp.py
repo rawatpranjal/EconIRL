@@ -27,10 +27,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import torch
-import torch.nn as nn
+import equinox as eqx
+import jax
+import jax.numpy as jnp
+import numpy as np
+import optax
 from scipy import optimize
 
+from econirl.core.bellman import SoftBellmanOperator
+from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod, compute_numerical_hessian
@@ -66,45 +71,41 @@ class TDCCPConfig:
     ccp_smoothing: float = 0.01
     outer_max_iter: int = 200
     outer_tol: float = 1e-6
+    n_policy_iterations: int = 3
+    policy_iteration_tol: float = 1e-4
     compute_se: bool = True
     verbose: bool = False
 
 
-class _EVComponentNetwork(nn.Module):
+class _EVComponentNetwork(eqx.Module):
     """MLP for approximating a single EV component function.
 
     Maps normalized state features to a scalar value representing
     one component of the expected value decomposition.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, num_hidden_layers: int):
-        super().__init__()
-        layers: list[nn.Module] = []
+    mlp: eqx.nn.MLP
 
-        # Input layer
-        layers.append(nn.Linear(input_dim, hidden_dim))
-        layers.append(nn.ReLU())
+    def __init__(self, input_dim: int, hidden_dim: int, num_hidden_layers: int, *, key: jax.Array):
+        self.mlp = eqx.nn.MLP(
+            in_size=input_dim,
+            out_size=1,
+            width_size=hidden_dim,
+            depth=num_hidden_layers,
+            activation=jax.nn.relu,
+            key=key,
+        )
 
-        # Hidden layers
-        for _ in range(num_hidden_layers - 1):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.ReLU())
-
-        # Output layer (scalar)
-        layers.append(nn.Linear(hidden_dim, 1))
-
-        self.network = nn.Sequential(*layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass.
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        """Forward pass for a single input vector.
 
         Args:
-            x: Input features of shape (batch, input_dim).
+            x: Input features of shape (input_dim,).
 
         Returns:
-            Scalar predictions of shape (batch, 1).
+            Scalar prediction of shape ().
         """
-        return self.network(x)
+        return self.mlp(x).squeeze(-1)
 
 
 class TDCCPEstimator(BaseEstimator):
@@ -128,6 +129,7 @@ class TDCCPEstimator(BaseEstimator):
         self,
         config: TDCCPConfig | None = None,
         se_method: SEMethod = "asymptotic",
+        seed: int = 0,
         **kwargs,
     ):
         """Initialize the TD-CCP estimator.
@@ -135,11 +137,13 @@ class TDCCPEstimator(BaseEstimator):
         Args:
             config: Configuration dataclass. Uses defaults if None.
             se_method: Method for computing standard errors.
+            seed: Random seed for JAX PRNG key generation.
             **kwargs: Additional keyword arguments (ignored for compatibility).
         """
         if config is None:
             config = TDCCPConfig()
         self._config = config
+        self._seed = seed
 
         super().__init__(
             se_method=se_method,
@@ -166,7 +170,7 @@ class TDCCPEstimator(BaseEstimator):
         panel: Panel,
         num_states: int,
         num_actions: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Estimate CCPs from data using frequency estimator with smoothing.
 
         P_hat(a|s) = (N(s,a) + smoothing) / (N(s) + num_actions * smoothing)
@@ -182,12 +186,11 @@ class TDCCPEstimator(BaseEstimator):
         smoothing = self._config.ccp_smoothing
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
-        idx = all_states * num_actions + all_actions
-        counts = torch.zeros(num_states * num_actions, dtype=torch.float32).scatter_add_(
-            0, idx.long(), torch.ones(idx.shape[0])
-        ).reshape(num_states, num_actions)
 
-        state_counts = counts.sum(dim=1, keepdim=True)
+        counts = jnp.zeros((num_states, num_actions), dtype=jnp.float32)
+        counts = counts.at[all_states, all_actions].add(1.0)
+
+        state_counts = counts.sum(axis=1, keepdims=True)
         ccps = (counts + smoothing) / (state_counts + num_actions * smoothing)
         return ccps
 
@@ -197,9 +200,9 @@ class TDCCPEstimator(BaseEstimator):
 
     @staticmethod
     def _compute_flow_components(
-        ccps: torch.Tensor,
-        feature_matrix: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        ccps: jnp.ndarray,
+        feature_matrix: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute per-feature flow functions and entropy flow.
 
         For each feature k:
@@ -218,11 +221,11 @@ class TDCCPEstimator(BaseEstimator):
             - flow_entropy: shape (num_states,)
         """
         # flow_k[s] = sum_a ccps[s,a] * features[s,a,k]
-        flow_features = torch.einsum("sa,sak->sk", ccps, feature_matrix)
+        flow_features = jnp.einsum("sa,sak->sk", ccps, feature_matrix)
 
         # Entropy: -sum_a p(a|s) log p(a|s)
-        safe_ccps = torch.clamp(ccps, min=1e-10)
-        flow_entropy = -(ccps * torch.log(safe_ccps)).sum(dim=1)
+        safe_ccps = jnp.clip(ccps, a_min=1e-10)
+        flow_entropy = -(ccps * jnp.log(safe_ccps)).sum(axis=1)
 
         return flow_features, flow_entropy
 
@@ -230,36 +233,37 @@ class TDCCPEstimator(BaseEstimator):
     # Step 3: Train component networks via AVI with semi-gradient TD
     # ------------------------------------------------------------------
 
-    def _build_state_features(self, states: torch.Tensor, problem: DDCProblem) -> torch.Tensor:
+    def _build_state_features(self, states: jnp.ndarray, problem: DDCProblem) -> jnp.ndarray:
         """Create features for NN input from state indices.
 
         Uses the problem's state_encoder if available, otherwise
         normalizes state index to [0, 1].
 
         Args:
-            states: Tensor of integer state indices.
+            states: Array of integer state indices.
             problem: Problem specification with optional state_encoder.
 
         Returns:
-            Feature tensor of shape (len(states), state_dim).
+            Feature array of shape (len(states), state_dim).
         """
         if problem.state_encoder is not None:
             return problem.state_encoder(states)
         denom = max(problem.num_states - 1, 1)
-        return (states.float() / denom).unsqueeze(-1)
+        return (states.astype(jnp.float32) / denom)[:, None]
 
     def _train_component_network(
         self,
-        flow: torch.Tensor,
-        states: torch.Tensor,
-        next_states: torch.Tensor,
+        flow: jnp.ndarray,
+        states: jnp.ndarray,
+        next_states: jnp.ndarray,
         problem: DDCProblem,
         gamma: float,
+        key: jax.Array,
     ) -> tuple[_EVComponentNetwork, list[float]]:
         """Train a single EV component network via AVI with semi-gradient TD.
 
         For each AVI round:
-            1. Compute targets: Y = flow[s_t] + gamma * net(features[s_{t+1}]).detach()
+            1. Compute targets: Y = flow[s_t] + gamma * net(features[s_{t+1}])
             2. Train net to minimize MSE between net(features[s_t]) and Y
                for epochs_per_avi epochs.
 
@@ -267,8 +271,9 @@ class TDCCPEstimator(BaseEstimator):
             flow: Flow values of shape (num_states,) for this component.
             states: All observed s_t indices (flattened from panel).
             next_states: All observed s_{t+1} indices.
-            num_states: Total number of states.
+            problem: Problem specification.
             gamma: Discount factor.
+            key: JAX PRNG key for network initialization and shuffling.
 
         Returns:
             Tuple of (trained network, list of per-epoch losses).
@@ -276,8 +281,14 @@ class TDCCPEstimator(BaseEstimator):
         cfg = self._config
         input_dim = problem.state_dim or 1
 
-        net = _EVComponentNetwork(input_dim, cfg.hidden_dim, cfg.num_hidden_layers)
-        optimizer = torch.optim.Adam(net.parameters(), lr=cfg.learning_rate)
+        key, init_key = jax.random.split(key)
+        net = _EVComponentNetwork(input_dim, cfg.hidden_dim, cfg.num_hidden_layers, key=init_key)
+
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(1.0),
+            optax.adam(cfg.learning_rate),
+        )
+        opt_state = optimizer.init(eqx.filter(net, eqx.is_array))
 
         # Precompute state features for the whole dataset
         feat_s = self._build_state_features(states, problem)
@@ -287,16 +298,28 @@ class TDCCPEstimator(BaseEstimator):
         n_samples = len(states)
         losses: list[float] = []
 
+        # Define the JIT-compiled training step. The optimizer is captured
+        # in the closure since it is a static (non-array) pytree.
+        @eqx.filter_jit
+        def train_step(model, opt_state, batch_feat, batch_targets):
+            def loss_fn(model):
+                preds = jax.vmap(model)(batch_feat)
+                return jnp.mean((preds - batch_targets) ** 2)
+            loss, grads = eqx.filter_value_and_grad(loss_fn)(model)
+            updates, new_opt_state = optimizer.update(grads, opt_state, model)
+            new_model = eqx.apply_updates(model, updates)
+            return new_model, new_opt_state, loss
+
         for avi_iter in range(cfg.avi_iterations):
-            # Compute TD targets with current network (frozen)
-            with torch.no_grad():
-                v_next = net(feat_sp).squeeze(-1)
+            # Compute TD targets with current network (frozen for this AVI round)
+            v_next = jax.lax.stop_gradient(jax.vmap(net)(feat_sp))
             targets = flow_s + gamma * v_next
 
             # Train for epochs_per_avi epochs on these targets
             for epoch in range(cfg.epochs_per_avi):
                 # Shuffle indices for mini-batches
-                perm = torch.randperm(n_samples)
+                key, perm_key = jax.random.split(key)
+                perm = jax.random.permutation(perm_key, n_samples)
 
                 epoch_loss = 0.0
                 n_batches = 0
@@ -304,14 +327,11 @@ class TDCCPEstimator(BaseEstimator):
                     end = min(start + cfg.batch_size, n_samples)
                     idx = perm[start:end]
 
-                    preds = net(feat_s[idx]).squeeze(-1)
-                    loss = torch.nn.functional.mse_loss(preds, targets[idx])
+                    net, opt_state, loss = train_step(
+                        net, opt_state, feat_s[idx], targets[idx]
+                    )
 
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-
-                    epoch_loss += loss.item()
+                    epoch_loss += float(loss)
                     n_batches += 1
 
                 avg_loss = epoch_loss / max(n_batches, 1)
@@ -321,11 +341,12 @@ class TDCCPEstimator(BaseEstimator):
 
     def _train_all_components(
         self,
-        flow_features: torch.Tensor,
-        flow_entropy: torch.Tensor,
+        flow_features: jnp.ndarray,
+        flow_entropy: jnp.ndarray,
         panel: Panel,
         problem: DDCProblem,
         gamma: float,
+        key: jax.Array,
     ) -> tuple[list[_EVComponentNetwork], _EVComponentNetwork, dict[str, list[float]]]:
         """Train all EV component networks (one per feature + entropy).
 
@@ -333,8 +354,9 @@ class TDCCPEstimator(BaseEstimator):
             flow_features: Per-feature flow values, shape (num_states, num_features).
             flow_entropy: Entropy flow values, shape (num_states,).
             panel: Panel data (for transition samples).
-            num_states: Total number of states.
+            problem: Problem specification.
             gamma: Discount factor.
+            key: JAX PRNG key.
 
         Returns:
             Tuple of (feature_nets, entropy_net, loss_histories).
@@ -349,24 +371,28 @@ class TDCCPEstimator(BaseEstimator):
         # Train one network per feature component
         for k in range(num_features):
             self._log(f"Training EV component network for feature {k}")
+            key, comp_key = jax.random.split(key)
             net, losses = self._train_component_network(
                 flow=flow_features[:, k],
                 states=states,
                 next_states=next_states,
                 problem=problem,
                 gamma=gamma,
+                key=comp_key,
             )
             feature_nets.append(net)
             loss_histories[f"feature_{k}"] = losses
 
         # Train entropy network
         self._log("Training EV component network for entropy")
+        key, entropy_key = jax.random.split(key)
         entropy_net, entropy_losses = self._train_component_network(
             flow=flow_entropy,
             states=states,
             next_states=next_states,
             problem=problem,
             gamma=gamma,
+            key=entropy_key,
         )
         loss_histories["entropy"] = entropy_losses
 
@@ -380,8 +406,8 @@ class TDCCPEstimator(BaseEstimator):
     def _evaluate_ev_components(
         feature_nets: list[_EVComponentNetwork],
         entropy_net: _EVComponentNetwork,
-        state_features: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        state_features: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Evaluate all trained component networks on a set of state features.
 
         Args:
@@ -394,10 +420,9 @@ class TDCCPEstimator(BaseEstimator):
             - ev_features: shape (num_states, num_features)
             - ev_entropy: shape (num_states,)
         """
-        with torch.no_grad():
-            ev_list = [net(state_features).squeeze(-1) for net in feature_nets]
-            ev_features = torch.stack(ev_list, dim=1)
-            ev_entropy = entropy_net(state_features).squeeze(-1)
+        ev_list = [jax.vmap(net)(state_features) for net in feature_nets]
+        ev_features = jnp.stack(ev_list, axis=1)
+        ev_entropy = jax.vmap(entropy_net)(state_features)
         return ev_features, ev_entropy
 
     def _partial_mle(
@@ -405,11 +430,11 @@ class TDCCPEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        ev_features: torch.Tensor,
-        ev_entropy: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
-    ) -> tuple[torch.Tensor, float, int, int, str]:
+        transitions: jnp.ndarray,
+        ev_features: jnp.ndarray,
+        ev_entropy: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
+    ) -> tuple[jnp.ndarray, float, int, int, str]:
         """Optimize structural parameters via partial MLE.
 
         Using the learned EV components, construct choice-specific values
@@ -433,7 +458,10 @@ class TDCCPEstimator(BaseEstimator):
         num_actions = problem.num_actions
         feature_matrix = utility.feature_matrix  # (S, A, K)
 
-        def _compute_choice_values(params: torch.Tensor) -> torch.Tensor:
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+
+        def _compute_choice_values(params: jnp.ndarray) -> jnp.ndarray:
             """Compute choice-specific values v(s, a) given parameters.
 
             v(s, a) = u(s, a; theta)
@@ -443,31 +471,30 @@ class TDCCPEstimator(BaseEstimator):
             where P_a is the transition matrix for action a.
             """
             # Flow utility: u(s, a) = theta . phi(s, a)
-            flow_u = torch.einsum("sak,k->sa", feature_matrix, params)
+            flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
 
             # Continuation values per action
             # For each action a: E[ev_k | s, a] = transitions[a] @ ev_features[:, k]
-            continuation = torch.zeros((num_states, num_actions), dtype=torch.float32)
+            continuation = jnp.zeros((num_states, num_actions), dtype=jnp.float32)
             for a in range(num_actions):
                 # Feature part: sum_k theta_k * (P_a @ ev_k)
                 ev_next_features = transitions[a] @ ev_features  # (S, K)
-                feat_contribution = torch.einsum("sk,k->s", ev_next_features, params)
+                feat_contribution = jnp.einsum("sk,k->s", ev_next_features, params)
 
                 # Entropy part: P_a @ ev_H
                 ev_next_entropy = transitions[a] @ ev_entropy  # (S,)
 
-                continuation[:, a] = gamma * (feat_contribution + ev_next_entropy)
+                continuation = continuation.at[:, a].set(
+                    gamma * (feat_contribution + ev_next_entropy)
+                )
 
             return flow_u + continuation
 
-        def _log_likelihood(params: torch.Tensor) -> float:
+        def _log_likelihood(params: jnp.ndarray) -> float:
             """Compute conditional choice log-likelihood."""
             v = _compute_choice_values(params)
-            log_probs = torch.nn.functional.log_softmax(v / sigma, dim=1)
-
-            all_states = panel.get_all_states()
-            all_actions = panel.get_all_actions()
-            ll = log_probs[all_states, all_actions].sum().item()
+            log_probs = jax.nn.log_softmax(v / sigma, axis=1)
+            ll = float(log_probs[all_states, all_actions].sum())
             return ll
 
         # Store the ll function for Hessian computation later
@@ -476,30 +503,30 @@ class TDCCPEstimator(BaseEstimator):
 
         # Scipy optimizer interface
         def objective(params_np):
-            params = torch.tensor(params_np, dtype=torch.float32)
+            params = jnp.array(params_np, dtype=jnp.float32)
             return -_log_likelihood(params)
 
         def gradient(params_np):
             eps = 1e-5
             n = len(params_np)
-            grad = torch.zeros(n)
+            grad = np.zeros(n)
             for i in range(n):
                 p_plus = params_np.copy()
                 p_minus = params_np.copy()
                 p_plus[i] += eps
                 p_minus[i] -= eps
                 grad[i] = (objective(p_plus) - objective(p_minus)) / (2 * eps)
-            return grad.numpy()
+            return grad
 
         if initial_params is None:
             initial_params = utility.get_initial_parameters()
 
         lower, upper = utility.get_parameter_bounds()
-        bounds = list(zip(lower.numpy(), upper.numpy()))
+        bounds = list(zip(np.asarray(lower), np.asarray(upper)))
 
         result = optimize.minimize(
             objective,
-            initial_params.numpy(),
+            np.asarray(initial_params),
             method="L-BFGS-B",
             jac=gradient,
             bounds=bounds,
@@ -509,7 +536,7 @@ class TDCCPEstimator(BaseEstimator):
             },
         )
 
-        params_opt = torch.tensor(result.x, dtype=torch.float32)
+        params_opt = jnp.array(result.x, dtype=jnp.float32)
         ll_opt = -result.fun
 
         return params_opt, ll_opt, result.nit, result.nfev, result.message
@@ -523,94 +550,124 @@ class TDCCPEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
-        """Run the full TD-CCP estimation pipeline.
+        """Run TD-CCP with NPL-style policy iteration.
 
-        Args:
-            panel: Panel data with observed choices.
-            utility: Utility function specification.
-            problem: Problem specification.
-            transitions: Transition matrices P(s'|s,a).
-            initial_params: Starting values for partial MLE.
-            **kwargs: Additional keyword arguments (ignored).
-
-        Returns:
-            EstimationResult with estimated parameters and diagnostics.
+        After the initial CCP-based estimation, recomputes the policy
+        from estimated parameters, updates flow components under the
+        new policy, retrains EV networks, and re-optimizes. This
+        eliminates the scale mismatch from using a fixed CCP.
         """
         start_time = time.time()
         num_states = problem.num_states
         num_actions = problem.num_actions
         gamma = problem.discount_factor
         sigma = problem.scale_parameter
+        feature_matrix = utility.feature_matrix
 
-        # Step 1: Estimate CCPs from data
+        key = jax.random.PRNGKey(self._seed)
+
+        # Step 1: Initial CCPs from data
         self._log("Step 1: Estimating CCPs from data")
         ccps = self._estimate_ccps(panel, num_states, num_actions)
 
-        # Step 2: Decompose flows
-        self._log("Step 2: Computing flow decomposition")
-        feature_matrix = utility.feature_matrix
-        flow_features, flow_entropy = self._compute_flow_components(ccps, feature_matrix)
+        total_nit = 0
+        total_nfev = 0
+        all_loss_histories: dict[str, list[float]] = {}
+        params_opt = initial_params
 
-        # Step 3: Train component networks
-        self._log("Step 3: Training EV component networks via AVI")
-        feature_nets, entropy_net, loss_histories = self._train_all_components(
-            flow_features=flow_features,
-            flow_entropy=flow_entropy,
-            panel=panel,
-            problem=problem,
-            gamma=gamma,
-        )
+        for pi_iter in range(self._config.n_policy_iterations):
+            self._log(f"Policy iteration {pi_iter + 1}/{self._config.n_policy_iterations}")
 
-        # Extract learned EV components for all states
-        all_state_features = self._build_state_features(
-            torch.arange(num_states), problem
-        )
-        ev_features, ev_entropy = self._evaluate_ev_components(
-            feature_nets, entropy_net, all_state_features
-        )
+            # Step 2: Decompose flows under current policy (CCPs)
+            flow_features, flow_entropy = self._compute_flow_components(ccps, feature_matrix)
 
-        # Step 4: Partial MLE
-        self._log("Step 4: Running partial MLE")
-        params_opt, ll_opt, n_iter, n_feval, opt_msg = self._partial_mle(
-            panel=panel,
-            utility=utility,
-            problem=problem,
-            transitions=transitions,
-            ev_features=ev_features,
-            ev_entropy=ev_entropy,
-            initial_params=initial_params,
-        )
-        self._log(f"  Parameters: {params_opt.numpy()}")
-        self._log(f"  Log-likelihood: {ll_opt:.4f}")
+            # Step 3: Train component networks
+            self._log("  Training EV component networks via AVI")
+            key, train_key = jax.random.split(key)
+            feature_nets, entropy_net, loss_histories = self._train_all_components(
+                flow_features=flow_features,
+                flow_entropy=flow_entropy,
+                panel=panel,
+                problem=problem,
+                gamma=gamma,
+                key=train_key,
+            )
+            for k, v in loss_histories.items():
+                all_loss_histories[f"iter{pi_iter}_{k}"] = v
 
-        # Compute policy and value function from optimized parameters
-        v = self._compute_choice_values_fn(params_opt)
-        policy = torch.nn.functional.softmax(v / sigma, dim=1)
-        V = sigma * torch.logsumexp(v / sigma, dim=1)
+            # Extract learned EV components for all states
+            all_state_features = self._build_state_features(
+                jnp.arange(num_states), problem
+            )
+            ev_features, ev_entropy = self._evaluate_ev_components(
+                feature_nets, entropy_net, all_state_features
+            )
 
-        # Step 5: Hessian for standard errors
+            # Step 4: Partial MLE
+            self._log("  Running partial MLE")
+            params_opt, ll_opt, n_iter, n_feval, opt_msg = self._partial_mle(
+                panel=panel,
+                utility=utility,
+                problem=problem,
+                transitions=transitions,
+                ev_features=ev_features,
+                ev_entropy=ev_entropy,
+                initial_params=params_opt,
+            )
+            total_nit += n_iter
+            total_nfev += n_feval
+            self._log(f"  Params: {np.asarray(params_opt)}, LL: {ll_opt:.4f}")
+
+            # Compute exact policy via value iteration with estimated reward
+            reward_matrix = utility.compute(params_opt)
+            operator = SoftBellmanOperator(problem, transitions)
+            vi_result = value_iteration(
+                operator, reward_matrix, tol=1e-8, max_iter=5000,
+            )
+            new_policy = vi_result.policy
+
+            # Check convergence
+            policy_change = float(jnp.abs(new_policy - ccps).max())
+            self._log(f"  Policy change: {policy_change:.6f}")
+
+            if policy_change < self._config.policy_iteration_tol:
+                self._log(f"  Policy converged at iteration {pi_iter + 1}")
+                ccps = new_policy
+                break
+
+            # Update CCPs for next iteration
+            ccps = new_policy
+
+        # Final policy and value via exact value iteration
+        reward_matrix = utility.compute(params_opt)
+        operator = SoftBellmanOperator(problem, transitions)
+        vi_result = value_iteration(operator, reward_matrix, tol=1e-8, max_iter=5000)
+        policy = vi_result.policy
+        V = vi_result.V
+
+        # Hessian for standard errors
         hessian = None
         if self._config.compute_se:
-            self._log("Step 5: Computing numerical Hessian")
+            self._log("Computing numerical Hessian")
 
             def ll_fn(params):
-                return torch.tensor(self._log_likelihood_fn(params))
+                return jnp.array(self._log_likelihood_fn(params))
 
             hessian = compute_numerical_hessian(params_opt, ll_fn)
 
         optimization_time = time.time() - start_time
 
-        # Total inner iterations = avi_iterations * epochs_per_avi * num_components
         num_features = utility.num_parameters
-        num_components = num_features + 1  # features + entropy
+        num_components = num_features + 1
         total_inner = (
             self._config.avi_iterations
             * self._config.epochs_per_avi
             * num_components
+            * (pi_iter + 1)
         )
 
         return EstimationResult(
@@ -621,15 +678,16 @@ class TDCCPEstimator(BaseEstimator):
             hessian=hessian,
             gradient_contributions=None,
             converged=True,
-            num_iterations=n_iter,
-            num_function_evals=n_feval,
+            num_iterations=total_nit,
+            num_function_evals=total_nfev,
             num_inner_iterations=total_inner,
-            message=f"TD-CCP completed: {opt_msg}",
+            message=f"TD-CCP ({pi_iter + 1} policy iters): {opt_msg}",
             optimization_time=optimization_time,
             metadata={
-                "loss_histories": loss_histories,
+                "loss_histories": all_loss_histories,
                 "avi_iterations": self._config.avi_iterations,
                 "epochs_per_avi": self._config.epochs_per_avi,
+                "n_policy_iterations": pi_iter + 1,
                 "ev_features": ev_features,
                 "ev_entropy": ev_entropy,
             },

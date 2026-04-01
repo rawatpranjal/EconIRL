@@ -16,7 +16,7 @@ This specification is used in:
 
 from __future__ import annotations
 
-import torch
+import jax.numpy as jnp
 
 from econirl.preferences.base import BaseUtilityFunction
 
@@ -44,17 +44,17 @@ class LinearUtility(BaseUtilityFunction):
         >>> utility = LinearUtility.from_environment(env)
         >>>
         >>> # Or manually specify
-        >>> features = torch.randn(100, 2, 5)  # 100 states, 2 actions, 5 features
+        >>> features = jnp.ones((100, 2, 5))  # 100 states, 2 actions, 5 features
         >>> utility = LinearUtility(features, parameter_names=["a", "b", "c", "d", "e"])
         >>>
         >>> # Compute utility
-        >>> theta = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0])
+        >>> theta = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
         >>> U = utility.compute(theta)  # shape (100, 2)
     """
 
     def __init__(
         self,
-        feature_matrix: torch.Tensor,
+        feature_matrix: jnp.ndarray,
         parameter_names: list[str] | None = None,
         anchor_action: int | None = None,
     ):
@@ -97,14 +97,14 @@ class LinearUtility(BaseUtilityFunction):
             anchor_features = feature_matrix[:, anchor_action : anchor_action + 1, :]
             self._feature_matrix = feature_matrix - anchor_features
         else:
-            self._feature_matrix = feature_matrix.clone()
+            self._feature_matrix = jnp.array(feature_matrix)
 
     @property
-    def feature_matrix(self) -> torch.Tensor:
+    def feature_matrix(self) -> jnp.ndarray:
         """Return the feature matrix (potentially normalized)."""
         return self._feature_matrix
 
-    def compute(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute utility matrix U(s, a; θ) = θ · φ(s, a).
 
         Args:
@@ -116,9 +116,9 @@ class LinearUtility(BaseUtilityFunction):
         self.validate_parameters(parameters)
 
         # U[s, a] = Σ_k θ[k] * φ[s, a, k]
-        return torch.einsum("sak,k->sa", self._feature_matrix, parameters)
+        return jnp.einsum("sak,k->sa", self._feature_matrix, parameters)
 
-    def compute_gradient(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_gradient(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute gradient ∂U/∂θ = φ(s, a).
 
         For linear utility, the gradient is simply the feature matrix,
@@ -131,9 +131,9 @@ class LinearUtility(BaseUtilityFunction):
             Gradient tensor of shape (num_states, num_actions, num_parameters)
         """
         # For linear utility, gradient is constant
-        return self._feature_matrix.clone()
+        return jnp.array(self._feature_matrix)
 
-    def compute_hessian(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_hessian(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute Hessian ∂²U/∂θ².
 
         For linear utility, the Hessian is zero (utility is linear in θ).
@@ -144,13 +144,12 @@ class LinearUtility(BaseUtilityFunction):
         Returns:
             Zero tensor of shape (num_states, num_actions, num_parameters, num_parameters)
         """
-        return torch.zeros(
+        return jnp.zeros(
             (self.num_states, self.num_actions, self.num_parameters, self.num_parameters),
             dtype=self._feature_matrix.dtype,
-            device=self._feature_matrix.device,
         )
 
-    def get_parameter_bounds(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_parameter_bounds(self) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Return parameter bounds for all parameters.
 
         Returns unbounded (-inf, inf) for all parameters. Estimators that
@@ -159,8 +158,8 @@ class LinearUtility(BaseUtilityFunction):
         estimator.
         """
         n_params = self.num_parameters
-        lower = torch.full((n_params,), float("-inf"))
-        upper = torch.full((n_params,), float("inf"))
+        lower = jnp.full((n_params,), float("-inf"))
+        upper = jnp.full((n_params,), float("inf"))
         return lower, upper
 
     @classmethod
@@ -187,17 +186,7 @@ class LinearUtility(BaseUtilityFunction):
             anchor_action=anchor_action,
         )
 
-    def to(self, device: torch.device | str) -> "LinearUtility":
-        """Move feature matrix to specified device."""
-        new_utility = LinearUtility(
-            feature_matrix=self._feature_matrix.to(device),
-            parameter_names=self._parameter_names.copy(),
-            anchor_action=None,  # Already normalized if needed
-        )
-        new_utility._anchor_action = self._anchor_action
-        return new_utility
-
-    def subset_states(self, state_indices: torch.Tensor) -> "LinearUtility":
+    def subset_states(self, state_indices: jnp.ndarray) -> "LinearUtility":
         """Create a new utility function for a subset of states.
 
         Useful for state aggregation or focusing on specific regions.

@@ -7,6 +7,7 @@ Available solvers:
 - value_iteration: Simple fixed-point iteration (guaranteed convergence)
 - policy_iteration: Often faster convergence via policy evaluation step
 - hybrid_iteration: Contraction + Newton-Kantorovich (best for high beta)
+- optimistix_solve: Optimistix-based solver with implicit differentiation
 
 The hybrid solver implements Rust (1987, 2000)'s recommended approach:
 1. Start with cheap contraction iterations
@@ -16,7 +17,8 @@ The hybrid solver implements Rust (1987, 2000)'s recommended approach:
 For high discount factors (beta > 0.99), the hybrid solver can be
 10-100x faster than pure contraction (value_iteration).
 
-All methods exploit the contraction property of the soft Bellman operator.
+All iteration-based solvers use jax.lax.while_loop for compiled
+convergence loops, eliminating Python dispatch overhead.
 """
 
 from __future__ import annotations
@@ -24,9 +26,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-import torch
+import jax
+import jax.numpy as jnp
 
-from econirl.core.bellman import BellmanResult, SoftBellmanOperator
+from econirl.core.bellman import BellmanResult, SoftBellmanOperator, bellman_operator_fn
 from econirl.core.types import DDCProblem
 
 
@@ -43,9 +46,9 @@ class SolverResult:
         final_error: Final convergence error (sup norm of value change)
     """
 
-    Q: torch.Tensor
-    V: torch.Tensor
-    policy: torch.Tensor
+    Q: jnp.ndarray
+    V: jnp.ndarray
+    policy: jnp.ndarray
     converged: bool
     num_iterations: int
     final_error: float
@@ -53,17 +56,15 @@ class SolverResult:
 
 def value_iteration(
     operator: SoftBellmanOperator,
-    utility: torch.Tensor,
-    V_init: torch.Tensor | None = None,
+    utility: jnp.ndarray,
+    V_init: jnp.ndarray | None = None,
     tol: float = 1e-10,
     max_iter: int = 1000,
 ) -> SolverResult:
-    """Solve for the fixed point using value iteration.
+    """Solve for the fixed point using value iteration with jax.lax.while_loop.
 
-    Iteratively applies the soft Bellman operator until convergence:
-        V_{k+1} = T(V_k)
-
-    Convergence is guaranteed because T is a contraction with modulus β.
+    The entire convergence loop is compiled to a single XLA kernel,
+    eliminating Python dispatch overhead per iteration.
 
     Args:
         operator: SoftBellmanOperator instance
@@ -74,56 +75,47 @@ def value_iteration(
 
     Returns:
         SolverResult with converged value function and policy
-
-    Example:
-        >>> operator = SoftBellmanOperator(problem, transitions)
-        >>> result = value_iteration(operator, utility)
-        >>> if result.converged:
-        ...     print(f"Converged in {result.num_iterations} iterations")
     """
     num_states = operator.problem.num_states
+    beta = operator.problem.discount_factor
+    sigma = operator.problem.scale_parameter
+    transitions = operator.transitions
 
     if V_init is None:
-        V = torch.zeros(num_states, dtype=utility.dtype, device=utility.device)
+        V = jnp.zeros(num_states, dtype=jnp.float64)
     else:
-        V = V_init.clone()
+        V = jnp.array(V_init)
 
-    converged = False
-    final_error = float("inf")
+    def body_fn(carry):
+        V, iteration, error = carry
+        V_new = bellman_operator_fn(V, (utility, transitions, beta, sigma))
+        error = jnp.max(jnp.abs(V_new - V))
+        return V_new, iteration + 1, error
 
-    for iteration in range(max_iter):
-        result = operator.apply(utility, V)
-        V_new = result.V
+    def cond_fn(carry):
+        _, iteration, error = carry
+        return jnp.logical_and(error > tol, iteration < max_iter)
 
-        # Check convergence using sup norm
-        error = torch.abs(V_new - V).max().item()
-
-        V = V_new
-
-        if error < tol:
-            converged = True
-            final_error = error
-            break
-
-        final_error = error
+    init_state = (V, jnp.int32(0), jnp.float64(tol + 1.0))
+    V_final, n_iter, final_error = jax.lax.while_loop(cond_fn, body_fn, init_state)
 
     # Get final Q and policy
-    final_result = operator.apply(utility, V)
+    final_result = operator.apply(utility, V_final)
 
     return SolverResult(
         Q=final_result.Q,
         V=final_result.V,
         policy=final_result.policy,
-        converged=converged,
-        num_iterations=iteration + 1,
-        final_error=final_error,
+        converged=bool(final_error <= tol),
+        num_iterations=int(n_iter),
+        final_error=float(final_error),
     )
 
 
 def policy_iteration(
     operator: SoftBellmanOperator,
-    utility: torch.Tensor,
-    V_init: torch.Tensor | None = None,
+    utility: jnp.ndarray,
+    V_init: jnp.ndarray | None = None,
     tol: float = 1e-10,
     max_iter: int = 100,
     eval_method: Literal["matrix", "iterative"] = "matrix",
@@ -133,11 +125,8 @@ def policy_iteration(
     """Solve for the fixed point using policy iteration.
 
     Policy iteration alternates between:
-    1. Policy evaluation: Given policy π, solve for V^π
+    1. Policy evaluation: Given policy, solve for V
     2. Policy improvement: Update policy using new V
-
-    For logit models, the "policy" is the choice probability distribution,
-    and policy evaluation requires solving a linear system.
 
     This can converge faster than value iteration, especially for
     high discount factors.
@@ -157,14 +146,13 @@ def policy_iteration(
     """
     problem = operator.problem
     num_states = problem.num_states
-    num_actions = problem.num_actions
     beta = problem.discount_factor
     sigma = problem.scale_parameter
 
     if V_init is None:
-        V = torch.zeros(num_states, dtype=utility.dtype, device=utility.device)
+        V = jnp.zeros(num_states, dtype=jnp.float64)
     else:
-        V = V_init.clone()
+        V = jnp.array(V_init)
 
     # Initial policy
     result = operator.apply(utility, V)
@@ -189,7 +177,7 @@ def policy_iteration(
         new_policy = new_result.policy
 
         # Check convergence of policy
-        policy_error = torch.abs(new_policy - policy).max().item()
+        policy_error = float(jnp.abs(new_policy - policy).max())
 
         policy = new_policy
 
@@ -214,110 +202,87 @@ def policy_iteration(
 
 
 def _policy_evaluation_matrix(
-    utility: torch.Tensor,
-    policy: torch.Tensor,
-    transitions: torch.Tensor,
+    utility: jnp.ndarray,
+    policy: jnp.ndarray,
+    transitions: jnp.ndarray,
     beta: float,
     sigma: float,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Evaluate policy by solving linear system.
 
-    Given policy π, solves:
-        V^π(s) = Σ_a π(a|s) u(s,a) + σ·H(π(·|s)) + β Σ_a π(a|s) Σ_{s'} P(s'|s,a) V^π(s')
+    Given policy pi, solves:
+        (I - beta*P_pi) V = r_pi
 
-    where H(π) = -Σ_a π(a) log π(a) is Shannon entropy.
-
-    This can be written as: (I - βP^π) V = r^π
-    where P^π is the policy-weighted transition matrix.
+    where r_pi = E_pi[u] + sigma*H(pi) is expected flow utility plus entropy.
     """
     num_states = utility.shape[0]
-    device = utility.device
-    dtype = utility.dtype
 
     # Expected flow utility under policy (including entropy bonus)
-    # r^π(s) = Σ_a π(a|s) u(s,a) + σ·H(π(·|s))
-    # where H(π) = -Σ_a π(a) log π(a) is Shannon entropy
-    log_policy = torch.log(policy + 1e-10)
-    expected_utility = (policy * utility).sum(dim=1)
-    entropy_bonus = -sigma * (policy * log_policy).sum(dim=1)
+    log_policy = jnp.log(policy + 1e-10)
+    expected_utility = (policy * utility).sum(axis=1)
+    entropy_bonus = -sigma * (policy * log_policy).sum(axis=1)
     r_pi = expected_utility + entropy_bonus
 
-    # Policy-weighted transition matrix P^π(s,s') = Σ_a π(a|s) P(s'|s,a)
-    # transitions shape: (num_actions, num_states, num_states) = [a, from_s, to_s]
-    # policy shape: (num_states, num_actions) = [from_s, a]
-    P_pi = torch.einsum("sa,ast->st", policy, transitions)
+    # Policy-weighted transition matrix P_pi[s,s'] = sum_a pi(a|s) P(s'|s,a)
+    P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
-    # Solve (I - βP^π) V = r^π
-    A = torch.eye(num_states, device=device, dtype=dtype) - beta * P_pi
-    V = torch.linalg.solve(A, r_pi)
+    # Solve (I - beta*P_pi) V = r_pi
+    A = jnp.eye(num_states) - beta * P_pi
+    V = jnp.linalg.solve(A, r_pi)
 
     return V
 
 
 def _policy_evaluation_iterative(
-    utility: torch.Tensor,
-    policy: torch.Tensor,
-    transitions: torch.Tensor,
+    utility: jnp.ndarray,
+    policy: jnp.ndarray,
+    transitions: jnp.ndarray,
     beta: float,
     sigma: float,
     tol: float,
     max_iter: int,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Evaluate policy by fixed-point iteration.
 
     Useful when state space is large and matrix solve is expensive.
     """
     num_states = utility.shape[0]
-    device = utility.device
-    dtype = utility.dtype
 
-    # Expected flow utility under policy (including entropy bonus)
-    # r^π(s) = Σ_a π(a|s) u(s,a) + σ·H(π(·|s))
-    # where H(π) = -Σ_a π(a) log π(a) is Shannon entropy
-    log_policy = torch.log(policy + 1e-10)
-    expected_utility = (policy * utility).sum(dim=1)
-    entropy_bonus = -sigma * (policy * log_policy).sum(dim=1)
+    log_policy = jnp.log(policy + 1e-10)
+    expected_utility = (policy * utility).sum(axis=1)
+    entropy_bonus = -sigma * (policy * log_policy).sum(axis=1)
     r_pi = expected_utility + entropy_bonus
 
-    # Policy-weighted transition matrix
-    P_pi = torch.einsum("sa,ast->st", policy, transitions)
+    P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
-    # Iterate: V_{k+1} = r^π + β P^π V_k
-    V = torch.zeros(num_states, device=device, dtype=dtype)
+    # Iterate: V_{k+1} = r_pi + beta * P_pi @ V_k
+    V = jnp.zeros(num_states)
 
-    for _ in range(max_iter):
+    def body_fn(carry):
+        V, error, k = carry
         V_new = r_pi + beta * (P_pi @ V)
-        if torch.abs(V_new - V).max() < tol:
-            return V_new
-        V = V_new
+        error = jnp.max(jnp.abs(V_new - V))
+        return V_new, error, k + 1
 
+    def cond_fn(carry):
+        _, error, k = carry
+        return jnp.logical_and(error > tol, k < max_iter)
+
+    V, _, _ = jax.lax.while_loop(cond_fn, body_fn, (V, jnp.float64(tol + 1.0), jnp.int32(0)))
     return V
 
 
 def _newton_kantorovich_step(
-    V: torch.Tensor,
-    utility: torch.Tensor,
+    V: jnp.ndarray,
+    utility: jnp.ndarray,
     operator: SoftBellmanOperator,
-) -> tuple[torch.Tensor, float]:
+) -> tuple[jnp.ndarray, float]:
     """Perform a single Newton-Kantorovich iteration.
 
     The NK update is:
-        V_{k+1} = V_k + (I - βP)⁻¹ [T(V_k) - V_k]
-
-    where:
-    - T is the soft Bellman operator
-    - P is the policy-weighted transition matrix at current V
-    - (I - βP)⁻¹ accelerates convergence via Newton's method
+        V_{k+1} = V_k + (I - beta*P)^{-1} [T(V_k) - V_k]
 
     This achieves quadratic convergence near the fixed point.
-
-    Args:
-        V: Current value function estimate
-        utility: Flow utility matrix, shape (num_states, num_actions)
-        operator: SoftBellmanOperator instance
-
-    Returns:
-        Tuple of (updated value function, post-update residual norm)
 
     Reference:
         Rust (2000) NFXP Manual, Section 3.2
@@ -325,35 +290,31 @@ def _newton_kantorovich_step(
     # Apply Bellman operator to get T(V_k)
     result = operator.apply(utility, V)
     V_bellman = result.V
-
-    # Compute residual: T(V_k) - V_k
     residual = V_bellman - V
 
-    # Policy-weighted transition matrix P^π(s,s') = Σ_a π(a|s) P(s'|s,a)
-    # transitions shape: (num_actions, num_states, num_states) = [a, from_s, to_s]
-    # policy shape: (num_states, num_actions) = [from_s, a]
-    P_pi = torch.einsum("sa,ast->st", result.policy, operator.transitions)
+    # Policy-weighted transition matrix
+    P_pi = jnp.einsum("sa,ast->st", result.policy, operator.transitions)
 
-    # Solve (I - βP) Δ = residual for the Newton correction Δ
+    # Solve (I - beta*P) delta = residual for the Newton correction
     beta = operator.problem.discount_factor
     num_states = len(V)
-    A = torch.eye(num_states, device=V.device, dtype=V.dtype) - beta * P_pi
-    delta = torch.linalg.solve(A, residual)
+    A = jnp.eye(num_states) - beta * P_pi
+    delta = jnp.linalg.solve(A, residual)
 
     # Apply Newton correction
     V_new = V + delta
 
     # Compute post-update residual for convergence check
     result_new = operator.apply(utility, V_new)
-    post_residual_norm = torch.abs(result_new.V - V_new).max().item()
+    post_residual_norm = float(jnp.abs(result_new.V - V_new).max())
 
     return V_new, post_residual_norm
 
 
 def hybrid_iteration(
     operator: SoftBellmanOperator,
-    utility: torch.Tensor,
-    V_init: torch.Tensor | None = None,
+    utility: jnp.ndarray,
+    V_init: jnp.ndarray | None = None,
     tol: float = 1e-10,
     max_iter: int = 1000,
     switch_tol: float = 1e-3,
@@ -362,16 +323,8 @@ def hybrid_iteration(
     """Solve for the fixed point using hybrid contraction + Newton-Kantorovich.
 
     This implements the hybrid algorithm from Rust (1987, 2000):
-    1. Run contraction iterations (value iteration) until error < switch_tol
+    1. Run contraction iterations until error < switch_tol
     2. Switch to Newton-Kantorovich iterations for quadratic convergence
-    3. Typically converges in just 1-2 NK iterations after the switch
-
-    The NK iteration is:
-        V_{k+1} = V_k + (I - βP)⁻¹ [T(V_k) - V_k]
-
-    This exploits the structure of the Bellman fixed-point equation to
-    achieve quadratic convergence, much faster than the linear convergence
-    of pure contraction.
 
     Args:
         operator: SoftBellmanOperator instance
@@ -385,52 +338,43 @@ def hybrid_iteration(
     Returns:
         SolverResult with converged value function and policy
 
-    Example:
-        >>> operator = SoftBellmanOperator(problem, transitions)
-        >>> result = hybrid_iteration(operator, utility, switch_tol=1e-3)
-        >>> print(f"Converged in {result.num_iterations} iterations")
-
     Reference:
         Rust, J. (2000). "NFXP Manual"
         Iskhakov et al. (2016). "The Endurance of First-Price Auctions"
     """
     num_states = operator.problem.num_states
+    beta = operator.problem.discount_factor
+    sigma = operator.problem.scale_parameter
+    transitions = operator.transitions
 
     if V_init is None:
-        V = torch.zeros(num_states, dtype=utility.dtype, device=utility.device)
+        V = jnp.zeros(num_states, dtype=jnp.float64)
     else:
-        V = V_init.clone()
+        V = jnp.array(V_init)
 
-    converged = False
-    final_error = float("inf")
-    iteration = 0
-    switch_to_nk = False
+    # Phase 1: Contraction iterations via while_loop
+    def sa_body(carry):
+        V, error, k = carry
+        V_new = bellman_operator_fn(V, (utility, transitions, beta, sigma))
+        error = jnp.max(jnp.abs(V_new - V))
+        return V_new, error, k + 1
 
-    # Phase 1: Contraction iterations until close to solution
-    for iteration in range(max_iter):
-        result = operator.apply(utility, V)
-        V_new = result.V
+    def sa_cond(carry):
+        _, error, k = carry
+        return jnp.logical_and(error > switch_tol, k < max_iter)
 
-        error = torch.abs(V_new - V).max().item()
-        V = V_new
-        final_error = error
+    init_state = (V, jnp.float64(switch_tol + 1.0), jnp.int32(0))
+    V, sa_error, sa_iters = jax.lax.while_loop(sa_cond, sa_body, init_state)
 
-        if error < tol:
-            # Already converged during contraction phase
-            converged = True
-            break
+    converged = bool(sa_error <= tol)
+    final_error = float(sa_error)
+    total_iters = int(sa_iters)
 
-        if error < switch_tol:
-            # Switch to NK phase
-            switch_to_nk = True
-            break
-
-    contraction_iters = iteration + 1
-
-    # Phase 2: Newton-Kantorovich iterations for quadratic convergence
-    if not converged and switch_to_nk:
+    # Phase 2: Newton-Kantorovich iterations
+    if not converged and float(sa_error) <= switch_tol:
         for nk_iter in range(max_nk_iter):
             V, error = _newton_kantorovich_step(V, utility, operator)
+            total_iters += 1
 
             if error < tol:
                 converged = True
@@ -438,10 +382,6 @@ def hybrid_iteration(
                 break
 
             final_error = error
-
-        iteration = contraction_iters + nk_iter + 1
-    else:
-        iteration = contraction_iters
 
     # Get final Q and policy
     final_result = operator.apply(utility, V)
@@ -451,132 +391,129 @@ def hybrid_iteration(
         V=final_result.V,
         policy=final_result.policy,
         converged=converged,
-        num_iterations=iteration,
+        num_iterations=total_iters,
         final_error=final_error,
     )
 
 
-@dataclass
-class FiniteHorizonResult:
-    """Result from solving a finite-horizon dynamic programming problem.
-
-    All tensors are time-indexed: index 0 is the first period, T-1 is the last.
-
-    Attributes:
-        Q: Action-value functions, shape (num_periods, num_states, num_actions)
-        V: Value functions, shape (num_periods, num_states)
-        policy: Choice probabilities, shape (num_periods, num_states, num_actions)
-        num_periods: Number of time periods
-    """
-
-    Q: torch.Tensor
-    V: torch.Tensor
-    policy: torch.Tensor
-    num_periods: int
-
-
 def backward_induction(
     operator: SoftBellmanOperator,
-    utility: torch.Tensor,
-    num_periods: int,
-    terminal_value: torch.Tensor | None = None,
-) -> FiniteHorizonResult:
-    """Solve finite-horizon DDC by backward induction.
-
-    For t = T-1, T-2, ..., 0:
-        Q_t(s,a) = u(s,a) + β Σ_{s'} P(s'|s,a) V_{t+1}(s')
-        V_t(s) = σ log(Σ_a exp(Q_t(s,a)/σ))
-        π_t(a|s) = softmax(Q_t(s,a)/σ)
-
-    This is the standard finite-horizon solution for DDC models
-    (Keane & Wolpin 1994, Ziebart 2008). No convergence criterion
-    needed — the backward pass is deterministic.
+    utility_sequence: list[jnp.ndarray] | jnp.ndarray,
+    terminal_V: jnp.ndarray | None = None,
+) -> SolverResult:
+    """Solve finite-horizon problem via backward induction.
 
     Args:
         operator: SoftBellmanOperator instance
-        utility: Flow utility matrix, shape (num_states, num_actions).
-            If time-varying, shape (num_periods, num_states, num_actions).
-        num_periods: Number of decision periods T
-        terminal_value: Terminal value function V_T(s), shape (num_states,).
-            Defaults to zeros (no continuation value after horizon).
+        utility_sequence: List of utility matrices, one per period (T periods),
+            or stacked array of shape (T, num_states, num_actions)
+        terminal_V: Terminal value function. If None, uses zeros.
 
     Returns:
-        FiniteHorizonResult with time-indexed Q, V, and policy tensors.
-
-    Example:
-        >>> operator = SoftBellmanOperator(problem, transitions)
-        >>> result = backward_induction(operator, utility, num_periods=10)
-        >>> print(result.policy.shape)  # (10, num_states, num_actions)
+        SolverResult with period-0 values (Q, V, policy)
     """
     num_states = operator.problem.num_states
-    num_actions = operator.problem.num_actions
-    dtype = utility.dtype
-    device = utility.device
 
-    # Time-varying or stationary utility
-    time_varying = utility.dim() == 3
-    if time_varying and utility.shape[0] != num_periods:
-        raise ValueError(
-            f"Time-varying utility has {utility.shape[0]} periods, "
-            f"expected {num_periods}"
-        )
-
-    # Allocate output tensors
-    all_Q = torch.zeros(num_periods, num_states, num_actions, dtype=dtype, device=device)
-    all_V = torch.zeros(num_periods, num_states, dtype=dtype, device=device)
-    all_policy = torch.zeros(num_periods, num_states, num_actions, dtype=dtype, device=device)
-
-    # Terminal value
-    if terminal_value is None:
-        V_next = torch.zeros(num_states, dtype=dtype, device=device)
+    if terminal_V is None:
+        V = jnp.zeros(num_states, dtype=jnp.float64)
     else:
-        V_next = terminal_value.clone()
+        V = jnp.array(terminal_V)
 
-    # Backward pass: t = T-1, T-2, ..., 0
-    for t in range(num_periods - 1, -1, -1):
-        u_t = utility[t] if time_varying else utility
-        result = operator.apply(u_t, V_next)
+    if isinstance(utility_sequence, list):
+        utility_sequence = jnp.stack(utility_sequence)
 
-        all_Q[t] = result.Q
-        all_V[t] = result.V
-        all_policy[t] = result.policy
+    T = utility_sequence.shape[0]
 
-        V_next = result.V
+    # Backward pass using scan (reversed)
+    def step(V_next, utility_t):
+        result = operator.apply(utility_t, V_next)
+        return result.V, (result.Q, result.V, result.policy)
 
-    return FiniteHorizonResult(
-        Q=all_Q,
-        V=all_V,
-        policy=all_policy,
-        num_periods=num_periods,
+    V_final, (all_Q, all_V, all_policy) = jax.lax.scan(
+        step, V, utility_sequence[::-1]
+    )
+
+    # Reverse to get period-0 first
+    all_Q = all_Q[::-1]
+    all_V = all_V[::-1]
+    all_policy = all_policy[::-1]
+
+    return SolverResult(
+        Q=all_Q[0],
+        V=all_V[0],
+        policy=all_policy[0],
+        converged=True,
+        num_iterations=T,
+        final_error=0.0,
     )
 
 
-def solve(
+def optimistix_solve(
     problem: DDCProblem,
-    transitions: torch.Tensor,
-    utility: torch.Tensor,
-    method: Literal["value", "policy", "hybrid"] = "value",
-    **kwargs,
-) -> SolverResult:
-    """Convenience function to solve a DDC problem.
+    transitions: jnp.ndarray,
+    utility: jnp.ndarray,
+    tol: float = 1e-10,
+    max_steps: int = 10000,
+) -> jnp.ndarray:
+    """Solve Bellman fixed point using optimistix with implicit differentiation.
+
+    This is the recommended solver for use with jax.grad, jax.hessian, etc.
+    The implicit function theorem is applied automatically through the
+    ImplicitAdjoint, giving machine-precision gradients of V* w.r.t.
+    structural parameters at O(n) memory cost.
 
     Args:
         problem: DDCProblem specification
-        transitions: Transition matrices, shape (num_actions, num_states, num_states)
-        utility: Flow utility matrix, shape (num_states, num_actions)
-        method: "value" for value iteration, "policy" for policy iteration
-        **kwargs: Additional arguments passed to the solver
+        transitions: Transition matrices, shape (A, S, S)
+        utility: Flow utility matrix, shape (S, A)
+        tol: Convergence tolerance
+        max_steps: Maximum number of iterations
 
     Returns:
-        SolverResult with solution
+        Converged value function V*, shape (S,). Differentiable via IFT.
     """
-    operator = SoftBellmanOperator(problem, transitions)
+    import optimistix as optx
 
+    args = (utility, transitions, problem.discount_factor, problem.scale_parameter)
+    V_init = jnp.zeros(problem.num_states)
+    solver = optx.FixedPointIteration(rtol=tol, atol=tol)
+    sol = optx.fixed_point(
+        bellman_operator_fn, solver, V_init, args=args,
+        max_steps=max_steps,
+        adjoint=optx.ImplicitAdjoint(),
+        throw=False,
+    )
+    return sol.value
+
+
+def solve(
+    operator: SoftBellmanOperator,
+    utility: jnp.ndarray,
+    V_init: jnp.ndarray | None = None,
+    method: Literal["value", "policy", "hybrid"] = "hybrid",
+    tol: float = 1e-10,
+    max_iter: int = 1000,
+    **kwargs,
+) -> SolverResult:
+    """Convenience dispatcher for different solver methods.
+
+    Args:
+        operator: SoftBellmanOperator instance
+        utility: Flow utility matrix
+        V_init: Initial value function guess
+        method: "value", "policy", or "hybrid"
+        tol: Convergence tolerance
+        max_iter: Maximum iterations
+        **kwargs: Additional arguments passed to the specific solver
+
+    Returns:
+        SolverResult
+    """
     if method == "value":
-        return value_iteration(operator, utility, **kwargs)
+        return value_iteration(operator, utility, V_init, tol, max_iter)
     elif method == "policy":
-        return policy_iteration(operator, utility, **kwargs)
+        return policy_iteration(operator, utility, V_init, tol, max_iter, **kwargs)
     elif method == "hybrid":
-        return hybrid_iteration(operator, utility, **kwargs)
+        return hybrid_iteration(operator, utility, V_init, tol, max_iter, **kwargs)
     else:
         raise ValueError(f"Unknown method: {method}. Use 'value', 'policy', or 'hybrid'.")

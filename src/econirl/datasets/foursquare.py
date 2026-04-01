@@ -197,15 +197,15 @@ def load_foursquare(
 
     if as_panel:
         from econirl.core.types import Panel, Trajectory
-        import torch
+        import jax.numpy as jnp
 
         trajectories = []
         for user_id in result["user_id"].unique():
             user_data = result[result["user_id"] == user_id].sort_values("period")
             traj = Trajectory(
-                states=torch.tensor(user_data["state"].values, dtype=torch.long),
-                actions=torch.tensor(user_data["action"].values, dtype=torch.long),
-                next_states=torch.tensor(user_data["next_state"].values, dtype=torch.long),
+                states=jnp.array(user_data["state"].values, dtype=jnp.int32),
+                actions=jnp.array(user_data["action"].values, dtype=jnp.int32),
+                next_states=jnp.array(user_data["next_state"].values, dtype=jnp.int32),
                 individual_id=int(user_id),
             )
             trajectories.append(traj)

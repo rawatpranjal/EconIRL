@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-import torch
+import jax.numpy as jnp
 
 from econirl.preferences.base import BaseUtilityFunction
 
@@ -63,7 +63,7 @@ class ActionDependentUtility(BaseUtilityFunction):
         ...     num_states=90,
         ...     state_scale=90.0,
         ... )
-        >>> params = torch.tensor([0.001, 3.0])  # [theta_c, RC]
+        >>> params = jnp.array([0.001, 3.0])  # [theta_c, RC]
         >>> U = utility.compute(params)  # shape (90, 2)
         >>> print(f"U[45, keep]: {U[45, 0]:.4f}")  # Should be negative
         >>> print(f"U[45, replace]: {U[45, 1]:.4f}")  # Should be -3.0
@@ -79,8 +79,8 @@ class ActionDependentUtility(BaseUtilityFunction):
         num_actions: int,
         parameter_names: list[str],
         state_scale: float = 1.0,
-        utility_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None,
-        gradient_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None,
+        utility_fn: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray] | None = None,
+        gradient_fn: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray] | None = None,
     ):
         """Initialize the action-dependent utility function.
 
@@ -90,9 +90,9 @@ class ActionDependentUtility(BaseUtilityFunction):
             parameter_names: Names for each parameter (e.g., ["theta_c", "RC"])
             state_scale: Scale factor for normalizing state variable (default: 1.0)
             utility_fn: Optional custom utility function. If None, uses Rust model.
-                       Signature: (params: Tensor, states: Tensor) -> Tensor[num_states, num_actions]
+                       Signature: (params: ndarray, states: ndarray) -> ndarray[num_states, num_actions]
             gradient_fn: Optional custom gradient function. If None, computes analytically.
-                        Signature: (params: Tensor, states: Tensor) -> Tensor[num_states, num_actions, num_params]
+                        Signature: (params: ndarray, states: ndarray) -> ndarray[num_states, num_actions, num_params]
         """
         super().__init__(
             num_states=num_states,
@@ -106,14 +106,14 @@ class ActionDependentUtility(BaseUtilityFunction):
         self._gradient_fn = gradient_fn
 
         # Pre-compute state indices tensor
-        self._state_indices = torch.arange(num_states, dtype=torch.float32)
+        self._state_indices = jnp.arange(num_states, dtype=jnp.float32)
 
     @property
     def state_scale(self) -> float:
         """Scale factor for state normalization."""
         return self._state_scale
 
-    def compute(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute utility matrix U(s, a; params) for all state-action pairs.
 
         For the default Rust model:
@@ -135,7 +135,7 @@ class ActionDependentUtility(BaseUtilityFunction):
         # Default: Rust (1987) model
         return self._compute_rust_utility(parameters)
 
-    def _compute_rust_utility(self, parameters: torch.Tensor) -> torch.Tensor:
+    def _compute_rust_utility(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute Rust (1987) utility structure.
 
         U(s, keep) = -theta_c * s / scale
@@ -151,17 +151,17 @@ class ActionDependentUtility(BaseUtilityFunction):
         rc = parameters[1]
 
         # Initialize utility matrix
-        U = torch.zeros((self.num_states, self.num_actions), dtype=parameters.dtype)
+        U = jnp.zeros((self.num_states, self.num_actions), dtype=parameters.dtype)
 
         # Keep action: U = -theta_c * s / scale
-        U[:, self.KEEP] = -theta_c * self._state_indices / self._state_scale
+        U = U.at[:, self.KEEP].set(-theta_c * self._state_indices / self._state_scale)
 
         # Replace action: U = -RC
-        U[:, self.REPLACE] = -rc
+        U = U.at[:, self.REPLACE].set(-rc)
 
         return U
 
-    def compute_gradient(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_gradient(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute gradient of utility with respect to parameters.
 
         For the Rust model:
@@ -185,7 +185,7 @@ class ActionDependentUtility(BaseUtilityFunction):
         # Default: Rust (1987) model gradient
         return self._compute_rust_gradient(parameters)
 
-    def _compute_rust_gradient(self, parameters: torch.Tensor) -> torch.Tensor:
+    def _compute_rust_gradient(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute gradient for Rust (1987) utility.
 
         dU/d(theta_c) = [-s/scale, 0]  for [keep, replace]
@@ -197,20 +197,20 @@ class ActionDependentUtility(BaseUtilityFunction):
         Returns:
             Gradient tensor of shape (num_states, num_actions, num_parameters)
         """
-        grad = torch.zeros(
+        grad = jnp.zeros(
             (self.num_states, self.num_actions, self.num_parameters),
             dtype=parameters.dtype,
         )
 
         # dU/d(theta_c): only affects keep action
-        grad[:, self.KEEP, 0] = -self._state_indices / self._state_scale
+        grad = grad.at[:, self.KEEP, 0].set(-self._state_indices / self._state_scale)
 
         # dU/d(RC): only affects replace action
-        grad[:, self.REPLACE, 1] = -1.0
+        grad = grad.at[:, self.REPLACE, 1].set(-1.0)
 
         return grad
 
-    def compute_hessian(self, parameters: torch.Tensor) -> torch.Tensor:
+    def compute_hessian(self, parameters: jnp.ndarray) -> jnp.ndarray:
         """Compute Hessian of utility with respect to parameters.
 
         For linear utility structures like Rust (1987), the Hessian is zero
@@ -222,12 +222,12 @@ class ActionDependentUtility(BaseUtilityFunction):
         Returns:
             Zero tensor of shape (num_states, num_actions, num_parameters, num_parameters)
         """
-        return torch.zeros(
+        return jnp.zeros(
             (self.num_states, self.num_actions, self.num_parameters, self.num_parameters),
             dtype=parameters.dtype,
         )
 
-    def get_initial_parameters(self) -> torch.Tensor:
+    def get_initial_parameters(self) -> jnp.ndarray:
         """Return reasonable initial parameter values for optimization.
 
         For the Rust model, returns conservative starting values:
@@ -239,12 +239,12 @@ class ActionDependentUtility(BaseUtilityFunction):
         """
         if self.num_parameters == 2:
             # Rust model defaults
-            return torch.tensor([0.01, 1.0], dtype=torch.float32)
+            return jnp.array([0.01, 1.0], dtype=jnp.float32)
         else:
             # Generic: start near zero
-            return torch.zeros(self.num_parameters, dtype=torch.float32)
+            return jnp.zeros(self.num_parameters, dtype=jnp.float32)
 
-    def get_parameter_bounds(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_parameter_bounds(self) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Return lower and upper bounds for parameters.
 
         For the Rust model:
@@ -256,8 +256,8 @@ class ActionDependentUtility(BaseUtilityFunction):
         """
         if self.num_parameters == 2:
             # Rust model: both parameters must be non-negative
-            lower = torch.tensor([0.0, 0.0], dtype=torch.float32)
-            upper = torch.tensor([float("inf"), float("inf")], dtype=torch.float32)
+            lower = jnp.array([0.0, 0.0], dtype=jnp.float32)
+            upper = jnp.array([float("inf"), float("inf")], dtype=jnp.float32)
             return lower, upper
         else:
             # Generic: no bounds
@@ -312,26 +312,6 @@ class ActionDependentUtility(BaseUtilityFunction):
             parameter_names=env.parameter_names,
             state_scale=state_scale,
         )
-
-    def to(self, device: torch.device | str) -> "ActionDependentUtility":
-        """Move internal tensors to specified device.
-
-        Args:
-            device: Target device (e.g., "cuda", "cpu")
-
-        Returns:
-            New ActionDependentUtility with tensors on specified device
-        """
-        new_utility = ActionDependentUtility(
-            num_states=self.num_states,
-            num_actions=self.num_actions,
-            parameter_names=self._parameter_names.copy(),
-            state_scale=self._state_scale,
-            utility_fn=self._utility_fn,
-            gradient_fn=self._gradient_fn,
-        )
-        new_utility._state_indices = self._state_indices.to(device)
-        return new_utility
 
     def __repr__(self) -> str:
         return (

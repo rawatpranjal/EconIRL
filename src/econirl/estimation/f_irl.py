@@ -30,7 +30,8 @@ from __future__ import annotations
 import time
 from typing import Literal
 
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -96,7 +97,7 @@ class FIRLEstimator(BaseEstimator):
         panel: Panel,
         n_states: int,
         n_actions: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute empirical state-action marginal from demonstrations.
 
         Returns:
@@ -105,19 +106,19 @@ class FIRLEstimator(BaseEstimator):
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
         idx = all_states * n_actions + all_actions
-        counts = torch.zeros(n_states * n_actions).scatter_add_(
-            0, idx.long(), torch.ones(idx.shape[0])
+        counts = jnp.zeros(n_states * n_actions).scatter_add_(
+            0, idx.long(), jnp.ones(idx.shape[0])
         ).reshape(n_states, n_actions)
         total = counts.sum()
         return counts / total.clamp(min=1)
 
     def _compute_policy_marginal(
         self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
         problem: DDCProblem,
         panel: Panel,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute state-action marginal under policy via forward propagation.
 
         Returns:
@@ -127,17 +128,17 @@ class FIRLEstimator(BaseEstimator):
         beta = problem.discount_factor
 
         # Initial state distribution from data
-        init_counts = torch.zeros(n_states)
-        init_states = torch.tensor(
+        init_counts = jnp.zeros(n_states)
+        init_states = jnp.array(
             [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
-            dtype=torch.long,
+            dtype=jnp.int32,
         )
-        init_counts.scatter_add_(0, init_states, torch.ones_like(init_states, dtype=torch.float32))
+        init_counts.scatter_add_(0, init_states, jnp.ones_like(init_states, dtype=jnp.float32))
         mu = init_counts / init_counts.sum().clamp(min=1)
 
         # Forward propagation of state visitation
-        state_vis = mu.clone()
-        P_pi = torch.einsum("sa,ast->st", policy, transitions)
+        state_vis = mu.copy()
+        P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
         for t in range(1, self._horizon):
             mu = mu @ P_pi
@@ -151,9 +152,9 @@ class FIRLEstimator(BaseEstimator):
 
     def _f_divergence_gradient(
         self,
-        p_expert: torch.Tensor,
-        p_policy: torch.Tensor,
-    ) -> torch.Tensor:
+        p_expert: jnp.ndarray,
+        p_policy: jnp.ndarray,
+    ) -> jnp.ndarray:
         """Compute gradient of f-divergence w.r.t. reward.
 
         The reward update direction is proportional to the f-divergence
@@ -173,13 +174,13 @@ class FIRLEstimator(BaseEstimator):
         if self._f_divergence == "kl":
             # Gradient of KL(expert || policy) w.r.t. log-reward
             # Points where expert has mass but policy doesn't get upweighted
-            return torch.log(p_expert_safe / p_policy_safe)
+            return jnp.log(p_expert_safe / p_policy_safe)
         elif self._f_divergence == "chi2":
             # Chi-squared divergence gradient
             return (p_expert_safe / p_policy_safe) - 1.0
         elif self._f_divergence == "tv":
             # Total variation gradient
-            return torch.sign(p_expert - p_policy)
+            return jnp.sign(p_expert - p_policy)
         else:
             raise ValueError(f"Unknown f-divergence: {self._f_divergence}")
 
@@ -188,8 +189,8 @@ class FIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run f-IRL optimization."""
@@ -203,7 +204,7 @@ class FIRLEstimator(BaseEstimator):
         expert_marginal = self._compute_expert_marginal(panel, n_states, n_actions)
 
         # Initialize tabular reward
-        reward = torch.zeros(n_states, n_actions)
+        reward = jnp.zeros(n_states, n_actions)
 
         best_ll = float("-inf")
         best_policy = None
@@ -241,9 +242,9 @@ class FIRLEstimator(BaseEstimator):
 
             if ll > best_ll:
                 best_ll = ll
-                best_policy = policy.clone()
-                best_V = solver_result.V.clone()
-                best_reward = reward.clone()
+                best_policy = policy.copy()
+                best_V = solver_result.V.copy()
+                best_reward = reward.copy()
 
             if self._verbose and (it + 1) % 100 == 0:
                 div = (expert_marginal - policy_marginal).abs().sum().item()
@@ -276,8 +277,8 @@ class FIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate via f-IRL.
@@ -302,7 +303,7 @@ class FIRLEstimator(BaseEstimator):
             num_observations=n_obs,
             aic=-2 * result.log_likelihood + 2 * n_params,
             bic=-2 * result.log_likelihood
-            + n_params * torch.log(torch.tensor(n_obs)).item(),
+            + n_params * jnp.log(jnp.array(n_obs)).item(),
             prediction_accuracy=self._compute_prediction_accuracy(
                 panel, result.policy
             ),
@@ -317,7 +318,7 @@ class FIRLEstimator(BaseEstimator):
         return EstimationSummary(
             parameters=result.parameters,
             parameter_names=param_names,
-            standard_errors=torch.full_like(result.parameters, float("nan")),
+            standard_errors=jnp.full_like(result.parameters, float("nan")),
             hessian=None,
             variance_covariance=None,
             method=self.name,

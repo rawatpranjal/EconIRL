@@ -9,7 +9,8 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.environments import MultiComponentBusEnvironment
 from econirl.evaluation.adapters import build_utility_for_estimator
@@ -22,13 +23,9 @@ _ITER_PARAM_MAP: dict[str, str] = {
     "NFXPEstimator": "outer_max_iter",
     "CCPEstimator": "num_policy_iterations",
     "MCEIRLEstimator": "outer_max_iter",
-    "MaxEntIRLEstimator": "outer_max_iter",
-    "MaxMarginPlanningEstimator": "max_iterations",
     "TDCCPEstimator": "outer_max_iter",
     "GLADIUSEstimator": "max_epochs",
-    "GAILEstimator": "max_rounds",
     "AIRLEstimator": "max_rounds",
-    "GCLEstimator": "max_iterations",
 }
 
 
@@ -110,13 +107,13 @@ def track_convergence(
             if spec.can_recover_params and summary.parameters is not None:
                 est = summary.parameters
                 if len(est) == len(true_params):
-                    p_rmse = ((est - true_params) ** 2).float().mean().sqrt().item()
+                    p_rmse = ((est - true_params) ** 2).astype(jnp.float32).mean().sqrt().item()
 
             # Policy RMSE
             pol_rmse = float("nan")
             if summary.policy is not None:
                 pol_rmse = (
-                    ((summary.policy - true_policy) ** 2).float().mean().sqrt().item()
+                    ((summary.policy - true_policy) ** 2).astype(jnp.float32).mean().sqrt().item()
                 )
 
             profile.iterations.append(n_iter)

@@ -6,7 +6,8 @@ all derived from the same DDCEnvironment.
 
 from __future__ import annotations
 
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.environments.base import DDCEnvironment
 from econirl.preferences.action_reward import ActionDependentReward
@@ -17,12 +18,7 @@ from econirl.preferences.reward import LinearReward
 # Estimator classes that need ActionDependentReward
 _ACTION_DEPENDENT_NAMES = {
     "MCEIRLEstimator",
-    "MaxEntIRLEstimator",
-    "MaxMarginPlanningEstimator",
-    "MaxMarginIRLEstimator",
     "AIRLEstimator",
-    "GAILEstimator",
-    "BayesianIRLEstimator",
     "FIRLEstimator",
 }
 
@@ -30,7 +26,7 @@ _ACTION_DEPENDENT_NAMES = {
 _LINEAR_REWARD_NAMES: set[str] = set()
 
 
-def project_state_features(env: DDCEnvironment) -> torch.Tensor:
+def project_state_features(env: DDCEnvironment) -> jnp.ndarray:
     """Project 3D feature matrix to 2D state-only features.
 
     Extracts the keep-action (action=0) features from the 3D
@@ -42,7 +38,7 @@ def project_state_features(env: DDCEnvironment) -> torch.Tensor:
     Returns:
         State features of shape (n_states, n_features).
     """
-    return env.feature_matrix[:, 0, :].clone()
+    return env.feature_matrix[:, 0, :].copy()
 
 
 def build_utility_for_estimator(
@@ -74,5 +70,5 @@ def build_utility_for_estimator(
             n_actions=env.num_actions,
         )
 
-    # Default: LinearUtility (NFXP, CCP, TD-CCP, GLADIUS, GAIL, GCL)
+    # Default: LinearUtility (NFXP, CCP, TD-CCP, GLADIUS, NNES, SEES)
     return LinearUtility.from_environment(env)

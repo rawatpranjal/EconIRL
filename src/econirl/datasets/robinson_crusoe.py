@@ -152,15 +152,15 @@ def load_robinson_crusoe(
 def _to_panel(df: pd.DataFrame):
     """Convert to Panel format."""
     from econirl.core.types import Panel, Trajectory
-    import torch
+    import jax.numpy as jnp
 
     trajectories = []
     for ind_id in df['id'].unique():
         ind_data = df[df['id'] == ind_id].sort_values('period')
 
-        states = torch.tensor(ind_data['inventory'].values, dtype=torch.long)
-        actions = torch.tensor(ind_data['choice'].values, dtype=torch.long)
-        next_states = torch.cat([states[1:], states[-1:]])
+        states = jnp.array(ind_data['inventory'].values, dtype=jnp.int32)
+        actions = jnp.array(ind_data['choice'].values, dtype=jnp.int32)
+        next_states = jnp.concatenate([states[1:], states[-1:]])
 
         traj = Trajectory(
             states=states,

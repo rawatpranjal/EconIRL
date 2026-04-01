@@ -62,25 +62,25 @@ from econirl.preferences.linear import LinearUtility
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.ccp import CCPEstimator
 
-# Sklearn-style Estimators (recommended) — lazy imports to avoid broken deps
+# Sklearn-style Estimators — lazy imports (still on PyTorch, pending migration)
 try:
     from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES, TDCCP
-except ImportError:
+except (ImportError, SyntaxError):
     pass
 
 try:
     from econirl.estimators import NeuralGLADIUS
-except ImportError:
+except (ImportError, SyntaxError):
     pass
 
 try:
     from econirl.estimators import NeuralAIRL
-except ImportError:
+except (ImportError, SyntaxError):
     pass
 
 try:
     from econirl.estimators import MCEIRLNeural
-except ImportError:
+except (ImportError, SyntaxError):
     pass
 
 # Sklearn-style Utilities

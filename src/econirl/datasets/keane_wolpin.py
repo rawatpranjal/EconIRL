@@ -205,7 +205,7 @@ def _generate_kw_sample(
 def _to_panel(df: pd.DataFrame):
     """Convert DataFrame to Panel format."""
     from econirl.core.types import Panel, Trajectory
-    import torch
+    import jax.numpy as jnp
 
     # Create composite state from individual state variables
     # For KW, state = (schooling, exp_white, exp_blue) encoded as single int
@@ -225,9 +225,9 @@ def _to_panel(df: pd.DataFrame):
     for ind_id in df['id'].unique():
         ind_data = df[df['id'] == ind_id].sort_values('period')
 
-        states = torch.tensor(ind_data['state'].values, dtype=torch.long)
-        actions = torch.tensor(ind_data['choice'].values, dtype=torch.long)
-        next_states = torch.cat([states[1:], states[-1:]])
+        states = jnp.array(ind_data['state'].values, dtype=jnp.int32)
+        actions = jnp.array(ind_data['choice'].values, dtype=jnp.int32)
+        next_states = jnp.concatenate([states[1:], states[-1:]])
 
         traj = Trajectory(
             states=states,

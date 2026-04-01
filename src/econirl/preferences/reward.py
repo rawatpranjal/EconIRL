@@ -16,7 +16,7 @@ This specification is used in:
 
 from __future__ import annotations
 
-import torch
+import jax.numpy as jnp
 
 from econirl.preferences.base import BaseUtilityFunction
 
@@ -41,7 +41,7 @@ class LinearReward(BaseUtilityFunction):
 
     Example:
         >>> # Create state features for a grid world
-        >>> features = torch.randn(100, 5)  # 100 states, 5 features
+        >>> features = jnp.ones((100, 5))  # 100 states, 5 features
         >>> reward = LinearReward(
         ...     state_features=features,
         ...     parameter_names=["goal", "obstacle", "distance", "safety", "comfort"],
@@ -49,14 +49,14 @@ class LinearReward(BaseUtilityFunction):
         ... )
         >>>
         >>> # Compute reward
-        >>> theta = torch.tensor([1.0, -2.0, -0.1, 0.5, 0.3])
+        >>> theta = jnp.array([1.0, -2.0, -0.1, 0.5, 0.3])
         >>> R = reward.compute(theta)  # shape (100, 4)
         >>> # R[s, a] is the same for all actions a in state s
     """
 
     def __init__(
         self,
-        state_features: torch.Tensor,
+        state_features: jnp.ndarray,
         parameter_names: list[str],
         n_actions: int = 2,
     ):
@@ -92,14 +92,14 @@ class LinearReward(BaseUtilityFunction):
             anchor_action=None,  # No anchor for reward functions
         )
 
-        self._state_features = state_features.clone()
+        self._state_features = jnp.array(state_features)
 
     @property
-    def state_features(self) -> torch.Tensor:
+    def state_features(self) -> jnp.ndarray:
         """Return the state feature matrix."""
         return self._state_features
 
-    def compute(self, params: torch.Tensor) -> torch.Tensor:
+    def compute(self, params: jnp.ndarray) -> jnp.ndarray:
         """Compute reward matrix R(s; θ) = θ · φ(s), broadcast to all actions.
 
         Args:
@@ -112,12 +112,14 @@ class LinearReward(BaseUtilityFunction):
         self.validate_parameters(params)
 
         # R[s] = Σ_k θ[k] * φ[s, k]
-        reward_per_state = torch.einsum("sk,k->s", self._state_features, params)
+        reward_per_state = jnp.einsum("sk,k->s", self._state_features, params)
 
         # Broadcast to all actions: (num_states,) -> (num_states, num_actions)
-        return reward_per_state.unsqueeze(1).expand(-1, self.num_actions)
+        return jnp.broadcast_to(
+            reward_per_state[:, None], (self.num_states, self.num_actions)
+        )
 
-    def compute_gradient(self, params: torch.Tensor) -> torch.Tensor:
+    def compute_gradient(self, params: jnp.ndarray) -> jnp.ndarray:
         """Compute gradient ∂R/∂θ = φ(s), broadcast to all actions.
 
         For linear reward, the gradient is simply the state feature matrix,
@@ -133,12 +135,13 @@ class LinearReward(BaseUtilityFunction):
         # For linear reward, gradient w.r.t. params is the feature matrix
         # Shape: (num_states, num_features)
         # Need to broadcast to (num_states, num_actions, num_features)
-        gradient = self._state_features.unsqueeze(1).expand(
-            -1, self.num_actions, -1
+        gradient = jnp.broadcast_to(
+            self._state_features[:, None, :],
+            (self.num_states, self.num_actions, self.num_parameters),
         )
-        return gradient.clone()
+        return jnp.array(gradient)
 
-    def compute_hessian(self, params: torch.Tensor) -> torch.Tensor:
+    def compute_hessian(self, params: jnp.ndarray) -> jnp.ndarray:
         """Compute Hessian ∂²R/∂θ².
 
         For linear reward, the Hessian is zero (reward is linear in θ).
@@ -149,21 +152,12 @@ class LinearReward(BaseUtilityFunction):
         Returns:
             Zero tensor of shape (num_states, num_actions, num_parameters, num_parameters)
         """
-        return torch.zeros(
+        return jnp.zeros(
             (self.num_states, self.num_actions, self.num_parameters, self.num_parameters),
             dtype=self._state_features.dtype,
-            device=self._state_features.device,
         )
 
-    def to(self, device: torch.device | str) -> "LinearReward":
-        """Move state features to specified device."""
-        return LinearReward(
-            state_features=self._state_features.to(device),
-            parameter_names=self._parameter_names.copy(),
-            n_actions=self.num_actions,
-        )
-
-    def subset_states(self, state_indices: torch.Tensor) -> "LinearReward":
+    def subset_states(self, state_indices: jnp.ndarray) -> "LinearReward":
         """Create a new reward function for a subset of states.
 
         Useful for state aggregation or focusing on specific regions.

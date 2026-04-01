@@ -19,8 +19,8 @@ Reference:
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
-import torch
 from gymnasium import spaces
 
 from econirl.environments.base import DDCEnvironment
@@ -120,11 +120,11 @@ class RustBusEnvironment(DDCEnvironment):
         return 2  # Keep, Replace
 
     @property
-    def transition_matrices(self) -> torch.Tensor:
+    def transition_matrices(self) -> jnp.ndarray:
         return self._transition_matrices
 
     @property
-    def feature_matrix(self) -> torch.Tensor:
+    def feature_matrix(self) -> jnp.ndarray:
         return self._feature_matrix
 
     @property
@@ -143,7 +143,7 @@ class RustBusEnvironment(DDCEnvironment):
         """Return the mileage transition probabilities."""
         return self._mileage_transition_probs.copy()
 
-    def _build_transition_matrices(self) -> torch.Tensor:
+    def _build_transition_matrices(self) -> jnp.ndarray:
         """Build transition probability matrices P(s'|s,a).
 
         Returns:
@@ -154,8 +154,8 @@ class RustBusEnvironment(DDCEnvironment):
         n = self._num_mileage_bins
         p = self._mileage_transition_probs
 
-        # Initialize transition matrices
-        transitions = torch.zeros((2, n, n), dtype=torch.float32)
+        # Build with numpy then convert (JAX arrays are immutable)
+        transitions = np.zeros((2, n, n), dtype=np.float32)
 
         # Keep action: mileage increases by 0, 1, or 2 with given probabilities
         for s in range(n):
@@ -169,9 +169,9 @@ class RustBusEnvironment(DDCEnvironment):
             next_s = min(delta, n - 1)
             transitions[self.REPLACE, :, next_s] = prob
 
-        return transitions
+        return jnp.array(transitions)
 
-    def _build_feature_matrix(self) -> torch.Tensor:
+    def _build_feature_matrix(self) -> jnp.ndarray:
         """Build feature matrix for utility computation.
 
         Features are structured so that:
@@ -185,10 +185,12 @@ class RustBusEnvironment(DDCEnvironment):
             Tensor of shape (num_states, num_actions, num_features)
         """
         n = self._num_mileage_bins
-        features = torch.zeros((n, 2, 2), dtype=torch.float32)
+
+        # Build with numpy then convert (JAX arrays are immutable)
+        features = np.zeros((n, 2, 2), dtype=np.float32)
 
         # Mileage values (state indices represent mileage bins)
-        mileage = torch.arange(n, dtype=torch.float32)
+        mileage = np.arange(n, dtype=np.float32)
 
         # Keep action (a=0): utility = -operating_cost * mileage
         # Feature: [-mileage, 0] so that θ·φ = -operating_cost * mileage
@@ -200,7 +202,7 @@ class RustBusEnvironment(DDCEnvironment):
         features[:, self.REPLACE, 0] = 0.0
         features[:, self.REPLACE, 1] = -1.0
 
-        return features
+        return jnp.array(features)
 
     def _get_initial_state_distribution(self) -> np.ndarray:
         """Return initial state distribution (start at mileage 0)."""

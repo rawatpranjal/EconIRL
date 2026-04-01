@@ -11,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import _policy_evaluation_matrix, value_iteration
@@ -106,9 +107,9 @@ class BenchmarkResult:
     pct_optimal_transfer: float | None = None
     estimates: dict[str, float] = field(default_factory=dict)
     true_params: dict[str, float] = field(default_factory=dict)
-    estimated_reward: torch.Tensor | None = None
-    learned_policy: torch.Tensor | None = None
-    true_reward: torch.Tensor | None = None
+    estimated_reward: jnp.ndarray | None = None
+    learned_policy: jnp.ndarray | None = None
+    true_reward: jnp.ndarray | None = None
 
 
 def _make_env(dgp: BenchmarkDGP) -> MultiComponentBusEnvironment:
@@ -124,9 +125,9 @@ def _make_env(dgp: BenchmarkDGP) -> MultiComponentBusEnvironment:
 
 
 def _evaluate_pct_optimal(
-    learned_policy: torch.Tensor,
-    true_utility: torch.Tensor,
-    transitions: torch.Tensor,
+    learned_policy: jnp.ndarray,
+    true_utility: jnp.ndarray,
+    transitions: jnp.ndarray,
     problem: DDCProblem,
 ) -> float:
     """Compute % of optimal value achieved by a learned policy.
@@ -145,7 +146,7 @@ def _evaluate_pct_optimal(
     )
 
     # Baseline: uniform random policy
-    uniform_policy = torch.ones_like(learned_policy) / learned_policy.shape[1]
+    uniform_policy = jnp.ones_like(learned_policy) / learned_policy.shape[1]
     v_random = _policy_evaluation_matrix(
         true_utility, uniform_policy, transitions,
         beta=problem.discount_factor,
@@ -164,8 +165,8 @@ def _evaluate_pct_optimal(
 
 
 def _compute_transfer_pct_optimal(
-    est_utility: torch.Tensor,
-    true_utility: torch.Tensor,
+    est_utility: jnp.ndarray,
+    true_utility: jnp.ndarray,
     problem: DDCProblem,
     dgp: BenchmarkDGP,
 ) -> float:
@@ -207,7 +208,7 @@ def _compute_transfer_pct_optimal(
     )
 
     # Baseline: uniform random policy under transfer transitions
-    uniform_policy = torch.ones(problem.num_states, problem.num_actions) / problem.num_actions
+    uniform_policy = jnp.ones(problem.num_states, problem.num_actions) / problem.num_actions
     v_random = _policy_evaluation_matrix(
         true_utility, uniform_policy, transfer_transitions,
         beta=problem.discount_factor,
@@ -226,8 +227,8 @@ def _compute_transfer_pct_optimal(
 
 
 def _evaluate_policy_transfer(
-    learned_policy: torch.Tensor,
-    true_utility: torch.Tensor,
+    learned_policy: jnp.ndarray,
+    true_utility: jnp.ndarray,
     problem: DDCProblem,
     dgp: BenchmarkDGP,
 ) -> float:
@@ -264,7 +265,7 @@ def _evaluate_policy_transfer(
         sigma=problem.scale_parameter,
     )
 
-    uniform_policy = torch.ones_like(learned_policy) / learned_policy.shape[1]
+    uniform_policy = jnp.ones_like(learned_policy) / learned_policy.shape[1]
     v_random = _policy_evaluation_matrix(
         true_utility, uniform_policy, transfer_transitions,
         beta=problem.discount_factor,
@@ -283,26 +284,17 @@ def _evaluate_policy_transfer(
 
 
 def get_default_estimator_specs() -> list[EstimatorSpec]:
-    """Get benchmark-tuned specs for all estimators."""
+    """Get benchmark-tuned specs for the 10 production estimators."""
     from econirl.estimation import (
         AIRLEstimator,
-        BayesianIRLEstimator,
         BehavioralCloningEstimator,
-        DeepMaxEntIRLEstimator,
-        FIRLEstimator,
-        IQLearnEstimator,
-        NNESEstimator,
-        SEESEstimator,
         CCPEstimator,
-        GAILEstimator,
-        GCLEstimator,
+        FIRLEstimator,
         GLADIUSEstimator,
-
-        MaxEntIRLEstimator,
-        MaxMarginIRLEstimator,
-        MaxMarginPlanningEstimator,
         MCEIRLEstimator,
         NFXPEstimator,
+        NNESEstimator,
+        SEESEstimator,
         TDCCPEstimator,
         TDCCPConfig,
     )
@@ -344,41 +336,6 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
             name="MCE IRL",
         ),
         EstimatorSpec(
-            MaxEntIRLEstimator,
-            kwargs=dict(
-                inner_solver="value",
-                inner_tol=1e-8,
-                inner_max_iter=5000,
-                outer_max_iter=300,
-                compute_hessian=False,
-            ),
-            name="MaxEnt IRL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
-            MaxMarginPlanningEstimator,
-            kwargs=dict(
-                learning_rate=1.0,
-                max_iterations=3000,
-                compute_se=False,
-                loss_type="trajectory_hamming",
-                loss_scale=0.5,
-                regularization_lambda=0.0,
-                inner_max_iter=5000,
-            ),
-            name="Max Margin",
-        ),
-        EstimatorSpec(
-            MaxMarginIRLEstimator,
-            kwargs=dict(
-                max_iterations=50,
-                margin_tol=1e-4,
-                compute_hessian=False,
-            ),
-            name="Max Margin IRL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
             TDCCPEstimator,
             kwargs=dict(
                 config=TDCCPConfig(
@@ -391,6 +348,28 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
                 ),
             ),
             name="TD-CCP",
+        ),
+        EstimatorSpec(
+            NNESEstimator,
+            kwargs=dict(
+                hidden_dim=32,
+                v_epochs=500,
+                outer_max_iter=200,
+                compute_se=False,
+            ),
+            name="NNES",
+            can_recover_params=True,
+        ),
+        EstimatorSpec(
+            SEESEstimator,
+            kwargs=dict(
+                basis_type="fourier",
+                basis_dim=8,
+                penalty_lambda=0.01,
+                compute_se=False,
+            ),
+            name="SEES",
+            can_recover_params=True,
         ),
         EstimatorSpec(
             GLADIUSEstimator,
@@ -408,20 +387,6 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
             name="GLADIUS",
         ),
         EstimatorSpec(
-            GAILEstimator,
-            kwargs=dict(
-                discriminator_type="linear",
-                max_rounds=500,
-                discriminator_lr=0.02,
-                discriminator_steps=10,
-                reward_transform="logit",
-                convergence_tol=0,
-                compute_se=False,
-            ),
-            name="GAIL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
             AIRLEstimator,
             kwargs=dict(
                 reward_type="linear",
@@ -434,52 +399,6 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
             can_recover_params=False,
         ),
         EstimatorSpec(
-            GCLEstimator,
-            kwargs=dict(
-                max_iterations=300,
-                n_sample_trajectories=200,
-                cost_lr=5e-4,
-                embed_dim=16,
-                hidden_dims=[32, 32],
-                importance_clipping=5.0,
-                normalize_reward=True,
-            ),
-            name="GCL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
-            BayesianIRLEstimator,
-            kwargs=dict(
-                n_samples=2000,
-                burnin=500,
-                proposal_sigma=0.1,
-                prior_sigma=5.0,
-            ),
-            name="BIRL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
-            DeepMaxEntIRLEstimator,
-            kwargs=dict(
-                hidden_dims=[32, 32],
-                lr=1e-3,
-                max_epochs=300,
-            ),
-            name="Deep MaxEnt",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
-            NNESEstimator,
-            kwargs=dict(
-                hidden_dim=32,
-                v_epochs=500,
-                outer_max_iter=200,
-                compute_se=False,
-            ),
-            name="NNES",
-            can_recover_params=True,
-        ),
-        EstimatorSpec(
             FIRLEstimator,
             kwargs=dict(
                 f_divergence="kl",
@@ -487,28 +406,6 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
                 max_iter=500,
             ),
             name="f-IRL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
-            SEESEstimator,
-            kwargs=dict(
-                basis_type="fourier",
-                basis_dim=8,
-                penalty_lambda=0.01,
-                compute_se=False,
-            ),
-            name="SEES",
-            can_recover_params=True,
-        ),
-        EstimatorSpec(
-            IQLearnEstimator,
-            kwargs=dict(
-                q_type="tabular",
-                divergence="chi2",
-                alpha=10.0,
-                max_iter=1000,
-            ),
-            name="IQ-Learn",
             can_recover_params=False,
         ),
     ]
@@ -543,7 +440,7 @@ def run_single(
     true_params = env.get_true_parameter_vector()
     true_policy = compute_policy(true_params, problem, transitions, env.feature_matrix)
     true_dict = dict(zip(env.parameter_names, true_params.tolist()))
-    true_utility = torch.einsum("sak,k->sa", env.feature_matrix, true_params)
+    true_utility = jnp.einsum("sak,k->sa", env.feature_matrix, true_params)
 
     t0 = time.perf_counter()
     try:
@@ -560,7 +457,7 @@ def run_single(
             est_params = summary.parameters
             if len(est_params) == len(true_params):
                 param_rmse = (
-                    ((est_params - true_params) ** 2).float().mean().sqrt().item()
+                    ((est_params - true_params) ** 2).astype(jnp.float32).mean().sqrt().item()
                 )
                 for i, name in enumerate(env.parameter_names):
                     estimates[name] = est_params[i].item()
@@ -569,7 +466,7 @@ def run_single(
         policy_rmse = float("nan")
         if summary.policy is not None:
             policy_rmse = (
-                ((summary.policy - true_policy) ** 2).float().mean().sqrt().item()
+                ((summary.policy - true_policy) ** 2).astype(jnp.float32).mean().sqrt().item()
             )
 
         # % of optimal value (works for all estimators with a policy)
@@ -583,17 +480,14 @@ def run_single(
         estimated_reward = None
         if summary.parameters is not None:
             n_s, n_a = problem.num_states, problem.num_actions
-            if spec.name == "GCL":
-                # GCL returns cost parameters c(s,a) — negate to get rewards
-                estimated_reward = -summary.parameters.reshape(n_s, n_a)
-            elif spec.name in ("Deep MaxEnt", "f-IRL"):
+            if spec.name in ("f-IRL",):
                 # These return reward matrix R(s,a) directly
                 estimated_reward = summary.parameters.reshape(n_s, n_a)
             elif (summary.metadata or {}).get("reward_table") is not None:
                 # IQ-Learn: use raw reward table from inverse Bellman
-                estimated_reward = torch.tensor(summary.metadata["reward_table"])
+                estimated_reward = jnp.array(summary.metadata["reward_table"])
             elif len(summary.parameters) == len(true_params):
-                estimated_reward = torch.einsum(
+                estimated_reward = jnp.einsum(
                     "sak,k->sa", env.feature_matrix, summary.parameters
                 )
 
@@ -730,39 +624,26 @@ def get_scaling_estimator_specs(n_states: int) -> list[EstimatorSpec]:
     """
     from econirl.estimation import (
         AIRLEstimator,
-        BayesianIRLEstimator,
         BehavioralCloningEstimator,
-        DeepMaxEntIRLEstimator,
-        FIRLEstimator,
-        NNESEstimator,
-        SEESEstimator,
         CCPEstimator,
-        GAILEstimator,
-        GCLEstimator,
+        FIRLEstimator,
         GLADIUSEstimator,
-        MaxEntIRLEstimator,
-        MaxMarginIRLEstimator,
-        MaxMarginPlanningEstimator,
         MCEIRLEstimator,
         NFXPEstimator,
+        NNESEstimator,
+        SEESEstimator,
         TDCCPEstimator,
         TDCCPConfig,
     )
 
     hidden_dim = min(64, max(32, n_states // 4))
 
-    # Adaptive parameters for slow estimators
-    # MMP: reduce iterations for large n (each iter = 1 VI solve)
-    mmp_iters = min(500, max(200, 2000 // n_states))
-    # GCL: scale network capacity and sample count with state space
-    gcl_hidden = min(64, max(32, n_states // 2))
-    gcl_samples = min(200, max(50, 500 // n_states))
-    # GAIL/AIRL: fewer rounds for large n (each round = simulation + VI)
+    # AIRL: fewer rounds for large n (each round = simulation + VI)
     adv_rounds = min(200, max(100, 1000 // n_states))
     # NNES: more V-network training for larger state spaces
     nnes_epochs = min(1000, max(500, 10 * n_states))
 
-    specs = [
+    return [
         EstimatorSpec(
             BehavioralCloningEstimator,
             kwargs=dict(smoothing=1.0),
@@ -799,42 +680,6 @@ def get_scaling_estimator_specs(n_states: int) -> list[EstimatorSpec]:
             name="MCE IRL",
         ),
         EstimatorSpec(
-            MaxEntIRLEstimator,
-            kwargs=dict(
-                inner_solver="value",
-                inner_tol=1e-8,
-                inner_max_iter=5000,
-                outer_max_iter=300,
-                compute_hessian=False,
-            ),
-            name="MaxEnt IRL",
-            can_recover_params=False,
-        ),
-        # MMP: reduce iterations (each = 1 VI), lower lr for stability
-        EstimatorSpec(
-            MaxMarginPlanningEstimator,
-            kwargs=dict(
-                learning_rate=0.5,
-                max_iterations=mmp_iters,
-                compute_se=False,
-                loss_type="trajectory_hamming",
-                loss_scale=0.5,
-                regularization_lambda=0.01,
-                inner_max_iter=5000,
-            ),
-            name="Max Margin",
-        ),
-        EstimatorSpec(
-            MaxMarginIRLEstimator,
-            kwargs=dict(
-                max_iterations=100,
-                margin_tol=1e-4,
-                compute_hessian=False,
-            ),
-            name="Max Margin IRL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
             TDCCPEstimator,
             kwargs=dict(
                 config=TDCCPConfig(
@@ -847,6 +692,29 @@ def get_scaling_estimator_specs(n_states: int) -> list[EstimatorSpec]:
                 ),
             ),
             name="TD-CCP",
+        ),
+        # NNES: more V-network training for larger state spaces
+        EstimatorSpec(
+            NNESEstimator,
+            kwargs=dict(
+                hidden_dim=hidden_dim,
+                v_epochs=nnes_epochs,
+                outer_max_iter=200,
+                compute_se=False,
+            ),
+            name="NNES",
+            can_recover_params=True,
+        ),
+        EstimatorSpec(
+            SEESEstimator,
+            kwargs=dict(
+                basis_type="fourier",
+                basis_dim=min(16, max(8, n_states // 5)),
+                penalty_lambda=0.01,
+                compute_se=False,
+            ),
+            name="SEES",
+            can_recover_params=True,
         ),
         EstimatorSpec(
             GLADIUSEstimator,
@@ -863,21 +731,6 @@ def get_scaling_estimator_specs(n_states: int) -> list[EstimatorSpec]:
             ),
             name="GLADIUS",
         ),
-        # GAIL: fewer rounds, higher lr, fewer disc steps for speed
-        EstimatorSpec(
-            GAILEstimator,
-            kwargs=dict(
-                discriminator_type="linear",
-                max_rounds=adv_rounds,
-                discriminator_lr=0.05,
-                discriminator_steps=5,
-                reward_transform="logit",
-                convergence_tol=1e-3,
-                compute_se=False,
-            ),
-            name="GAIL",
-            can_recover_params=False,
-        ),
         # AIRL: fewer rounds, higher lr for speed
         EstimatorSpec(
             AIRLEstimator,
@@ -891,43 +744,6 @@ def get_scaling_estimator_specs(n_states: int) -> list[EstimatorSpec]:
             name="AIRL",
             can_recover_params=False,
         ),
-        # GCL: scale network with state space, higher lr
-        EstimatorSpec(
-            GCLEstimator,
-            kwargs=dict(
-                max_iterations=300,
-                n_sample_trajectories=gcl_samples,
-                cost_lr=1e-3,
-                embed_dim=16,
-                hidden_dims=[gcl_hidden, gcl_hidden],
-                importance_clipping=5.0,
-                normalize_reward=True,
-            ),
-            name="GCL",
-            can_recover_params=False,
-        ),
-        EstimatorSpec(
-            DeepMaxEntIRLEstimator,
-            kwargs=dict(
-                hidden_dims=[hidden_dim, hidden_dim],
-                lr=1e-3,
-                max_epochs=min(300, max(100, 3000 // n_states)),
-            ),
-            name="Deep MaxEnt",
-            can_recover_params=False,
-        ),
-        # NNES: more V-network training for larger state spaces
-        EstimatorSpec(
-            NNESEstimator,
-            kwargs=dict(
-                hidden_dim=hidden_dim,
-                v_epochs=nnes_epochs,
-                outer_max_iter=200,
-                compute_se=False,
-            ),
-            name="NNES",
-            can_recover_params=True,
-        ),
         EstimatorSpec(
             FIRLEstimator,
             kwargs=dict(
@@ -938,36 +754,7 @@ def get_scaling_estimator_specs(n_states: int) -> list[EstimatorSpec]:
             name="f-IRL",
             can_recover_params=False,
         ),
-        EstimatorSpec(
-            SEESEstimator,
-            kwargs=dict(
-                basis_type="fourier",
-                basis_dim=min(16, max(8, n_states // 5)),
-                penalty_lambda=0.01,
-                compute_se=False,
-            ),
-            name="SEES",
-            can_recover_params=True,
-        ),
     ]
-
-    # BIRL: reduce samples for speed, skip for large state spaces
-    if n_states <= 20:
-        specs.append(
-            EstimatorSpec(
-                BayesianIRLEstimator,
-                kwargs=dict(
-                    n_samples=500,
-                    burnin=100,
-                    proposal_sigma=0.2,
-                    prior_sigma=5.0,
-                ),
-                name="BIRL",
-                can_recover_params=False,
-            ),
-        )
-
-    return specs
 
 
 def run_scaling_benchmark(

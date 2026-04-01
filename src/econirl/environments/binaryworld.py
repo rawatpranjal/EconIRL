@@ -34,8 +34,8 @@ References:
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
-import torch
 from gymnasium import spaces
 
 from econirl.environments.base import DDCEnvironment
@@ -133,7 +133,7 @@ class BinaryworldEnvironment(DDCEnvironment):
 
         return neighborhood
 
-    def _build_feature_matrix(self) -> torch.Tensor:
+    def _build_feature_matrix(self) -> jnp.ndarray:
         """Build the binary neighborhood feature matrix.
 
         Each state gets a 9-dimensional binary feature vector encoding the
@@ -147,14 +147,15 @@ class BinaryworldEnvironment(DDCEnvironment):
         for s in range(self._n_states):
             features_per_state[s] = self._get_neighborhood(s)
 
-        state_features = torch.tensor(features_per_state, dtype=torch.float32)
+        state_features = jnp.array(features_per_state, dtype=jnp.float32)
         # Broadcast state-only features to all 5 actions: (S, 9) -> (S, 5, 9)
-        feature_matrix = state_features.unsqueeze(1).expand(
-            self._n_states, 5, 9
-        ).clone()
+        feature_matrix = jnp.broadcast_to(
+            jnp.expand_dims(state_features, axis=1),
+            (self._n_states, 5, 9),
+        ).copy()
         return feature_matrix
 
-    def _compute_reward(self) -> torch.Tensor:
+    def _compute_reward(self) -> jnp.ndarray:
         """Compute the reward for each state based on blue neighbor count.
 
         The reward rule is:
@@ -165,7 +166,8 @@ class BinaryworldEnvironment(DDCEnvironment):
         Returns:
             Tensor of shape (n_states,) with reward values.
         """
-        reward = torch.zeros(self._n_states, dtype=torch.float32)
+        # Build with numpy then convert (JAX arrays are immutable)
+        reward = np.zeros(self._n_states, dtype=np.float32)
         for s in range(self._n_states):
             neighborhood = self._get_neighborhood(s)
             blue_count = int(neighborhood.sum())
@@ -173,7 +175,7 @@ class BinaryworldEnvironment(DDCEnvironment):
                 reward[s] = 1.0
             elif blue_count == 5:
                 reward[s] = -1.0
-        return reward
+        return jnp.array(reward)
 
     # ------------------------------------------------------------------
     # DDCEnvironment abstract property implementations
@@ -188,15 +190,15 @@ class BinaryworldEnvironment(DDCEnvironment):
         return 5
 
     @property
-    def transition_matrices(self) -> torch.Tensor:
+    def transition_matrices(self) -> jnp.ndarray:
         return self._transition_matrices
 
     @property
-    def feature_matrix(self) -> torch.Tensor:
+    def feature_matrix(self) -> jnp.ndarray:
         return self._feature_matrix
 
     @property
-    def true_reward(self) -> torch.Tensor:
+    def true_reward(self) -> jnp.ndarray:
         """Return the ground-truth reward vector of shape (num_states,)."""
         return self._true_reward
 
@@ -225,7 +227,7 @@ class BinaryworldEnvironment(DDCEnvironment):
         """Two-dimensional grid position."""
         return 2
 
-    def encode_states(self, states: torch.Tensor) -> torch.Tensor:
+    def encode_states(self, states: jnp.ndarray) -> jnp.ndarray:
         """Encode flat state indices to (row, col) normalized to [0, 1].
 
         Args:
@@ -234,9 +236,10 @@ class BinaryworldEnvironment(DDCEnvironment):
         Returns:
             Tensor of shape (batch, 2) with normalized row and column.
         """
-        rows = (states.float() // self._grid_size) / max(self._grid_size - 1, 1)
-        cols = (states.float() % self._grid_size) / max(self._grid_size - 1, 1)
-        return torch.stack([rows, cols], dim=-1)
+        states_f = states.astype(jnp.float32)
+        rows = (states_f // self._grid_size) / max(self._grid_size - 1, 1)
+        cols = (states_f % self._grid_size) / max(self._grid_size - 1, 1)
+        return jnp.stack([rows, cols], axis=-1)
 
     # ------------------------------------------------------------------
     # DDCEnvironment abstract method implementations
@@ -248,7 +251,7 @@ class BinaryworldEnvironment(DDCEnvironment):
 
     def _compute_flow_utility(self, state: int, action: int) -> float:
         """Return the reward for the given state (action-independent)."""
-        return self._true_reward[state].item()
+        return float(self._true_reward[state])
 
     def _sample_next_state(self, state: int, action: int) -> int:
         """Return deterministic next state."""
@@ -297,9 +300,10 @@ class BinaryworldEnvironment(DDCEnvironment):
         rng = np.random.default_rng(seed)
 
         # Build the reward matrix (S, A) from the state-only reward
-        reward_matrix = self._true_reward.unsqueeze(1).expand(
-            self._n_states, 5
-        ).clone()
+        reward_matrix = jnp.broadcast_to(
+            jnp.expand_dims(self._true_reward, axis=1),
+            (self._n_states, 5),
+        ).copy()
 
         # Solve for optimal policy
         problem = self.problem_spec
@@ -321,7 +325,7 @@ class BinaryworldEnvironment(DDCEnvironment):
                 if rng.random() < noise_fraction:
                     action = int(rng.integers(0, 5))
                 else:
-                    probs = policy[state].numpy()
+                    probs = np.array(policy[state])
                     action = int(rng.choice(5, p=probs))
 
                 next_state = self._sample_next_state(state, action)
@@ -334,9 +338,9 @@ class BinaryworldEnvironment(DDCEnvironment):
 
             trajectories.append(
                 Trajectory(
-                    states=torch.tensor(states_list, dtype=torch.long),
-                    actions=torch.tensor(actions_list, dtype=torch.long),
-                    next_states=torch.tensor(next_states_list, dtype=torch.long),
+                    states=jnp.array(states_list, dtype=jnp.int32),
+                    actions=jnp.array(actions_list, dtype=jnp.int32),
+                    next_states=jnp.array(next_states_list, dtype=jnp.int32),
                     individual_id=i,
                 )
             )
