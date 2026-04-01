@@ -39,6 +39,8 @@ from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
 from econirl.estimation.adversarial import (
     AIRLEstimator,
     AIRLConfig,
+    AIRLHetEstimator,
+    AIRLHetConfig,
     TabularDiscriminator,
     LinearDiscriminator,
 )
@@ -77,6 +79,8 @@ __all__ = [
     # Adversarial IRL
     "AIRLEstimator",
     "AIRLConfig",
+    "AIRLHetEstimator",
+    "AIRLHetConfig",
     "TabularDiscriminator",
     "LinearDiscriminator",
     # Distribution-matching IRL

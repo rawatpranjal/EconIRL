@@ -1,0 +1,37 @@
+[
+  {
+    "epsilon": -0.5,
+    "reward_mse": 0.0,
+    "type_ii_error": 0.008231008425354958
+  },
+  {
+    "epsilon": -0.25,
+    "reward_mse": 0.0,
+    "type_ii_error": 0.004093164578080177
+  },
+  {
+    "epsilon": -0.1,
+    "reward_mse": 0.0,
+    "type_ii_error": 0.0016321783186867833
+  },
+  {
+    "epsilon": 0.0,
+    "reward_mse": 0.0,
+    "type_ii_error": 0.0
+  },
+  {
+    "epsilon": 0.1,
+    "reward_mse": 0.0,
+    "type_ii_error": 0.0016248536994680762
+  },
+  {
+    "epsilon": 0.25,
+    "reward_mse": 0.0,
+    "type_ii_error": 0.004048894625157118
+  },
+  {
+    "epsilon": 0.5,
+    "reward_mse": 0.0,
+    "type_ii_error": 0.00805378332734108
+  }
+]

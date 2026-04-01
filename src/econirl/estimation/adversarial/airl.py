@@ -31,6 +31,7 @@ from tqdm import tqdm
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import hybrid_iteration, value_iteration, backward_induction
 from econirl.core.types import DDCProblem, Panel
+from econirl.estimation.adversarial.base import AdversarialEstimatorBase
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
 from econirl.preferences.action_reward import ActionDependentReward
@@ -75,7 +76,7 @@ class AIRLConfig:
     verbose: bool = False
 
 
-class AIRLEstimator(BaseEstimator):
+class AIRLEstimator(AdversarialEstimatorBase):
     """Adversarial Inverse Reinforcement Learning for tabular MDPs.
 
     AIRL learns a disentangled reward function that is robust to changes
@@ -275,12 +276,12 @@ class AIRLEstimator(BaseEstimator):
         n_states: int,
     ) -> jnp.ndarray:
         """Compute initial state distribution from data."""
-        counts = jnp.zeros(n_states, dtype=jnp.float32)
         init_states = jnp.array(
             [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
             dtype=jnp.int32,
         )
-        counts.scatter_add_(0, init_states, jnp.ones_like(init_states, dtype=jnp.float32))
+        counts = jnp.zeros(n_states, dtype=jnp.float32)
+        counts = counts.at[init_states].add(1.0)
 
         if counts.sum() > 0:
             return counts / counts.sum()
@@ -514,6 +515,6 @@ class AIRLEstimator(BaseEstimator):
                 "final_disc_loss": disc_losses[-1] if disc_losses else None,
                 "disc_losses": disc_losses,
                 "policy_changes": policy_changes,
-                "reward_matrix": np.asarray(final_reward).tolist(),
+                "reward_matrix": jnp.array(final_reward).tolist(),
             },
         )

@@ -58,20 +58,23 @@ class AdversarialEstimatorBase(BaseEstimator):
         n_samples: int,
         initial_dist: jnp.ndarray,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
-        """Sample state-action pairs from current policy."""
+        """Sample state-action pairs from current policy.
+
+        Note: prefer _sample_transitions_from_policy (lax.scan) for speed.
+        """
         n_states, n_actions = policy.shape
         states = []
         actions = []
 
-        state = jax.random.categorical(jax.random.key(0), jnp.log(initial_dist, 1).item()
+        state = int(jax.random.categorical(jax.random.key(0), jnp.log(initial_dist + 1e-10)))
 
-        for _ in range(n_samples):
-            action = jax.random.categorical(jax.random.key(0), jnp.log(policy[state], 1).item()
+        for i in range(n_samples):
+            action = int(jax.random.categorical(jax.random.key(i + 1), jnp.log(policy[state] + 1e-10)))
             states.append(state)
             actions.append(action)
 
             next_state_dist = transitions[action, state, :]
-            state = jax.random.categorical(jax.random.key(0), jnp.log(next_state_dist, 1).item()
+            state = int(jax.random.categorical(jax.random.key(i + n_samples), jnp.log(next_state_dist + 1e-10)))
 
         return jnp.array(states, dtype=jnp.int32), jnp.array(
             actions, dtype=jnp.int32
@@ -119,12 +122,12 @@ class AdversarialEstimatorBase(BaseEstimator):
         n_states: int,
     ) -> jnp.ndarray:
         """Compute initial state distribution from data."""
-        counts = jnp.zeros(n_states, dtype=jnp.float32)
         init_states = jnp.array(
             [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
             dtype=jnp.int32,
         )
-        counts.scatter_add_(0, init_states, jnp.ones_like(init_states, dtype=jnp.float32))
+        counts = jnp.zeros(n_states, dtype=jnp.float32)
+        counts = counts.at[init_states].add(1.0)
 
         if counts.sum() > 0:
             return counts / counts.sum()

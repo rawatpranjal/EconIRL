@@ -1,0 +1,137 @@
+{
+  "config": {
+    "n_individuals": 500,
+    "n_periods": 80,
+    "n_states": 21,
+    "n_actions": 3,
+    "discount_factor": 0.95
+  },
+  "phase1": [
+    {
+      "Method": "Oracle",
+      "Reward MSE": 0.0,
+      "Reward Corr": 1.0,
+      "In-Sample CCP Err": 0.0
+    },
+    {
+      "Method": "Reduced-Form Q",
+      "Reward MSE": NaN,
+      "Reward Corr": NaN,
+      "In-Sample CCP Err": 0.09044457972049713
+    },
+    {
+      "Method": "AIRL + Anchors",
+      "Reward MSE": 33.174564361572266,
+      "Reward Corr": 0.10589757479478111,
+      "In-Sample CCP Err": 0.32750993967056274
+    },
+    {
+      "Method": "AIRL No Anchors",
+      "Reward MSE": 33.174564361572266,
+      "Reward Corr": 0.10589757479478111,
+      "In-Sample CCP Err": 0.3675411343574524
+    },
+    {
+      "Method": "IQ-Learn",
+      "Reward MSE": 17.857656478881836,
+      "Reward Corr": 0.3517782397382721,
+      "In-Sample CCP Err": 0.08992253988981247
+    }
+  ],
+  "type_i": [
+    {
+      "Method": "Oracle",
+      "Type I CCP Error": 1.390775050680304e-08
+    },
+    {
+      "Method": "Reduced-Form Q",
+      "Type I CCP Error": 0.08291810005903244
+    },
+    {
+      "Method": "AIRL + Anchors",
+      "Type I CCP Error": 0.35509318113327026
+    },
+    {
+      "Method": "AIRL No Anchors",
+      "Type I CCP Error": 0.3212413787841797
+    },
+    {
+      "Method": "IQ-Learn",
+      "Type I CCP Error": 0.101445272564888
+    }
+  ],
+  "type_ii": [
+    {
+      "skip_k": 1,
+      "Oracle": 0.0,
+      "Reduced-Form Q": 0.09044457972049713,
+      "AIRL + Anchors": 0.32750993967056274,
+      "AIRL No Anchors": 0.3675411343574524,
+      "IQ-Learn": 0.08992276340723038
+    },
+    {
+      "skip_k": 2,
+      "Oracle": 0.0,
+      "Reduced-Form Q": 0.08940001577138901,
+      "AIRL + Anchors": 0.343586802482605,
+      "AIRL No Anchors": 0.370157390832901,
+      "IQ-Learn": 0.09321163594722748
+    },
+    {
+      "skip_k": 3,
+      "Oracle": 0.0,
+      "Reduced-Form Q": 0.08859405666589737,
+      "AIRL + Anchors": 0.34671369194984436,
+      "AIRL No Anchors": 0.37046605348587036,
+      "IQ-Learn": 0.10442773252725601
+    },
+    {
+      "skip_k": 5,
+      "Oracle": 0.0,
+      "Reduced-Form Q": 0.08810758590698242,
+      "AIRL + Anchors": 0.34763383865356445,
+      "AIRL No Anchors": 0.36981678009033203,
+      "IQ-Learn": 0.1199968159198761
+    },
+    {
+      "skip_k": 7,
+      "Oracle": 0.0,
+      "Reduced-Form Q": 0.08803286403417587,
+      "AIRL + Anchors": 0.3443903625011444,
+      "AIRL No Anchors": 0.371815949678421,
+      "IQ-Learn": 0.1364288330078125
+    }
+  ],
+  "summary": [
+    {
+      "Method": "Oracle",
+      "Reward MSE": 0.0,
+      "Type I CCP Err": 1.390775050680304e-08,
+      "Type II CCP Err (k=3)": 0.0
+    },
+    {
+      "Method": "Reduced-Form Q",
+      "Reward MSE": NaN,
+      "Type I CCP Err": 0.08291810005903244,
+      "Type II CCP Err (k=3)": 0.08859405666589737
+    },
+    {
+      "Method": "AIRL + Anchors",
+      "Reward MSE": 33.174564361572266,
+      "Type I CCP Err": 0.35509318113327026,
+      "Type II CCP Err (k=3)": 0.34671369194984436
+    },
+    {
+      "Method": "AIRL No Anchors",
+      "Reward MSE": 33.174564361572266,
+      "Type I CCP Err": 0.3212413787841797,
+      "Type II CCP Err (k=3)": 0.37046605348587036
+    },
+    {
+      "Method": "IQ-Learn",
+      "Reward MSE": 17.857656478881836,
+      "Type I CCP Err": 0.101445272564888,
+      "Type II CCP Err (k=3)": 0.10442773252725601
+    }
+  ]
+}
