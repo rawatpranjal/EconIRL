@@ -436,14 +436,14 @@ class NFXP:
             return
 
         # Parameter estimates
-        params = self._result.parameters.numpy()
+        params = np.asarray(self._result.parameters)
         param_names = self._result.parameter_names
 
         self.params_ = {name: float(val) for name, val in zip(param_names, params)}
         self.coef_ = params.copy()
 
         # Standard errors
-        se = self._result.standard_errors.numpy()
+        se = np.asarray(self._result.standard_errors)
         self.se_ = {name: float(val) for name, val in zip(param_names, se)}
 
         # Other attributes
@@ -451,12 +451,12 @@ class NFXP:
         self.converged_ = bool(self._result.converged)
 
         if self._result.value_function is not None:
-            self.value_function_ = self._result.value_function.numpy()
+            self.value_function_ = np.asarray(self._result.value_function)
             self.value_ = self.value_function_
 
         # Policy matrix
         if self._result.policy is not None:
-            self.policy_ = self._result.policy.numpy()
+            self.policy_ = np.asarray(self._result.policy)
 
         # p-values from t-statistics
         if self.se_ is not None:
@@ -533,7 +533,7 @@ class NFXP:
         states = np.asarray(states, dtype=np.int64)
 
         # Get policy (choice probabilities) from result
-        policy = self._result.policy.numpy()
+        policy = np.asarray(self._result.policy)
 
         # Index into the policy for the requested states
         proba = policy[states]
@@ -591,7 +591,7 @@ class NFXP:
             np.random.seed(seed)
 
         # Get the policy (choice probabilities)
-        policy = self._result.policy.numpy()  # shape: (n_states, n_actions)
+        policy = np.asarray(self._result.policy)  # shape: (n_states, n_actions)
 
         # Get transition probabilities (for action 0 = keep)
         transitions = self.transitions_  # shape: (n_states, n_states)
@@ -711,8 +711,8 @@ class NFXP:
 
         return CounterfactualResult(
             params=cf_params,
-            value_function=result.V.numpy(),
-            policy=result.policy.numpy(),
+            value_function=np.asarray(result.V),
+            policy=np.asarray(result.policy),
         )
 
     def __repr__(self) -> str:

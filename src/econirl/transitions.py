@@ -94,9 +94,9 @@ class TransitionEstimator:
         n_transitions = 0
 
         for traj in data.trajectories:
-            states = traj.states.numpy()
-            actions = traj.actions.numpy()
-            next_states = traj.next_states.numpy()
+            states = np.asarray(traj.states)
+            actions = np.asarray(traj.actions)
+            next_states = np.asarray(traj.next_states)
 
             for t in range(len(states)):
                 # Only count transitions where action is 0 (keep/no replacement)

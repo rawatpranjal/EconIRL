@@ -466,7 +466,7 @@ class CCPEstimator(BaseEstimator):
         # Use float64 for high discount factors (condition number ≈ 1/(1-β))
         beta = problem.discount_factor
         if beta > 0.99:
-            transitions = transitions.astype(jnp.float64)
+            transitions = jnp.array(transitions, dtype=jnp.float64)
 
         # Initialize parameters — use data-driven starting values if zeros
         if initial_params is None:
