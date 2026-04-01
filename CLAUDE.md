@@ -20,6 +20,16 @@ Start with 250 users to verify the pipeline works end to end. Then scale to 2000
 
 When the numbers say the lift is zero, say the lift is zero. Do not dress up a null result. A null result with interpretable features is more useful than a positive result with opaque ones.
 
+## Project Vision
+
+The aspiration is EconML for DDC/IRL. The estimators are interchangeable parts. The value is in the shared post-estimation infrastructure that sits on top of all of them. Pick any estimator and get inference (standard errors, confidence intervals, Wald tests, identification diagnostics), validation (in-sample, out-of-sample, transfer), and counterfactual simulation (parameter changes, transition changes, elasticity analysis) through the same unified pipeline.
+
+Sieve compression is a post-estimation step, not an estimation method. Estimate a high-dimensional reward with AIRL or deep MaxEnt, then project it onto a sieve basis (polynomials, splines) for interpretability. The neural step gets accuracy, the sieve step gets understanding.
+
+Structural estimators (NFXP, CCP, NNES) use linear utility by design. Neural reward plug-and-play applies only to IRL estimators (AIRL, deep MaxEnt, GLADIUS). Do not add neural reward support to structural estimators.
+
+Examples and showcases should run on real data, not simulated data. Use simulation only when ground truth is needed for parameter recovery tests.
+
 ## Project Overview
 
 **econirl** is a Python library for structural estimation and inverse reinforcement learning (IRL) in dynamic discrete choice models. It bridges econometrics (NFXP, CCP) with machine learning (MaxEnt IRL, MCE IRL, GAIL, AIRL).
@@ -128,6 +138,8 @@ Example page titles must follow a consistent "Subject Problem" pattern with no c
 
 Tables in documentation must show actual numbers from running the code. Do not use qualitative placeholders like "positive" or "near zero" when you can run the script and report the estimate.
 
+Always build the docs locally after making documentation changes to verify rendering before committing. Run `python3 -m sphinx -b html docs docs/_build/html` from the project root and check the output for errors.
+
 Keep `docs/conf.py` release version in sync with `pyproject.toml` and `src/econirl/__init__.py`.
 
 ## Key References
@@ -136,3 +148,4 @@ Keep `docs/conf.py` release version in sync with `pyproject.toml` and `src/econi
 - Ziebart (2010): Maximum Causal Entropy IRL
 - Kim et al. (2021): Reward Identification in IRL
 - Cao & Cohen (2021): Identifiability in IRL
+- Lee, Sudhir & Wang (2026): AIRL with unobserved heterogeneity for structural DDC on sequential content

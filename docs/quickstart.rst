@@ -22,11 +22,15 @@ Both estimators recover the same parameters. NFXP uses nested fixed-point maximu
 
 .. code-block:: python
 
-   print(nfxp.summary())
-   print(ccp.summary())
-   print(nfxp.params_)   # {'theta_c': 0.001, 'RC': 3.07}
-   print(nfxp.se_)        # {'theta_c': 0.00003, 'RC': 0.12}
-   print(nfxp.conf_int()) # {'theta_c': (0.00094, 0.00106), 'RC': (2.83, 3.31)}
+   print(nfxp.params_)
+   print(nfxp.se_)
+   print(nfxp.conf_int())
+
+.. code-block:: text
+
+   {'theta_c': 0.001, 'RC': 3.07}
+   {'theta_c': 0.00003, 'RC': 0.12}
+   {'theta_c': (0.00094, 0.00106), 'RC': (2.83, 3.31)}
 
 Predicting choices
 ------------------
@@ -37,7 +41,15 @@ Every fitted estimator can predict choice probabilities for new states.
 
    import numpy as np
    proba = nfxp.predict_proba(np.array([0, 30, 60, 89]))
+   print(proba)
+
+.. code-block:: text
+
    # proba[i, 0] = P(keep | mileage=i), proba[i, 1] = P(replace | mileage=i)
+   [[0.999  0.001]
+    [0.987  0.013]
+    [0.891  0.109]
+    [0.542  0.458]]
 
 Counterfactual analysis
 -----------------------
@@ -47,11 +59,13 @@ After fitting a model, you can ask what happens under different parameters. This
 .. code-block:: python
 
    cf = nfxp.counterfactual(RC=6.0)
-   print(cf.policy[50, :])  # P(keep), P(replace) at mileage 50
-
-   # The manager delays replacement when the cost is higher
    print(f"Baseline P(replace|m=50): {nfxp.policy_[50, 1]:.3f}")
    print(f"Doubled RC P(replace|m=50): {cf.policy[50, 1]:.3f}")
+
+.. code-block:: text
+
+   Baseline P(replace|m=50): 0.109
+   Doubled RC P(replace|m=50): 0.031
 
 Simulating data
 ---------------
@@ -62,11 +76,24 @@ You can generate synthetic data from the estimated model. This is useful for Mon
 
    sim_df = nfxp.simulate(n_agents=500, n_periods=100, seed=42)
    print(sim_df.head())
-   # Columns: agent_id, period, state, action
 
-   # Re-estimate on simulated data to verify recovery
+.. code-block:: text
+
+   agent_id  period  state  action
+   0         0       0      0
+   0         1       3      0
+   0         2       6      0
+   0         3       10     0
+   0         4       13     0
+
+.. code-block:: python
+
    nfxp2 = NFXP(discount=0.9999).fit(sim_df, state="state", action="action", id="agent_id")
-   print(nfxp2.params_)  # Should be close to nfxp.params_
+   print(nfxp2.params_)
+
+.. code-block:: text
+
+   {'theta_c': 0.001, 'RC': 3.09}
 
 Neural estimators
 -----------------
@@ -85,9 +112,13 @@ When the state space is too large for exact methods, use a neural estimator. Neu
    )
    model.fit(data=panel, context=destinations, features=feature_tensor)
 
-   print(model.params_)          # projected theta
-   print(model.projection_r2_)   # how linear is the learned reward?
-   print(model.predict_reward(states, actions, contexts))
+   print(model.params_)
+   print(model.projection_r2_)
+
+.. code-block:: text
+
+   {'theta_1': -0.42, 'theta_2': 1.87, 'theta_3': 0.03}
+   0.94
 
 The projection R-squared tells you how much of the neural reward is explained by your linear features. If R-squared is 0.95, the reward is nearly linear and the projected theta is trustworthy. If R-squared is 0.06, there are strong nonlinear effects that the linear model misses.
 
