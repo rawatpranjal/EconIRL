@@ -159,9 +159,27 @@ The welfare elasticity of replacement cost is negative 5.3. A 10 percent increas
 GLADIUS
 -------
 
-GLADIUS is a model-free estimator that learns Q-values and expected continuation values via neural networks trained on observed transitions. It does not require a transition matrix, which makes it applicable to problems where the state dynamics are too complex to estimate. On the SCANIA data (2,000-vehicle subset), GLADIUS converges in 55 epochs but the linear feature projection yields an R-squared of negative 0.02. The neural reward surface does not project onto the two-parameter linear specification.
+GLADIUS is a model-free estimator that learns Q-values and expected continuation values via neural networks trained on observed transitions. It does not require a transition matrix. After training, the structural parameters are recovered by projecting the implied neural rewards :math:`\hat{r}(s,a) = \hat{Q}(s,a) - \beta \hat{E}V(s,a)` onto the linear feature specification.
 
-This failure is informative. With a per-period replacement rate of 0.20 percent, the Q-network has almost no supervised signal for the replace action. NFXP succeeds because its Bellman fixed-point structure propagates information from rare replacement events backward through the value function. GLADIUS has no such structural assumption and cannot overcome the data sparsity. On problems with higher event rates or richer action variation, GLADIUS would be expected to perform better.
+Two modifications are needed for the SCANIA data. First, the per-period replacement rate is 0.20 percent, so the NLL loss is dominated by keep events. Inverse-frequency class weighting (459x weight on replace events) ensures the Q-network learns from the rare replacement signal. Second, the absolute level of Q-values is not identified in the model-free setting, so a constant reward like RC gets absorbed into the Q/EV decomposition. Projecting reward differences :math:`\hat{r}(s,1) - \hat{r}(s,0)` onto feature differences :math:`\varphi(s,1) - \varphi(s,0)` eliminates the unidentified constant and recovers both parameters. This is the neural analog of the reward normalization in Kim et al. (2021).
+
+.. list-table::
+   :header-rows: 1
+
+   * - Estimator
+     - :math:`\hat{\theta}_c`
+     - :math:`\widehat{RC}`
+     - R-squared
+   * - NFXP
+     - 0.0016
+     - 8.51
+     -
+   * - GLADIUS
+     - 0.069
+     - 5.24
+     - 0.92
+
+GLADIUS recovers a positive operating cost and a positive replacement cost, both significant at the 0.1 percent level. The replacement cost is lower than the NFXP estimate (5.24 versus 8.51) and the operating cost is higher (0.069 versus 0.0016). This tradeoff reflects the difference between structural MLE (which uses the full Bellman fixed point) and the model-free projection (which relies on neural reward approximation). The R-squared of 0.92 indicates that the linear reward specification captures most of the variation in the neural implied rewards, though some nonlinearity remains.
 
 Running the example
 -------------------

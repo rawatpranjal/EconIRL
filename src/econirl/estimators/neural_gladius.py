@@ -520,6 +520,16 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         best_loss = float("inf")
         patience_counter = 0
 
+        # Compute inverse-frequency class weights for the NLL loss.
+        # This prevents rare actions (e.g., 0.2% replacement events)
+        # from being drowned out by the majority action.
+        action_counts = torch.bincount(actions.long(), minlength=self.n_actions).float()
+        action_counts = action_counts.clamp(min=1.0)
+        class_weights = N / (self.n_actions * action_counts)
+        if self.verbose and class_weights.max() / class_weights.min() > 10:
+            print(f"  Class weights: {class_weights.tolist()} "
+                  f"(ratio {class_weights.max()/class_weights.min():.0f}x)")
+
         for epoch in range(self.max_epochs):
             perm = torch.randperm(N)
             epoch_loss = 0.0
@@ -543,9 +553,11 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                     s_feat, ctx_feat, self.n_actions
                 )  # (B, A)
 
-                # NLL loss: -log softmax(Q/sigma)[observed_action]
+                # Weighted NLL loss: inverse-frequency weights per action
                 log_probs = torch.log_softmax(q_all / self.scale, dim=1)
-                nll = -log_probs[torch.arange(len(a)), a.long()].mean()
+                per_obs_nll = -log_probs[torch.arange(len(a)), a.long()]
+                weights = class_weights[a.long()]
+                nll = (per_obs_nll * weights).mean()
 
                 # Bellman penalty: (EV(s,a) - V(s'))^2
                 ev_sa = self._ev_net(s_feat, ctx_feat, a_oh)
@@ -659,23 +671,48 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 f"f{i}" for i in range(features.shape[-1])
             ]
 
-        with torch.no_grad():
-            s_feat = self._state_encoder(states)
-            ctx_feat = self._context_encoder(contexts)
-            a_oh = F.one_hot(actions.long(), self.n_actions).float()
-
-            q_vals = self._q_net(s_feat, ctx_feat, a_oh)
-            ev_vals = self._ev_net(s_feat, ctx_feat, a_oh)
-            rewards = q_vals - self.discount * ev_vals
-
-        # Get features for observed (s, a) pairs
         if not isinstance(feat_matrix, torch.Tensor):
             feat_matrix = torch.tensor(np.asarray(feat_matrix), dtype=torch.float32)
-        phi = feat_matrix[states.long(), actions.long(), :]  # (N, K)
 
-        # Use float32 for projection
-        phi = phi.float()
-        rewards = rewards.float()
+        # Compute implied rewards for ALL state-action pairs at the
+        # state level, then project ACTION DIFFERENCES onto feature
+        # differences. This eliminates the unidentified constant in
+        # the absolute Q-level (Kim et al. 2021, Cao & Cohen 2021).
+        n_s = self._n_states
+        unique_states = torch.arange(n_s, dtype=torch.long)
+        unique_ctx = torch.zeros(n_s, dtype=torch.long)
+
+        with torch.no_grad():
+            s_feat = self._state_encoder(unique_states)
+            ctx_feat = self._context_encoder(unique_ctx)
+
+            # Compute Q and EV for each action at each state
+            q_all = self._q_net.all_actions(s_feat, ctx_feat, self.n_actions)
+            r_all = torch.zeros(n_s, self.n_actions)
+            for a_idx in range(self.n_actions):
+                a_oh = F.one_hot(
+                    torch.full((n_s,), a_idx, dtype=torch.long),
+                    self.n_actions,
+                ).float()
+                ev_a = self._ev_net(s_feat, ctx_feat, a_oh)
+                r_all[:, a_idx] = q_all[:, a_idx] - self.discount * ev_a
+
+        # Project using action differences relative to action 0.
+        # For each state s and action a>0:
+        #   dr(s) = r(s, a) - r(s, 0)
+        #   dphi(s) = phi(s, a) - phi(s, 0)
+        # The constant in the absolute reward cancels in the difference,
+        # so both level and slope parameters are identified.
+        dr_list = []
+        dphi_list = []
+        for a_idx in range(1, self.n_actions):
+            dr = r_all[:, a_idx] - r_all[:, 0]  # (S,)
+            dphi = feat_matrix[:n_s, a_idx, :] - feat_matrix[:n_s, 0, :]  # (S, K)
+            dr_list.append(dr)
+            dphi_list.append(dphi)
+
+        rewards = torch.cat(dr_list).float()
+        phi = torch.cat(dphi_list).float()
 
         theta, se, r2 = self._project_parameters(phi, rewards)
 
