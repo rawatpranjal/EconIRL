@@ -35,6 +35,17 @@ Clinical treatment decisions modeled as sequential choice under uncertainty.
 
    icu_sepsis
 
+Industrial Organization
+-----------------------
+
+Firm dynamics, market entry and exit, and retail pricing under dynamic optimization.
+
+.. toctree::
+   :maxdepth: 1
+
+   entry_exit
+   supermarket
+
 Transportation and Route Choice
 --------------------------------
 
@@ -46,6 +57,8 @@ Driver, cyclist, and vehicle routing on road networks and highways.
    ngsim_lane_change
    shanghai_route
    beijing_taxi
+   citibike_route
+   citibike_usage
 
 Labor and Career Decisions
 --------------------------

@@ -1,0 +1,132 @@
+"""Citibike Usage Frequency: Structural estimation of daily ride decisions.
+
+Demonstrates NFXP, CCP, and MCE-IRL on a daily ride/no-ride DDC
+problem for Citibike members. Falls back to synthetic data if the
+real Citibike data has not been downloaded.
+
+Usage:
+    python examples/citibike-usage/run_estimation.py
+"""
+
+import time
+
+import jax.numpy as jnp
+import numpy as np
+
+from econirl.core.types import DDCProblem, Panel
+from econirl.datasets.citibike_usage import load_citibike_usage
+from econirl.environments.citibike_usage import CitibikeUsageEnvironment
+from econirl.estimation.ccp import CCPEstimator
+from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
+from econirl.estimation.nfxp import NFXPEstimator
+from econirl.inference import etable
+from econirl.inference.fit_metrics import brier_score, kl_divergence
+from econirl.inference.hypothesis_tests import vuong_test
+from econirl.preferences.linear import LinearUtility
+from econirl.simulation.counterfactual import counterfactual_policy, elasticity_analysis
+
+
+def main():
+    print("=" * 65)
+    print("Citibike Daily Usage (8 states, 2 actions)")
+    print("=" * 65)
+
+    env = CitibikeUsageEnvironment(discount_factor=0.95)
+    panel = load_citibike_usage(as_panel=True, n_individuals=1000, n_periods=90)
+
+    cutoff = int(panel.num_individuals * 0.8)
+    train = Panel(trajectories=panel.trajectories[:cutoff])
+    test = Panel(trajectories=panel.trajectories[cutoff:])
+    print(f"  Train: {train.num_individuals} riders, {train.num_observations} obs")
+    print(f"  Test:  {test.num_individuals} riders, {test.num_observations} obs")
+    print(f"  True: {env.true_parameters}")
+
+    transitions = env.transition_matrices
+    problem = env.problem_spec
+    utility = LinearUtility(
+        feature_matrix=env.feature_matrix,
+        parameter_names=env.parameter_names,
+    )
+
+    results = {}
+
+    t0 = time.time()
+    nfxp = NFXPEstimator(se_method="robust")
+    results["NFXP"] = nfxp.estimate(train, utility, problem, transitions)
+    print(f"\nNFXP: {time.time() - t0:.1f}s")
+    print(results["NFXP"].summary())
+
+    t0 = time.time()
+    ccp = CCPEstimator(num_policy_iterations=20, se_method="robust")
+    results["CCP"] = ccp.estimate(train, utility, problem, transitions)
+    print(f"\nCCP: {time.time() - t0:.1f}s")
+    print(results["CCP"].summary())
+
+    t0 = time.time()
+    mce_config = MCEIRLConfig(learning_rate=0.1, outer_max_iter=300)
+    mce = MCEIRLEstimator(config=mce_config)
+    results["MCE-IRL"] = mce.estimate(train, utility, problem, transitions)
+    print(f"\nMCE-IRL: {time.time() - t0:.1f}s")
+    print(results["MCE-IRL"].summary())
+
+    # Parameter recovery
+    print("\n" + "=" * 65)
+    print("Parameter Recovery Table")
+    print("=" * 65)
+    print(f"{'Parameter':<18} {'True':>8} {'NFXP':>8} {'CCP':>8} {'MCE-IRL':>8}")
+    print("-" * 58)
+    for i, name in enumerate(env.parameter_names):
+        true_val = env.true_parameters[name]
+        print(f"{name:<18} {true_val:>8.4f} "
+              f"{float(results['NFXP'].parameters[i]):>8.4f} "
+              f"{float(results['CCP'].parameters[i]):>8.4f} "
+              f"{float(results['MCE-IRL'].parameters[i]):>8.4f}")
+
+    # Diagnostics
+    print("\n" + "=" * 65)
+    print("Post-Estimation Diagnostics")
+    print("=" * 65)
+
+    print("\n--- etable() ---")
+    print(etable(results["NFXP"], results["CCP"], results["MCE-IRL"]))
+
+    obs_states = jnp.array(train.get_all_states())
+    obs_actions = jnp.array(train.get_all_actions())
+
+    print("\n--- Brier Scores ---")
+    for name, r in results.items():
+        bs = brier_score(r.policy, obs_states, obs_actions)
+        print(f"  {name}: {bs['brier_score']:.4f}")
+
+    print("\n--- Vuong Test (NFXP vs MCE-IRL) ---")
+    vt = vuong_test(results["NFXP"].policy, results["MCE-IRL"].policy, obs_states, obs_actions)
+    print(f"  Z-statistic: {vt['statistic']:.3f}")
+    print(f"  P-value: {vt['p_value']:.4f}")
+
+    # Counterfactual: free rides
+    print("\n" + "=" * 65)
+    print("Counterfactual: Free Rides (ride_cost = 0)")
+    print("=" * 65)
+    best = results["NFXP"]
+    cost_idx = env.parameter_names.index("ride_cost")
+    new_params = best.parameters.at[cost_idx].set(0.0)
+    cf = counterfactual_policy(best, new_params, utility, problem, transitions)
+    print(f"Welfare change: {float(cf.welfare_change):+.3f}")
+
+    # Elasticity
+    print("\n--- Ride Cost Elasticity ---")
+    ea = elasticity_analysis(
+        best, utility, problem, transitions,
+        parameter_name="ride_cost",
+        pct_changes=[-1.0, -0.50, -0.25, 0.25, 0.50, 1.0],
+    )
+    print(f"{'% Change':>10} {'Welfare':>12} {'Avg Policy':>12}")
+    print("-" * 36)
+    for i, pct in enumerate(ea["pct_changes"]):
+        wc = ea["welfare_changes"][i]
+        pc = ea["policy_changes"][i]
+        print(f"{pct:>+10.0%} {float(wc):>+12.3f} {float(pc):>12.3f}")
+
+
+if __name__ == "__main__":
+    main()

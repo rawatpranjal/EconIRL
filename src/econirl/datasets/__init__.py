@@ -23,7 +23,11 @@ Search/Click Datasets (Sequential Choice):
 from econirl.datasets.rust_bus import load_rust_bus
 from econirl.datasets.occupational_choice import load_occupational_choice
 from econirl.datasets.icu_sepsis import load_icu_sepsis, load_icu_sepsis_mdp, get_icu_sepsis_info
+from econirl.datasets.citibike_route import load_citibike_route, get_citibike_route_info
+from econirl.datasets.citibike_usage import load_citibike_usage, get_citibike_usage_info
+from econirl.datasets.entry_exit import load_entry_exit, get_entry_exit_info
 from econirl.datasets.frozen_lake import load_frozen_lake, get_frozen_lake_info
+from econirl.datasets.supermarket import load_supermarket, get_supermarket_info
 from econirl.datasets.instacart import load_instacart, get_instacart_info
 from econirl.datasets.keane_wolpin import load_keane_wolpin, get_keane_wolpin_info
 from econirl.datasets.robinson_crusoe import load_robinson_crusoe, get_robinson_crusoe_info
@@ -66,6 +70,17 @@ __all__ = [
     "load_robinson_crusoe",
     "get_robinson_crusoe_info",
     "load_equipment_replacement",
+    # Urban Mobility Datasets
+    "load_citibike_route",
+    "get_citibike_route_info",
+    "load_citibike_usage",
+    "get_citibike_usage_info",
+    # IO / Firm Dynamics Datasets
+    "load_entry_exit",
+    "get_entry_exit_info",
+    # Retail IO Datasets
+    "load_supermarket",
+    "get_supermarket_info",
     # Healthcare Datasets
     "load_icu_sepsis",
     "load_icu_sepsis_mdp",
