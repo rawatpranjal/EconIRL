@@ -6,6 +6,7 @@ from econirl.estimation.categories import (
     EstimatorCategory,
     ProblemCapabilities,
     ESTIMATOR_REGISTRY,
+    CONTRIB_REGISTRY,
     get_estimators_by_category,
     get_estimators_with_capability,
     get_category,
@@ -16,14 +17,25 @@ from econirl.estimation.categories import (
 class TestEstimatorRegistry:
     """Tests for the estimator registry."""
 
-    def test_all_18_estimators_registered(self):
-        """All 18 estimators should be in the registry."""
-        assert len(ESTIMATOR_REGISTRY) == 18
+    def test_10_production_estimators_registered(self):
+        """10 production estimators should be in the registry."""
+        assert len(ESTIMATOR_REGISTRY) == 10
+
+    def test_8_contrib_estimators_registered(self):
+        """8 contrib estimators should be in the contrib registry."""
+        assert len(CONTRIB_REGISTRY) == 8
 
     def test_known_estimators_present(self):
-        """Key estimators should be in the registry."""
-        for name in ["NFXP", "CCP", "MCE IRL", "AIRL", "GAIL", "IQ-Learn", "BC", "GLADIUS"]:
+        """Key production estimators should be in the registry."""
+        for name in ["NFXP", "CCP", "MCE IRL", "AIRL", "BC", "GLADIUS",
+                      "TD-CCP", "NNES", "SEES", "f-IRL"]:
             assert name in ESTIMATOR_REGISTRY, f"{name} not in registry"
+
+    def test_contrib_estimators_present(self):
+        """Moved estimators should be in contrib registry."""
+        for name in ["MaxEnt IRL", "Deep MaxEnt", "GAIL", "IQ-Learn",
+                      "Max Margin", "GCL", "BIRL"]:
+            assert name in CONTRIB_REGISTRY, f"{name} not in contrib registry"
 
     def test_registry_values_are_tuples(self):
         """Each registry entry should be (EstimatorCategory, ProblemCapabilities)."""
@@ -35,12 +47,6 @@ class TestEstimatorRegistry:
 class TestEstimatorCategory:
     """Tests for category enumeration."""
 
-    def test_all_categories_have_members(self):
-        """Every category should have at least one estimator."""
-        for cat in EstimatorCategory:
-            members = get_estimators_by_category(cat)
-            assert len(members) > 0, f"Category {cat.value} has no members"
-
     def test_structural_estimators(self):
         """NFXP and CCP should be structural."""
         structural = get_estimators_by_category(EstimatorCategory.STRUCTURAL)
@@ -48,18 +54,33 @@ class TestEstimatorCategory:
         assert "CCP" in structural
 
     def test_adversarial_estimators(self):
-        """GAIL, AIRL, GCL should be adversarial."""
+        """Only AIRL should be in production adversarial."""
         adversarial = get_estimators_by_category(EstimatorCategory.ADVERSARIAL_IRL)
-        assert set(adversarial) == {"GAIL", "AIRL", "GCL"}
+        assert set(adversarial) == {"AIRL"}
 
     def test_q_learning_estimators(self):
-        """IQ-Learn and GLADIUS should be q_learning_irl."""
+        """GLADIUS should be in q_learning_irl."""
         q_learning = get_estimators_by_category(EstimatorCategory.Q_LEARNING_IRL)
-        assert set(q_learning) == {"IQ-Learn", "GLADIUS"}
+        assert set(q_learning) == {"GLADIUS"}
 
     def test_imitation_is_bc_only(self):
         """Only BC should be in the imitation category."""
         assert get_estimators_by_category(EstimatorCategory.IMITATION) == ["BC"]
+
+    def test_structural_approx(self):
+        """SEES, NNES, TD-CCP should be structural_approx."""
+        approx = get_estimators_by_category(EstimatorCategory.STRUCTURAL_APPROX)
+        assert set(approx) == {"SEES", "NNES", "TD-CCP"}
+
+    def test_entropy_irl(self):
+        """MCE IRL should be entropy_irl."""
+        entropy = get_estimators_by_category(EstimatorCategory.ENTROPY_IRL)
+        assert set(entropy) == {"MCE IRL"}
+
+    def test_distribution_irl(self):
+        """f-IRL should be distribution_irl."""
+        dist = get_estimators_by_category(EstimatorCategory.DISTRIBUTION_IRL)
+        assert set(dist) == {"f-IRL"}
 
 
 class TestProblemCapabilities:
@@ -77,10 +98,9 @@ class TestProblemCapabilities:
             assert caps.recovers_structural_params, f"{name} should recover params"
 
     def test_no_inner_solve_estimators(self):
-        """CCP, SEES, NNES, TD-CCP, IQ-Learn, GLADIUS, BC should have no inner Bellman solve."""
+        """CCP, SEES, NNES, TD-CCP, GLADIUS, BC should have no inner Bellman solve."""
         no_solve = get_estimators_with_capability(has_inner_bellman_solve=False)
         assert "CCP" in no_solve
-        assert "IQ-Learn" in no_solve
         assert "GLADIUS" in no_solve
         assert "BC" in no_solve
 
@@ -113,9 +133,13 @@ class TestProblemCapabilities:
 class TestHelperFunctions:
     """Tests for get_category and get_capabilities."""
 
-    def test_get_category(self):
+    def test_get_category_production(self):
         assert get_category("NFXP") == EstimatorCategory.STRUCTURAL
+
+    def test_get_category_contrib(self):
+        """Contrib estimators should also be accessible via get_category."""
         assert get_category("IQ-Learn") == EstimatorCategory.Q_LEARNING_IRL
+        assert get_category("GAIL") == EstimatorCategory.ADVERSARIAL_IRL
 
     def test_get_capabilities(self):
         caps = get_capabilities("NFXP")

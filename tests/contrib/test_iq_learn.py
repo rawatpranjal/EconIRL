@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
+from econirl.contrib.iq_learn import IQLearnEstimator, IQLearnConfig
 from econirl.preferences.action_reward import ActionDependentReward
 
 

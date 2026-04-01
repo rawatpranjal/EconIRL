@@ -10,7 +10,7 @@ import pytest
 import torch
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.gcl import GCLEstimator, GCLConfig
+from econirl.contrib.gcl import GCLEstimator, GCLConfig
 from econirl.preferences.neural_cost import NeuralCostFunction
 
 

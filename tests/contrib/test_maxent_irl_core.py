@@ -15,7 +15,7 @@ import numpy as np
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
-from econirl.estimation.maxent_irl import MaxEntIRLEstimator
+from econirl.contrib.maxent_irl import MaxEntIRLEstimator
 from econirl.estimation.base import EstimationResult
 from econirl.preferences.reward import LinearReward
 from econirl.simulation.synthetic import simulate_panel

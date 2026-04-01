@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.adversarial.gail import GAILEstimator, GAILConfig
+from econirl.contrib.gail import GAILEstimator, GAILConfig
 from econirl.preferences.action_reward import ActionDependentReward
 
 

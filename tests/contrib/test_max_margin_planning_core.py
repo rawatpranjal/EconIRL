@@ -6,7 +6,7 @@ import numpy as np
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.max_margin_planning import MaxMarginPlanningEstimator, MMPConfig
+from econirl.contrib.max_margin_planning import MaxMarginPlanningEstimator, MMPConfig
 from econirl.preferences.action_reward import ActionDependentReward
 
 

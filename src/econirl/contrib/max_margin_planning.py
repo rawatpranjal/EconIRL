@@ -41,6 +41,7 @@ from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.base import BaseUtilityFunction
+from econirl.preferences.linear import LinearUtility
 from econirl.preferences.reward import LinearReward
 
 
@@ -300,7 +301,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             Expert feature expectations, shape (n_features,).
         """
         # Get feature matrix
-        if isinstance(reward_fn, ActionDependentReward):
+        if isinstance(reward_fn, (ActionDependentReward, LinearUtility)):
             feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
             is_action_dependent = True
         elif isinstance(reward_fn, LinearReward):
@@ -308,8 +309,8 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             is_action_dependent = False
         else:
             raise TypeError(
-                f"MaxMarginPlanningEstimator requires LinearReward or "
-                f"ActionDependentReward, got {type(reward_fn)}"
+                f"MaxMarginPlanningEstimator requires LinearReward, "
+                f"ActionDependentReward, or LinearUtility, got {type(reward_fn)}"
             )
 
         all_states = panel.get_all_states()
@@ -380,7 +381,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             d_pi = d_pi / d_pi.sum()
 
         # Compute feature expectations based on reward type
-        if isinstance(reward_fn, ActionDependentReward):
+        if isinstance(reward_fn, (ActionDependentReward, LinearUtility)):
             feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
             # μ_π = Σ_s d_π(s) Σ_a π(a|s) φ(s,a,k)
             policy_weighted_features = torch.einsum("sa,sak->sk", policy, feature_matrix)
@@ -390,8 +391,8 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             feature_expectations = torch.einsum("s,sk->k", d_pi, reward_fn.state_features)
         else:
             raise TypeError(
-                f"MaxMarginPlanningEstimator requires LinearReward or "
-                f"ActionDependentReward, got {type(reward_fn)}"
+                f"MaxMarginPlanningEstimator requires LinearReward, "
+                f"ActionDependentReward, or LinearUtility, got {type(reward_fn)}"
             )
 
         return feature_expectations
@@ -475,10 +476,10 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         start_time = time.time()
 
         # Verify utility is a supported type
-        if not isinstance(utility, (LinearReward, ActionDependentReward)):
+        if not isinstance(utility, (LinearReward, ActionDependentReward, LinearUtility)):
             raise TypeError(
-                f"MaxMarginPlanningEstimator requires LinearReward or "
-                f"ActionDependentReward, got {type(utility)}"
+                f"MaxMarginPlanningEstimator requires LinearReward, "
+                f"ActionDependentReward, or LinearUtility, got {type(utility)}"
             )
 
         reward_fn = utility

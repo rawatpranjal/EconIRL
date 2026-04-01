@@ -9,15 +9,15 @@ Tests cover:
 
 import numpy as np
 import pytest
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.estimation.gladius import (
-    EVNetwork,
+    _EVNetwork,
     GLADIUSConfig,
     GLADIUSEstimator,
-    QNetwork,
-    _build_mlp,
+    _QNetwork,
 )
 
 
@@ -59,89 +59,92 @@ class TestGLADIUSConfig:
 class TestNetworkArchitectures:
     """Tests for Q-network and EV-network shapes."""
 
-    def test_build_mlp_shape(self):
-        """Check that _build_mlp creates the right number of layers."""
-        mlp = _build_mlp(input_dim=5, hidden_dim=16, num_layers=2, output_dim=1)
-        # 2 hidden layers means: Linear+ReLU + Linear+ReLU + Linear = 5 modules
-        n_modules = len(list(mlp.children()))
-        assert n_modules == 5, f"Expected 5 modules, got {n_modules}"
-
-    def test_build_mlp_zero_hidden(self):
-        """MLP with 0 hidden layers should be a single linear layer."""
-        mlp = _build_mlp(input_dim=5, hidden_dim=16, num_layers=0, output_dim=1)
-        n_modules = len(list(mlp.children()))
-        assert n_modules == 1
-
     def test_q_network_forward_shape(self):
         """Q-network forward pass should produce (batch,) output."""
         state_dim = 1
         n_actions = 3
-        q_net = QNetwork(state_dim, n_actions, hidden_dim=16, num_layers=2)
+        key = jax.random.PRNGKey(0)
+        q_net = _QNetwork(state_dim, n_actions, hidden_dim=16, num_layers=2, key=key)
 
         batch = 10
-        state_features = torch.randn(batch, state_dim)
-        action_onehot = torch.zeros(batch, n_actions)
-        action_onehot[:, 0] = 1.0
+        state_features = jax.random.normal(jax.random.PRNGKey(1), (batch, state_dim))
+        action_onehot = jnp.zeros((batch, n_actions))
+        action_onehot = action_onehot.at[:, 0].set(1.0)
 
-        q_vals = q_net(state_features, action_onehot)
+        q_vals = q_net.forward(state_features, action_onehot)
         assert q_vals.shape == (batch,), f"Expected ({batch},), got {q_vals.shape}"
-        assert torch.all(torch.isfinite(q_vals)), "Q values should be finite"
+        assert jnp.all(jnp.isfinite(q_vals)), "Q values should be finite"
 
     def test_q_network_forward_all_actions_shape(self):
         """forward_all_actions should produce (batch, n_actions)."""
         state_dim = 1
         n_actions = 3
-        q_net = QNetwork(state_dim, n_actions, hidden_dim=16, num_layers=2)
+        key = jax.random.PRNGKey(0)
+        q_net = _QNetwork(state_dim, n_actions, hidden_dim=16, num_layers=2, key=key)
 
         batch = 10
-        state_features = torch.randn(batch, state_dim)
+        state_features = jax.random.normal(jax.random.PRNGKey(1), (batch, state_dim))
 
         q_all = q_net.forward_all_actions(state_features)
         assert q_all.shape == (batch, n_actions), f"Expected ({batch}, {n_actions}), got {q_all.shape}"
-        assert torch.all(torch.isfinite(q_all)), "All Q values should be finite"
+        assert jnp.all(jnp.isfinite(q_all)), "All Q values should be finite"
 
     def test_ev_network_forward_shape(self):
         """EV-network forward pass should produce (batch,) output."""
         state_dim = 1
         n_actions = 2
-        ev_net = EVNetwork(state_dim, n_actions, hidden_dim=16, num_layers=2)
+        key = jax.random.PRNGKey(0)
+        ev_net = _EVNetwork(state_dim, n_actions, hidden_dim=16, num_layers=2, key=key)
 
         batch = 8
-        state_features = torch.randn(batch, state_dim)
-        action_onehot = torch.zeros(batch, n_actions)
-        action_onehot[:, 1] = 1.0
+        state_features = jax.random.normal(jax.random.PRNGKey(1), (batch, state_dim))
+        action_onehot = jnp.zeros((batch, n_actions))
+        action_onehot = action_onehot.at[:, 1].set(1.0)
 
-        ev_vals = ev_net(state_features, action_onehot)
+        ev_vals = ev_net.forward(state_features, action_onehot)
         assert ev_vals.shape == (batch,), f"Expected ({batch},), got {ev_vals.shape}"
-        assert torch.all(torch.isfinite(ev_vals)), "EV values should be finite"
+        assert jnp.all(jnp.isfinite(ev_vals)), "EV values should be finite"
 
     def test_q_network_gradient_flow(self):
         """Gradients should flow through the Q-network."""
-        q_net = QNetwork(state_dim=1, n_actions=2, hidden_dim=16, num_layers=2)
-        state_features = torch.randn(4, 1)
-        action_onehot = torch.zeros(4, 2)
-        action_onehot[:, 0] = 1.0
+        key = jax.random.PRNGKey(0)
+        q_net = _QNetwork(state_dim=1, n_actions=2, hidden_dim=16, num_layers=2, key=key)
+        state_features = jax.random.normal(jax.random.PRNGKey(1), (4, 1))
+        action_onehot = jnp.zeros((4, 2))
+        action_onehot = action_onehot.at[:, 0].set(1.0)
 
-        q_vals = q_net(state_features, action_onehot)
-        loss = q_vals.sum()
-        loss.backward()
+        import equinox as eqx
 
-        for param in q_net.parameters():
-            assert param.grad is not None, "Gradients should be computed"
+        def loss_fn(q_net):
+            q_vals = q_net.forward(state_features, action_onehot)
+            return q_vals.sum()
+
+        grads = eqx.filter_grad(loss_fn)(q_net)
+
+        # Check that at least some gradient leaves are non-zero
+        leaves = jax.tree_util.tree_leaves(eqx.filter(grads, eqx.is_array))
+        has_nonzero = any(jnp.any(leaf != 0) for leaf in leaves)
+        assert has_nonzero, "At least some gradients should be nonzero"
 
     def test_ev_network_gradient_flow(self):
         """Gradients should flow through the EV-network."""
-        ev_net = EVNetwork(state_dim=1, n_actions=2, hidden_dim=16, num_layers=2)
-        state_features = torch.randn(4, 1)
-        action_onehot = torch.zeros(4, 2)
-        action_onehot[:, 1] = 1.0
+        key = jax.random.PRNGKey(0)
+        ev_net = _EVNetwork(state_dim=1, n_actions=2, hidden_dim=16, num_layers=2, key=key)
+        state_features = jax.random.normal(jax.random.PRNGKey(1), (4, 1))
+        action_onehot = jnp.zeros((4, 2))
+        action_onehot = action_onehot.at[:, 1].set(1.0)
 
-        ev_vals = ev_net(state_features, action_onehot)
-        loss = ev_vals.sum()
-        loss.backward()
+        import equinox as eqx
 
-        for param in ev_net.parameters():
-            assert param.grad is not None, "Gradients should be computed"
+        def loss_fn(ev_net):
+            ev_vals = ev_net.forward(state_features, action_onehot)
+            return ev_vals.sum()
+
+        grads = eqx.filter_grad(loss_fn)(ev_net)
+
+        leaves = jax.tree_util.tree_leaves(eqx.filter(grads, eqx.is_array))
+        has_nonzero = any(jnp.any(leaf != 0) for leaf in leaves)
+        assert has_nonzero, "At least some gradients should be nonzero"
 
 
 class TestGLADIUSEstimatorSmall:
@@ -153,28 +156,28 @@ class TestGLADIUSEstimatorSmall:
         n_states, n_actions = 3, 2
 
         # Simple transitions: keep advances, replace resets
-        transitions = torch.zeros((n_actions, n_states, n_states))
-        transitions[0, 0, 1] = 1.0  # keep at 0 -> go to 1
-        transitions[0, 1, 2] = 1.0  # keep at 1 -> go to 2
-        transitions[0, 2, 2] = 1.0  # keep at 2 -> stay at 2
-        transitions[1, :, 0] = 1.0  # replace -> reset to 0
+        transitions = jnp.zeros((n_actions, n_states, n_states))
+        transitions = transitions.at[0, 0, 1].set(1.0)  # keep at 0 -> go to 1
+        transitions = transitions.at[0, 1, 2].set(1.0)  # keep at 1 -> go to 2
+        transitions = transitions.at[0, 2, 2].set(1.0)  # keep at 2 -> stay at 2
+        transitions = transitions.at[1, :, 0].set(1.0)   # replace -> reset to 0
 
         # Trajectories consistent with simple replacement behavior
         trajectories = [
             Trajectory(
-                states=torch.tensor([0, 1, 2, 0, 1]),
-                actions=torch.tensor([0, 0, 1, 0, 0]),
-                next_states=torch.tensor([1, 2, 0, 1, 2]),
+                states=jnp.array([0, 1, 2, 0, 1]),
+                actions=jnp.array([0, 0, 1, 0, 0]),
+                next_states=jnp.array([1, 2, 0, 1, 2]),
             ),
             Trajectory(
-                states=torch.tensor([0, 1, 0, 1, 2]),
-                actions=torch.tensor([0, 0, 0, 0, 1]),
-                next_states=torch.tensor([1, 0, 1, 2, 0]),
+                states=jnp.array([0, 1, 0, 1, 2]),
+                actions=jnp.array([0, 0, 0, 0, 1]),
+                next_states=jnp.array([1, 0, 1, 2, 0]),
             ),
             Trajectory(
-                states=torch.tensor([0, 1, 2, 0]),
-                actions=torch.tensor([0, 0, 1, 0]),
-                next_states=torch.tensor([1, 2, 0, 1]),
+                states=jnp.array([0, 1, 2, 0]),
+                actions=jnp.array([0, 0, 1, 0]),
+                next_states=jnp.array([1, 2, 0, 1]),
             ),
         ]
         panel = Panel(trajectories=trajectories)
@@ -186,10 +189,12 @@ class TestGLADIUSEstimatorSmall:
         )
 
         # Feature matrix: operating cost feature and replacement indicator
-        feature_matrix = torch.zeros(n_states, n_actions, 2)
+        feature_matrix = jnp.zeros((n_states, n_actions, 2))
         for s in range(n_states):
-            feature_matrix[s, 0, 0] = s / max(n_states - 1, 1)  # operating cost (keep)
-            feature_matrix[s, 1, 1] = 1.0  # replacement indicator
+            feature_matrix = feature_matrix.at[s, 0, 0].set(
+                s / max(n_states - 1, 1)
+            )  # operating cost (keep)
+            feature_matrix = feature_matrix.at[s, 1, 1].set(1.0)  # replacement indicator
 
         from econirl.preferences.linear import LinearUtility
         utility = LinearUtility(
@@ -258,12 +263,12 @@ class TestGLADIUSEstimatorSmall:
 
         policy = result.policy
         # Each row should sum to 1
-        row_sums = policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones(small_setup["n_states"]), atol=1e-5), (
+        row_sums = policy.sum(axis=1)
+        assert jnp.allclose(row_sums, jnp.ones(small_setup["n_states"]), atol=1e-5), (
             f"Policy rows should sum to 1, got {row_sums}"
         )
         # All entries should be non-negative
-        assert torch.all(policy >= 0), "Policy should be non-negative"
+        assert jnp.all(policy >= 0), "Policy should be non-negative"
 
     def test_loss_decreases(self, small_setup):
         """Training loss should decrease over epochs."""
@@ -319,7 +324,7 @@ class TestGLADIUSEstimatorSmall:
         assert result.parameters.shape == (2,), (
             f"Expected shape (2,), got {result.parameters.shape}"
         )
-        assert torch.all(torch.isfinite(result.parameters)), "Parameters should be finite"
+        assert jnp.all(jnp.isfinite(result.parameters)), "Parameters should be finite"
 
     def test_networks_stored_after_fit(self, small_setup):
         """After fitting, q_net_ and ev_net_ should be stored."""
@@ -343,8 +348,8 @@ class TestGLADIUSEstimatorSmall:
 
         assert estimator.q_net_ is not None
         assert estimator.ev_net_ is not None
-        assert isinstance(estimator.q_net_, QNetwork)
-        assert isinstance(estimator.ev_net_, EVNetwork)
+        assert isinstance(estimator.q_net_, _QNetwork)
+        assert isinstance(estimator.ev_net_, _EVNetwork)
 
     def test_config_kwargs_override(self):
         """Config kwargs should override defaults."""
@@ -390,37 +395,34 @@ class TestGLADIUSStateFeatures:
 
     def test_state_features_range(self):
         """State features should be in [0, 1]."""
-        from econirl.core.types import DDCProblem
         estimator = GLADIUSEstimator(max_epochs=1)
         n_states = 10
         problem = DDCProblem(num_states=n_states, num_actions=2)
-        states = torch.arange(n_states)
+        states = jnp.arange(n_states)
         features = estimator._build_state_features(states, problem)
 
         assert features.shape == (n_states, 1)
-        assert features.min() >= 0.0
-        assert features.max() <= 1.0
-        assert torch.isclose(features[0, 0], torch.tensor(0.0))
-        assert torch.isclose(features[-1, 0], torch.tensor(1.0))
+        assert float(features.min()) >= 0.0
+        assert float(features.max()) <= 1.0
+        assert jnp.isclose(features[0, 0], 0.0)
+        assert jnp.isclose(features[-1, 0], 1.0)
 
     def test_state_features_all(self):
         """_build_state_features_all should match per-state features."""
-        from econirl.core.types import DDCProblem
         estimator = GLADIUSEstimator(max_epochs=1)
         n_states = 5
         problem = DDCProblem(num_states=n_states, num_actions=2)
         all_feat = estimator._build_state_features_all(problem)
-        per_feat = estimator._build_state_features(torch.arange(n_states), problem)
-        assert torch.allclose(all_feat, per_feat)
+        per_feat = estimator._build_state_features(jnp.arange(n_states), problem)
+        assert jnp.allclose(all_feat, per_feat)
 
     def test_state_features_single_state(self):
         """Single-state environment should not divide by zero."""
-        from econirl.core.types import DDCProblem
         estimator = GLADIUSEstimator(max_epochs=1)
         problem = DDCProblem(num_states=1, num_actions=2)
-        features = estimator._build_state_features(torch.tensor([0]), problem)
+        features = estimator._build_state_features(jnp.array([0]), problem)
         assert features.shape == (1, 1)
-        assert torch.isfinite(features).all()
+        assert jnp.all(jnp.isfinite(features))
 
 
 @pytest.mark.slow
@@ -467,7 +469,7 @@ class TestGLADIUSParameterRecovery:
             transitions=env.transition_matrices,
         )
 
-        true_params = torch.tensor([0.001, 3.0])
+        true_params = jnp.array([0.001, 3.0])
         estimated_params = result.parameters
 
         # IRL recovers parameters up to a scale factor, so we compare
@@ -475,15 +477,15 @@ class TestGLADIUSParameterRecovery:
         # The true ratio is 3.0 / 0.001 = 3000.
         # We also check RMSE directly with a generous bound since the
         # parameters have very different scales.
-        rmse = torch.sqrt(((estimated_params - true_params) ** 2).mean()).item()
+        rmse = float(jnp.sqrt(jnp.mean((estimated_params - true_params) ** 2)))
 
         # Also check that the sign/direction is correct
-        assert estimated_params[1].item() > 0, "Replacement cost should be positive"
+        assert float(estimated_params[1]) > 0, "Replacement cost should be positive"
 
         # Check that the estimated policy is reasonable
         assert result.policy.shape == (env.problem_spec.num_states, env.problem_spec.num_actions)
-        policy_sums = result.policy.sum(dim=1)
-        assert torch.allclose(policy_sums, torch.ones(env.problem_spec.num_states), atol=1e-4)
+        policy_sums = result.policy.sum(axis=1)
+        assert jnp.allclose(policy_sums, jnp.ones(env.problem_spec.num_states), atol=1e-4)
 
         # RMSE check -- generous bound for NN-based method
         assert rmse < 1.0, (

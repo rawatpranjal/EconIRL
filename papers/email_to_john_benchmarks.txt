@@ -1,0 +1,31 @@
+Dear John,
+
+Thank you for the kind words about EconIRL. I will try to answer each of your questions in turn.
+
+Q: Can I mention EconIRL in my talk at IIOC on April 11th?
+A: Absolutely. I would be honored.
+
+Q: Why is TD-CCP so slow relative to NFXP? Is this the Adusumilli and Eckardt estimator?
+A: Yes, this is the Adusumilli and Eckardt estimator. The 130-second runtime is not a fundamental property of the method but an artifact of the benchmark configuration. The estimator trains four neural networks (one per feature component plus an entropy correction) using temporal difference learning to approximate the continuation values that enter the CCP formula. The benchmark uses 20 approximate value iterations with 100 SGD epochs per iteration, repeated across 3 policy iterations. This amounts to roughly 500,000 gradient updates on neural networks, which is overkill for a 90-state problem. With 10 epochs per iteration the runtime drops to under 15 seconds while still recovering the parameters accurately. The method exists for problems where the state space is too large for matrix inversion. CCP estimation requires inverting the matrix (I - beta F_pi), which is O(S^3). For S = 90 this takes microseconds. For S = 1,000,000 it is infeasible. TD-CCP replaces the matrix inversion with neural network function approximation that scales to arbitrarily large state spaces. The cost is paid upfront in training the networks. Once trained, the partial MLE step is fast.
+
+Q: Is the slowness due to "fixed setup costs" for estimation including estimating the CCP?
+A: Partly, but the CCP estimation itself is negligible (under 0.5 seconds). The setup cost is in training the neural network approximations of the continuation value functions. This is where the 130 seconds goes. For a small state space like S = 90 this investment is unnecessary because exact matrix methods work fine. For large state spaces where exact methods fail, this upfront cost is the price of scalability.
+
+Q: For CCP (K=20), is this NPL with 20 iterations?
+A: Yes. Starting from nonparametric CCP estimates, each iteration solves the pseudo-likelihood using L-BFGS-B with the current continuation value covariates, then updates the CCPs from the new parameter estimates. Twenty iterations is more than enough for convergence on this problem. The estimator converges to the same solution as NFXP, as the table confirms.
+
+Q: "As you add other methods such as IQ-IRL I think it could be a service to have a paper that describes all the methods in more detail and tries to compare them in terms not only of speed but accuracy... though it can be tricky with different identifying normalizations. For example GLADIUS assumes RC=0 as an identifying normalization and will not result in a theta_c but a backed out cost function that may or may not be linear in mileage since last replacement and you won't get standard errors."
+A: I agree completely. The identification issue is the central difficulty in making a fair comparison. The five estimators in the current benchmark fall into two groups that use fundamentally different identifying strategies.
+
+The first group recovers structural parameters theta directly. NFXP, CCP, MCE-IRL, NNES, and TD-CCP all assume the reward has a known parametric form r(s,a) = theta_c * mileage + RC * replace. This parametric restriction reduces the unknown rewards from S times A free values down to two parameters and is what makes identification possible. The five estimators differ in how they solve the forward problem (inner Bellman loop vs CCP inversion vs neural approximation vs feature matching) but they all maximize the same conditional log-likelihood over the same two parameters. That is why NFXP, CCP, and MCE-IRL produce identical estimates in the table. NNES and TD-CCP show small differences because they approximate the value function with neural networks and the approximation introduces a small bias.
+
+The second group recovers a nonparametric reward function. GLADIUS and IQ-Learn do not assume a parametric form for the reward. They parameterize Q(s,a) directly and back out the implied reward via the inverse Bellman operator r(s,a) = Q(s,a) - beta E[V(s')]. This gives one reward value per state-action pair rather than two structural parameters. The problem is that rewards are only identified up to potential-based shaping: any r'(s,a) = r(s,a) + h(s) - beta sum h(s') p(s'|s,a) for an arbitrary function h yields the same policy. GLADIUS resolves this by assuming a normalizing (anchor) action a_0 with known reward r(s,a_0) = 0 in each state, which pins down the equivalence class. IQ-Learn instead uses the chi-squared regularizer to select the member of the equivalence class with smallest L2 norm at expert-visited states. Neither approach recovers theta_c or RC directly.
+
+A fair comparison across both groups would need to evaluate on quantities that are identified under all methods. Policy recovery (does the estimated policy match the true policy?) and reward differences (does r(s,replace) - r(s,maintain) match the truth?) are identified under both parametric and nonparametric approaches. Raw parameter values like theta_c are only meaningful for the first group. I will add IQ-Learn to the benchmark and structure the comparison around these identified quantities.
+
+I attached a separate note explaining what IQ-Learn actually does in our DDC setting. The short version is that it is penalized conditional log-likelihood, as I derive in the attached PDF.
+
+I will send Sanjog a Zoom link for the meeting.
+
+Best,
+Pranjal

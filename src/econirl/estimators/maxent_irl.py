@@ -36,7 +36,7 @@ import torch
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.maxent_irl import MaxEntIRLEstimator
+from econirl.contrib.maxent_irl import MaxEntIRLEstimator
 from econirl.preferences.reward import LinearReward
 from econirl.transitions import TransitionEstimator
 

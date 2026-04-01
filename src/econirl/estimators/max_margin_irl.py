@@ -33,7 +33,7 @@ import pandas as pd
 import torch
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.max_margin_irl import MaxMarginIRLEstimator
+from econirl.contrib.max_margin_irl import MaxMarginIRLEstimator
 from econirl.preferences.reward import LinearReward
 from econirl.transitions import TransitionEstimator
 

@@ -190,6 +190,39 @@ def run_bc(train_panel, utility, problem, transitions, n_states, n_actions):
     return result.policy, elapsed, result
 
 
+def run_nfxp(train_panel, utility, problem, transitions, n_states, n_actions):
+    """NFXP (Rust 1987) — full nested fixed point MLE."""
+    from econirl.estimation.nfxp import NFXPEstimator
+
+    print("\n--- NFXP (Nested Fixed Point) ---")
+    t0 = time.time()
+
+    estimator = NFXPEstimator(
+        optimizer="BHHH",
+        inner_solver="hybrid",
+        inner_tol=1e-10,
+        outer_tol=1e-6,
+        outer_max_iter=500,
+        se_method="asymptotic",
+        compute_hessian=False,
+        verbose=True,
+    )
+    result = estimator.estimate(
+        train_panel, utility, problem, transitions,
+    )
+
+    elapsed = time.time() - t0
+    print(f"  Completed in {elapsed:.1f}s")
+    print(f"  Converged: {result.converged}")
+    print(f"  Train LL: {result.log_likelihood:,.2f}")
+    print(f"  Parameters:")
+    for i, name in enumerate(FEATURE_NAMES):
+        val = result.parameters[i].item()
+        print(f"    {name:<20} {val:>10.4f}")
+
+    return result.policy, elapsed, result
+
+
 def run_ccp(train_panel, utility, problem, transitions, n_states, n_actions):
     """CCP / Hotz-Miller estimator."""
     from econirl.estimation.ccp import CCPEstimator
@@ -361,16 +394,20 @@ def main():
     _run_and_eval("BC", lambda: run_bc(
         train_panel, utility, problem, transitions, n_states, n_actions))
 
-    # 2. CCP (structural baseline)
+    # 2. NFXP (gold standard structural)
+    _run_and_eval("NFXP", lambda: run_nfxp(
+        train_panel, utility, problem, transitions, n_states, n_actions))
+
+    # 3. CCP (fast structural)
     _run_and_eval("CCP", lambda: run_ccp(
         train_panel, utility, problem, transitions, n_states, n_actions))
 
-    # Use CCP parameters as warm-start for TD-CCP.
-    # NNES uses its own CCP-bootstrap for initial params because its
-    # V-network training is more stable starting from near-zero rewards.
+    # Use CCP or NFXP parameters as warm-start for TD-CCP.
     ccp_init = None
-    if results.get("CCP", {}).get("summary") is not None:
-        ccp_init = results["CCP"]["summary"].parameters.clone()
+    for src in ["CCP", "NFXP"]:
+        if results.get(src, {}).get("summary") is not None:
+            ccp_init = results[src]["summary"].parameters.clone()
+            break
 
     # 3. NNES (uses internal CCP bootstrap for init)
     _run_and_eval("NNES", lambda: run_nnes(
@@ -399,7 +436,7 @@ def main():
           f"{'Time (s)':>10} {'Converged':>10}")
     print("-" * 56)
 
-    for name in ["BC", "CCP", "NNES", "TD-CCP"]:
+    for name in ["BC", "NFXP", "CCP", "NNES", "TD-CCP"]:
         r = results.get(name, {})
         ll = r.get("test_ll", float("nan"))
         acc = r.get("step_acc", float("nan"))
@@ -411,7 +448,7 @@ def main():
     print("=" * 74)
 
     # Print structural parameters side by side for structural estimators
-    structural = ["CCP", "NNES", "TD-CCP"]
+    structural = ["NFXP", "CCP", "NNES", "TD-CCP"]
     active = [n for n in structural if results.get(n, {}).get("summary") is not None]
 
     if active:

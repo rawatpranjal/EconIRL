@@ -16,6 +16,28 @@ This guide explains why each of econirl's 9 core estimators exists, what theorem
 | f-IRL | Inverse (π→R) | Tabular | Yes | No | No | No |
 | BC | Imitation | None | No | No | No | No |
 
+## Identifying Assumptions
+
+Every estimator must resolve the fundamental non-identification of rewards in dynamic discrete choice models. Observed choice probabilities identify only differences in Q-values across actions, not the level of rewards. Without further restrictions, any reward of the form r'(s,a) = r(s,a) + h(s) - beta sum h(s') p(s'|s,a) for an arbitrary function h yields the same optimal policy (Ng et al. 1999). The estimators in this package use three distinct strategies to resolve this ambiguity.
+
+| Estimator | Reward Form | Identifying Restriction | Recovers | Needs Known p |
+|-----------|-------------|------------------------|----------|---------------|
+| NFXP | Linear r = theta phi(s,a) | Parametric form with dim(theta) < \|S\|(\|A\|-1) | theta (structural params) | Yes |
+| CCP | Linear r = theta phi(s,a) | Parametric form (same as NFXP) | theta (structural params) | Yes |
+| MCE-IRL | Linear r = theta phi(s,a) | Feature matching + norm constraint | theta (feature weights) | Yes |
+| NNES | Linear r = theta phi(s,a) | Parametric form + neural V approximation | theta (structural params) | Yes |
+| TD-CCP | Linear r = theta phi(s,a) | Parametric form + TD approximation | theta (structural params) | No (uses data transitions) |
+| SEES | Linear r = theta phi(s,a) | Parametric form + sieve V approximation | theta (structural params) | Yes |
+| IQ-Learn | Nonparametric R(s,a) | chi-squared regularizer (min L2 norm of implied reward) | R(s,a) matrix | Yes (tabular) |
+| AIRL | Nonparametric R(s) | Disentanglement (state-only reward + shaping potential) | R(s) function | No (adversarial) |
+| f-IRL | Nonparametric R(s,a) | f-divergence minimization (occupancy matching) | R(s,a) matrix | Yes |
+
+The first six estimators (NFXP through SEES) assume a parametric reward r(s,a) = sum theta_k phi_k(s,a) where the features phi are known. This reduces the unknown rewards from \|S\| times \|A\| free values to a small number of structural parameters and is what makes direct comparison of parameter estimates possible. All six maximize the same conditional log-likelihood over the same parameters, differing only in how they solve the forward problem. NFXP uses a Bellman inner loop. CCP uses Hotz-Miller inversion. MCE-IRL uses feature matching (mathematically equivalent to the CCP likelihood under AS/CI/EV). NNES and TD-CCP approximate the value function with neural networks. SEES uses sieve basis functions.
+
+The last three estimators (IQ-Learn, AIRL, f-IRL) do not assume a parametric reward form. They recover a nonparametric reward function, one value per state-action pair, by backing out the implied reward from the learned Q-function via the inverse Bellman operator. Because the reward is not restricted to a parametric family, identification requires an alternative strategy. IQ-Learn uses the chi-squared regularizer to select the reward with smallest L2 norm at expert-visited states. AIRL uses the discriminator structure to disentangle state-only rewards from the shaping potential. f-IRL minimizes an f-divergence between expert and learned occupancy measures.
+
+Comparing estimators across these two groups requires evaluating on quantities that are identified under both approaches. Policy recovery and reward differences between actions are identified under all methods. Raw parameter estimates like theta_c are meaningful only for the parametric group.
+
 ## Decision Flowchart
 
 ```
