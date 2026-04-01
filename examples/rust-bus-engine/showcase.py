@@ -22,8 +22,10 @@ Run:
 
 import time
 
+import econirl._jax_config  # enable float64 before any JAX ops
+import jax
+import jax.numpy as jnp
 import numpy as np
-import torch
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -69,9 +71,9 @@ def evaluate_policy(result, panel, utility, problem, transitions):
     log_probs = operator.compute_log_choice_probabilities(flow_u, sol.V)
     states = panel.get_all_states()
     actions = panel.get_all_actions()
-    ll = log_probs[states, actions].sum().item()
-    predicted = sol.policy[states].argmax(dim=1)
-    acc = (predicted == actions).float().mean().item()
+    ll = log_probs[states, actions].sum()
+    predicted = sol.policy[states].argmax(axis=1)
+    acc = (predicted == actions).astype(jnp.float32).mean()
     return ll, acc
 
 
@@ -111,14 +113,14 @@ def main():
     # with utility computation and counterfactual functions)
     transitions = estimate_transitions_from_panel(
         train_panel, num_states=90, max_increment=2
-    ).float()
+    ).astype(jnp.float32)
 
     # Count mileage increments for display
     counts = np.zeros(3)
     for traj in train_panel.trajectories:
         for t in range(len(traj.states) - 1):
-            if traj.actions[t].item() == 0:
-                inc = traj.states[t + 1].item() - traj.states[t].item()
+            if traj.actions[t] == 0:
+                inc = traj.states[t + 1] - traj.states[t]
                 if 0 <= inc <= 2:
                     counts[int(inc)] += 1
     probs = counts / counts.sum()
@@ -201,7 +203,7 @@ def main():
     for i, pname in enumerate(results["NFXP"].parameter_names):
         print(f"{pname:<18} ", end="")
         for name in estimators:
-            print(f"{results[name].parameters[i].item():>12.6f}", end="")
+            print(f"{results[name].parameters[i]:>12.6f}", end="")
         print()
 
     # -----------------------------------------------------------------------
@@ -225,13 +227,13 @@ def main():
     for name, r in results.items():
         lower, upper = r.confidence_interval(alpha=0.05)
         for i, pname in enumerate(r.parameter_names):
-            print(f"{name:<10} {pname:<18} {lower[i].item():>12.6f} "
-                  f"{r.parameters[i].item():>12.6f} {upper[i].item():>12.6f}")
+            print(f"{name:<10} {pname:<18} {lower[i]:>12.6f} "
+                  f"{r.parameters[i]:>12.6f} {upper[i]:>12.6f}")
 
     # 3C: Wald test (H0: replacement_cost = 10)
     print_subheader("3C: Wald Test (H0: replacement_cost = 10)")
-    R = torch.tensor([[0.0, 1.0]], dtype=torch.float32)
-    r_val = torch.tensor([10.0], dtype=torch.float32)
+    R = jnp.array([[0.0, 1.0]], dtype=jnp.float32)
+    r_val = jnp.array([10.0], dtype=jnp.float32)
     print(f"{'Estimator':<10} {'Wald Stat':>12} {'df':>6} {'p-value':>12} {'Reject?':>10}")
     print("-" * 56)
     for name, r in results.items():
@@ -291,8 +293,8 @@ def main():
     print(f"\n{'Parameter':<18} {'Asymptotic SE':>16} {'Robust SE':>16} {'Ratio':>10}")
     print("-" * 66)
     for i, pname in enumerate(results["NFXP"].parameter_names):
-        se_asym = results["NFXP"].standard_errors[i].item()
-        se_robust = result_robust.standard_errors[i].item()
+        se_asym = results["NFXP"].standard_errors[i]
+        se_robust = result_robust.standard_errors[i]
         ratio = se_robust / se_asym if se_asym > 0 else float("nan")
         print(f"{pname:<18} {se_asym:>16.6f} {se_robust:>16.6f} {ratio:>10.4f}")
     print("\nNote: CCP and MCE-IRL do not produce per-observation gradient")
@@ -349,20 +351,19 @@ def main():
 
     # 5A: Parameter counterfactual -- double replacement cost
     print_subheader("5A: Double Replacement Cost")
-    new_params = nfxp_result.parameters.clone()
-    new_params[1] = new_params[1] * 2  # double replacement_cost
+    new_params = nfxp_result.parameters.at[1].mul(2)  # double replacement_cost
     cf = counterfactual_policy(nfxp_result, new_params, utility, problem, transitions)
-    print(f"Replacement cost: {nfxp_result.parameters[1].item():.4f} -> "
-          f"{new_params[1].item():.4f}")
+    print(f"Replacement cost: {nfxp_result.parameters[1]:.4f} -> "
+          f"{new_params[1]:.4f}")
     print(f"Welfare change (mean value): {cf.welfare_change:+.4f}")
-    print(f"Max absolute policy change:  {cf.policy_change.abs().max().item():.4f}")
+    print(f"Max absolute policy change:  {float(jnp.abs(cf.policy_change).max()):.4f}")
     print(f"\nReplacement probability at selected mileage states:")
     print(f"{'Mileage Bin':<14} {'Baseline':>12} {'Counterfactual':>16} {'Change':>12}")
     print("-" * 58)
     for s in [0, 20, 40, 60, 80, 89]:
-        base_p = cf.baseline_policy[s, 1].item()
-        cf_p = cf.counterfactual_policy[s, 1].item()
-        change = cf.policy_change[s, 1].item()
+        base_p = cf.baseline_policy[s, 1]
+        cf_p = cf.counterfactual_policy[s, 1]
+        change = cf.policy_change[s, 1]
         print(f"{s:<14} {base_p:>12.6f} {cf_p:>16.6f} {change:>+12.6f}")
 
     # 5B: Transition counterfactual -- faster bus wear
@@ -372,14 +373,14 @@ def main():
     )
     print(f"Scenario: estimated transition probs -> (0.50, 0.40, 0.10) [faster wear]")
     print(f"Welfare change (mean value): {cf_trans.welfare_change:+.4f}")
-    print(f"Max absolute policy change:  {cf_trans.policy_change.abs().max().item():.4f}")
+    print(f"Max absolute policy change:  {float(jnp.abs(cf_trans.policy_change).max()):.4f}")
     print(f"\nReplacement probability shift under faster wear:")
     print(f"{'Mileage Bin':<14} {'Baseline':>12} {'Faster Wear':>14} {'Change':>12}")
     print("-" * 56)
     for s in [0, 20, 40, 60, 80, 89]:
-        base_p = cf_trans.baseline_policy[s, 1].item()
-        cf_p = cf_trans.counterfactual_policy[s, 1].item()
-        change = cf_trans.policy_change[s, 1].item()
+        base_p = cf_trans.baseline_policy[s, 1]
+        cf_p = cf_trans.counterfactual_policy[s, 1]
+        change = cf_trans.policy_change[s, 1]
         print(f"{s:<14} {base_p:>12.6f} {cf_p:>14.6f} {change:>+12.6f}")
 
     # 5C: Elasticity analysis
@@ -406,8 +407,8 @@ def main():
     print(f"Simulated 1,000 individuals x 100 periods under each scenario.\n")
     print(f"{'Metric':<30} {'Baseline':>12} {'Double RC':>12} {'Change':>12}")
     print("-" * 70)
-    repl_base = sim["baseline_action_frequencies"][1].item()
-    repl_cf = sim["counterfactual_action_frequencies"][1].item()
+    repl_base = sim["baseline_action_frequencies"][1]
+    repl_cf = sim["counterfactual_action_frequencies"][1]
     print(f"{'Replacement frequency':<30} {repl_base:>12.4f} {repl_cf:>12.4f} "
           f"{repl_cf - repl_base:>+12.4f}")
     print(f"{'Mean mileage bin':<30} {sim['baseline_mean_state']:>12.1f} "
@@ -431,7 +432,7 @@ def main():
     for i, pname in enumerate(results["NFXP"].parameter_names):
         print(f"  {pname:<28}", end="")
         for name in estimators:
-            print(f"{results[name].parameters[i].item():>14.6f}", end="")
+            print(f"{results[name].parameters[i]:>14.6f}", end="")
         print()
 
     print()
@@ -439,7 +440,7 @@ def main():
     for i, pname in enumerate(results["NFXP"].parameter_names):
         print(f"  SE({pname}){'':<{20 - len(pname)}}", end="")
         for name in estimators:
-            se = results[name].standard_errors[i].item()
+            se = results[name].standard_errors[i]
             if np.isnan(se):
                 print(f"{'N/A':>14}", end="")
             else:

@@ -114,7 +114,7 @@ def counterfactual_policy(
 
     # Welfare change: average change in value across states
     # (could weight by stationary distribution)
-    welfare_change = value_change.mean().item()
+    welfare_change = value_change.mean()
 
     return CounterfactualResult(
         baseline_policy=baseline_policy,
@@ -165,7 +165,7 @@ def counterfactual_transitions(
 
     policy_change = cf_result.policy - baseline_result.policy
     value_change = cf_result.V - baseline_result.V
-    welfare_change = value_change.mean().item()
+    welfare_change = value_change.mean()
 
     return CounterfactualResult(
         baseline_policy=baseline_result.policy,
@@ -244,21 +244,25 @@ def simulate_counterfactual(
     baseline_states = baseline_panel.get_all_states()
     cf_states = cf_panel.get_all_states()
 
-    # Action frequencies
-    baseline_action_freq = jnp.zeros(problem.num_actions)
-    cf_action_freq = jnp.zeros(problem.num_actions)
-
-    for a in range(problem.num_actions):
-        baseline_action_freq[a] = (baseline_actions == a).astype(jnp.float32).mean()
-        cf_action_freq[a] = (cf_actions == a).astype(jnp.float32).mean()
+    # Action frequencies (functional — no in-place mutation)
+    baseline_action_freq = jnp.array([
+        float((baseline_actions == a).astype(jnp.float32).mean())
+        for a in range(problem.num_actions)
+    ])
+    cf_action_freq = jnp.array([
+        float((cf_actions == a).astype(jnp.float32).mean())
+        for a in range(problem.num_actions)
+    ])
 
     # State frequencies
-    baseline_state_freq = jnp.zeros(problem.num_states)
-    cf_state_freq = jnp.zeros(problem.num_states)
-
-    for s in range(problem.num_states):
-        baseline_state_freq[s] = (baseline_states == s).astype(jnp.float32).mean()
-        cf_state_freq[s] = (cf_states == s).astype(jnp.float32).mean()
+    baseline_state_freq = jnp.array([
+        float((baseline_states == s).astype(jnp.float32).mean())
+        for s in range(problem.num_states)
+    ])
+    cf_state_freq = jnp.array([
+        float((cf_states == s).astype(jnp.float32).mean())
+        for s in range(problem.num_states)
+    ])
 
     return {
         "baseline_action_frequencies": baseline_action_freq,
@@ -267,8 +271,8 @@ def simulate_counterfactual(
         "baseline_state_frequencies": baseline_state_freq,
         "counterfactual_state_frequencies": cf_state_freq,
         "state_frequency_change": cf_state_freq - baseline_state_freq,
-        "baseline_mean_state": baseline_states.astype(jnp.float32).mean().item(),
-        "counterfactual_mean_state": cf_states.astype(jnp.float32).mean().item(),
+        "baseline_mean_state": baseline_states.astype(jnp.float32).mean(),
+        "counterfactual_mean_state": cf_states.astype(jnp.float32).mean(),
         "n_individuals": n_individuals,
         "n_periods": n_periods,
     }
@@ -341,13 +345,13 @@ def compute_welfare_effect(
         )
 
         # Expected value under each distribution
-        ev_baseline = (mu_baseline * counterfactual.baseline_value).sum().item()
-        ev_cf = (mu_cf * counterfactual.counterfactual_value).sum().item()
+        ev_baseline = (mu_baseline * counterfactual.baseline_value).sum()
+        ev_cf = (mu_cf * counterfactual.counterfactual_value).sum()
 
         # Welfare change holding distribution fixed
         welfare_fixed_dist = (
             mu_baseline * counterfactual.value_change
-        ).sum().item()
+        ).sum()
 
         return {
             "baseline_expected_value": ev_baseline,
@@ -359,9 +363,9 @@ def compute_welfare_effect(
     else:
         # Simple average across states
         return {
-            "mean_value_change": counterfactual.value_change.mean().item(),
-            "max_value_change": counterfactual.value_change.max().item(),
-            "min_value_change": counterfactual.value_change.min().item(),
+            "mean_value_change": counterfactual.value_change.mean(),
+            "max_value_change": counterfactual.value_change.max(),
+            "min_value_change": counterfactual.value_change.min(),
         }
 
 
@@ -390,7 +394,7 @@ def elasticity_analysis(
         Dictionary with elasticity analysis results
     """
     param_idx = utility.parameter_names.index(parameter_name)
-    baseline_value = result.parameters[param_idx].item()
+    baseline_value = float(result.parameters[param_idx])
 
     results = {
         "parameter": parameter_name,
@@ -401,8 +405,7 @@ def elasticity_analysis(
     }
 
     for pct in pct_changes:
-        new_params = result.parameters.copy()
-        new_params[param_idx] = baseline_value * (1 + pct)
+        new_params = result.parameters.at[param_idx].set(baseline_value * (1 + pct))
 
         cf = counterfactual_policy(
             result=result,
@@ -413,7 +416,7 @@ def elasticity_analysis(
         )
 
         # Average absolute policy change
-        avg_policy_change = cf.policy_change.abs().mean().item()
+        avg_policy_change = float(jnp.abs(cf.policy_change).mean())
         results["policy_changes"].append(avg_policy_change)
         results["welfare_changes"].append(cf.welfare_change)
 
