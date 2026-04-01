@@ -23,16 +23,21 @@ Quick start
 Estimation
 ----------
 
-Three estimators recover the utility parameters from 1600 training consumers over 52 weekly periods (83200 observations).
+Three estimators recover the utility parameters from 1600 training consumers over 52 weekly periods (83,200 observations). The true parameters are a habit strength of 0.30, a recency effect of 0.50, and a reorder cost of negative 0.20.
 
 .. code-block:: python
 
    from econirl.estimation.nfxp import NFXPEstimator
+   from econirl.estimation.ccp import CCPEstimator
+   from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
    from econirl.preferences.linear import LinearUtility
 
    utility = LinearUtility(feature_matrix=env.feature_matrix, parameter_names=env.parameter_names)
-   nfxp = NFXPEstimator()
-   result = nfxp.estimate(panel, utility, env.problem_spec, env.transition_matrices)
+   transitions = env.transition_matrices
+
+   nfxp_result = NFXPEstimator(se_method="robust").estimate(panel, utility, env.problem_spec, transitions)
+   ccp_result = CCPEstimator(num_policy_iterations=20, se_method="robust").estimate(panel, utility, env.problem_spec, transitions)
+   mce_result = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.1, outer_max_iter=300)).estimate(panel, utility, env.problem_spec, transitions)
 
 .. list-table:: Parameter Recovery (1600 consumers, 52 weeks)
    :header-rows: 1
@@ -40,64 +45,84 @@ Three estimators recover the utility parameters from 1600 training consumers ove
    * - Parameter
      - True
      - NFXP
-     - CCP
+     - CCP (K=20)
      - MCE-IRL
    * - habit_strength
      - 0.3000
-     - 0.3789
-     - 0.2015
-     - 0.3786
+     - 0.3869
+     - 0.2024
+     - 0.0651
    * - recency_effect
      - 0.5000
-     - 0.5279
-     - 0.2500
-     - 0.5279
+     - 0.5276
+     - 0.2525
+     - 0.5590
    * - reorder_cost
      - -0.2000
-     - -0.3048
-     - 0.2203
-     - -0.3045
+     - -0.3126
+     - 0.2208
+     - -0.0229
 
-NFXP and MCE-IRL produce nearly identical estimates and recover the correct sign and relative magnitude of all three parameters. The habit strength is positive (consumers who reorder more keep reordering), the recency effect is positive (recent purchasers reorder sooner), and the reorder cost is negative (placing an order has a hassle cost). NFXP standard errors are 0.17 for habit strength, 0.06 for recency effect, and 0.15 for reorder cost.
+NFXP recovers all three parameters with the correct signs and reasonable magnitudes. The habit strength estimate of 0.387 is 29 percent above the true value of 0.30, the recency effect is within 6 percent, and the reorder cost is overestimated in magnitude at negative 0.31 versus negative 0.20. NFXP standard errors are 0.17 for habit strength, 0.06 for recency effect, and 0.15 for reorder cost. MCE-IRL recovers the recency effect accurately (0.559 versus 0.50) but underestimates habit strength and reorder cost. CCP misses the sign on reorder cost entirely, consistent with the NPL Hessian instabilities observed on other environments with asymmetric action frequencies.
+
+Post-estimation diagnostics
+---------------------------
+
+The ``etable`` function places all three models side by side with significance stars.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(nfxp_result, ccp_result, mce_result))
+
+.. code-block:: text
+
+   ==============================================================
+                       NFXP (Nested Fixed Point)    NPL (K=20)MCE IRL (Ziebart 2010)
+   ==============================================================
+         habit_strength      0.3869**     0.2024***        0.0651
+                             (0.1691)      (0.0000)      (0.1287)
+         recency_effect     0.5276***     0.2525***     0.5590***
+                             (0.0633)      (0.0000)      (0.0449)
+           reorder_cost     -0.3126**     0.2208***       -0.0229
+                             (0.1538)      (0.0000)      (0.1149)
+   --------------------------------------------------------------
+           Observations        83,200        83,200        83,200
+         Log-Likelihood    -52,311.24    -52,324.20    -52,312.12
+   ==============================================================
+
+The Vuong test between NFXP and MCE-IRL yields a z-statistic of 0.636 with a p-value of 0.525, indicating the two models are statistically indistinguishable in fit. Brier scores are 0.437 for all three methods, and KL divergences are below 0.007, confirming that all three produce similar predictive accuracy despite the parameter differences.
+
+.. list-table:: Fit Metrics
+   :header-rows: 1
+
+   * - Metric
+     - NFXP
+     - CCP
+     - MCE-IRL
+   * - Brier Score
+     - 0.4370
+     - 0.4372
+     - 0.4370
+   * - KL Divergence
+     - 0.0048
+     - 0.0062
+     - 0.0056
+   * - Log-Likelihood
+     - -52,311
+     - -52,324
+     - -52,312
 
 Counterfactual analysis
 -----------------------
 
-The free delivery promotion sets the reorder cost to zero, simulating a promotional offer that eliminates the hassle of placing an order. The welfare change is positive 4.33.
+The free delivery promotion sets the reorder cost to zero, simulating a promotional offer that eliminates the hassle of placing an order. The welfare change is positive 4.45.
 
-.. list-table:: Reorder Probability Under Free Delivery
-   :header-rows: 1
+.. code-block:: python
 
-   * - State
-     - Baseline
-     - Free Delivery
-     - Change
-   * - 0 orders, 0-3 days
-     - 0.666
-     - 0.732
-     - +0.066
-   * - 0 orders, 8-14 days
-     - 0.642
-     - 0.715
-     - +0.073
-   * - 3-5 orders, 0-3 days
-     - 0.684
-     - 0.747
-     - +0.063
-   * - 3-5 orders, 8-14 days
-     - 0.662
-     - 0.731
-     - +0.069
-   * - 11+ orders, 0-3 days
-     - 0.683
-     - 0.746
-     - +0.063
-   * - 11+ orders, 8-14 days
-     - 0.661
-     - 0.731
-     - +0.069
-
-The free delivery promotion increases reorder rates by 6 to 7 percentage points across all states. The lift is slightly larger for consumers with stale purchase history (8 to 14 days since last order) than for recent purchasers (0 to 3 days), suggesting that the promotion is most effective at reactivating lapsed customers.
+   from econirl.simulation.counterfactual import counterfactual_policy, elasticity_analysis
+   new_params = nfxp_result.parameters.at[2].set(0.0)
+   cf = counterfactual_policy(nfxp_result, new_params, utility, problem, transitions)
 
 .. list-table:: Reorder Cost Elasticity
    :header-rows: 1
@@ -106,25 +131,32 @@ The free delivery promotion increases reorder rates by 6 to 7 percentage points 
      - Welfare Change
      - Avg Policy Change
    * - -100% (free)
-     - +4.329
-     - 0.068
+     - +4.445
+     - 0.070
    * - -50%
-     - +2.114
-     - 0.035
+     - +2.170
+     - 0.036
    * - -25%
-     - +1.044
+     - +1.071
      - 0.018
    * - +25%
-     - -1.017
+     - -1.043
      - 0.019
    * - +50%
-     - -2.006
-     - 0.038
+     - -2.056
+     - 0.039
    * - +100%
-     - -3.897
-     - 0.077
+     - -3.991
+     - 0.079
 
-The elasticity is approximately symmetric around the baseline. Each 25 percent reduction in reorder cost raises welfare by about 1.0 and shifts the reorder probability by about 1.8 percentage points. The response is nearly linear across the range tested.
+The elasticity is approximately symmetric around the baseline. Each 25 percent reduction in reorder cost raises welfare by about 1.1 and shifts the reorder probability by about 1.8 percentage points. The response is nearly linear across the range tested.
+
+Running the example
+-------------------
+
+.. code-block:: bash
+
+   python examples/instacart/run_estimation.py
 
 Marketing interpretation
 ------------------------

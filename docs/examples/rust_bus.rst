@@ -14,7 +14,7 @@ The sklearn-style API fits any estimator in one call. All four estimators below 
 
 .. code-block:: python
 
-   from econirl import NFXP, CCP, NNES, TDCCP
+   from econirl import NFXP, CCP, NNES, SEES, TDCCP
    from econirl.datasets import load_rust_bus
 
    df = load_rust_bus()
@@ -69,8 +69,23 @@ The sklearn-style API fits any estimator in one call. All four estimators below 
      - 0.30
      - -4265
      - 130s
+   * - SEES (Fourier, K=12)
+     - -0.0006
+     - 2.997
+     - NaN
+     - NaN
+     - -1902
+     - 8s
 
 NFXP, CCP, and MCE-IRL recover identical parameters. CCP avoids the inner Bellman loop entirely and matches NFXP in a fraction of the time. MCE-IRL reaches the same answer from the IRL side, confirming the theoretical equivalence between maximum causal entropy IRL and logit DDC estimation. The neural estimators (NNES and TD-CCP) get close but introduce small approximation error from the value network. This is expected. Neural methods are designed for high-dimensional problems where exact methods cannot run.
+
+SEES (Luo and Sang 2024) approximates the value function with a Fourier sieve basis of dimension 12 and jointly optimizes structural parameters and basis coefficients via penalized MLE. It recovers RC within 0.003 of the true value. The operating cost parameter is close to zero, reflecting the difficulty of identifying a small parameter through basis function approximation. Standard errors are unavailable because the Schur complement Hessian is singular at this solution. On the 90-state bus problem the computational advantage over NFXP is modest (8 seconds versus 0.1 seconds), but the same approach scales to state spaces where NFXP inner loop is infeasible.
+
+.. code-block:: python
+
+   from econirl import SEES
+   sees = SEES(discount=0.9999, basis_type="fourier", basis_dim=12, penalty_lambda=0.001)
+   sees.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 MCE-IRL inference pipeline
 --------------------------

@@ -127,6 +127,30 @@ MCEIRLNeural learns a state-only reward R(s) and projects onto interpretable fea
      - R(s,a) via features
      - R(s) via neural network
 
+Post-estimation diagnostics
+---------------------------
+
+The ``etable`` function compares all four estimators side by side with significance stars. On the 5x5 grid all four methods recover the same parameters, so the comparison table mainly serves to verify consistency.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(mce_result, maxent_result, nfxp_result, ccp_result))
+
+The EPIC distance between MCE-IRL and NFXP reward vectors is 0.001, confirming that the two methods recover effectively identical reward functions. This is expected on a small deterministic gridworld where both estimators are consistent.
+
+.. code-block:: python
+
+   from econirl.inference import epic_distance
+   ed = epic_distance(mce_result, nfxp_result, transitions, problem)
+
+The reward identifiability test checks the graph-theoretic condition from Kim et al. (2021). The gridworld transition graph is strongly connected and aperiodic because the Stay action creates self-loops, so rewards are identifiable up to the usual additive constant.
+
+.. code-block:: python
+
+   from econirl.inference import check_reward_identifiability
+   ident = check_reward_identifiability(transitions)
+
 Running the examples
 --------------------
 

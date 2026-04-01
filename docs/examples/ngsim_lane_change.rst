@@ -76,6 +76,25 @@ Huang et al. found that risk aversion through front and rear headway is the most
 
 All three estimators agree on the sign pattern predicted by Huang et al. Collision risk carries the largest negative weight, followed by headway risk. Drivers value speed but not enough to override safety concerns. The lane change cost is moderate, consistent with drivers treating lane changes as risky maneuvers that require compensation from better conditions in the target lane. Exact values depend on the vehicle subsample and speed discretization.
 
+Post-estimation diagnostics
+---------------------------
+
+The ``etable`` function compares the three estimators with standard errors and significance stars.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(mce_result, nfxp_result, maxent_result))
+
+The Vuong test between NFXP and MCE-IRL yields a z-statistic and p-value indicating whether the two models have statistically different fit to the observed lane change data. On 500 vehicles with the same feature specification, the two methods achieve similar log-likelihoods because both are consistent estimators for the same reward function.
+
+.. code-block:: python
+
+   from econirl.inference import vuong_test
+   vt = vuong_test(nfxp_result.policy, mce_result.policy, obs_states, obs_actions)
+
+All three estimators agree on parameter signs, but MCE-IRL produces the largest absolute magnitudes for collision risk and headway risk. This is consistent with MCE-IRL's tighter feature matching objective, which concentrates more weight on the safety features that dominate the observed lane change decisions.
+
 .. code-block:: bash
 
    python examples/ngsim-lane-change/run_ngsim_mce_irl.py

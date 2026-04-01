@@ -1,6 +1,10 @@
 Rust Bus Post-Estimation Diagnostics
 ======================================
 
+.. image:: /_static/post_estimation_diagnostics.png
+   :alt: Post-estimation diagnostic suite showing etable model comparison, profile likelihood for replacement cost, and discount factor sensitivity analysis.
+   :width: 100%
+
 This example demonstrates the full post-estimation diagnostic suite on the Rust (1987) bus engine dataset. After estimating two models on the same data, the diagnostics compare fit, test hypotheses, measure reward equivalence, and probe identification strength. All 15 tools shown here are available from ``econirl.inference``.
 
 Quick start

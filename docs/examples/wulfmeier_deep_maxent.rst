@@ -59,6 +59,21 @@ The benchmark runs MCEIRLNeural (deep reward network with 2 hidden layers of 64 
 
 On Binaryworld the neural estimator achieves 24 percent lower EVD than linear MCE-IRL. The gap widens with larger grids and more demonstrations because the neural network can represent the count threshold that the linear model structurally cannot. On Objectworld the two methods perform comparably because the reward is closer to linear in the distance features.
 
+Post-estimation diagnostics
+---------------------------
+
+Standard post-estimation tools like ``etable`` apply to the linear MCE-IRL estimator, which produces structural parameters with standard errors. The neural estimator produces a nonlinear reward function, so parameter-level comparisons are not directly meaningful. Instead, the comparison relies on the EVD metric and the KL divergence between expert and learned policies.
+
+.. code-block:: python
+
+   from econirl.inference import brier_score, kl_divergence
+
+   for name, result in [("Neural", neural_result), ("Linear", linear_result)]:
+       bs = brier_score(result.policy, obs_states, obs_actions)
+       print(f"{name}: Brier={bs['brier_score']:.4f}")
+
+The projection R-squared measures how much of the neural reward variance is explained by the linear feature basis. An R-squared of 0.8 or above suggests that the neural reward has captured a pattern that is mostly (but not entirely) linear in the available features. This diagnostic helps practitioners decide whether the added complexity of a neural reward is justified for their application.
+
 .. code-block:: bash
 
    python examples/wulfmeier-deep-maxent/replicate.py --grid-size 8 --seeds 3 --epochs 100

@@ -69,6 +69,21 @@ def main():
         for pname, val in zip(env.parameter_names, r.parameters):
             print(f"  {pname}: {float(val):.4f}")
 
+    # MCE-IRL
+    t0 = time.time()
+    mce_config = MCEIRLConfig(
+        learning_rate=0.05,
+        outer_max_iter=300,
+        inner_max_iter=500,
+    )
+    mce_est = MCEIRLEstimator(config=mce_config)
+    mce_result = mce_est.estimate(train, utility, problem, transitions)
+    dt = time.time() - t0
+    results["MCE-IRL"] = mce_result
+    print(f"\nMCE-IRL: {dt:.1f}s, converged={mce_result.converged}")
+    for pname, val in zip(env.parameter_names, mce_result.parameters):
+        print(f"  {pname}: {float(val):.4f}")
+
     # ── Standard errors ────────────────────────────────────────────────
 
     print("\nStandard errors (NFXP):")
@@ -76,6 +91,30 @@ def main():
     if se is not None:
         for pname, val in zip(env.parameter_names, se):
             print(f"  {pname}: {float(val):.4f}")
+
+    # ── Post-estimation diagnostics ────────────────────────────────────
+
+    print("\n" + "=" * 65)
+    print("Post-Estimation Diagnostics")
+    print("=" * 65)
+
+    print("\n--- etable() ---")
+    print(etable(results["NFXP"], results["CCP"], results["MCE-IRL"]))
+
+    # Fit metrics
+    obs_states = jnp.array(train.get_all_states())
+    obs_actions = jnp.array(train.get_all_actions())
+
+    print("\n--- Brier Scores ---")
+    for name, r in results.items():
+        bs = brier_score(r.policy, obs_states, obs_actions)
+        print(f"  {name}: {bs['brier_score']:.4f}")
+
+    print("\n--- Vuong Test (NFXP vs MCE-IRL) ---")
+    vt = vuong_test(results["NFXP"].policy, results["MCE-IRL"].policy, obs_states, obs_actions)
+    print(f"  Z-statistic: {vt['statistic']:.3f}")
+    print(f"  P-value: {vt['p_value']:.4f}")
+    print(f"  Direction: {vt['direction']}")
 
     # ── Counterfactual: Double vasopressor cost ────────────────────────
 

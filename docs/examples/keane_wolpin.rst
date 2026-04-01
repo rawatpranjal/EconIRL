@@ -50,6 +50,25 @@ The simplification relative to the original paper is in the shock distribution. 
 
 The school_return coefficient dominates at 2.065, reflecting the strong incentive for human capital accumulation. Both experience return coefficients are positive, confirming that work experience raises future earnings. The school_cost feature is coded as negative one in the feature matrix, so the positive coefficient translates to a net cost of attending school relative to other options. The model uses logit shocks rather than the multivariate normal shocks in the original paper, so point estimates differ from published values. Standard errors are unavailable because the Hessian is near-singular at this solution, a known challenge with high-dimensional finite-horizon models where many state cells have few observations.
 
+Post-estimation diagnostics
+---------------------------
+
+Standard errors are unavailable for this model because the Hessian is near-singular. The ``check_identification`` function confirms the identification difficulty by reporting the Hessian condition number and minimum eigenvalue.
+
+.. code-block:: python
+
+   from econirl.inference.standard_errors import check_identification
+   diag = check_identification(result.hessian)
+
+The near-singular Hessian indicates that some parameters are weakly identified with 500 individuals and 10 periods. This is a known challenge with high-dimensional finite-horizon models. Many state cells in the 704-state space have few or zero observations, which leaves the likelihood surface flat in those directions. Increasing the sample size or reducing the state space dimensionality would improve identification.
+
+The ``etable`` function still displays the point estimates even when standard errors are not available. The table shows NaN for SE and p-values, making the identification problem visible to the reader.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(nfxp_result))
+
 .. code-block:: bash
 
    python examples/keane-wolpin-careers/replicate.py

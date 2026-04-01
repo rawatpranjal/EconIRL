@@ -44,6 +44,30 @@ The script performs a full EDA before estimation. It reports trajectory length s
 
 MCE IRL and NFXP recover nearly identical parameters, confirming their theoretical equivalence on real data. The generalization gap between train and test log-likelihood per observation is small, indicating that the model is not overfitting the training routes. Accuracy is lower than on synthetic gridworlds because real taxi behavior is noisier and the grid discretization loses fine-grained spatial information.
 
+Post-estimation diagnostics
+---------------------------
+
+The ``etable`` function places the two estimators side by side.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(mce_result, nfxp_result))
+
+The EPIC distance between MCE-IRL and NFXP reward vectors is effectively zero, confirming their theoretical equivalence on real data. The cosine similarity of 1.00 confirms the reward directions are identical.
+
+.. code-block:: python
+
+   from econirl.inference import epic_distance
+   ed = epic_distance(mce_result, nfxp_result, transitions, problem)
+
+The reward identifiability test checks the graph-theoretic condition from Kim et al. (2021) on the T-Drive transition matrix. The identifiability result depends on the grid discretization and how many cells are reachable from each state.
+
+.. code-block:: python
+
+   from econirl.inference import check_reward_identifiability
+   ident = check_reward_identifiability(transitions)
+
 .. code-block:: bash
 
    python examples/beijing-taxi/run_estimation.py --n-taxis 100 --grid-size 15

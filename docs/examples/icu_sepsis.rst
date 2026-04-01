@@ -71,6 +71,25 @@ NFXP and CCP recover the implicit reward function from 1600 training patients (1
 
 The large negative vasopressor weight (negative 4.15) reveals that clinicians strongly penalize aggressive vasopressor dosing. The fluid weight is also negative but much smaller in magnitude (negative 0.33), indicating that fluid overload risk is a concern but less dominant than vasopressor side effects. Both estimators agree on these signs and relative magnitudes.
 
+Post-estimation diagnostics
+---------------------------
+
+The ``etable`` function compares NFXP and CCP side by side with standard errors and significance stars.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(nfxp_result, ccp_result))
+
+NFXP and CCP agree on the sign and magnitude of the vasopressor and fluid weights but diverge on the SOFA and absorbing weights. The SOFA weight is 1.13 under NFXP but negative 0.003 under CCP. This divergence likely reflects the sensitivity of the absorbing state structure to the Hotz-Miller inversion. Absorbing states (death and discharge) concentrate the data distribution and can distort the CCP likelihood surface, similar to the FrozenLake identification challenge.
+
+The Brier score measures overall prediction quality. On 716 states with 25 actions, the Brier score is dominated by the many low-probability actions that the model correctly assigns near-zero probability.
+
+.. code-block:: python
+
+   from econirl.inference import brier_score
+   bs = brier_score(nfxp_result.policy, obs_states, obs_actions)
+
 Counterfactual analysis
 -----------------------
 

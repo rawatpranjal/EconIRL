@@ -59,6 +59,25 @@ The features describe each road segment. The length feature captures how long th
 
 Behavioral cloning wins on pure prediction because 714 states with 18,000 training transitions gives enough data to memorize the empirical choice probabilities. The structural estimators sacrifice in-sample fit for interpretable parameters. All four structural methods agree that drivers prefer shorter road segments and avoid residential streets in favor of primary roads.
 
+Post-estimation diagnostics
+---------------------------
+
+The ``etable`` function compares all four structural estimators side by side.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(nfxp_result, ccp_result, nnes_result, tdccp_result))
+
+The Vuong test between NFXP and CCP shows the two methods are statistically indistinguishable on route choice data. The KL divergence from the model-implied CCPs to the empirical frequencies provides a goodness-of-fit metric that does not depend on the likelihood normalization.
+
+.. code-block:: python
+
+   from econirl.inference import vuong_test, kl_divergence
+   vt = vuong_test(nfxp_result.policy, ccp_result.policy, obs_states, obs_actions)
+
+Behavioral cloning outperforms all structural methods on test log-likelihood because it can memorize the empirical choice frequencies without parametric restrictions. This is not a failure of structural estimation. The structural methods recover interpretable parameters (drivers prefer shorter segments and avoid residential streets) that enable counterfactual analysis, which BC cannot do.
+
 .. code-block:: bash
 
    python examples/shanghai_route_choice.py

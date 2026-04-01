@@ -41,6 +41,25 @@ The reward function depends on both the state and the action. Browsing costs tim
 
 The refine parameter is positive. This means filtering and sorting reduces effective search cost rather than adding to it. A platform design team would read this as evidence that investing in better filter tools pays off more than adding more hotel images.
 
+Post-estimation diagnostics
+---------------------------
+
+The ``etable`` function compares NFXP and CCP side by side with standard errors and significance stars. Both estimators produce nearly identical parameters, confirming that the CCP approximation is accurate for this 37-state problem.
+
+.. code-block:: python
+
+   from econirl.inference import etable
+   print(etable(nfxp_result, ccp_result))
+
+The Vuong test between NFXP and CCP yields an indistinguishable result, as expected when both methods converge to the same MLE. The Brier score measures prediction quality against observed actions. On hotel search data, the Brier scores are moderate because search behavior has high inherent stochasticity.
+
+.. code-block:: python
+
+   from econirl.inference import vuong_test, brier_score
+   vt = vuong_test(nfxp_result.policy, ccp_result.policy, obs_states, obs_actions)
+
+The positive refine parameter is the most important structural finding. It means that adding filter and sort features to a hotel search platform reduces effective search cost rather than adding friction. This has a direct platform design implication: investing in better filter tools pays off more than adding more hotel images or review content.
+
 The script also runs behavioral cloning as a non-structural baseline and compares test log-likelihood across all three estimators.
 
 .. code-block:: bash
