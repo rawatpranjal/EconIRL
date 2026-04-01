@@ -142,9 +142,9 @@ MCE IRL uses dual stopping criteria following imitation. The gradient path check
 
 ## ReadTheDocs
 
-The documentation is hosted at https://econirl.readthedocs.io. The Sphinx config lives in `docs/conf.py` and the RTD config in `.readthedocs.yaml`. RTD builds automatically on push to main via a GitHub webhook.
+The documentation is hosted at https://econirl.readthedocs.io. The Sphinx config lives in `docs/conf.py` and the RTD config in `.readthedocs.yaml`. The GitHub webhook for automatic builds is broken. After pushing documentation changes, you must manually trigger a build on RTD by running `curl -X POST -H "Authorization: Token $RTD_TOKEN" https://readthedocs.org/api/v3/projects/econirl/versions/latest/builds/` or by going to https://app.readthedocs.org/projects/econirl/builds/ and clicking "Build Version". Do not assume pushing to main will trigger a build.
 
-After pushing documentation changes, RTD takes 2 to 3 minutes to build. The CDN can cache old pages for several minutes after the build finishes. Hard refresh (Cmd+Shift+R) or appending `?v=X` to the URL busts the browser cache. If the site still shows stale content, check the build status at https://app.readthedocs.org/projects/econirl/builds/ before debugging further.
+After triggering a build, RTD takes 2 to 3 minutes to finish. The CDN can cache old pages for several minutes after the build finishes. Hard refresh (Cmd+Shift+R) or appending `?v=X` to the URL busts the browser cache. If the site still shows stale content, check the build status at https://app.readthedocs.org/projects/econirl/builds/ before debugging further.
 
 Every example page in `docs/examples/` must have a hero image at the top via an `.. image::` directive pointing to `docs/_static/`. Do not create example pages without a domain illustration.
 
