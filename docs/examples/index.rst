@@ -24,6 +24,8 @@ Optimal stopping problems where an agent decides when to replace or maintain dur
    :maxdepth: 1
 
    rust_bus
+   counterfactual_sim_bus
+   counterfactual_real_bus
    scania_component
    rdw_scrappage
 
