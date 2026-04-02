@@ -115,7 +115,7 @@ Halving the stockout penalty increases expected lifetime welfare by 0.41 utils.
      - -0.275
      - 0.009
 
-The welfare response is asymmetric. Reducing the stockout penalty by 50 percent produces a welfare gain of 0.41 utils, while increasing it by 50 percent only costs 0.19 utils. The small policy changes (0.4 to 1.2 percent) indicate that the retailer's ordering and pricing decisions are not highly sensitive to the stockout penalty at its estimated level, consistent with a retailer that already manages inventory conservatively enough to avoid frequent stockouts.
+The welfare response is asymmetric. Reducing the stockout penalty by 50 percent produces a welfare gain of 0.41 utils, while increasing it by 50 percent only costs 0.19 utils. If customers became more tolerant of empty shelves (through substitute availability or online ordering), the retailer could afford to hold less inventory and run promotions more aggressively, capturing the 0.41 utils gain. The small policy changes (0.4 to 1.2 percent) indicate that the retailer already manages inventory conservatively enough to avoid frequent stockouts, so further increasing the stockout penalty has diminishing effect on behavior. This is the signature of a well-optimized retailer operating near the interior of the inaction region.
 
 Running the example
 -------------------
