@@ -8,7 +8,9 @@ Usage:
     python examples/supermarket/run_estimation.py
 """
 
+import json
 import time
+from pathlib import Path
 
 import jax.numpy as jnp
 import numpy as np
@@ -23,6 +25,7 @@ from econirl.inference import etable
 from econirl.inference.fit_metrics import brier_score, kl_divergence
 from econirl.inference.hypothesis_tests import vuong_test
 from econirl.preferences.linear import LinearUtility
+from econirl.simulation.counterfactual import counterfactual_policy, elasticity_analysis
 
 
 def main():
@@ -96,6 +99,59 @@ def main():
     for name, r in results.items():
         kl = kl_divergence(data_ccps, r.policy)
         print(f"  {name}: {kl['kl_divergence']:.6f}")
+
+    # Counterfactual: halve stockout penalty
+    # Use MCE-IRL as base since NFXP has identification issues on
+    # markup_benefit and promotion_cost (collinear features)
+    print("\n" + "=" * 65)
+    print("Counterfactual: Halve Stockout Penalty")
+    print("=" * 65)
+    best = results["MCE-IRL"]
+    stockout_idx = env.parameter_names.index("stockout_penalty")
+    new_params = best.parameters.at[stockout_idx].set(best.parameters[stockout_idx] / 2)
+    cf = counterfactual_policy(best, new_params, utility, problem, transitions)
+    print(f"Welfare change: {float(cf.welfare_change):+.3f}")
+
+    # Elasticity on stockout_penalty
+    print("\n--- Stockout Penalty Elasticity ---")
+    ea = elasticity_analysis(
+        best, utility, problem, transitions,
+        parameter_name="stockout_penalty",
+        pct_changes=[-0.50, -0.25, 0.25, 0.50, 1.0],
+    )
+    print(f"{'% Change':>10} {'Welfare':>12} {'Avg Policy':>12}")
+    print("-" * 36)
+    for i, pct in enumerate(ea["pct_changes"]):
+        wc = ea["welfare_changes"][i]
+        pc = ea["policy_changes"][i]
+        print(f"{pct:>+10.0%} {float(wc):>+12.3f} {float(pc):>12.3f}")
+
+    # Save results to JSON
+    out = {
+        "parameters": {},
+        "standard_errors": {},
+        "log_likelihoods": {},
+    }
+    for name, r in results.items():
+        out["parameters"][name] = {
+            pname: float(r.parameters[i])
+            for i, pname in enumerate(env.parameter_names)
+        }
+        out["standard_errors"][name] = {
+            pname: float(r.standard_errors[i])
+            for i, pname in enumerate(env.parameter_names)
+        }
+        out["log_likelihoods"][name] = float(r.log_likelihood)
+    out["counterfactual"] = {"welfare_change": float(cf.welfare_change)}
+    out["elasticity"] = {
+        "pct_changes": [float(p) for p in ea["pct_changes"]],
+        "welfare_changes": [float(w) for w in ea["welfare_changes"]],
+        "policy_changes": [float(p) for p in ea["policy_changes"]],
+    }
+    results_path = Path(__file__).parent / "results.json"
+    with open(results_path, "w") as f:
+        json.dump(out, f, indent=2)
+    print(f"\nResults saved to {results_path}")
 
 
 if __name__ == "__main__":

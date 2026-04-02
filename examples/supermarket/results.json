@@ -1,0 +1,76 @@
+{
+  "parameters": {
+    "NFXP": {
+      "markup_benefit": 30.182903289794922,
+      "holding_cost": 0.8832164406776428,
+      "stockout_penalty": -1.448649287223816,
+      "promotion_cost": 29.580078125
+    },
+    "CCP": {
+      "markup_benefit": -0.16320566833019257,
+      "holding_cost": 0.8820522427558899,
+      "stockout_penalty": -1.4536359310150146,
+      "promotion_cost": -0.767177164554596
+    },
+    "MCE-IRL": {
+      "markup_benefit": 0.3014266788959503,
+      "holding_cost": 0.8832748532295227,
+      "stockout_penalty": -1.4486573934555054,
+      "promotion_cost": -0.30143314599990845
+    }
+  },
+  "standard_errors": {
+    "NFXP": {
+      "markup_benefit": 5334.9326171875,
+      "holding_cost": 0.05683346465229988,
+      "stockout_penalty": 0.0330071859061718,
+      "promotion_cost": 5849.24267578125
+    },
+    "CCP": {
+      "markup_benefit": 1.1641488526947796e-05,
+      "holding_cost": 4.893530331173679e-06,
+      "stockout_penalty": 1.8815131625160575e-05,
+      "promotion_cost": 3.3033734325726982e-06
+    },
+    "MCE-IRL": {
+      "markup_benefit": 0.03174557164311409,
+      "holding_cost": 0.0853046104311943,
+      "stockout_penalty": 0.1367822140455246,
+      "promotion_cost": 0.03174849599599838
+    }
+  },
+  "log_likelihoods": {
+    "NFXP": -14032.7890625,
+    "CCP": -14032.90625,
+    "MCE-IRL": -14032.9072265625
+  },
+  "counterfactual": {
+    "parameter": "stockout_penalty",
+    "base_estimator": "MCE-IRL",
+    "welfare_change": 0.407
+  },
+  "elasticity": {
+    "parameter": "stockout_penalty",
+    "pct_changes": [
+      -0.5,
+      -0.25,
+      0.25,
+      0.5,
+      1.0
+    ],
+    "welfare_changes": [
+      0.407,
+      0.163,
+      -0.111,
+      -0.187,
+      -0.275
+    ],
+    "policy_changes": [
+      0.012,
+      0.005,
+      0.004,
+      0.006,
+      0.009
+    ]
+  }
+}
