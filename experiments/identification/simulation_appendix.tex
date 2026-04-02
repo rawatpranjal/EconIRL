@@ -2,6 +2,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
+\usepackage{float}
 \usepackage{enumitem}
 \usepackage{hyperref}
 \usepackage{natbib}
@@ -134,7 +135,7 @@ We construct a tabular MDP that mimics the LSW book-reading environment. The sta
 
 \subsection{A. Reward recovery}
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{lrr}
 \toprule
@@ -153,7 +154,7 @@ Reduced-form & 40.020 & 0.138 \\
 
 The counterfactual changes the transition kernel so that buying advances $k$ episodes instead of one. The Bellman equation is re-solved under each method's recovered reward.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{crrrr}
 \toprule
@@ -175,7 +176,7 @@ $k$ & Oracle/AIRL+a/IQ/GLADIUS & AIRL-no-a & Reduced-form \\
 
 We construct shaped rewards $\tilde{r} = r^* + \alpha V^*(s) - \alpha\beta V^*(s')$ for $\alpha \in [0,1]$ and evaluate the Type II counterfactual with $k=3$.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{rrr}
 \toprule
@@ -196,7 +197,7 @@ $\alpha$ & Type II CF error & Corr.\ with $r^*$ \\
 
 The tabular $\chi^2$ IQ-Learn objective has multiple local optima in finite samples. We compare three finite-sample estimators. The reduced-form logit converges to $A^*$, which is the wrong target for Type II counterfactuals. The anchor-constrained MLE adds soft penalties on the implied reward at exit and absorbing states to the logit NLL. GLADIUS uses neural $Q$ and EV networks.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{rrrr}
 \toprule
@@ -215,7 +216,7 @@ $N$ & Reduced-form & Anchor-MLE & GLADIUS \\
 
 We set the true exit payoff to $\varepsilon$ while the anchors assume it is zero.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{rrrr}
 \toprule
@@ -235,7 +236,7 @@ $\varepsilon$ & Corr.\ with $r^*$ & Type II CF error & In-sample $\pi$ shift \\
 
 High-content episodes become paid-only and the wait action is blocked, forcing buy-or-exit. This is a Type II shift that mirrors Section 7.3 of LSW.
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{lr}
 \toprule
@@ -254,7 +255,7 @@ Reduced-form & 0.185 \\
 \section{Summary}
 %% ======================================================================
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{lcccc}
 \toprule
