@@ -415,6 +415,23 @@ class TDCCP:
             if ev is not None:
                 self.ev_features_ = np.asarray(ev)
 
+    @property
+    def reward_matrix_(self) -> np.ndarray | None:
+        """Structural reward matrix R(s,a) of shape (n_states, n_actions).
+
+        Computes the utility matrix from the fitted parameters and the
+        feature specification. Returns None if the model has not been fitted.
+        """
+        if self.params_ is None or self._utility_fn is None or self._result is None:
+            return None
+        param_names = self._result.parameter_names
+        param_vector = jnp.array(
+            [self.params_[name] for name in param_names],
+            dtype=jnp.float32,
+        )
+        utility_matrix = self._utility_fn.compute(param_vector)
+        return np.asarray(utility_matrix)
+
     def summary(self) -> str:
         """Generate a formatted summary of estimation results.
 

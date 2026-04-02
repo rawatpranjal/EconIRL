@@ -927,6 +927,33 @@ class NeuralAIRL(NeuralEstimatorMixin):
     # Prediction methods
     # ------------------------------------------------------------------
 
+    @property
+    def reward_matrix_(self) -> np.ndarray | None:
+        """Structural reward matrix R(s,a) of shape (n_states, n_actions).
+
+        Computes implied rewards g(s,a) from the reward network for all
+        state-action pairs evaluated at context=0. Returns None if the
+        model has not been fitted.
+        """
+        if self._reward_net is None or self._n_states is None:
+            return None
+
+        n_s = self._n_states
+        self._reward_net.eval()
+
+        with torch.no_grad():
+            unique_states = torch.arange(n_s, dtype=torch.long)
+            ctx_default = torch.zeros(n_s, dtype=torch.long)
+
+            s_feat = self._state_encoder(unique_states)
+            ctx_feat = self._context_encoder(ctx_default)
+
+            r_all = self._reward_net.all_actions(
+                s_feat, ctx_feat, self.n_actions
+            )
+
+        return r_all.numpy()
+
     def predict_proba(self, states: np.ndarray) -> np.ndarray:
         """Predict choice probabilities for given states.
 

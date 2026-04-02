@@ -371,6 +371,23 @@ class MCEIRL:
         self.log_likelihood_ = float(self._result.log_likelihood)
         self.converged_ = bool(self._result.converged)
 
+    @property
+    def reward_matrix_(self) -> np.ndarray | None:
+        """Structural reward matrix R(s,a) of shape (n_states, n_actions).
+
+        Computes the reward matrix from the fitted parameters and the
+        reward function. Returns None if the model has not been fitted.
+        """
+        if self.params_ is None or self._reward_fn is None or self._result is None:
+            return None
+        param_names = self._result.parameter_names
+        param_vector = jnp.array(
+            [self.params_[name] for name in param_names],
+            dtype=jnp.float32,
+        )
+        reward_matrix = self._reward_fn.compute(param_vector)
+        return np.asarray(reward_matrix)
+
     def predict_proba(self, states: np.ndarray) -> np.ndarray:
         """Predict choice probabilities.
 

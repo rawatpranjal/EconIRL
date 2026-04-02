@@ -167,6 +167,22 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         Maximum gradient norm for clipping. 0 disables clipping.
     patience : int, default=50
         Early stopping patience (epochs without improvement).
+    alternating_updates : bool, default=True
+        Use alternating zeta/Q optimization from Algorithm 1 in
+        Kang et al. (2025). When False, both networks are updated
+        jointly in each step (legacy behavior).
+    lr_decay_rate : float, default=0.001
+        Learning rate decay rate. Effective LR decays as
+        lr_0 / (1 + decay_rate * step). Set to 0 for constant LR.
+    tikhonov_annealing : bool, default=False
+        When True, NLL loss is scaled by tikhonov_initial_weight /
+        (1 + epoch), transitioning from behavioral cloning early to
+        Bellman-driven refinement later.
+    tikhonov_initial_weight : float, default=100.0
+        Initial weight on NLL when Tikhonov annealing is enabled.
+    anchor_action : int or None, default=None
+        When set, Bellman error is only computed for transitions
+        where a equals this action index.
     state_encoder : callable, optional
         Function mapping state indices (long tensor) to feature vectors.
         Receives shape (B,) and should return shape (B, state_dim).
@@ -237,6 +253,11 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         bellman_weight: float = 1.0,
         gradient_clip: float = 1.0,
         patience: int = 50,
+        alternating_updates: bool = True,
+        lr_decay_rate: float = 0.001,
+        tikhonov_annealing: bool = False,
+        tikhonov_initial_weight: float = 100.0,
+        anchor_action: int | None = None,
         state_encoder: Callable[[torch.Tensor], torch.Tensor] | None = None,
         context_encoder: Callable[[torch.Tensor], torch.Tensor] | None = None,
         state_dim: int | None = None,
@@ -257,6 +278,11 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.bellman_weight = bellman_weight
         self.gradient_clip = gradient_clip
         self.patience = patience
+        self.alternating_updates = alternating_updates
+        self.lr_decay_rate = lr_decay_rate
+        self.tikhonov_annealing = tikhonov_annealing
+        self.tikhonov_initial_weight = tikhonov_initial_weight
+        self.anchor_action = anchor_action
         self.state_encoder = state_encoder
         self.context_encoder = context_encoder
         self.state_dim = state_dim
@@ -507,13 +533,30 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
     ) -> None:
         """Run the mini-batch training loop.
 
-        Optimizes NLL + bellman_weight * Bellman penalty via Adam.
-        Uses early stopping with the configured patience.
+        When alternating_updates is True (default), follows Algorithm 1
+        from Kang et al. (2025): even batches update the zeta (EV)
+        network, odd batches update the Q network. This stabilizes
+        training by giving each network a stable target.
+
+        Learning rate decays as lr_0 / (1 + decay_rate * step). Optional
+        Tikhonov annealing scales the NLL weight by 1/(1+epoch) to
+        transition from behavioral cloning to Bellman-driven refinement.
         """
-        optimizer = torch.optim.Adam(
-            list(self._q_net.parameters()) + list(self._ev_net.parameters()),
-            lr=self.lr,
-            weight_decay=1e-4,
+        # Separate optimizers for alternating updates.
+        q_optimizer = torch.optim.Adam(
+            self._q_net.parameters(), lr=self.lr, weight_decay=1e-4,
+        )
+        zeta_optimizer = torch.optim.Adam(
+            self._ev_net.parameters(), lr=self.lr, weight_decay=1e-4,
+        )
+
+        # LR decay: lr(t) = lr_0 / (1 + decay * t)
+        decay = self.lr_decay_rate
+        q_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            q_optimizer, lambda step: 1.0 / (1.0 + decay * step)
+        )
+        zeta_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            zeta_optimizer, lambda step: 1.0 / (1.0 + decay * step)
         )
 
         N = len(states)
@@ -535,6 +578,13 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             epoch_loss = 0.0
             n_batches = 0
 
+            # Tikhonov annealing: decay CE weight over epochs
+            if self.tikhonov_annealing:
+                ce_weight = self.tikhonov_initial_weight / (1.0 + epoch)
+            else:
+                ce_weight = 1.0
+
+            batch_idx = 0
             for i in range(0, N, self.batch_size):
                 idx = perm[i : i + self.batch_size]
                 s = states[idx]
@@ -548,48 +598,115 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 ctx_feat = self._context_encoder(ctx)
                 a_oh = F.one_hot(a.long(), self.n_actions).float()
 
-                # Q values for all actions at current state
-                q_all = self._q_net.all_actions(
-                    s_feat, ctx_feat, self.n_actions
-                )  # (B, A)
+                if self.alternating_updates and batch_idx % 2 == 0:
+                    # Even batch: update zeta (EV) network only.
+                    # Minimize MSE between zeta(s,a) and V(s') from Q.
+                    zeta_sa = self._ev_net(s_feat, ctx_feat, a_oh)
+                    with torch.no_grad():
+                        q_next_all = self._q_net.all_actions(
+                            ns_feat, ctx_feat, self.n_actions
+                        )
+                        v_next = self.scale * torch.logsumexp(
+                            q_next_all / self.scale, dim=1
+                        )
+                    loss = ((zeta_sa - v_next) ** 2).mean()
 
-                # Weighted NLL loss: inverse-frequency weights per action
-                log_probs = torch.log_softmax(q_all / self.scale, dim=1)
-                per_obs_nll = -log_probs[torch.arange(len(a)), a.long()]
-                weights = class_weights[a.long()]
-                nll = (per_obs_nll * weights).mean()
+                    zeta_optimizer.zero_grad()
+                    loss.backward()
+                    if self.gradient_clip > 0:
+                        nn.utils.clip_grad_norm_(
+                            self._ev_net.parameters(), self.gradient_clip,
+                        )
+                    zeta_optimizer.step()
+                    zeta_scheduler.step()
 
-                # Bellman penalty: (EV(s,a) - V(s'))^2
-                ev_sa = self._ev_net(s_feat, ctx_feat, a_oh)
-                q_next_all = self._q_net.all_actions(
-                    ns_feat, ctx_feat, self.n_actions
-                )
-                v_next = self.scale * torch.logsumexp(
-                    q_next_all / self.scale, dim=1
-                )
-                bellman = ((ev_sa - v_next.detach()) ** 2).mean()
-
-                loss = nll + self.bellman_weight * bellman
-
-                optimizer.zero_grad()
-                loss.backward()
-                if self.gradient_clip > 0:
-                    nn.utils.clip_grad_norm_(
-                        list(self._q_net.parameters())
-                        + list(self._ev_net.parameters()),
-                        self.gradient_clip,
+                elif self.alternating_updates and batch_idx % 2 == 1:
+                    # Odd batch: update Q network only.
+                    # NLL + Bellman consistency penalty.
+                    q_all = self._q_net.all_actions(
+                        s_feat, ctx_feat, self.n_actions
                     )
-                optimizer.step()
+
+                    # Weighted NLL loss
+                    log_probs = torch.log_softmax(q_all / self.scale, dim=1)
+                    per_obs_nll = -log_probs[torch.arange(len(a)), a.long()]
+                    weights = class_weights[a.long()]
+                    nll = (per_obs_nll * weights).mean()
+
+                    # Bellman penalty: push V_Q(s') toward zeta(s,a)
+                    q_next_all = self._q_net.all_actions(
+                        ns_feat, ctx_feat, self.n_actions
+                    )
+                    v_next = self.scale * torch.logsumexp(
+                        q_next_all / self.scale, dim=1
+                    )
+                    with torch.no_grad():
+                        zeta_sa = self._ev_net(s_feat, ctx_feat, a_oh)
+
+                    # Optional anchor action filtering
+                    if self.anchor_action is not None:
+                        mask = (a == self.anchor_action).float()
+                        bellman = (
+                            (mask * (v_next - zeta_sa) ** 2).sum()
+                            / mask.sum().clamp(min=1.0)
+                        )
+                    else:
+                        bellman = ((v_next - zeta_sa) ** 2).mean()
+
+                    loss = ce_weight * nll + self.bellman_weight * bellman
+
+                    q_optimizer.zero_grad()
+                    loss.backward()
+                    if self.gradient_clip > 0:
+                        nn.utils.clip_grad_norm_(
+                            self._q_net.parameters(), self.gradient_clip,
+                        )
+                    q_optimizer.step()
+                    q_scheduler.step()
+
+                else:
+                    # Legacy joint update (alternating_updates=False).
+                    q_all = self._q_net.all_actions(
+                        s_feat, ctx_feat, self.n_actions
+                    )
+                    log_probs = torch.log_softmax(q_all / self.scale, dim=1)
+                    per_obs_nll = -log_probs[torch.arange(len(a)), a.long()]
+                    weights = class_weights[a.long()]
+                    nll = (per_obs_nll * weights).mean()
+
+                    ev_sa = self._ev_net(s_feat, ctx_feat, a_oh)
+                    q_next_all = self._q_net.all_actions(
+                        ns_feat, ctx_feat, self.n_actions
+                    )
+                    v_next = self.scale * torch.logsumexp(
+                        q_next_all / self.scale, dim=1
+                    )
+                    bellman = ((ev_sa - v_next.detach()) ** 2).mean()
+                    loss = ce_weight * nll + self.bellman_weight * bellman
+
+                    q_optimizer.zero_grad()
+                    zeta_optimizer.zero_grad()
+                    loss.backward()
+                    if self.gradient_clip > 0:
+                        nn.utils.clip_grad_norm_(
+                            list(self._q_net.parameters())
+                            + list(self._ev_net.parameters()),
+                            self.gradient_clip,
+                        )
+                    q_optimizer.step()
+                    zeta_optimizer.step()
+                    q_scheduler.step()
+                    zeta_scheduler.step()
 
                 epoch_loss += loss.item()
                 n_batches += 1
+                batch_idx += 1
 
             avg_loss = epoch_loss / max(n_batches, 1)
 
             if self.verbose and (epoch + 1) % 50 == 0:
                 print(
-                    f"  Epoch {epoch + 1}: loss={avg_loss:.4f} "
-                    f"(nll={nll.item():.4f}, bellman={bellman.item():.4f})"
+                    f"  Epoch {epoch + 1}: loss={avg_loss:.4f}"
                 )
 
             # Early stopping
@@ -725,6 +842,40 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
     # ------------------------------------------------------------------
     # Prediction methods
     # ------------------------------------------------------------------
+
+    @property
+    def reward_matrix_(self) -> np.ndarray | None:
+        """Structural reward matrix R(s,a) of shape (n_states, n_actions).
+
+        Computes implied rewards r(s,a) = Q(s,a) - beta*EV(s,a) for all
+        state-action pairs evaluated at context=0. Returns None if the
+        model has not been fitted.
+        """
+        if self._q_net is None or self._ev_net is None or self._n_states is None:
+            return None
+
+        n_s = self._n_states
+        self._q_net.eval()
+        self._ev_net.eval()
+
+        with torch.no_grad():
+            unique_states = torch.arange(n_s, dtype=torch.long)
+            ctx_default = torch.zeros(n_s, dtype=torch.long)
+
+            s_feat = self._state_encoder(unique_states)
+            ctx_feat = self._context_encoder(ctx_default)
+
+            q_all = self._q_net.all_actions(s_feat, ctx_feat, self.n_actions)
+            r_all = torch.zeros(n_s, self.n_actions)
+            for a_idx in range(self.n_actions):
+                a_oh = F.one_hot(
+                    torch.full((n_s,), a_idx, dtype=torch.long),
+                    self.n_actions,
+                ).float()
+                ev_a = self._ev_net(s_feat, ctx_feat, a_oh)
+                r_all[:, a_idx] = q_all[:, a_idx] - self.discount * ev_a
+
+        return r_all.numpy()
 
     def predict_proba(self, states: np.ndarray) -> np.ndarray:
         """Predict choice probabilities for given states.

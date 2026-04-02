@@ -22,6 +22,7 @@ class EstimatorProtocol(Protocol):
         pvalues_: P-values as {name: value} dict
         policy_: Learned policy π(a|s) as ndarray of shape (S, A)
         value_: Value function V(s) as ndarray of shape (S,)
+        reward_matrix_: Structural reward matrix R(s,a) as ndarray of shape (S, A)
     """
 
     params_: dict[str, float] | None
@@ -29,6 +30,7 @@ class EstimatorProtocol(Protocol):
     pvalues_: dict[str, float] | None
     policy_: np.ndarray | None
     value_: np.ndarray | None
+    reward_matrix_: np.ndarray | None
 
     def fit(self, data, state: str, action: str, id: str, **kwargs) -> "EstimatorProtocol":
         """Fit the estimator to data."""
