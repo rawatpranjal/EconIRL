@@ -22,9 +22,21 @@ A Unified Treatment of Three Estimation Approaches\\[6pt]
 \begin{document}
 \maketitle
 
-\begin{abstract}
-Three methods for recovering reward functions from observed sequential choices---reduced-form Q-estimation, adversarial inverse reinforcement learning (AIRL), and inverse soft-Q learning (IQ-Learn)---are compared within a unified notation. We establish when the methods yield identical counterfactual predictions and when they diverge, connecting the analysis to the partial identification framework of Kalouptsidi, Scott \& Souza-Rodrigues (2021). The results are applied to evaluate the estimation strategy of Lee, Sudhir \& Wang (2026), who use AIRL with anchor-based identification to study sequential content consumption. We show that their anchor normalization---exit payoff fixed to zero, absorbing-state value fixed to zero---uniquely pins down the reward and value functions, making the AIRL decomposition exact rather than approximate. This identification result, combined with deterministic transitions in their application, means the recovered structural reward supports counterfactuals that change the MDP environment, not merely those that extrapolate across state values. A simulation study on a calibrated book-reading MDP confirms every theoretical prediction at the population level and quantifies robustness to anchor misspecification.
-\end{abstract}
+\vspace{-0.5em}
+\noindent\fbox{\parbox{\dimexpr\textwidth-2\fboxsep-2\fboxrule}{%
+\textbf{TL;DR.} Three methods recover reward functions from observed choices. All three fit the data equally well and produce identical predictions when you only change state values (Type~I counterfactuals). They diverge when you change the environment itself---new transition dynamics, new action sets, segment-specific policies (Type~II counterfactuals). Only methods that separate immediate reward from continuation value survive Type~II. A reduced-form logit, which is simpler and faster, cannot do this separation and fails on exactly the counterfactuals that matter for policy design.
+
+\medskip
+\textbf{Executive takeaways:}
+\begin{enumerate}[nosep,leftmargin=1.5em]
+\item \textbf{John is right about the validation exercise.} The LSW wait-time validation (Section~6.3) is a Type~I counterfactual. A reduced-form logit would pass it identically. The AIRL machinery is not needed for this test.
+\item \textbf{John is wrong about the policy counterfactuals.} The WFF removal, segment-specific delay, and content-based paywall counterfactuals (Sections~7.1--7.3) all change the MDP environment. These require the structural reward that AIRL with anchors recovers. A reduced-form model fails with 18.5pp mean CCP error on the paywall counterfactual.
+\item \textbf{The anchors are the real contribution.} Generic AIRL recovers reward only up to an arbitrary shaping function. The LSW anchors (exit payoff $= 0$, absorbing-state value $= 0$) eliminate this ambiguity \emph{exactly}, not approximately. This is what licenses their Type~II counterfactuals.
+\item \textbf{The identification is robust, not knife-edge.} Misspecifying the exit payoff by 0.5 produces only 0.2pp counterfactual error. The anchors degrade gracefully.
+\item \textbf{IQ-Learn is a viable alternative.} It recovers the structural reward without adversarial training. In theory it matches AIRL+anchors. In practice, finite-sample optimization is harder than the convex reduced-form logit, so convergence requires care.
+\end{enumerate}
+}}
+\bigskip
 
 %% ======================================================================
 \section{Environment}
