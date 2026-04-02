@@ -94,3 +94,59 @@ compute_welfare_effect
       print(f"Baseline welfare: {welfare['baseline_expected_value']:.4f}")
       print(f"Counterfactual welfare: {welfare['counterfactual_expected_value']:.4f}")
       print(f"Welfare change: {welfare['total_welfare_change']:.4f}")
+
+state_extrapolation
+~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.state_extrapolation
+
+   Type 1 counterfactual: evaluate policy at shifted state values.
+
+discount_factor_change
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.discount_factor_change
+
+   Type 3 counterfactual: change the discount factor.
+
+welfare_decomposition
+~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.welfare_decomposition
+
+   Type 4 counterfactual: decompose welfare change into channels.
+
+counterfactual
+~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.counterfactual
+
+   Unified counterfactual dispatcher.
+
+counterfactual_transitions
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.counterfactual_transitions
+
+   Compute optimal policy under different transition dynamics.
+
+compute_stationary_distribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.compute_stationary_distribution
+
+   Compute the stationary state distribution under a policy.
+
+elasticity_analysis
+~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.elasticity_analysis
+
+   Analyze sensitivity of policy to parameter changes.
+
+simulate_counterfactual
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: econirl.simulation.counterfactual.simulate_counterfactual
+
+   Simulate outcomes under baseline and counterfactual policies.

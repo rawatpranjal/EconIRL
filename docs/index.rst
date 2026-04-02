@@ -52,3 +52,4 @@ All estimators in the R(s,a) row accept a feature tensor of shape (S, A, K) wher
    api/index
    references
    loading_data
+   counterfactuals
