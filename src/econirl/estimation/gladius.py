@@ -5,18 +5,29 @@ which uses neural networks to parameterize Q-functions and expected
 future value functions for inverse reinforcement learning in dynamic
 discrete choice models.
 
-Algorithm:
-    1. Parameterize Q(s,a) and EV(s,a) = E[V(s')|s,a] with MLPs.
-    2. Train via mini-batch SGD on observed (s, a, s') transitions:
-       - NLL loss: negative log-likelihood of observed actions under
-         softmax policy derived from Q.
-       - Bellman penalty: squared TD error beta*(EV(s,a) - V(s'))^2,
-         where V(s') = sigma * logsumexp(Q(s', :) / sigma).
-    3. Extract structural parameters by regressing implied rewards
-       r(s,a) = Q(s,a) - beta * EV(s,a) onto the feature matrix.
+Algorithm (IRL setting, no observed rewards):
+    1. Parameterize Q(s,a) and zeta(s,a) = E[V(s')|s,a] with MLPs.
+    2. Train via alternating mini-batch SGD (Algorithm 1, Kang 2025):
+       - Even batches: update zeta via MSE(zeta(s,a), V_Q(s')), Q frozen.
+       - Odd batches: update Q via NLL of observed actions, zeta frozen.
+       Q receives NO Bellman gradients in the IRL setting. Passing
+       gradients through V_Q(s') = logsumexp(Q) causes Q-value explosion
+       because no observed reward anchors the absolute scale.
+    3. Extract structural parameters via action-difference projection:
+       dr(s) = r(s,a) - r(s,0), dphi(s) = phi(s,a) - phi(s,0), then
+       least-squares. This eliminates the unidentified additive constant
+       (Kim et al. 2021, Cao & Cohen 2021).
+
+Known limitation: NLL-only training identifies Q up to a state-dependent
+constant c(s) that leaks into implied rewards through asymmetric
+transitions. On tabular problems (Rust bus, beta=0.95), this produces
+~40% bias on the operating cost parameter regardless of network size or
+data volume. NFXP recovers both parameters within 5%. Use GLADIUS for
+continuous-state environments or when rewards are observed.
 
 Reference:
-    Kang, M., et al. (2025). DDC IRL with neural networks.
+    Kang, E. H., et al. (2025). Offline Inverse RL and Dynamic Discrete
+    Choice Models. arXiv:2502.14131.
 """
 
 from __future__ import annotations
@@ -584,15 +595,23 @@ class GLADIUSEstimator(BaseEstimator):
                 )
                 nll = -log_probs[jnp.arange(len(a_batch)), a_batch].mean()
 
-                # In the IRL setting (no observed rewards), Q is trained
-                # only by NLL. The Bellman consistency is enforced entirely
-                # by the zeta step, which fits zeta(s,a) to V_Q(s').
-                # Giving Q Bellman gradients through V_Q(s') = logsumexp(Q)
-                # causes Q-value explosion because there is no observed
-                # reward to anchor the scale.
+                # IRL setting: Q trained by NLL only. Bellman consistency
+                # is enforced by the zeta step (MSE on V(s')).
                 #
-                # The Bellman penalty is still computed for logging but
-                # does not flow gradients to Q (stop_gradient on both sides).
+                # DO NOT pass Bellman gradients to Q here. Without observed
+                # rewards to anchor absolute Q-levels, gradients through
+                # V_Q(s') = logsumexp(Q) cause Q-value explosion (Q grows
+                # from [-1.5, 1.5] to [4548, 6782], destroying reward
+                # recovery). See commit d19469da for the fix.
+                #
+                # This means Q is effectively behavioral cloning, and the
+                # implied rewards r = Q - beta*zeta inherit a state-dependent
+                # bias from the unidentified constant in Q. The bias is
+                # ~40% on Rust bus OC with beta=0.95. Structural estimators
+                # (NFXP, CCP) do not have this limitation.
+                #
+                # Bellman loss is computed for logging only (both sides
+                # stop-gradiented).
                 zeta_sa = jax.lax.stop_gradient(
                     zeta_net.forward(s_feat, a_onehot)
                 )

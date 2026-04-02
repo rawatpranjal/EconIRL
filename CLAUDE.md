@@ -86,6 +86,9 @@ The `_compute_expected_features()` method in `mce_irl.py` uses occupancy measure
 - Normalize features to [-1, 1] range
 - Rust bus parameters (0.001, 3.0) have poor scaling - consider normalization
 
+### GLADIUS Without Observed Rewards (IRL Setting)
+GLADIUS trains Q by NLL only, which identifies Q up to a state-dependent constant c(s). That constant leaks into the implied rewards r(s,a) through the transition structure asymmetrically. For the bus engine, maintaining stays near state s while replacing jumps to state 0, so the constant propagates differently per action. Action-difference projection removes a global constant but not this state-dependent one, producing a systematically flat reward-difference curve. On the Rust bus with beta of 0.95, GLADIUS recovers replacement cost within 8 percent but overestimates operating cost by about 40 percent regardless of network size, training length, or data volume. This is a structural bias, not a tuning problem. NFXP solves the Bellman equation exactly and recovers both parameters within 5 percent. Use GLADIUS for continuous-state environments where tabular methods cannot be applied, or when rewards are observed in the data (the paper's intended use case, where the bi-conjugate Bellman error anchors Q-values). Do not pass Bellman gradients through V_Q to Q in the IRL setting because this causes Q-value explosion without observed rewards to anchor the scale.
+
 ### Transition Matrix Conventions
 - Estimators expect: `(n_actions, n_states, n_states)` i.e., `transitions[a, s, s']`
 - Some internal code uses: `(n_states, n_actions, n_states)` i.e., `transitions[s, a, s']`
