@@ -1,11 +1,16 @@
 Instacart Grocery Reorder
 =========================
 
+.. image:: /_static/mdp_schematic_instacart.png
+   :alt: Instacart MDP structure showing frequency by recency state grid with reorder and skip actions.
+   :width: 80%
+   :align: center
+
+This example applies structural estimation to a grocery reorder problem modeled on the Instacart Market Basket Analysis data. A consumer decides each week whether to reorder a product category from a delivery platform. The state captures purchase history (how many times the consumer has ordered before) and recency (how long since the last order). The action is skip or reorder.
+
 .. image:: /_static/instacart_overview.png
    :alt: Grocery reorder DDC showing state dependence in reorder rates by purchase frequency, recency effect on reorder probability, and state visitation heatmap across purchase and recency buckets.
    :width: 100%
-
-This example applies structural estimation to a grocery reorder problem modeled on the Instacart Market Basket Analysis data. A consumer decides each week whether to reorder a product category from a delivery platform. The state captures purchase history (how many times the consumer has ordered before) and recency (how long since the last order). The action is skip or reorder.
 
 The environment has 20 states arranged as 5 purchase frequency buckets by 4 recency buckets. Reordering increases the purchase frequency bucket and resets recency to zero. Skipping increases recency and lets the purchase frequency bucket decay slowly. This captures two stylized facts from real grocery data: consumers who have ordered more in the past are more likely to reorder (state dependence), and consumers who ordered recently are more likely to reorder again soon (recency effect).
 

@@ -1,11 +1,16 @@
 Rust Bus Engine Replacement
 ===========================
 
+.. image:: /_static/mdp_schematic_rust_bus.png
+   :alt: Rust bus MDP structure showing mileage states with keep and replace actions.
+   :width: 80%
+   :align: center
+
+This example replicates Rust (1987) on the bus engine replacement dataset. A fleet manager decides each month whether to keep running a bus engine or replace it. The operating cost rises with mileage and the replacement cost is fixed. The state space has 90 mileage bins and 2 actions.
+
 .. image:: /_static/rust_bus_counterfactual.png
    :alt: Counterfactual analysis showing replacement probability and relative value function under varying replacement cost and operating cost.
    :width: 100%
-
-This example replicates Rust (1987) on the bus engine replacement dataset. A fleet manager decides each month whether to keep running a bus engine or replace it. The operating cost rises with mileage and the replacement cost is fixed. The state space has 90 mileage bins and 2 actions.
 
 Quick start
 -----------

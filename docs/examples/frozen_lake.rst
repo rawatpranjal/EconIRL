@@ -1,11 +1,16 @@
 FrozenLake Navigation
 =====================
 
+.. image:: /_static/mdp_schematic_frozen_lake.png
+   :alt: FrozenLake MDP structure showing 4x4 grid with start, hole, and goal cells and slippery NSEW actions.
+   :width: 80%
+   :align: center
+
+This example applies three estimators to the classic FrozenLake environment from reinforcement learning. An agent navigates a 4x4 frozen lake to reach the goal cell without falling into holes. On the slippery surface, each action moves the agent in the intended direction with probability one third and in each perpendicular direction with probability one third. The environment has 16 states and 4 actions.
+
 .. image:: /_static/frozen_lake_overview.png
    :alt: FrozenLake 4x4 grid layout showing start, frozen, hole, and goal cells alongside slippery transition probability diagram.
    :width: 100%
-
-This example applies three estimators to the classic FrozenLake environment from reinforcement learning. An agent navigates a 4x4 frozen lake to reach the goal cell without falling into holes. On the slippery surface, each action moves the agent in the intended direction with probability one third and in each perpendicular direction with probability one third. The environment has 16 states and 4 actions.
 
 FrozenLake is the simplest stochastic DDC testbed. It has known ground-truth parameters, making it ideal for verifying parameter recovery and comparing estimators on a problem small enough to inspect by hand.
 

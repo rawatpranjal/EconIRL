@@ -1,6 +1,11 @@
 Shanghai Route Choice
 =====================
 
+.. image:: /_static/mdp_schematic_shanghai_route.png
+   :alt: Shanghai route MDP structure showing intersection state with fan-out road segment choices to next intersections.
+   :width: 80%
+   :align: center
+
 .. image:: /_static/shanghai_network.png
    :alt: Shanghai road network colored by road type with sample taxi routes, and edge popularity heatmap from training data.
    :width: 100%

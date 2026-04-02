@@ -1,11 +1,16 @@
 Trivago Hotel Search
 ====================
 
+.. image:: /_static/mdp_schematic_trivago_search.png
+   :alt: Trivago search MDP structure showing session state with browse and refine self-loops and clickout and abandon terminal actions.
+   :width: 80%
+   :align: center
+
+This example models hotel search sessions on Trivago as a sequential discrete choice problem. At each step in a search session, the user decides to browse hotel details, refine the search with filters, click out to book a hotel, or abandon the session. The state space has 37 states encoding session depth, items viewed, and device type.
+
 .. image:: /_static/trivago_search.png
    :alt: Hotel search session flow diagram showing browse, refine, clickout, and abandon actions and bar chart of structural parameters.
    :width: 100%
-
-This example models hotel search sessions on Trivago as a sequential discrete choice problem. At each step in a search session, the user decides to browse hotel details, refine the search with filters, click out to book a hotel, or abandon the session. The state space has 37 states encoding session depth, items viewed, and device type.
 
 .. code-block:: python
 

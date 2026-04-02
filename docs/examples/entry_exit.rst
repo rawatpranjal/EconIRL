@@ -1,6 +1,11 @@
 Dixit Firm Entry and Exit
 =========================
 
+.. image:: /_static/mdp_schematic_entry_exit.png
+   :alt: Dixit entry-exit MDP structure showing active and inactive status rows with profit transitions and sunk-cost entry and exit arrows.
+   :width: 80%
+   :align: center
+
 This example applies structural estimation to the Dixit (1989) model of firm entry and exit under uncertainty. A firm observes a stochastic market profitability signal each period and decides whether to be active or inactive. Entering a market requires paying a sunk entry cost. Exiting requires paying a sunk exit cost. These sunk costs create a band of inaction known as hysteresis: once a firm enters, it remains active even when profitability drops below the level that would justify fresh entry. This is a foundational model in industrial organization for understanding why market structure responds sluggishly to demand shocks.
 
 .. image:: /_static/entry_exit_overview.png

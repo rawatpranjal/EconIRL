@@ -1,6 +1,11 @@
 SCANIA Component X Replacement
 ===============================
 
+.. image:: /_static/mdp_schematic_scania_component.png
+   :alt: SCANIA component MDP structure showing degradation state chain with operate and replace actions.
+   :width: 80%
+   :align: center
+
 The SCANIA IDA 2024 Industrial Challenge dataset tracks 23,550 heavy trucks with 105 anonymized operational readout features grouped under 14 sensor families. Each vehicle is observed at irregular intervals until either an anonymized mechanical component is repaired or the study window closes. Of the 23,550 vehicles, 2,272 (9.6 percent) received a repair during the study period. The remaining 21,278 are right-censored.
 
 Model

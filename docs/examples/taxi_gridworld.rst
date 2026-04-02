@@ -1,12 +1,17 @@
 Gridworld Tabular and Neural Estimation
 ========================================
 
-.. image:: /_static/taxi_gridworld_policy.png
-   :alt: Optimal policy and value function on a 5x5 gridworld. Arrows show the greedy action at each cell, and color intensity shows the value function.
+.. image:: /_static/mdp_schematic_taxi_gridworld.png
+   :alt: Gridworld MDP structure showing 5x5 grid with NSEW and Stay actions and goal cell.
    :width: 80%
    :align: center
 
 This example explores reward recovery on synthetic gridworlds. It covers two questions. First, when should you use a neural reward network instead of a tabular one. Second, how does Maximum Causal Entropy IRL (Ziebart 2010) compare against the earlier Maximum Entropy IRL (Ziebart 2008).
+
+.. image:: /_static/taxi_gridworld_policy.png
+   :alt: Optimal policy and value function on a 5x5 gridworld. Arrows show the greedy action at each cell, and color intensity shows the value function.
+   :width: 80%
+   :align: center
 
 The figure shows the optimal policy under the true parameters. Each cell is colored by its value function, with warmer colors indicating higher expected discounted utility. The arrows show the greedy action at each state. The agent moves right and down toward the goal at cell (4,4), marked with a star.
 

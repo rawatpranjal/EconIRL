@@ -1,6 +1,11 @@
 Supermarket Pricing and Inventory
 ==================================
 
+.. image:: /_static/mdp_schematic_supermarket.png
+   :alt: Supermarket MDP structure showing inventory by price state grid with pricing, ordering, and stochastic demand actions.
+   :width: 80%
+   :align: center
+
 This example applies structural estimation to real supermarket data from Aguirregabiria (1999). A retailer manages 534 products in a single Spanish supermarket over 29 months. Each period the retailer makes two joint decisions for each product: whether to run a price promotion and whether to place an order from the supplier. Promotions boost sales volume but reduce margins. Orders replenish inventory but have logistical costs.
 
 The data is discretized into 10 states (5 inventory quintile bins by 2 lagged promotion status levels) and 4 actions (promotion or regular price crossed with order or no order). Transitions are estimated directly from the 13,884 observed product-month transitions. Five features capture the economic structure: a holding cost proportional to inventory, a stockout indicator for critically low inventory without ordering, a net promotion effect, a lagged promotion indicator capturing demand persistence, and an order cost indicator.

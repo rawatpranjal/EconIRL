@@ -1,6 +1,11 @@
 Citibike Daily Ride Frequency
 ==============================
 
+.. image:: /_static/mdp_schematic_citibike_usage.png
+   :alt: Citibike usage MDP structure showing habit stock chain with ride and skip actions.
+   :width: 80%
+   :align: center
+
 This example applies structural estimation to real Citibike trip data from January 2024. Each day a member decides whether to take a bikeshare trip. The state captures the day type (weekday or weekend) and recent usage intensity measured as the number of rides in the last seven days. The model recovers preferences over weekend riding, habit strength from recent usage, and the per-ride cost from observed behavior.
 
 The environment has 8 states (2 day types by 4 recent usage buckets: zero rides, one to two rides, three to five rides, and six or more rides in the past week). Riding increases the usage bucket by one and not riding decreases it by one, capturing habit formation and decay. Day type transitions reflect the 5/7 weekday probability in a standard week. Three features enter the ride utility: a weekend indicator, normalized recent usage intensity, and a ride cost indicator.

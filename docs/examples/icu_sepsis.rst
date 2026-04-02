@@ -1,11 +1,16 @@
 ICU Sepsis Treatment
 ====================
 
+.. image:: /_static/mdp_schematic_icu_sepsis.png
+   :alt: ICU sepsis MDP structure showing patient state, 5 by 5 dosing action grid, and absorbing discharge or death states.
+   :width: 80%
+   :align: center
+
+This example applies inverse reinforcement learning to the ICU-Sepsis benchmark MDP derived from MIMIC-III patient records. The data comes from Komorowski et al. (2018) and was packaged as a standalone benchmark by Killian et al. (2024). A clinician decides at each four-hour window how much IV fluid and vasopressor to administer to a sepsis patient, balancing the benefits of aggressive treatment against the risks of fluid overload and vasoconstriction.
+
 .. image:: /_static/icu_sepsis_overview.png
    :alt: ICU-Sepsis benchmark MDP overview showing illness severity distribution across 713 clinical states, clinician treatment intensity by SOFA quintile, and admission severity distribution.
    :width: 100%
-
-This example applies inverse reinforcement learning to the ICU-Sepsis benchmark MDP derived from MIMIC-III patient records. The data comes from Komorowski et al. (2018) and was packaged as a standalone benchmark by Killian et al. (2024). A clinician decides at each four-hour window how much IV fluid and vasopressor to administer to a sepsis patient, balancing the benefits of aggressive treatment against the risks of fluid overload and vasoconstriction.
 
 The MDP has 716 states representing clusters of patient physiology (vital signs, lab values, demographics), 25 actions arranged as a 5 by 5 grid of IV fluid dose and vasopressor dose, and transition probabilities estimated from real patient trajectories. The reward is plus one upon patient survival and zero otherwise. The expert policy is the aggregate clinician behavior observed in MIMIC-III.
 

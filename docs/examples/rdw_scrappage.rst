@@ -1,6 +1,11 @@
 RDW Vehicle Scrappage
 =====================
 
+.. image:: /_static/mdp_schematic_rdw_scrappage.png
+   :alt: RDW scrappage MDP structure showing age chain with defect severity dimension and keep or scrap actions.
+   :width: 80%
+   :align: center
+
 Every year in the Netherlands each passenger vehicle over three years old must pass a mandatory APK roadworthiness inspection. The vehicle owner observes the car's age and the severity of any defects found during the inspection. The owner then decides whether to keep the car and pay for repairs or to scrap the vehicle and exit the fleet. This example formulates the scrappage decision as a dynamic discrete choice model in the tradition of Rust (1987) and estimates it on real administrative data from the Dutch RDW open data registry.
 
 The dataset contains 170,852 Volkswagen Golf vehicles registered between 2005 and 2015, observed annually from age 3 through either scrappage or right-censoring at the current date. The 2,009,144 vehicle-year observations include 17,106 exit events (scrappage or export). Defect severity comes from 447,296 individual defect records downloaded from the RDW geconstateerde gebreken dataset.

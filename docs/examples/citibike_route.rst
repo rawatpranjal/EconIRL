@@ -1,6 +1,11 @@
 Citibike Station Destination Choice
 =====================================
 
+.. image:: /_static/mdp_schematic_citibike_route.png
+   :alt: Citibike route MDP structure showing origin cluster with hub-and-spoke arrows to destination clusters.
+   :width: 80%
+   :align: center
+
 This example applies inverse reinforcement learning to real Citibike bikeshare trips from January 2024. A rider at an origin station cluster during a time-of-day window chooses which destination cluster to ride to. The model recovers rider preferences over distance, destination popularity, time-of-day effects, and same-cluster affinity from 1.88 million observed trips.
 
 The environment has 80 states (20 station clusters from K-Means on geographic coordinates, crossed with 4 time-of-day buckets: night, morning, afternoon, evening). The action space is 20 destination clusters. Six features capture the choice structure: normalized distance between origin and destination centroids, destination cluster popularity, a peak-hour indicator for morning and afternoon, an evening indicator, squared distance for nonlinear aversion, and a same-cluster indicator for trips within the origin cluster.
