@@ -21,25 +21,80 @@ econirl recovers structural parameters from sequential choice data. Every estima
 Estimators
 ----------
 
-Estimators differ along two axes. The first is whether the reward function is linear in parameters or learned by a neural network. Linear reward estimators recover exact structural parameters with valid standard errors. Neural reward estimators learn a flexible reward function and extract approximate parameters by least-squares projection. The projection R-squared tells you how much of the neural reward is explained by your linear features.
-
-The second axis is whether the reward depends only on the state or on both the state and the action. State-only rewards R(s) fit problems where the value comes from where you are, such as route choice on a road network. State-action rewards R(s,a) fit problems where different actions have different costs or benefits at the same state, such as engine replacement or hotel search.
+All estimators share one interface and return parameters through ``params_``, ``se_``, and ``conf_int()``. Structural estimators recover interpretable θ with valid standard errors. IRL estimators recover a reward surface; use sieve compression to project onto structural features.
 
 .. list-table::
    :header-rows: 1
-   :widths: 20 40 40
+   :widths: 16 18 13 8 14 31
 
-   * -
-     - Linear Reward (exact theta, valid SEs)
-     - Neural Reward (projected theta, pseudo-SEs)
-   * - **R(s,a)** state-action
-     - ``NFXP`` (Rust 1987), ``CCP`` (Hotz-Miller 1993), ``NNES`` (Nguyen 2025), ``TDCCP``
-     - ``NeuralGLADIUS`` (Kang et al. 2025), ``NeuralAIRL`` (Fu et al. 2018)
-   * - **R(s)** state-only
-     - MCE-IRL (Ziebart 2010, coming soon)
-     -
+   * - Estimator
+     - Paper
+     - Identifies θ
+     - SEs
+     - State space
+     - Notes
+   * - ``NFXP``
+     - Rust 1987
+     - ✓
+     - ✓
+     - Tabular
+     - Exact Bellman; gold standard
+   * - ``CCP``
+     - Hotz-Miller 1993
+     - ✓
+     - ✓
+     - Tabular
+     - No inner loop; fast
+   * - ``MCEIRL``
+     - Ziebart 2010
+     - ✓
+     - ✓
+     - Tabular
+     - IRL-side DDC; equivalent to CCP
+   * - ``NNES``
+     - Nguyen 2025
+     - ✓
+     - ✓
+     - Continuous
+     - Neural V, linear R
+   * - ``TDCCP``
+     - AE 2022
+     - ✓
+     - ✓
+     - Continuous
+     - Neural V, linear R
+   * - ``SEES``
+     - Luo-Sang 2024
+     - ✓
+     - —
+     - Continuous
+     - Sieve V; SEs unavailable at boundary
+   * - ``IQLearn``
+     - Garg et al. 2021
+     - —
+     - —
+     - Tabular
+     - Implicit reward via soft-Q
+   * - ``NeuralGLADIUS``
+     - Kang et al. 2025
+     - proj.
+     - pseudo
+     - Continuous
+     - Neural Q+R; sieve compression
+   * - ``NeuralAIRL``
+     - Fu et al. 2018
+     - —
+     - —
+     - Tabular
+     - Adversarial; R(s,a,s') form
+   * - ``BC``
+     - —
+     - —
+     - —
+     - Any
+     - Behavioral cloning; lower-bound baseline
 
-All estimators in the R(s,a) row accept a feature tensor of shape (S, A, K) where each state-action pair has its own feature vector. MCE-IRL in the R(s) row accepts a feature tensor of shape (S, K) that is broadcast to all actions. The formal equivalence between maximum entropy IRL and logit DDC was established by Zeng et al. (2025) and Geng et al. (2017). See :doc:`references` for the full list of papers.
+See :doc:`references` for the full list of papers.
 
 .. toctree::
    :maxdepth: 2

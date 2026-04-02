@@ -99,7 +99,7 @@ The MCE-IRL estimator can also be used through its own sklearn-style wrapper wit
 
 .. code-block:: python
 
-   from econirl.estimators.mce_irl import MCEIRL
+   from econirl.estimation import MCEIRLEstimator as MCEIRL
 
    model = MCEIRL(
        n_states=90, n_actions=2, discount=0.99,
