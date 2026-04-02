@@ -321,11 +321,11 @@ def _build_panel_and_problem(data, mdp):
 def estimate_iq_learn(data, mdp, max_iter=2000):
     """IQ-Learn: chi² inverse soft-Q learning (Garg et al. 2021).
 
-    Uses the actual IQLearnEstimator from econirl.contrib.iq_learn.
+    Uses the actual IQLearnEstimator from econirl.estimation.iq_learn.
     Tabular Q-function, L-BFGS-B optimizer, chi² divergence.
     """
     import torch
-    from econirl.contrib.iq_learn import IQLearnEstimator, IQLearnConfig
+    from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
 
     panel, problem, utility, transitions_jnp = _build_panel_and_problem(data, mdp)
     # IQLearnEstimator expects torch.Tensor for transitions
@@ -376,7 +376,32 @@ def estimate_gladius(data, mdp, max_epochs=200):
     return {'r': reward_table, 'pi': summary.policy}
 
 
-def estimate_airl(data, mdp, max_rounds=100):
+def estimate_nfxp(data, mdp, optimizer='BHHH', inner_solver='hybrid',
+                  inner_tol=1e-10, inner_max_iter=10000, outer_max_iter=200):
+    """NFXP (Rust 1987) structural estimator.
+
+    Uses econirl.estimation.nfxp.NFXPEstimator on the same linear
+    action-dependent utility spec used elsewhere in this study.
+    """
+    from econirl.estimation.nfxp import NFXPEstimator
+
+    panel, problem, utility, transitions_jnp = _build_panel_and_problem(data, mdp)
+    est = NFXPEstimator(
+        optimizer=optimizer,
+        inner_solver=inner_solver,
+        inner_tol=inner_tol,
+        inner_max_iter=inner_max_iter,
+        outer_max_iter=outer_max_iter,
+        compute_hessian=False,
+        verbose=False,
+    )
+    summary = est.estimate(panel, utility, problem, transitions_jnp)
+    # Recover reward table from estimated parameters and known features
+    reward_table = utility.compute(summary.parameters)
+    return {'r': jnp.array(reward_table), 'pi': summary.policy}
+
+
+def estimate_airl(data, mdp, max_rounds=50):
     """AIRL (Fu et al. 2018): adversarial discriminator, no anchor constraints.
 
     Reward is not identified up to shaping — finite-sample analogue of
@@ -388,6 +413,9 @@ def estimate_airl(data, mdp, max_rounds=100):
     config = AIRLConfig(
         reward_type='tabular',
         max_rounds=max_rounds,
+        discriminator_steps=3,
+        generator_max_iter=500,
+        generator_tol=1e-4,
         use_shaping=True,
         compute_se=False,
         verbose=False,
@@ -398,7 +426,7 @@ def estimate_airl(data, mdp, max_rounds=100):
     return {'r': reward_table, 'pi': summary.policy}
 
 
-def estimate_lsw(data, mdp, max_rounds=100):
+def estimate_lsw(data, mdp, max_rounds=50):
     """LSW-AIRL (Lee, Sudhir & Wang 2026): AIRL with anchor identification.
 
     Exit action (action 2) is anchored to zero reward. Absorbing state is
@@ -415,6 +443,10 @@ def estimate_lsw(data, mdp, max_rounds=100):
         absorbing_state=mdp['ABS'],
         reward_type='tabular',
         max_airl_rounds=max_rounds,
+        max_em_iterations=1,   # K=1: E-step is trivial, one M-step suffices
+        discriminator_steps=3,
+        generator_max_iter=500,
+        generator_tol=1e-4,
         verbose=False,
     )
     est = AIRLHetEstimator(config)
@@ -513,12 +545,12 @@ def main():
         results['C'][str(alpha)] = {'error': round(err, 3), 'corr': round(corr, 3)}
 
     # --- D: Sample size (RF, IQ-Learn, AIRL, LSW, GLADIUS) ---
-    print("\nAnalysis D: Sample size (RF, IQ-Learn, AIRL, LSW, GLADIUS)")
+    print("\nAnalysis D: Sample size (RF, IQ-Learn, AIRL, LSW, GLADIUS, NFXP)")
     sample_sizes = [200, 500, 2000, 5000, 10000]
     n_seeds = 3
     results['D'] = {}
     for N in sample_sizes:
-        rf_errs, iq_errs, airl_errs, lsw_errs, gl_errs = [], [], [], [], []
+        rf_errs, iq_errs, airl_errs, lsw_errs, gl_errs, nfxp_errs = [], [], [], [], [], []
         for seed in range(n_seeds):
             data = generate_data(mdp, sol, N, jr.PRNGKey(seed * 1000 + N))
             rf = estimate_rf(data, mdp['n_states'], cfg.n_actions, n_iter=10000)
@@ -531,17 +563,24 @@ def main():
             lsw_errs.append(cf_error(Pt3, lsw['r'], r_true, beta, ABS, nR))
             gl = estimate_gladius(data, mdp, max_epochs=150)
             gl_errs.append(cf_error(Pt3, gl['r'], r_true, beta, ABS, nR))
+            try:
+                nfxp = estimate_nfxp(data, mdp, outer_max_iter=150)
+                nfxp_errs.append(cf_error(Pt3, nfxp['r'], r_true, beta, ABS, nR))
+            except Exception as e:
+                # Keep robustness: if NFXP fails on tiny samples, record NaN
+                nfxp_errs.append(float('nan'))
         print(
-            f"  N={N:>5}: RF={np.mean(rf_errs):.4f}, IQ={np.mean(iq_errs):.4f}, "
-            f"AIRL={np.mean(airl_errs):.4f}, LSW={np.mean(lsw_errs):.4f}, "
-            f"GLADIUS={np.mean(gl_errs):.4f}  ({n_seeds} seeds)"
+            f"  N={N:>5}: RF={np.nanmean(rf_errs):.4f}, IQ={np.nanmean(iq_errs):.4f}, "
+            f"AIRL={np.nanmean(airl_errs):.4f}, LSW={np.nanmean(lsw_errs):.4f}, "
+            f"GLADIUS={np.nanmean(gl_errs):.4f}, NFXP={np.nanmean(nfxp_errs):.4f}  ({n_seeds} seeds)"
         )
         results['D'][str(N)] = {
-            'rf': round(np.mean(rf_errs), 4),
-            'iq_learn': round(np.mean(iq_errs), 4),
-            'airl': round(np.mean(airl_errs), 4),
-            'lsw': round(np.mean(lsw_errs), 4),
-            'gladius': round(np.mean(gl_errs), 4),
+            'rf': round(np.nanmean(rf_errs), 4),
+            'iq_learn': round(np.nanmean(iq_errs), 4),
+            'airl': round(np.nanmean(airl_errs), 4),
+            'lsw': round(np.nanmean(lsw_errs), 4),
+            'gladius': round(np.nanmean(gl_errs), 4),
+            'nfxp': round(np.nanmean(nfxp_errs), 4),
         }
 
     # --- E: Anchor misspecification ---

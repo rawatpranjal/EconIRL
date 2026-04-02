@@ -1,7 +1,7 @@
 """Estimation algorithms for dynamic discrete choice models.
 
-Production estimators (10):
-    NFXP, CCP, MCE-IRL, TD-CCP, NNES, SEES, GLADIUS, AIRL, f-IRL, BC
+Production estimators (12):
+    NFXP, MPEC, CCP, MCE-IRL, TD-CCP, NNES, SEES, GLADIUS, IQ-Learn, AIRL, f-IRL, BC
 
 Contrib estimators (moved to econirl.contrib):
     MaxEnt IRL, Deep MaxEnt, Max Margin, Max Margin IRL, GAIL, GCL, BIRL, IQ-Learn
@@ -22,6 +22,7 @@ from econirl.estimation.categories import (
 
 # Structural
 from econirl.estimation.nfxp import NFXPEstimator
+from econirl.estimation.mpec import MPECEstimator, MPECConfig
 from econirl.estimation.ccp import CCPEstimator
 
 # Entropy IRL
@@ -34,6 +35,7 @@ from econirl.estimation.sees import SEESEstimator
 
 # Q-learning IRL
 from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
+from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
 
 # Adversarial IRL
 from econirl.estimation.adversarial import (
@@ -63,6 +65,8 @@ __all__ = [
     "EstimationResult",
     # Structural
     "NFXPEstimator",
+    "MPECEstimator",
+    "MPECConfig",
     "CCPEstimator",
     # Entropy IRL
     "MCEIRLEstimator",
@@ -76,6 +80,8 @@ __all__ = [
     # Q-learning IRL
     "GLADIUSEstimator",
     "GLADIUSConfig",
+    "IQLearnEstimator",
+    "IQLearnConfig",
     # Adversarial IRL
     "AIRLEstimator",
     "AIRLConfig",
@@ -110,8 +116,6 @@ _MOVED_TO_CONTRIB = {
     "GCLEstimator": "gcl",
     "GCLConfig": "gcl",
     "BayesianIRLEstimator": "bayesian_irl",
-    "IQLearnEstimator": "iq_learn",
-    "IQLearnConfig": "iq_learn",
     "GAILEstimator": "gail",
     "GAILConfig": "gail",
 }

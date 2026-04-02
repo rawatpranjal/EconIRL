@@ -16,7 +16,8 @@ from econirl.contrib.max_margin_irl import MaxMarginIRLEstimator
 from econirl.contrib.max_margin_planning import MaxMarginPlanningEstimator, MMPConfig
 from econirl.contrib.gcl import GCLEstimator, GCLConfig
 from econirl.contrib.bayesian_irl import BayesianIRLEstimator
-from econirl.contrib.iq_learn import IQLearnEstimator, IQLearnConfig
+# IQ-Learn promoted to production (econirl.estimation.iq_learn)
+from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
 from econirl.contrib.gail import GAILEstimator, GAILConfig
 
 __all__ = [
