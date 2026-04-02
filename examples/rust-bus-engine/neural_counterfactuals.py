@@ -71,17 +71,20 @@ def main():
     print()
 
     # --- NeuralGLADIUS ---
-    print("Fitting NeuralGLADIUS (discount=0.95) ...")
+    # With value_scale fix, GLADIUS can now train at beta=0.9999.
+    # The networks predict in per-period utility units (~[-10, 10])
+    # and multiply by 1/(1-beta)=10000 to reach the true Q-value scale.
+    print("Fitting NeuralGLADIUS (discount=0.9999, value_scale=auto) ...")
     gladius = NeuralGLADIUS(
         n_actions=2,
-        discount=0.95,
+        discount=0.9999,
         q_hidden_dim=64,
         q_num_layers=2,
         ev_hidden_dim=64,
         ev_num_layers=2,
-        max_epochs=300,
+        max_epochs=500,
         batch_size=256,
-        patience=50,
+        patience=100,
         bellman_weight=1.0,
         alternating_updates=True,
         verbose=True,
@@ -113,7 +116,7 @@ def main():
     problem = DDCProblem(
         num_states=n_states,
         num_actions=n_actions,
-        discount_factor=0.95,
+        discount_factor=0.9999,
         scale_parameter=1.0,
     )
 
@@ -366,6 +369,53 @@ def main():
     except ImportError:
         print("SHAP is not installed. Skipping feature attribution.")
         print("Install with: pip install shap")
+
+    # ==================================================================
+    #  Validation: Do the neural counterfactuals agree with structural?
+    # ==================================================================
+    banner("VALIDATION: Neural vs Structural Ground Truth")
+    print("Both NFXP and NeuralGLADIUS use beta=0.9999. We compare")
+    print("policies state by state to check if the neural reward")
+    print("produces the same optimal behavior as the structural model.")
+    print()
+
+    # Compare policies at key states
+    print(f"  {'State':>6s}  {'NFXP P(repl)':>14s}  {'Neural P(repl)':>14s}  {'Diff':>8s}")
+    print(f"  {'-----':>6s}  {'------------':>14s}  {'--------------':>14s}  {'----':>8s}")
+    from econirl.core.bellman import SoftBellmanOperator
+    from econirl.core.solvers import value_iteration as vi
+    operator = SoftBellmanOperator(problem, transitions)
+    neural_sol = vi(operator, reward_matrix)
+    for s in [0, 10, 20, 30, 40, 50, 60, 70, 80, 89]:
+        nfxp_p = float(nfxp.policy_[s, 1])
+        neural_p = float(neural_sol.policy[s, 1])
+        diff = neural_p - nfxp_p
+        print(f"  {s:6d}  {nfxp_p:14.4f}  {neural_p:14.4f}  {diff:+8.4f}")
+
+    # Policy correlation
+    nfxp_flat = nfxp.policy_[:, 1]
+    neural_flat = np.asarray(neural_sol.policy[:, 1])
+    corr = float(np.corrcoef(nfxp_flat, neural_flat)[0, 1])
+    mae = float(np.abs(nfxp_flat - neural_flat).mean())
+    print()
+    print(f"  Policy correlation: {corr:.4f}")
+    print(f"  Mean absolute error: {mae:.4f}")
+    print()
+
+    # Sieve compression should recover NFXP parameters if neural reward is correct
+    print("Sieve compression comparison (both at beta=0.9999):")
+    print(f"  NFXP structural:  theta_c={nfxp.params_['theta_c']:.6f}, "
+          f"RC={nfxp.params_['RC']:.4f}")
+    print(f"  Neural projected: theta_c={sieve['theta'][0]:.6f}, "
+          f"RC={abs(sieve['theta'][1]):.4f} (R^2={sieve['r_squared']:.4f})")
+    print()
+    if sieve["r_squared"] > 0.95:
+        print("  R-squared above 0.95: the neural reward is well-explained by")
+        print("  the linear basis. Sieve coefficients are trustworthy.")
+    else:
+        print("  R-squared below 0.95: the neural reward captures nonlinearity")
+        print("  that the linear basis misses. Sieve coefficients approximate")
+        print("  but do not fully represent the neural reward surface.")
 
     # ==================================================================
     #  Summary

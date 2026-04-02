@@ -90,16 +90,29 @@ class GLADIUSConfig:
     tikhonov_annealing: bool = False
     tikhonov_initial_weight: float = 100.0
     anchor_action: int | None = None
+    value_scale: float | None = None  # Output scale for Q/EV networks.
+    # When None (default), auto-set to 1/(1-beta) so networks predict
+    # in per-period utility units. With beta=0.9999, Q-values are order
+    # 10000; scaling lets the MLP work in [-10, 10] and multiplies the
+    # output by value_scale. Set to 1.0 to disable rescaling.
     compute_se: bool = True
     n_bootstrap: int = 100
     verbose: bool = False
 
 
 class _QNetwork(eqx.Module):
-    """MLP that maps (state_features, action_onehot) to a scalar Q value."""
+    """MLP that maps (state_features, action_onehot) to a scalar Q value.
+
+    When value_scale > 1, the MLP predicts in per-period utility units
+    (roughly [-10, 10]) and the output is multiplied by value_scale to
+    produce Q-values at the correct absolute level. This lets the
+    network train stably even with high discount factors (beta > 0.99)
+    where true Q-values are order 1/(1-beta).
+    """
 
     mlp: eqx.nn.MLP
     n_actions: int = eqx.field(static=True)
+    value_scale: float = eqx.field(static=True)
 
     def __init__(
         self,
@@ -109,8 +122,10 @@ class _QNetwork(eqx.Module):
         num_layers: int,
         *,
         key: jax.Array,
+        value_scale: float = 1.0,
     ):
         self.n_actions = n_actions
+        self.value_scale = value_scale
         self.mlp = eqx.nn.MLP(
             in_size=state_dim + n_actions,
             out_size=1,
@@ -129,7 +144,7 @@ class _QNetwork(eqx.Module):
         Returns:
             Scalar Q value.
         """
-        return self.mlp(x).squeeze(-1)
+        return self.mlp(x).squeeze(-1) * self.value_scale
 
     def forward(
         self, state_features: jax.Array, action_onehot: jax.Array
@@ -174,6 +189,7 @@ class _EVNetwork(eqx.Module):
 
     mlp: eqx.nn.MLP
     n_actions: int = eqx.field(static=True)
+    value_scale: float = eqx.field(static=True)
 
     def __init__(
         self,
@@ -183,8 +199,10 @@ class _EVNetwork(eqx.Module):
         num_layers: int,
         *,
         key: jax.Array,
+        value_scale: float = 1.0,
     ):
         self.n_actions = n_actions
+        self.value_scale = value_scale
         self.mlp = eqx.nn.MLP(
             in_size=state_dim + n_actions,
             out_size=1,
@@ -203,7 +221,7 @@ class _EVNetwork(eqx.Module):
         Returns:
             Scalar EV value.
         """
-        return self.mlp(x).squeeze(-1)
+        return self.mlp(x).squeeze(-1) * self.value_scale
 
     def forward(
         self, state_features: jax.Array, action_onehot: jax.Array
@@ -459,9 +477,19 @@ class GLADIUSEstimator(BaseEstimator):
         key = jax.random.PRNGKey(0)
         q_key, zeta_key = jax.random.split(key)
 
+        # Compute value_scale so networks predict in per-period units.
+        # With beta=0.9999, true Q ~ r/(1-beta) ~ 10000. The MLP predicts
+        # in [-10, 10] and multiplies by value_scale to reach the right level.
+        if self.config.value_scale is not None:
+            vs = self.config.value_scale
+        else:
+            vs = 1.0 / max(1.0 - beta, 1e-6)
+        # Cap at 10000 to avoid extreme scales
+        vs = min(vs, 10000.0)
+
         q_net = _QNetwork(
             state_dim, n_actions, self.config.q_hidden_dim,
-            self.config.q_num_layers, key=q_key,
+            self.config.q_num_layers, key=q_key, value_scale=vs,
         )
         # Zeta network approximates E[V(s')|s,a]. Same architecture as
         # the EV network but trained with the corrected alternating scheme
@@ -470,7 +498,7 @@ class GLADIUSEstimator(BaseEstimator):
         # gradient separation in the alternating update.
         zeta_net = _EVNetwork(
             state_dim, n_actions, self.config.v_hidden_dim,
-            self.config.v_num_layers, key=zeta_key,
+            self.config.v_num_layers, key=zeta_key, value_scale=vs,
         )
 
         # Build optimizers with gradient clipping, weight decay, and

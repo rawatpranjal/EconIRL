@@ -83,8 +83,8 @@ Sequential search, browsing, and purchase decisions in markets.
    trivago_search
    instacart
 
-Methodology
------------
+Post-Estimation
+---------------
 
 Cross-cutting tools for post-estimation diagnostics, model comparison, and inference.
 
