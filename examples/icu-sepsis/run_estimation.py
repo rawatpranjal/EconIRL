@@ -5,28 +5,32 @@ MDP derived from MIMIC-III records. The goal is to recover the implicit
 reward function driving ICU clinicians' decisions about IV fluid and
 vasopressor dosing for sepsis patients.
 
-This example generates expert demonstrations from the MIMIC-III clinician
-policy, then estimates the reward function using NFXP and CCP. The
-recovered reward reveals how clinicians trade off patient severity
-against treatment intensity. Counterfactual analysis shows what happens
-when vasopressor costs are doubled.
+Estimators:
+  NFXP      -- structural, model-based, linear utility
+  CCP       -- reduced-form, model-based, linear utility
+  NeuralGLADIUS -- model-free neural IRL, projects onto linear spec
+
+Counterfactual analysis shows what happens when vasopressor cost doubles.
 
 Run:
     python examples/icu-sepsis/run_estimation.py
 """
 
+import json
 import time
+from pathlib import Path
 
 import econirl._jax_config  # enable float64 before any JAX ops
 import jax.numpy as jnp
 import numpy as np
+import torch
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.datasets.icu_sepsis import load_icu_sepsis
 from econirl.environments.icu_sepsis import ICUSepsisEnvironment
 from econirl.estimation.ccp import CCPEstimator
-from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
 from econirl.estimation.nfxp import NFXPEstimator
+from econirl.estimators.neural_gladius import NeuralGLADIUS
 from econirl.inference import etable
 from econirl.inference.fit_metrics import brier_score, kl_divergence
 from econirl.inference.hypothesis_tests import vuong_test
@@ -56,7 +60,7 @@ def main():
         parameter_names=env.parameter_names,
     )
 
-    # ── Estimation ─────────────────────────────────────────────────────
+    # ── Structural estimators (model-based) ────────────────────────────
 
     results = {}
     for name, EstCls in [("NFXP", NFXPEstimator), ("CCP", CCPEstimator)]:
@@ -69,22 +73,42 @@ def main():
         for pname, val in zip(env.parameter_names, r.parameters):
             print(f"  {pname}: {float(val):.4f}")
 
-    # MCE-IRL
-    t0 = time.time()
-    mce_config = MCEIRLConfig(
-        learning_rate=0.05,
-        outer_max_iter=300,
-        inner_max_iter=500,
-    )
-    mce_est = MCEIRLEstimator(config=mce_config)
-    mce_result = mce_est.estimate(train, utility, problem, transitions)
-    dt = time.time() - t0
-    results["MCE-IRL"] = mce_result
-    print(f"\nMCE-IRL: {dt:.1f}s, converged={mce_result.converged}")
-    for pname, val in zip(env.parameter_names, mce_result.parameters):
-        print(f"  {pname}: {float(val):.4f}")
+    # ── NeuralGLADIUS (model-free IRL) ─────────────────────────────────
+    # State encoder: map discrete state index to its SOFA severity score.
+    # SOFA scores (0-1) are more informative than raw normalized indices
+    # because they capture patient severity rather than cluster ordering.
 
-    # ── Standard errors ────────────────────────────────────────────────
+    mdp_path = Path(__file__).parent.parent.parent / "src" / "econirl" / "datasets" / "icu_sepsis_mdp.npz"
+    sofa_scores = torch.tensor(np.load(mdp_path)["sofa_scores"], dtype=torch.float32)
+    sofa_encoder = lambda s: sofa_scores[s].unsqueeze(-1)  # (B,) → (B, 1)
+
+    feat_tensor = torch.tensor(np.array(env.feature_matrix), dtype=torch.float32)
+
+    t0 = time.time()
+    gladius = NeuralGLADIUS(
+        n_actions=env.num_actions,
+        discount=0.99,
+        q_hidden_dim=64,
+        q_num_layers=2,
+        ev_hidden_dim=64,
+        ev_num_layers=2,
+        max_epochs=300,
+        batch_size=512,
+        lr=5e-4,
+        patience=40,
+        state_encoder=sofa_encoder,
+        state_dim=1,
+        feature_names=env.parameter_names,
+        verbose=True,
+    )
+    gladius.fit(data=train, features=feat_tensor)
+    dt = time.time() - t0
+    print(f"\nNeuralGLADIUS: {dt:.1f}s, converged={gladius.converged_}, "
+          f"epochs={gladius.n_epochs_}, projection R²={gladius.projection_r2_:.3f}")
+    for pname, val in (gladius.params_ or {}).items():
+        print(f"  {pname}: {val:.4f}")
+
+    # ── Standard errors (NFXP) ─────────────────────────────────────────
 
     print("\nStandard errors (NFXP):")
     se = results["NFXP"].standard_errors
@@ -99,9 +123,8 @@ def main():
     print("=" * 65)
 
     print("\n--- etable() ---")
-    print(etable(results["NFXP"], results["CCP"], results["MCE-IRL"]))
+    print(etable(results["NFXP"], results["CCP"]))
 
-    # Fit metrics
     obs_states = jnp.array(train.get_all_states())
     obs_actions = jnp.array(train.get_all_actions())
 
@@ -110,20 +133,24 @@ def main():
         bs = brier_score(r.policy, obs_states, obs_actions)
         print(f"  {name}: {bs['brier_score']:.4f}")
 
-    print("\n--- Vuong Test (NFXP vs MCE-IRL) ---")
-    vt = vuong_test(results["NFXP"].policy, results["MCE-IRL"].policy, obs_states, obs_actions)
-    print(f"  Z-statistic: {vt['statistic']:.3f}")
-    print(f"  P-value: {vt['p_value']:.4f}")
-    print(f"  Direction: {vt['direction']}")
+    gladius_policy = jnp.array(gladius.policy_)
+    bs_g = brier_score(gladius_policy, obs_states, obs_actions)
+    print(f"  NeuralGLADIUS: {bs_g['brier_score']:.4f}")
 
-    # ── Counterfactual: Double vasopressor cost ────────────────────────
+    print("\n--- Vuong Test (NFXP vs CCP) ---")
+    vt = vuong_test(results["NFXP"].policy, results["CCP"].policy, obs_states, obs_actions)
+    print(f"  Z-statistic: {vt['statistic']:.3f}, P-value: {vt['p_value']:.4f}, "
+          f"Direction: {vt['direction']}")
+
+    # ── Counterfactual: Double vasopressor weight ──────────────────────
 
     print("\n" + "=" * 65)
-    print("Counterfactual: Double vasopressor cost")
+    print("Counterfactual: Double vasopressor weight")
     print("=" * 65)
 
     best = results["NFXP"]
-    new_params = best.parameters.at[2].set(best.parameters[2] * 2)
+    vaso_idx = env.parameter_names.index("vaso_weight")
+    new_params = best.parameters.at[vaso_idx].set(best.parameters[vaso_idx] * 2)
     cf = counterfactual_policy(best, new_params, utility, problem, transitions)
     print(f"Welfare change: {float(cf.welfare_change):+.4f}")
 
@@ -154,6 +181,40 @@ def main():
         wc = ea["welfare_changes"][i]
         pc = ea["policy_changes"][i]
         print(f"{pct:>+10.0%} {float(wc):>12.4f} {float(pc):>14.4f}")
+
+    # ── Save results ───────────────────────────────────────────────────
+
+    out = {
+        "parameters": {},
+        "standard_errors": {},
+        "log_likelihoods": {},
+        "gladius": {
+            "params": gladius.params_,
+            "projection_r2": gladius.projection_r2_,
+            "n_epochs": gladius.n_epochs_,
+            "converged": gladius.converged_,
+        },
+        "counterfactual": {"welfare_change": float(cf.welfare_change)},
+        "elasticity": {
+            "baseline_sofa_weight": float(ea["baseline_value"]),
+            "pct_changes": [float(p) for p in ea["pct_changes"]],
+            "welfare_changes": [float(w) for w in ea["welfare_changes"]],
+        },
+    }
+    for name, r in results.items():
+        out["parameters"][name] = {
+            pname: float(r.parameters[i])
+            for i, pname in enumerate(env.parameter_names)
+        }
+        out["standard_errors"][name] = {
+            pname: float(r.standard_errors[i])
+            for i, pname in enumerate(env.parameter_names)
+        } if r.standard_errors is not None else {}
+        out["log_likelihoods"][name] = float(r.log_likelihood)
+    results_path = Path(__file__).parent / "results.json"
+    with open(results_path, "w") as f:
+        json.dump(out, f, indent=2)
+    print(f"\nResults saved to {results_path}")
 
 
 if __name__ == "__main__":

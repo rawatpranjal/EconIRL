@@ -1,0 +1,63 @@
+{
+  "parameters": {
+    "NFXP": {
+      "sofa_weight": 1.1288401168124695,
+      "fluid_weight": -0.32704876439412095,
+      "vaso_weight": -4.152819600516268,
+      "absorbing_weight": 0.42910514626655677
+    },
+    "CCP": {
+      "sofa_weight": -0.0028001342434436083,
+      "fluid_weight": -0.3508380949497223,
+      "vaso_weight": -4.047710418701172,
+      "absorbing_weight": -0.1434689462184906
+    }
+  },
+  "standard_errors": {
+    "NFXP": {
+      "sofa_weight": 0.2465011030435562,
+      "fluid_weight": 0.02552044950425625,
+      "vaso_weight": 0.030464569106698036,
+      "absorbing_weight": 0.08877423405647278
+    },
+    "CCP": {
+      "sofa_weight": NaN,
+      "fluid_weight": NaN,
+      "vaso_weight": NaN,
+      "absorbing_weight": NaN
+    }
+  },
+  "log_likelihoods": {
+    "NFXP": -37357.451768422565,
+    "CCP": -37462.28125
+  },
+  "gladius": {
+    "params": {
+      "sofa_weight": 0.0,
+      "fluid_weight": 0.11510787904262543,
+      "vaso_weight": -0.9446327686309814,
+      "absorbing_weight": 0.0
+    },
+    "projection_r2": 0.07614463567733765,
+    "n_epochs": 81,
+    "converged": true
+  },
+  "counterfactual": {
+    "welfare_change": -29.77275827489004
+  },
+  "elasticity": {
+    "baseline_sofa_weight": 1.1288401168124695,
+    "pct_changes": [
+      -0.5,
+      -0.25,
+      0.25,
+      0.5
+    ],
+    "welfare_changes": [
+      -1.7486112490524635,
+      -0.8822668332809179,
+      0.8685550338154334,
+      1.7530851062693593
+    ]
+  }
+}

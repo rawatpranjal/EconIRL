@@ -23,7 +23,9 @@ Usage:
     python examples/keane-wolpin-careers/replicate.py
 """
 
+import json
 import time
+from pathlib import Path
 
 import jax.numpy as jnp
 import numpy as np
@@ -99,37 +101,41 @@ def build_transition_matrix() -> jnp.ndarray:
 def build_feature_matrix() -> jnp.ndarray:
     """Build feature matrix for linear utility specification.
 
-    Features capture returns to schooling, experience, and fixed costs:
+    Home production (action 3) is the reference alternative with utility 0.
+    All other utilities are identified relative to home. With choice-only
+    data (no wages), only utility differences across actions are identified,
+    so the 4-intercept parameterization is collinear; a single intercept
+    per non-home action suffices.
+
+    Six features (home = reference):
     - school_return: schooling level (for school action)
     - wc_exp_return: WC experience (for WC action)
     - bc_exp_return: BC experience (for BC action)
-    - school_cost: fixed cost of attending school
-    - wc_intercept: base WC wage
-    - bc_intercept: base BC wage
-    - home_value: value of home production
+    - school_cost: net fixed cost of attending school relative to home
+    - wc_intercept: base WC utility relative to home
+    - bc_intercept: base BC utility relative to home
     """
-    n_features = 7
+    n_features = 6
     features = np.zeros((N_STATES, N_ACTIONS, n_features))
 
     for s in range(N_STATES):
         school, exp_wc, exp_bc = decode_state(s)
 
-        # School returns (action 0)
-        features[s, 0, 0] = school / SCHOOL_MAX  # normalized schooling
-        features[s, 0, 3] = -1.0  # school cost
+        # School (action 0): schooling return + school cost vs home
+        features[s, 0, 0] = school / SCHOOL_MAX
+        features[s, 0, 3] = -1.0  # school cost (negative = cost relative to home)
 
-        # WC work returns (action 1)
-        features[s, 1, 0] = school / SCHOOL_MAX  # schooling affects wages
-        features[s, 1, 1] = exp_wc / EXP_WC_MAX  # WC experience
-        features[s, 1, 4] = 1.0  # WC intercept
+        # WC work (action 1): schooling + WC experience + WC intercept
+        features[s, 1, 0] = school / SCHOOL_MAX
+        features[s, 1, 1] = exp_wc / EXP_WC_MAX
+        features[s, 1, 4] = 1.0
 
-        # BC work returns (action 2)
-        features[s, 2, 0] = school / SCHOOL_MAX * 0.5  # less schooling effect
-        features[s, 2, 2] = exp_bc / EXP_BC_MAX  # BC experience
-        features[s, 2, 5] = 1.0  # BC intercept
+        # BC work (action 2): schooling (less) + BC experience + BC intercept
+        features[s, 2, 0] = school / SCHOOL_MAX * 0.5
+        features[s, 2, 2] = exp_bc / EXP_BC_MAX
+        features[s, 2, 5] = 1.0
 
-        # Home production (action 3)
-        features[s, 3, 6] = 1.0  # home value
+        # Home (action 3): utility = 0 (reference)
 
     return jnp.array(features)
 
@@ -166,7 +172,7 @@ class KWUtility:
         self.num_parameters = feature_matrix.shape[2]
         self.parameter_names = [
             "school_return", "wc_exp_return", "bc_exp_return",
-            "school_cost", "wc_intercept", "bc_intercept", "home_value",
+            "school_cost", "wc_intercept", "bc_intercept",
         ]
 
     @property
@@ -237,6 +243,26 @@ def main():
 
     print(f"\nNote: Uses logit shocks (not MV normal from paper).")
     print(f"Estimates demonstrate finite-horizon NFXP on multi-dimensional DDC.")
+
+    # Save results to JSON
+    out = {
+        "parameters": {
+            name: float(result.parameters[i])
+            for i, name in enumerate(utility.parameter_names)
+        },
+        "standard_errors": {
+            name: float(result.standard_errors[i])
+            for i, name in enumerate(utility.parameter_names)
+        },
+        "log_likelihood": float(result.log_likelihood),
+        "elapsed_seconds": round(elapsed, 1),
+        "n_obs": len(df),
+        "n_individuals": int(df["id"].nunique()),
+    }
+    results_path = Path(__file__).parent / "results.json"
+    with open(results_path, "w") as f:
+        json.dump(out, f, indent=2)
+    print(f"\nResults saved to {results_path}")
 
 
 if __name__ == "__main__":

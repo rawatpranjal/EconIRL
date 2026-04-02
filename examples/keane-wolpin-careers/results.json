@@ -1,0 +1,22 @@
+{
+  "parameters": {
+    "school_return": 0.21367041766643524,
+    "wc_exp_return": 0.34814825654029846,
+    "bc_exp_return": 0.44623520970344543,
+    "school_cost": -0.575644314289093,
+    "wc_intercept": 0.33396533131599426,
+    "bc_intercept": 0.35357630252838135
+  },
+  "standard_errors": {
+    "school_return": 0.28909472157669736,
+    "wc_exp_return": 0.20212126143798692,
+    "bc_exp_return": 0.19026956167512776,
+    "school_cost": 0.28212733907369353,
+    "wc_intercept": 0.2274384411915626,
+    "bc_intercept": 0.1474626566089322
+  },
+  "log_likelihood": -6698.657347871142,
+  "elapsed_seconds": 43.5,
+  "n_obs": 5000,
+  "n_individuals": 500
+}
