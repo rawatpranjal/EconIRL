@@ -14,6 +14,8 @@ $$
 f_\phi(s,a,s') = g_\phi(s,a) + \beta \, h_\phi(s') - h_\phi(s), \qquad D_\phi = \frac{\exp(f_\phi)}{\exp(f_\phi) + \pi(a \mid s)}.
 $$
 
+At the optimum, $h_\phi(s) = V(s)$ (the soft value function defined above), so $f$ is the stochastic advantage $r(s,a) + \beta V(s') - V(s)$. The term $g_\phi(s,a)$ plays the role of the reward $r(s,a)$ and is the only piece that transfers across environments.
+
 ## Pseudocode
 
 ```
