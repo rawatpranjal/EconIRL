@@ -94,7 +94,12 @@ The function $\phi(x) = x - x^2/2$ corresponds to $\chi^2$ divergence. At the op
 
 \subsection{GLADIUS \citep{kang2025}}
 
-GLADIUS parameterizes both $Q(s,a)$ and $\hat{\mathbb{E}}[V(s') \mid s,a]$ with neural networks, trained jointly via logit NLL plus a Bellman consistency penalty on observed $(s,a,s')$ transitions. It extracts reward via the same inverse Bellman operator as IQ-Learn. The MLP architecture shares parameters across states, providing implicit regularization over tabular $Q$.
+GLADIUS parameterizes both $Q_\theta(s,a)$ and $\hat{E}_\theta[V(s') \mid s,a]$ with neural networks, trained jointly on observed $(s,a,s')$ transitions:
+\begin{equation}\label{eq:gladius}
+\mathcal{L}(\theta) = -\frac{1}{N}\sum_{i}\log\pi_\theta(a_i \mid s_i)
+  + \lambda\,\frac{1}{N}\sum_{i}\bigl(\hat{E}_\theta[V(s_i') \mid s_i,a_i] - V_\theta(s_i')\bigr)^{2},
+\end{equation}
+where $V_\theta(s') = \sigma\log\sum_{a'}\exp(Q_\theta(s',a')/\sigma)$. After training, reward is extracted via the same inverse Bellman operator as IQ-Learn: $\hat{r}(s,a) = Q_\theta(s,a) - \beta\,\hat{E}_\theta[V(s')\mid s,a]$. The MLP architecture shares parameters across states, providing implicit regularization over tabular $Q$.
 
 %% ======================================================================
 \section{Counterfactual Taxonomy}
@@ -134,6 +139,8 @@ LSW study sequential content consumption with three actions (buy, wait, exit) us
 We construct a tabular MDP that mimics the LSW book-reading environment. The state encodes episode position, content quality, and wait-time level, giving $15 \times 3 \times 4 = 180$ regular states plus one absorbing state. The three actions are buy, wait, and exit, with deterministic transitions and $\beta = 0.95$. The true reward is $r^*(s,\text{buy}) = u(c) - 2.0$, $r^*(s,\text{wait}) = u(c) - 0.08w$, and $r^*(s,\text{exit}) = 0$, where $u \in \{0.5, 1.5, 3.0\}$. Analyses A through C and E through F are evaluated at the population level with no estimation noise. Analysis D uses finite-sample estimation.
 
 \subsection{A. Reward recovery}
+
+Methods with anchors pin the value function offset and recover $r^*$ exactly. Reduced-form logit converges to the advantage $A^* = r^* + \beta PV^* - V^*$, which is a noisy proxy for the reward because $V^*$ adds large state-specific offsets.
 
 \begin{table}[H]
 \centering
