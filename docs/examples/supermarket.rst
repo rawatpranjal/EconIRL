@@ -23,7 +23,7 @@ Quick start
 Estimation
 ----------
 
-Three estimators are fit on 427 training products (80 percent split) over 26 usable periods (11,102 observations). Since there is no ground truth, we compare model fit rather than parameter recovery.
+Three estimators are fit on 427 training products (80 percent split) over 26 usable periods (11,102 observations). The model uses three features: a holding cost level proportional to inventory, a stockout indicator for low inventory without ordering, and a net promotion effect capturing the combined margin and cost impact of running a promotion.
 
 .. code-block:: python
 
@@ -43,29 +43,31 @@ Three estimators are fit on 427 training products (80 percent split) over 26 usa
    :header-rows: 1
 
    * - Parameter
+     - NFXP
+     - NFXP SE
      - CCP (K=20)
      - MCE-IRL
      - MCE-IRL SE
-   * - markup_benefit
-     - -0.1632
-     - 0.3014
-     - 0.0317
    * - holding_cost
-     - 0.8821
      - 0.8833
-     - 0.0853
+     - 0.0571
+     - 0.8948
+     - 0.8833
+     - 0.0923
    * - stockout_penalty
-     - -1.4536
      - -1.4487
-     - 0.1368
-   * - promotion_cost
-     - -0.7672
-     - -0.3014
-     - 0.0317
+     - 0.0726
+     - -1.4417
+     - -1.4487
+     - 0.1469
+   * - net_promotion_effect
+     - -0.6028
+     - 0.0258
+     - -0.6041
+     - -0.6029
+     - 0.0572
 
-The holding cost and stockout penalty are well identified and consistent across estimators. CCP estimates a holding cost of 0.88 and MCE-IRL estimates 0.88 with a standard error of 0.085, both significant at the 1 percent level. The stockout penalty is negative 1.45 for both, indicating that running out of stock is roughly 60 percent more costly per period than carrying excess inventory. NFXP is omitted from the table because its markup_benefit and promotion_cost estimates blew up (30.2 and 29.6 with standard errors above 5000), due to near-collinearity between those two features. The Hessian condition number for NFXP is 13.2 million, confirming weak identification along that direction.
-
-CCP and MCE-IRL disagree on the markup_benefit and promotion_cost decomposition. MCE-IRL estimates markup_benefit as 0.30 and promotion_cost as negative 0.30, exact mirror images that suggest the model can only identify their difference (the net margin effect of running a promotion) rather than their individual levels. CCP places the promotion cost at negative 0.77, absorbing some of the markup effect.
+All three parameters are well identified and consistent across estimators. The holding cost is 0.88, significant at the 1 percent level with a standard error of 0.057 under NFXP. The stockout penalty is negative 1.45, roughly 60 percent larger in magnitude than the holding cost. The net promotion effect is negative 0.60, indicating that promotions have a net negative effect on per-period utility after accounting for both the margin reduction and any demand boost. NFXP and MCE-IRL produce identical estimates, while CCP deviates slightly on holding cost (0.89 versus 0.88).
 
 Post-estimation diagnostics
 ---------------------------
@@ -75,26 +77,7 @@ Post-estimation diagnostics
    from econirl.inference import etable
    print(etable(nfxp_result, ccp_result, mce_result))
 
-.. code-block:: text
-
-   ==============================================================
-                       NFXP (Nested Fixed Point)    NPL (K=20)MCE IRL (Ziebart 2010)
-   ==============================================================
-         markup_benefit       30.1829    -0.1632***     0.3014***
-                          (5334.9326)      (0.0000)      (0.0317)
-           holding_cost     0.8832***     0.8821***     0.8833***
-                             (0.0568)      (0.0000)      (0.0853)
-       stockout_penalty    -1.4486***    -1.4536***    -1.4487***
-                             (0.0330)      (0.0000)      (0.1368)
-         promotion_cost       29.5801    -0.7672***    -0.3014***
-                          (5849.2427)      (0.0000)      (0.0317)
-   --------------------------------------------------------------
-           Observations        11,102        11,102        11,102
-         Log-Likelihood    -14,032.79    -14,032.91    -14,032.91
-                    AIC      28,073.6      28,073.8      28,073.8
-   ==============================================================
-
-All three estimators achieve identical log-likelihoods at negative 14,033 and identical Brier scores at 0.704, confirming that the parameter disagreement on markup_benefit and promotion_cost does not affect predictive fit. The model correctly predicts the retailer's joint decision 32.7 percent of the time against a random baseline of 25 percent for four actions.
+All three estimators achieve identical log-likelihoods at negative 14,033 and identical Brier scores at 0.704. The model correctly predicts the retailer's joint decision 32.7 percent of the time against a random baseline of 25 percent for four actions.
 
 Counterfactual analysis
 -----------------------
@@ -144,7 +127,7 @@ Running the example
 Retail IO interpretation
 ------------------------
 
-The Aguirregabiria (1999) model demonstrates how dynamic optimization generates pricing patterns that static models cannot explain. A retailer who appears to price erratically in a static cross-section is actually solving an intertemporal problem: running a promotion today depletes inventory, which raises the option value of regular pricing tomorrow. The estimated parameters reveal the tradeoff between immediate margin (markup benefit) and dynamic costs (inventory holding, stockout risk, promotion frequency). The stockout penalty of negative 1.45 is the dominant cost, roughly 60 percent larger in magnitude than the holding cost of 0.88. This asymmetry drives the retailer to over-order relative to what a myopic model would predict, because the forward-looking retailer internalizes the high cost of empty shelves.
+The Aguirregabiria (1999) model demonstrates how dynamic optimization generates pricing patterns that static models cannot explain. A retailer who appears to price erratically in a static cross-section is actually solving an intertemporal problem: running a promotion today depletes inventory, which raises the option value of regular pricing tomorrow. The stockout penalty of negative 1.45 is the dominant cost, roughly 60 percent larger in magnitude than the holding cost of 0.88. This asymmetry drives the retailer to over-order relative to what a myopic model would predict, because the forward-looking retailer internalizes the high cost of empty shelves. The net promotion effect of negative 0.60 means that promotions are costly on net, consistent with trade promotion literature showing that most retail promotions fail to generate positive incremental profit.
 
 Reference
 ---------

@@ -1,7 +1,7 @@
 Citibike Station Destination Choice
 =====================================
 
-This example applies inverse reinforcement learning to Citibike bikeshare trips in New York City. A rider starting at an origin station cluster during a time-of-day window chooses which destination cluster to ride to. The model recovers rider preferences over distance, destination popularity, and peak-hour effects from observed trip data.
+This example applies inverse reinforcement learning to real Citibike bikeshare trips from January 2024. A rider starting at an origin station cluster during a time-of-day window chooses which destination cluster to ride to. The model recovers rider preferences over distance, destination popularity, and peak-hour effects from 1.88 million observed trips.
 
 The environment has 80 states (20 station clusters from K-Means on geographic coordinates, crossed with 4 time-of-day buckets: night, morning, afternoon, evening). The action space is 20 destination clusters. Three features capture the choice structure: normalized distance between origin and destination centroids, destination cluster popularity measured as the fraction of all trips ending there, and a peak-hour indicator for morning and afternoon periods.
 
@@ -9,10 +9,12 @@ The environment has 80 states (20 station clusters from K-Means on geographic co
    :alt: NYC Citibike station clusters showing origin-destination flows across Manhattan and Brooklyn with time-of-day variation in trip patterns.
    :width: 100%
 
-If real Citibike data has not been downloaded, the loader generates synthetic trajectories from the environment with default parameters. To use real data, run the download script first.
-
 Quick start
 -----------
+
+.. code-block:: bash
+
+   python scripts/download_citibike.py --month 2024-01
 
 .. code-block:: python
 
@@ -22,16 +24,10 @@ Quick start
    env = CitibikeRouteEnvironment(discount_factor=0.95)
    panel = load_citibike_route(as_panel=True)
 
-To download real data first:
-
-.. code-block:: bash
-
-   python scripts/download_citibike.py --month 2024-01
-
 Estimation
 ----------
 
-Three estimators are fit on the route choice data. With 20 destination clusters the action space is large enough that MCE-IRL's occupancy measure computation becomes the binding constraint. The true parameters are a distance weight of negative 1.0, a popularity weight of 0.5, and a peak weight of 0.3.
+Three estimators are fit on 799 training riders (39,950 trip observations) from the January 2024 Citibike system data.
 
 .. code-block:: python
 
@@ -47,31 +43,33 @@ Three estimators are fit on the route choice data. With 20 destination clusters 
    ccp_result = CCPEstimator(num_policy_iterations=20, se_method="robust").estimate(panel, utility, env.problem_spec, transitions)
    mce_result = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=500)).estimate(panel, utility, env.problem_spec, transitions)
 
-.. list-table:: Parameter Recovery (800 riders, 50 periods)
+.. list-table:: Estimation Results (799 riders, 39,950 observations)
    :header-rows: 1
 
    * - Parameter
-     - True
      - NNES
      - CCP (K=20)
      - MCE-IRL
+     - MCE-IRL SE
    * - distance_weight
-     - -1.0000
-     - -0.9900
-     - -1.0350
-     - -1.0304
+     - -4.0550
+     - -4.0406
+     - -4.0339
+     - 0.0429
    * - popularity_weight
-     - 0.5000
-     - 0.0100
-     - 0.0165
-     - -0.0000
+     - -0.0199
+     - 0.7110
+     - 0.0000
+     - 0.0000
    * - peak_weight
-     - 0.3000
      - 0.0100
-     - 0.2262
-     - -0.0000
+     - -0.8636
+     - 0.0000
+     - 0.0003
 
-All three estimators recover the distance weight accurately. NNES estimates negative 0.99, CCP estimates negative 1.04, and MCE-IRL estimates negative 1.03, all within 4 percent of the true value of negative 1.0. The popularity weight and peak weight are poorly identified across all estimators. CCP comes closest on peak_weight at 0.23 versus the true 0.30, but no estimator recovers popularity_weight. This identification failure reflects the structure of the 20-action multinomial choice problem: distance varies strongly across destination clusters while popularity and peak effects are nearly uniform, leaving insufficient variation to pin down those parameters.
+All three estimators agree on the distance weight at approximately negative 4.0, and this parameter is statistically significant with a standard error of 0.043 under MCE-IRL. The distance weight is four times larger than the synthetic environment's default of negative 1.0, reflecting the strong preference of real NYC riders for short trips in January. CCP and MCE-IRL achieve nearly identical log-likelihoods (negative 104,325) while NNES is 700 units worse. Prediction accuracy is 60 percent against a random baseline of 5 percent for 20 destinations, indicating strong concentration of trips toward nearby clusters.
+
+The popularity and peak features remain poorly identified across all estimators. CCP finds a positive popularity weight (0.71) and a negative peak weight (negative 0.86), but MCE-IRL and NNES estimate both near zero. The fundamental identification issue is that distance dominates destination choice so strongly in real data that the remaining features have insufficient residual variation to pin down their effects.
 
 Post-estimation diagnostics
 ---------------------------
@@ -86,24 +84,22 @@ Post-estimation diagnostics
    ==============================================================
                        NNES-NFXP (Bellman residual)    NPL (K=20)MCE IRL (Ziebart 2010)
    ==============================================================
-        distance_weight       -0.9900    -1.0350***    -1.0304***
-                                (nan)      (0.0000)      (0.0201)
-      popularity_weight        0.0100     0.0165***       -0.0000
+        distance_weight       -4.0550    -4.0406***    -4.0339***
+                                (nan)      (0.0000)      (0.0429)
+      popularity_weight       -0.0199     0.7110***        0.0000
                                 (nan)      (0.0000)      (0.0000)
-            peak_weight        0.0100     0.2262***       -0.0000
-                                (nan)      (0.0000)      (0.0001)
+            peak_weight        0.0100    -0.8636***        0.0000
+                                (nan)      (0.0000)      (0.0003)
    --------------------------------------------------------------
-           Observations        40,000        40,000        40,000
-         Log-Likelihood   -124,968.77   -118,434.02   -118,433.97
-                    AIC     249,943.5     236,874.0     236,873.9
+           Observations        39,950        39,950        39,950
+         Log-Likelihood   -105,024.38   -104,324.82   -104,324.89
+                    AIC     210,054.8     208,655.6     208,655.8
    ==============================================================
-
-CCP and MCE-IRL achieve nearly identical log-likelihoods (negative 118,434), while NNES has a substantially worse fit at negative 124,969. The neural value approximation in NNES struggles with the large action space (20 destinations), underperforming the exact methods on this problem. Prediction accuracy is 7.5 percent for CCP and MCE-IRL against a random baseline of 5 percent, reflecting the inherent difficulty of predicting one out of 20 destinations.
 
 Counterfactual analysis
 -----------------------
 
-The infrastructure improvement experiment halves the distance disutility, simulating a scenario where protected bike lanes and e-bikes make longer trips less costly. This predicts how the destination distribution would shift if distance mattered half as much.
+The infrastructure improvement experiment halves the distance disutility, simulating a scenario where protected bike lanes and e-bikes make longer trips less costly.
 
 .. code-block:: python
 
@@ -111,7 +107,7 @@ The infrastructure improvement experiment halves the distance disutility, simula
    new_params = mce_result.parameters.at[0].set(mce_result.parameters[0] / 2)
    cf = counterfactual_policy(mce_result, new_params, utility, problem, transitions)
 
-Halving the distance disutility increases expected lifetime welfare by 4.03 utils.
+Halving the distance disutility increases expected lifetime welfare by 11.0 utils.
 
 .. list-table:: Distance Weight Elasticity
    :header-rows: 1
@@ -120,31 +116,32 @@ Halving the distance disutility increases expected lifetime welfare by 4.03 util
      - Welfare Change
      - Avg Policy Change
    * - -50%
-     - +4.025
-     - 0.005
+     - +10.966
+     - 0.016
    * - -25%
-     - +1.969
-     - 0.003
+     - +5.037
+     - 0.008
    * - +25%
-     - -1.888
-     - 0.003
+     - -4.268
+     - 0.007
    * - +50%
-     - -3.697
-     - 0.005
+     - -7.862
+     - 0.014
    * - +100%
-     - -7.096
-     - 0.010
+     - -13.357
+     - 0.025
 
-The welfare response is nearly linear and symmetric. Reducing the distance disutility by 50 percent gains 4.0 utils while increasing it by 50 percent costs 3.7 utils. The small average policy changes (0.3 to 1.0 percent) indicate that the destination distribution shifts gradually rather than discretely, consistent with a model where many riders already choose nearby destinations and only marginal trips switch clusters.
+The welfare response is nearly linear and mildly asymmetric. Reducing the distance disutility by 50 percent gains 11.0 utils while increasing it by 50 percent costs 7.9 utils. The small average policy changes (0.7 to 2.5 percent) indicate that most trips already go to nearby clusters, so reducing distance costs mainly benefits the marginal long-distance trips rather than restructuring the overall destination distribution.
 
 Running the example
 -------------------
 
 .. code-block:: bash
 
+   python scripts/download_citibike.py --month 2024-01
    python examples/citibike-route/run_estimation.py
 
 Transportation interpretation
 -----------------------------
 
-Route choice IRL recovers revealed preferences from observed travel behavior without requiring stated preference surveys. The distance weight is the dominant parameter, capturing the strong disutility of longer trips that drives most destination choice variation. The weak identification of popularity and peak features suggests that those dimensions do not vary enough across the 20 destination clusters to be separately identified from the constant term in this specification. A richer feature set with station-level amenity counts or transit connectivity scores might improve identification of non-distance factors.
+Route choice IRL recovers revealed preferences from observed travel behavior without requiring stated preference surveys. The distance weight of negative 4.0 is the dominant parameter, reflecting the strong aversion to long trips in winter conditions. This magnitude is consistent with the well-documented tendency of bikeshare riders to prefer trips under 15 minutes. The weak identification of popularity and peak features in real data suggests that those dimensions do not vary enough across the 20 destination clusters to be separately identified from distance, or that riders' actual choice sets are more constrained than the model assumes. A richer feature set with station-level amenity counts, elevation profiles, or transit connectivity scores might improve identification of non-distance factors.

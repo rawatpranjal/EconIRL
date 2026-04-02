@@ -101,8 +101,6 @@ def main():
         print(f"  {name}: {kl['kl_divergence']:.6f}")
 
     # Counterfactual: halve stockout penalty
-    # Use MCE-IRL as base since NFXP has identification issues on
-    # markup_benefit and promotion_cost (collinear features)
     print("\n" + "=" * 65)
     print("Counterfactual: Halve Stockout Penalty")
     print("=" * 65)

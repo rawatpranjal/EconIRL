@@ -29,48 +29,63 @@ ssl._create_default_https_context = ssl._create_unverified_context
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "processed"
 
-CITIBIKE_URL_TEMPLATE = (
-    "https://s3.amazonaws.com/tripdata/{month}-citibike-tripdata.csv.zip"
-)
-
-
 def download_raw(month: str, output_dir: Path) -> Path:
-    """Download raw Citibike CSV zip for a given month."""
+    """Download raw Citibike CSV zip for a given month.
+
+    Tries multiple URL formats since Citibike changed naming conventions:
+    - 2024+: 202401-citibike-tripdata.zip (no dash, no .csv)
+    - 2023: 202301-citibike-tripdata.csv.zip (no dash, with .csv)
+    - older: 2023-01-citibike-tripdata.csv.zip (with dash)
+    """
     raw_dir = output_dir / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    zip_path = raw_dir / f"{month}-citibike-tripdata.csv.zip"
+    # Normalize month: "2024-01" -> "202401"
+    month_compact = month.replace("-", "")
+
+    zip_path = raw_dir / f"{month_compact}-citibike-tripdata.zip"
     if zip_path.exists():
         print(f"  Raw file already exists: {zip_path}")
         return zip_path
 
-    url = CITIBIKE_URL_TEMPLATE.format(month=month)
-    print(f"  Downloading from {url}...")
-    try:
-        urllib.request.urlretrieve(url, zip_path)
-        size_mb = os.path.getsize(zip_path) / 1e6
-        print(f"  Downloaded {size_mb:.1f} MB")
-    except Exception as e:
-        print(f"  Failed: {e}")
-        print("  Trying alternative URL format...")
-        alt_url = f"https://s3.amazonaws.com/tripdata/JC-{month}-citibike-tripdata.csv.zip"
+    url_candidates = [
+        f"https://s3.amazonaws.com/tripdata/{month_compact}-citibike-tripdata.zip",
+        f"https://s3.amazonaws.com/tripdata/{month_compact}-citibike-tripdata.csv.zip",
+        f"https://s3.amazonaws.com/tripdata/{month}-citibike-tripdata.csv.zip",
+        f"https://s3.amazonaws.com/tripdata/JC-{month}-citibike-tripdata.csv.zip",
+    ]
+
+    for url in url_candidates:
+        print(f"  Trying {url}...")
         try:
-            urllib.request.urlretrieve(alt_url, zip_path)
+            urllib.request.urlretrieve(url, zip_path)
             size_mb = os.path.getsize(zip_path) / 1e6
             print(f"  Downloaded {size_mb:.1f} MB")
-        except Exception as e2:
-            raise RuntimeError(
-                f"Could not download Citibike data for {month}. "
-                f"Check https://s3.amazonaws.com/tripdata/index.html for available files."
-            ) from e2
+            return zip_path
+        except Exception:
+            continue
 
-    return zip_path
+    raise RuntimeError(
+        f"Could not download Citibike data for {month}. "
+        f"Check https://s3.amazonaws.com/tripdata/index.html for available files."
+    )
 
 
 def load_and_clean(zip_path: Path) -> pd.DataFrame:
     """Load and clean raw Citibike trip data."""
+    import zipfile
+
     print("  Loading CSV from ZIP...")
-    df = pd.read_csv(zip_path, low_memory=False)
+    with zipfile.ZipFile(zip_path) as zf:
+        csv_files = [f for f in zf.namelist() if f.endswith(".csv")]
+        if len(csv_files) == 1:
+            df = pd.read_csv(zf.open(csv_files[0]), low_memory=False)
+        else:
+            print(f"  Found {len(csv_files)} CSV files in ZIP, concatenating...")
+            df = pd.concat(
+                [pd.read_csv(zf.open(f), low_memory=False) for f in sorted(csv_files)],
+                ignore_index=True,
+            )
 
     # Standardize column names (format changed over time)
     col_map = {}
