@@ -1,0 +1,202 @@
+{
+  "metadata": {
+    "n_individuals": 250,
+    "n_periods": 80,
+    "num_states": 90,
+    "discount": 0.9999,
+    "operating_cost": 0.001,
+    "replacement_cost": 3.0,
+    "seed": 42
+  },
+  "nfxp_policy_mae": 0.005339077571658098,
+  "results": [
+    {
+      "config_name": "baseline (64x2, lr=1e-3, bs=512)",
+      "status": "ok",
+      "epochs": 171,
+      "policy_mae": 0.4948360930726709,
+      "policy_corr": 0.8431665494287822,
+      "param_mae": 1.5340472414046527,
+      "runtime_seconds": 52.18491315841675,
+      "kwargs": {
+        "q_hidden_dim": 64,
+        "q_num_layers": 2,
+        "ev_hidden_dim": 64,
+        "ev_num_layers": 2,
+        "lr": 0.001,
+        "max_epochs": 500,
+        "batch_size": 512,
+        "patience": 100
+      },
+      "params": {
+        "operating_cost": 0.007980100810527802,
+        "replacement_cost": -0.06111438199877739
+      }
+    },
+    {
+      "config_name": "bigger net (128x3)",
+      "status": "ok",
+      "epochs": 142,
+      "policy_mae": 0.5073931999848212,
+      "policy_corr": 0.9435739849270594,
+      "param_mae": 1.5191885257028044,
+      "runtime_seconds": 82.00885701179504,
+      "kwargs": {
+        "q_hidden_dim": 128,
+        "q_num_layers": 3,
+        "ev_hidden_dim": 128,
+        "ev_num_layers": 3,
+        "lr": 0.001,
+        "max_epochs": 500,
+        "batch_size": 512,
+        "patience": 100
+      },
+      "params": {
+        "operating_cost": 0.006829976104199886,
+        "replacement_cost": -0.03254707530140877
+      }
+    },
+    {
+      "config_name": "smaller lr (1e-4)",
+      "status": "ok",
+      "epochs": 309,
+      "policy_mae": 0.4527568955569611,
+      "policy_corr": 0.9927954915180912,
+      "param_mae": 1.5069175845365972,
+      "runtime_seconds": 96.30322790145874,
+      "kwargs": {
+        "q_hidden_dim": 64,
+        "q_num_layers": 2,
+        "ev_hidden_dim": 64,
+        "ev_num_layers": 2,
+        "lr": 0.0001,
+        "max_epochs": 1000,
+        "batch_size": 512,
+        "patience": 200
+      },
+      "params": {
+        "operating_cost": 0.002996563445776701,
+        "replacement_cost": -0.011838605627417564
+      }
+    },
+    {
+      "config_name": "bigger batch (2048)",
+      "status": "ok",
+      "epochs": 230,
+      "policy_mae": 0.4877073878521675,
+      "policy_corr": 0.818802332952946,
+      "param_mae": 1.5296667714957148,
+      "runtime_seconds": 37.929786920547485,
+      "kwargs": {
+        "q_hidden_dim": 64,
+        "q_num_layers": 2,
+        "ev_hidden_dim": 64,
+        "ev_num_layers": 2,
+        "lr": 0.001,
+        "max_epochs": 500,
+        "batch_size": 2048,
+        "patience": 100
+      },
+      "params": {
+        "operating_cost": 0.007077284622937441,
+        "replacement_cost": -0.053256258368492126
+      }
+    },
+    {
+      "config_name": "longer training (2000 epochs)",
+      "status": "ok",
+      "epochs": 402,
+      "policy_mae": 0.5036493804436378,
+      "policy_corr": 0.9170466077953399,
+      "param_mae": 1.4983340204581619,
+      "runtime_seconds": 149.13652396202087,
+      "kwargs": {
+        "q_hidden_dim": 64,
+        "q_num_layers": 2,
+        "ev_hidden_dim": 64,
+        "ev_num_layers": 2,
+        "lr": 0.001,
+        "max_epochs": 2000,
+        "batch_size": 512,
+        "patience": 300
+      },
+      "params": {
+        "operating_cost": 0.008633598685264587,
+        "replacement_cost": 0.010965557768940926
+      }
+    },
+    {
+      "config_name": "tikhonov annealing",
+      "status": "ok",
+      "epochs": 500,
+      "policy_mae": 0.4935880796062977,
+      "policy_corr": 0.9584213449588947,
+      "param_mae": 1.512055988971144,
+      "runtime_seconds": 194.15204310417175,
+      "kwargs": {
+        "q_hidden_dim": 64,
+        "q_num_layers": 2,
+        "ev_hidden_dim": 64,
+        "ev_num_layers": 2,
+        "lr": 0.001,
+        "max_epochs": 500,
+        "batch_size": 512,
+        "patience": 100,
+        "tikhonov_annealing": true,
+        "tikhonov_initial_weight": 100.0
+      },
+      "params": {
+        "operating_cost": 0.006066490896046162,
+        "replacement_cost": -0.01904548704624176
+      }
+    },
+    {
+      "config_name": "no alternating (joint)",
+      "status": "ok",
+      "epochs": 201,
+      "policy_mae": 0.5065139729173276,
+      "policy_corr": 0.9400562401907673,
+      "param_mae": 1.5323164575621486,
+      "runtime_seconds": 112.84058594703674,
+      "kwargs": {
+        "q_hidden_dim": 64,
+        "q_num_layers": 2,
+        "ev_hidden_dim": 64,
+        "ev_num_layers": 2,
+        "lr": 0.001,
+        "max_epochs": 500,
+        "batch_size": 512,
+        "patience": 100,
+        "alternating_updates": false
+      },
+      "params": {
+        "operating_cost": 0.007030786946415901,
+        "replacement_cost": -0.05860212817788124
+      }
+    },
+    {
+      "config_name": "high bellman weight (10)",
+      "status": "ok",
+      "epochs": 207,
+      "policy_mae": 0.5051652190853974,
+      "policy_corr": 0.8429237058132083,
+      "param_mae": 1.53569400318712,
+      "runtime_seconds": 60.43482708930969,
+      "kwargs": {
+        "q_hidden_dim": 64,
+        "q_num_layers": 2,
+        "ev_hidden_dim": 64,
+        "ev_num_layers": 2,
+        "lr": 0.001,
+        "max_epochs": 500,
+        "batch_size": 512,
+        "patience": 100,
+        "bellman_weight": 10.0
+      },
+      "params": {
+        "operating_cost": 0.008815055713057518,
+        "replacement_cost": -0.0635729506611824
+      }
+    }
+  ]
+}
