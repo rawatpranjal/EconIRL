@@ -16,5 +16,6 @@ estimators/mce_irl
 estimators/airl
 estimators/f_irl
 estimators/gladius
+estimators/iq_learn
 estimators/bc
 ```
