@@ -3,20 +3,20 @@
 | | |
 |---|---|
 | **Estimators** | NFXP (exact Bellman), NNES-NPL (neural V approximation) |
-| **Environment** | Multi-component bus, 2 components x 10 bins, beta 0.95 |
-| **Key finding** | NNES matches NFXP precision via the NPL zero-Jacobian property. |
+| **Environment** | Rust bus engine, 90 bins, beta 0.99 |
+| **Key finding** | NNES matches NFXP on log-likelihood and RC recovery. The small operating cost is harder for the neural approximation. |
 
 ## Background
 
-NFXP solves the Bellman equation exactly at each optimizer step, which gives it the best possible precision for tabular state spaces. NNES (Nguyen 2025) replaces the exact Bellman solve with a neural network that approximates the value function V(s). The key theoretical insight is that the NPL variant of NNES has a zero-Jacobian property: first-order errors in the V approximation drop out of the structural parameter score. This means NNES achieves the same asymptotic efficiency as NFXP despite using an approximate value function. The comparison here uses a multi-component bus environment where NFXP serves as the oracle benchmark.
+NFXP solves the Bellman equation exactly at each optimizer step, which gives it the best possible precision for tabular state spaces. NNES (Nguyen 2025) replaces the exact Bellman solve with a neural network that approximates the value function V(s). The key theoretical insight is that the NPL variant of NNES has a zero-Jacobian property: first-order errors in the V approximation drop out of the structural parameter score. This means NNES achieves the same asymptotic efficiency as NFXP despite using an approximate value function. The comparison here uses the standard Rust bus engine where NFXP serves as the oracle benchmark.
 
 ## Setup
 
-The environment has two independent bus components, each with 10 mileage bins, yielding 100 joint states. Each replication simulates 200 buses over 100 periods at a discount factor of 0.95. The NFXP estimator uses the hybrid inner solver with exact Bellman convergence. The NNES estimator uses a two-layer MLP with 32 hidden units, trained for 500 epochs per outer iteration with 3 outer NPL iterations.
+The environment uses 90 mileage bins and a discount factor of 0.99. Each replication simulates 200 buses over 100 periods. The NFXP estimator uses the hybrid inner solver with exact Bellman convergence. The NNES estimator uses a two-layer MLP with 32 hidden units, trained for 500 epochs per outer iteration with 3 outer NPL iterations.
 
 ## Code
 
-The full Monte Carlo script is at ``examples/rust-bus-engine/nnes_vs_nfxp_mc.py``. The core estimator setup is:
+The full Monte Carlo script is at ``examples/rust-bus-engine/nnes_vs_nfxp_mc.py``.
 
 ```python
 from econirl.estimation.nfxp import NFXPEstimator
@@ -33,15 +33,21 @@ nnes = NNESEstimator(
 
 ## Results
 
-Five Monte Carlo replications. Results will be populated after running the script.
+Five Monte Carlo replications with true parameters theta_c equal to 0.001 and RC equal to 3.0.
 
 | Metric | NFXP | NNES |
 |---|---|---|
-| Total RMSE | -- | -- |
-| Mean log-likelihood | -- | -- |
-| Mean wall time (seconds) | -- | -- |
-| Converged | -- | -- |
+| Bias (theta_c) | 0.0001 | 0.0061 |
+| Bias (RC) | 0.0003 | 0.0007 |
+| RMSE (theta_c) | 0.0004 | 0.6270 |
+| RMSE (RC) | 0.0629 | 0.0409 |
+| Mean log-likelihood | -4203.34 | -4203.29 |
+| Mean wall time (seconds) | 22.3 | 51.0 |
 
 ## Discussion
 
-NFXP has the structural advantage of solving the Bellman equation exactly, which guarantees the tightest possible likelihood surface. NNES trades this exactness for flexibility: the neural network can approximate V(s) in state spaces where tabular methods are infeasible. In the tabular setting used here, NNES should match NFXP on parameter recovery because the NPL target W is computed exactly via matrix inversion and the network simply learns to reproduce it. The comparison demonstrates that the neural approximation does not degrade estimation quality when the state space is moderate. For high-dimensional continuous state spaces where NFXP cannot operate, NNES becomes the only structural MLE option with valid standard errors.
+The log-likelihoods are nearly identical, confirming that both estimators find the same quality of fit. The replacement cost RC is recovered well by both methods, with NNES actually achieving lower RMSE (0.041 vs 0.063). The operating cost theta_c, however, shows much higher variance under NNES. This parameter is three orders of magnitude smaller than RC (0.001 vs 3.0), making it harder for the neural network to resolve the fine-grained mileage gradient in the value function.
+
+The difficulty is inherent to the tabular setting where NFXP already works perfectly. NFXP solves the Bellman equation to machine precision, so even tiny parameters are identified exactly through the likelihood curvature. The neural V approximation introduces noise that is small relative to RC but large relative to theta_c. The NPL zero-Jacobian property ensures that this noise does not bias the standard errors, but it does not eliminate the noise itself.
+
+The value of NNES emerges in continuous or high-dimensional state spaces where NFXP cannot operate because it requires enumerating all states. In those settings, the neural approximation is the only feasible path to structural MLE with valid inference. On tabular problems like this 90-state bus engine, NFXP remains the gold standard.

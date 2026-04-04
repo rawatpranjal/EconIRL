@@ -1,16 +1,16 @@
 """NNES vs NFXP Monte Carlo comparison.
 
-Runs 5 Monte Carlo replications on a multi-component bus environment.
-NFXP is the oracle (knows the tabular structure and solves the Bellman
-equation exactly). NNES learns V(s) via a neural network and achieves
-comparable precision through the NPL zero-Jacobian property.
+Runs 5 Monte Carlo replications on the Rust bus engine. NFXP is the
+oracle (solves the Bellman equation exactly). NNES learns V(s) via a
+neural network and achieves comparable precision through the NPL
+zero-Jacobian property (Nguyen 2025).
 """
 
 import time
 import numpy as np
 import json
 
-from econirl.environments.multi_component_bus import MultiComponentBusEnvironment
+from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.nnes import NNESEstimator, NNESConfig
 from econirl.preferences.linear import LinearUtility
@@ -19,15 +19,19 @@ from econirl.simulation.synthetic import simulate_panel
 N_REPS = 5
 N_INDIVIDUALS = 200
 N_PERIODS = 100
-DISCOUNT = 0.95
+TRUE_OC = 0.001
+TRUE_RC = 3.0
+DISCOUNT = 0.99
+N_BINS = 90
 SEED_BASE = 42
 
 
 def run_one_rep(rep_id: int):
     """Run one Monte Carlo replication."""
-    env = MultiComponentBusEnvironment(
-        K=2,
-        M=10,
+    env = RustBusEnvironment(
+        operating_cost=TRUE_OC,
+        replacement_cost=TRUE_RC,
+        num_mileage_bins=N_BINS,
         discount_factor=DISCOUNT,
         seed=SEED_BASE + rep_id,
     )
@@ -40,7 +44,7 @@ def run_one_rep(rep_id: int):
         seed=SEED_BASE + rep_id + 1000,
     )
 
-    true_params = np.array([p for p in env.true_parameters.values()])
+    true_params = np.array([TRUE_OC, TRUE_RC])
     results = {}
 
     # NFXP oracle (exact Bellman solve)
@@ -88,30 +92,27 @@ def run_one_rep(rep_id: int):
         "has_se": nnes_result.standard_errors is not None,
     }
 
-    return results, true_params
+    return results
 
 
 def main():
     all_results = []
-    true_params = None
+    true_params = np.array([TRUE_OC, TRUE_RC])
 
     for rep in range(N_REPS):
         print(f"--- Rep {rep + 1}/{N_REPS} ---")
-        res, tp = run_one_rep(rep)
+        res = run_one_rep(rep)
         all_results.append(res)
-        true_params = tp
         for name in ["NFXP", "NNES"]:
             p = np.array(res[name]["params"])
             print(f"  {name}: params={p}, LL={res[name]['ll']:.2f}, "
                   f"time={res[name]['time']:.1f}s")
 
-    n_params = len(true_params)
-    param_names = [f"p{i}" for i in range(n_params)]
+    param_names = ["theta_c", "RC"]
 
     print("\n" + "=" * 70)
     print(f"NNES vs NFXP: {N_REPS} Monte Carlo reps")
-    print(f"Environment: MultiComponentBus, 2 components x 10 bins = "
-          f"{10**2} states, beta={DISCOUNT}")
+    print(f"Environment: Rust bus, {N_BINS} bins, beta={DISCOUNT}")
     print(f"Data: {N_INDIVIDUALS} buses x {N_PERIODS} periods")
     print(f"True params: {true_params}")
     print("=" * 70)
