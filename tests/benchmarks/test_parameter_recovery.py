@@ -30,6 +30,7 @@ from econirl.estimation import (
     AIRLConfig,
 )
 from econirl.estimation.mpec import MPECEstimator, MPECConfig
+from econirl.estimation.nnes import NNESEstimator
 from econirl.preferences.linear import LinearUtility
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.simulation.synthetic import simulate_panel
@@ -121,6 +122,30 @@ def test_mpec_rust_bus():
     result = estimator.estimate(panel, utility, problem, transitions)
     rmse = _rmse(result.parameters, true_params)
     assert rmse < 0.2, f"MPEC Rust bus RMSE={rmse:.4f} exceeds tolerance 0.2"
+
+
+# ---------------------------------------------------------------------------
+# NNES on Rust bus
+# ---------------------------------------------------------------------------
+
+@pytest.mark.slow
+def test_nnes_rust_bus():
+    """NNES should recover Rust bus parameters with RMSE < 0.3."""
+    env = RustBusEnvironment(
+        operating_cost=0.001, replacement_cost=3.0, discount_factor=0.9999
+    )
+    panel, utility, problem, transitions, true_params = _simulate_and_prepare(env)
+
+    estimator = NNESEstimator(
+        hidden_dim=32,
+        v_epochs=500,
+        n_outer_iterations=3,
+        compute_se=False,
+        verbose=False,
+    )
+    result = estimator.estimate(panel, utility, problem, transitions)
+    rmse = _rmse(result.parameters, true_params)
+    assert rmse < 0.3, f"NNES Rust bus RMSE={rmse:.4f} exceeds tolerance 0.3"
 
 
 # ---------------------------------------------------------------------------
