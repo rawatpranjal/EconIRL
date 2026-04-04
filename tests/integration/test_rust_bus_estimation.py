@@ -20,7 +20,7 @@ from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.preferences.linear import LinearUtility
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.simulation.synthetic import simulate_panel
-from econirl.simulation.counterfactual import counterfactual_policy
+from econirl.simulation.counterfactual import counterfactual_policy, counterfactual_transitions
 from econirl.inference.identification import check_identification
 
 
@@ -312,6 +312,79 @@ class TestCounterfactual:
         cf_replace_prob = cf.counterfactual_policy[:, 1].mean()
 
         assert cf_replace_prob < baseline_replace_prob
+
+    def test_type2_faster_deterioration(self, rust_env_small, small_panel, utility_small,
+                                         problem_spec_small, transitions_small):
+        """Faster mileage deterioration changes replacement frequency."""
+        estimator = NFXPEstimator(verbose=False, outer_max_iter=50)
+        result = estimator.estimate(
+            small_panel, utility_small, problem_spec_small, transitions_small
+        )
+
+        # Shift keep-action transitions rightward by 1 state (faster deterioration)
+        baseline_trans = np.array(transitions_small)
+        new_trans = baseline_trans.copy()
+        n_states = problem_spec_small.num_states
+        for s in range(n_states - 1):
+            row = baseline_trans[0, s, :].copy()
+            new_trans[0, s, :] = 0.0
+            for sp in range(n_states):
+                new_sp = min(sp + 1, n_states - 1)
+                new_trans[0, s, new_sp] += row[sp]
+
+        cf = counterfactual_transitions(
+            result, new_trans, utility_small, problem_spec_small, transitions_small
+        )
+
+        # Faster deterioration lowers the continuation value after replacement
+        # (resetting to state 0 is less valuable when you deteriorate faster),
+        # so replacement probability decreases at most states and on average.
+        baseline_replace = float(cf.baseline_policy[:, 1].mean())
+        cf_replace = float(cf.counterfactual_policy[:, 1].mean())
+        assert cf_replace != baseline_replace, (
+            "Transition change should shift replacement probability"
+        )
+        assert cf_replace < baseline_replace, (
+            f"Faster deterioration should decrease average replacement, "
+            f"but baseline={baseline_replace:.4f}, counterfactual={cf_replace:.4f}"
+        )
+
+    @pytest.mark.slow
+    def test_ccp_nfxp_counterfactual_agreement(self):
+        """CCP and NFXP counterfactual policies should be similar."""
+        env = RustBusEnvironment(
+            operating_cost=0.01, replacement_cost=2.0,
+            num_mileage_bins=20, discount_factor=0.99, seed=42,
+        )
+        panel = simulate_panel(env, n_individuals=200, n_periods=50, seed=123)
+        utility = LinearUtility.from_environment(env)
+
+        from econirl.estimation.ccp import CCPEstimator
+
+        nfxp = NFXPEstimator(verbose=False, outer_max_iter=50)
+        nfxp_result = nfxp.estimate(panel, utility, env.problem_spec, env.transition_matrices)
+
+        ccp = CCPEstimator(num_policy_iterations=5, verbose=False)
+        ccp_result = ccp.estimate(panel, utility, env.problem_spec, env.transition_matrices)
+
+        # Type 3: double replacement cost for both
+        new_params_nfxp = jnp.array(nfxp_result.parameters).at[1].multiply(2)
+        new_params_ccp = jnp.array(ccp_result.parameters).at[1].multiply(2)
+
+        cf_nfxp = counterfactual_policy(
+            nfxp_result, new_params_nfxp, utility, env.problem_spec, env.transition_matrices
+        )
+        cf_ccp = counterfactual_policy(
+            ccp_result, new_params_ccp, utility, env.problem_spec, env.transition_matrices
+        )
+
+        # Counterfactual policies should agree within tolerance
+        np.testing.assert_allclose(
+            cf_nfxp.counterfactual_policy,
+            cf_ccp.counterfactual_policy,
+            atol=0.1,
+            err_msg="NFXP and CCP counterfactual policies diverge",
+        )
 
 
 class TestEndToEnd:
