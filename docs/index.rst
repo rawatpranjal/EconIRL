@@ -109,3 +109,4 @@ See :doc:`references` for the full list of papers.
    references
    loading_data
    counterfactuals
+   troubleshooting
