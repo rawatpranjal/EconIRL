@@ -114,7 +114,7 @@ def run_mpec():
     return est.estimate(panel, utility, env.problem_spec, env.transition_matrices)
 
 def run_nnes():
-    est = NNESEstimator(hidden_dim=32, v_epochs=200, n_outer_iterations=3, compute_se=False, verbose=True)
+    est = NNESEstimator(hidden_dim=64, v_epochs=1000, n_outer_iterations=5, compute_se=False, verbose=True)
     return est.estimate(panel, utility, env.problem_spec, env.transition_matrices)
 
 def run_sees():
@@ -137,16 +137,16 @@ def run_maxent_irl():
         jnp.ones(n_states, dtype=jnp.float64),
     ], axis=1)
     lr = LinearReward(state_features=state_features, parameter_names=["operating_cost", "replacement_cost"], n_actions=2)
-    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=100, compute_hessian=False, verbose=True)
+    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500, compute_hessian=False, verbose=True)
     return est.estimate(panel, lr, env.problem_spec, env.transition_matrices)
 
 def run_iq_learn():
-    config = IQLearnConfig(q_type="linear", divergence="chi2", optimizer="L-BFGS-B", max_iter=1000, verbose=True)
+    config = IQLearnConfig(q_type="tabular", divergence="simple", alpha=10.0, optimizer="L-BFGS-B", max_iter=2000, verbose=True)
     est = IQLearnEstimator(config=config)
     return est.estimate(panel, reward, env.problem_spec, env.transition_matrices)
 
 def run_gladius():
-    config = GLADIUSConfig(max_epochs=100, q_hidden_dim=64, v_hidden_dim=64, compute_se=False, verbose=True)
+    config = GLADIUSConfig(max_epochs=500, q_hidden_dim=128, v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4, patience=100, compute_se=False, verbose=True)
     est = GLADIUSEstimator(config=config)
     return est.estimate(panel, utility, env.problem_spec, env.transition_matrices)
 
@@ -156,12 +156,12 @@ def run_gail():
     return est.estimate(panel, utility, env.problem_spec, env.transition_matrices)
 
 def run_airl():
-    config = AIRLConfig(reward_type="tabular", max_rounds=10, compute_se=False, verbose=True)
+    config = AIRLConfig(reward_type="linear", reward_lr=0.001, discriminator_steps=10, max_rounds=100, compute_se=False, verbose=True)
     est = AIRLEstimator(config=config)
     return est.estimate(panel, utility, env.problem_spec, env.transition_matrices)
 
 def run_firl():
-    est = FIRLEstimator(f_divergence="kl", lr=0.05, max_iter=300, verbose=True)
+    est = FIRLEstimator(f_divergence="chi2", lr=0.5, max_iter=500, reward_clip=100.0, verbose=True)
     return est.estimate(panel, utility, env.problem_spec, env.transition_matrices)
 
 def run_bc():
@@ -182,10 +182,10 @@ def run_mceirl_neural():
         n_actions=n_actions,
         discount=0.99,
         reward_type="state_action",
-        reward_hidden_dim=32,
-        reward_num_layers=2,
-        max_epochs=100,
-        lr=1e-3,
+        reward_hidden_dim=128,
+        reward_num_layers=3,
+        max_epochs=300,
+        lr=5e-4,
         seed=42,
         verbose=True,
     )
@@ -212,13 +212,11 @@ estimators = [
     ("MaxEnt-IRL",    run_maxent_irl,    "irl"),
     ("IQ-Learn",      run_iq_learn,      "irl"),
     ("GLADIUS",       run_gladius,       "policy_only"),
-    ("GAIL",          run_gail,          "policy_only"),
     ("AIRL",          run_airl,          "policy_only"),
     ("f-IRL",         run_firl,          "policy_only"),
     ("BC",            run_bc,            "policy_only"),
-    ("DeepMaxEnt",    run_deep_maxent,   "policy_only"),
-    ("BayesianIRL",   run_bayesian_irl,  "irl"),
     ("MCE-IRL-NN",    run_mceirl_neural, "policy_only"),
+    # Skipped (too slow): GAIL (548s), DeepMaxEnt (409s), BayesianIRL (965s)
 ]
 
 
