@@ -43,7 +43,12 @@ class SEESConfig:
     Attributes:
         basis_type: Sieve basis type ("fourier" or "polynomial").
         basis_dim: Number of basis functions.
-        penalty_lambda: L2 penalty on basis coefficients alpha.
+        penalty_weight: Weight omega on the equilibrium penalty
+            (Luo and Sang 2024, equation 3). Penalizes the Bellman
+            equation violation ||V - T(V; theta)||^2. Higher values
+            enforce the Bellman constraint more strongly, pushing the
+            estimator toward MLE. The paper recommends increasing omega
+            until the confidence interval stabilizes.
         max_iter: Maximum L-BFGS-B iterations.
         tol: Gradient tolerance for convergence.
         compute_se: Whether to compute standard errors.
@@ -53,7 +58,7 @@ class SEESConfig:
 
     basis_type: str = "fourier"
     basis_dim: int = 8
-    penalty_lambda: float = 0.01
+    penalty_weight: float = 10.0
     max_iter: int = 500
     tol: float = 1e-6
     compute_se: bool = True
@@ -83,7 +88,7 @@ class SEESEstimator(BaseEstimator):
         self,
         basis_type: str = "fourier",
         basis_dim: int = 8,
-        penalty_lambda: float = 0.01,
+        penalty_weight: float = 10.0,
         max_iter: int = 500,
         tol: float = 1e-6,
         compute_se: bool = True,
@@ -94,7 +99,7 @@ class SEESEstimator(BaseEstimator):
         if config is not None:
             basis_type = config.basis_type
             basis_dim = config.basis_dim
-            penalty_lambda = config.penalty_lambda
+            penalty_weight = config.penalty_weight
             max_iter = config.max_iter
             tol = config.tol
             compute_se = config.compute_se
@@ -108,14 +113,14 @@ class SEESEstimator(BaseEstimator):
         )
         self._basis_type = basis_type
         self._basis_dim = basis_dim
-        self._penalty_lambda = penalty_lambda
+        self._penalty_weight = penalty_weight
         self._max_iter = max_iter
         self._tol = tol
         self._compute_se = compute_se
         self._config = SEESConfig(
             basis_type=basis_type,
             basis_dim=basis_dim,
-            penalty_lambda=penalty_lambda,
+            penalty_weight=penalty_weight,
             max_iter=max_iter,
             tol=tol,
             compute_se=compute_se,
@@ -177,83 +182,91 @@ class SEESEstimator(BaseEstimator):
         initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
-        """Run sieve estimation."""
+        """Run sieve estimation (Luo and Sang 2024, equation 4).
+
+        Jointly optimizes structural parameters theta and basis
+        coefficients alpha by maximizing the penalized criterion:
+
+            LL(theta, alpha) - omega * ||V(alpha) - T(V(alpha); theta)||^2
+
+        where T is the soft Bellman operator. The penalty enforces
+        the equilibrium condition V = T(V; theta).
+        """
         start_time = time.time()
 
         n_states = problem.num_states
         n_actions = problem.num_actions
         sigma = problem.scale_parameter
         beta = problem.discount_factor
+        omega = self._penalty_weight
 
-        feature_matrix = utility.feature_matrix  # (S, A, K)
+        feature_matrix = jnp.array(utility.feature_matrix, dtype=jnp.float64)
         n_theta = utility.num_parameters
         n_alpha = self._basis_dim
+
+        obs_states = panel.get_all_states()
+        obs_actions = panel.get_all_actions()
 
         # Build sieve basis
         basis = self._build_basis(n_states)  # (S, basis_dim)
 
         # Precompute E[Psi(s') | s, a] = transitions[a] @ basis
         # Shape: (n_actions, n_states, basis_dim)
-        expected_basis = jnp.zeros((n_actions, n_states, n_alpha))
-        for a in range(n_actions):
-            expected_basis = expected_basis.at[a].set(transitions[a] @ basis)
+        transitions_f64 = jnp.array(transitions, dtype=jnp.float64)
+        expected_basis = jnp.einsum("ast,tk->ask", transitions_f64, basis)
 
         if initial_params is None:
             initial_params = utility.get_initial_parameters()
 
         # Joint parameter vector: [theta, alpha]
-        initial_alpha = jnp.zeros(n_alpha)
-        x0 = jnp.concatenate([initial_params, initial_alpha])
+        initial_alpha = jnp.zeros(n_alpha, dtype=jnp.float64)
+        x0 = jnp.concatenate([
+            jnp.array(initial_params, dtype=jnp.float64), initial_alpha
+        ])
 
-        def log_likelihood(x: jnp.ndarray) -> float:
+        def penalized_ll(x: jnp.ndarray) -> jnp.ndarray:
             theta = x[:n_theta]
             alpha = x[n_theta:]
 
-            # V(s) ~ basis @ alpha
-            # Q(s,a) = u(s,a;theta) + beta * E[basis(s') . alpha | s, a]
+            # V(s) = basis(s) @ alpha
+            V_approx = basis @ alpha  # (S,)
+
+            # Q(s,a) = u(s,a;theta) + beta * E[Psi(s') @ alpha | s, a]
             flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta)
-
-            # Continuation: beta * transitions[a] @ (basis @ alpha)
-            continuation = jnp.zeros((n_states, n_actions))
-            for a in range(n_actions):
-                continuation = continuation.at[:, a].set(beta * (expected_basis[a] @ alpha))
-
+            # expected_basis shape: (A, S, K), alpha shape: (K,)
+            continuation = beta * jnp.einsum("ask,k->sa", expected_basis, alpha)
             q_vals = flow_u + continuation
+
+            # Log-likelihood
             log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
+            ll = log_probs[obs_states, obs_actions].sum()
 
-            all_states = panel.get_all_states()
-            all_actions = panel.get_all_actions()
-            ll = log_probs[all_states, all_actions].sum().item()
+            # Bellman penalty: ||V - T(V; theta)||^2
+            # T(V; theta) = sigma * logsumexp(Q / sigma)
+            TV = sigma * jax.scipy.special.logsumexp(q_vals / sigma, axis=1)
+            bellman_violation = jnp.sum((V_approx - TV) ** 2)
 
-            # L2 penalty on alpha
-            penalty = self._penalty_lambda * (alpha ** 2).sum().item()
-            return ll - penalty
+            return ll - omega * bellman_violation
 
-        self._ll_fn = log_likelihood
+        self._ll_fn = penalized_ll
+
+        # JAX autodiff gradient
+        _neg_penalized_ll = jax.jit(lambda x: -penalized_ll(x))
+        _grad_fn = jax.jit(jax.grad(_neg_penalized_ll))
 
         def objective(x_np):
-            x = jnp.array(x_np, dtype=jnp.float32)
-            return -log_likelihood(x)
+            return float(_neg_penalized_ll(jnp.array(x_np, dtype=jnp.float64)))
 
         def gradient(x_np):
-            eps = 1e-5
-            n = len(x_np)
-            grad = np.zeros(n)
-            for i in range(n):
-                x_plus = x_np.copy()
-                x_minus = x_np.copy()
-                x_plus[i] += eps
-                x_minus[i] -= eps
-                grad[i] = (objective(x_plus) - objective(x_minus)) / (2 * eps)
-            return grad
+            return np.asarray(_grad_fn(jnp.array(x_np, dtype=jnp.float64)))
 
-        # Bounds: theta bounds from utility, alpha unbounded
+        # Bounds: theta bounds from utility, alpha bounded loosely
         lower_theta, upper_theta = utility.get_parameter_bounds()
         lower = jnp.concatenate([lower_theta, jnp.full((n_alpha,), -50.0)])
         upper = jnp.concatenate([upper_theta, jnp.full((n_alpha,), 50.0)])
         bounds = list(zip(np.asarray(lower), np.asarray(upper)))
 
-        self._log(f"SEES: {n_theta} structural + {n_alpha} basis params")
+        self._log(f"SEES: {n_theta} structural + {n_alpha} basis params, omega={omega}")
 
         result = optimize.minimize(
             objective,
@@ -270,33 +283,38 @@ class SEESEstimator(BaseEstimator):
         x_opt = jnp.array(result.x, dtype=jnp.float32)
         theta_opt = x_opt[:n_theta]
         alpha_opt = x_opt[n_theta:]
-        ll_opt = -result.fun
 
         self._log(f"theta: {np.asarray(theta_opt)}")
         self._log(f"alpha: {np.asarray(alpha_opt)}")
 
-        # Compute final policy
-        flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta_opt)
-        continuation = jnp.zeros((n_states, n_actions))
-        for a in range(n_actions):
-            continuation = continuation.at[:, a].set(beta * (expected_basis[a] @ alpha_opt))
-
+        # Compute final policy and value function
+        flow_u = jnp.einsum("sak,k->sa", feature_matrix.astype(jnp.float32), theta_opt)
+        continuation = beta * jnp.einsum(
+            "ask,k->sa", expected_basis.astype(jnp.float32), alpha_opt
+        )
         q_vals = flow_u + continuation
         policy = jax.nn.softmax(q_vals / sigma, axis=1)
         V = sigma * jax.scipy.special.logsumexp(q_vals / sigma, axis=1)
 
-        # Hessian for theta SEs (marginal over alpha via Schur complement)
+        # Compute pure log-likelihood (without penalty) for reporting
+        log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
+        ll_opt = float(log_probs[obs_states, obs_actions].sum())
+
+        # Bellman violation at solution
+        bellman_viol = float(jnp.max(jnp.abs(basis.astype(jnp.float32) @ alpha_opt - V)))
+
+        # Hessian for theta SEs via Schur complement (Corollary 3.1)
+        # H = H_theta_theta - H'_beta_theta @ H_beta_beta^{-1} @ H_beta_theta
         hessian = None
         if self._compute_se:
             self._log("Computing Hessian for standard errors (Schur complement)")
 
-            # Full Hessian over [theta, alpha], then marginalize out alpha
-            # via the Schur complement: H_theta = H_tt - H_ta @ H_aa^{-1} @ H_at
-            # This correctly accounts for uncertainty from alpha estimation.
             def full_ll_fn(x):
-                return jnp.array(log_likelihood(x))
+                return penalized_ll(x)
 
-            full_hessian = compute_numerical_hessian(x_opt, full_ll_fn)
+            full_hessian = compute_numerical_hessian(
+                jnp.array(x_opt, dtype=jnp.float64), full_ll_fn
+            )
 
             H_tt = full_hessian[:n_theta, :n_theta]
             H_ta = full_hessian[:n_theta, n_theta:]
@@ -304,7 +322,6 @@ class SEESEstimator(BaseEstimator):
             H_aa = full_hessian[n_theta:, n_theta:]
 
             try:
-                # Schur complement: H_theta = H_tt - H_ta @ H_aa^{-1} @ H_at
                 hessian = H_tt - H_ta @ jnp.linalg.solve(H_aa, H_at)
             except RuntimeError:
                 self._log("WARNING: H_aa singular, falling back to H_tt block")
@@ -328,5 +345,7 @@ class SEESEstimator(BaseEstimator):
                 "basis_type": self._basis_type,
                 "basis_dim": self._basis_dim,
                 "basis_matrix": basis,
+                "bellman_violation": bellman_viol,
+                "penalty_weight": omega,
             },
         )

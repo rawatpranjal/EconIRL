@@ -43,39 +43,44 @@ class MPECConfig:
     """Configuration for the MPEC estimator.
 
     Attributes:
-        rho_initial: Initial augmented Lagrangian penalty weight
-        rho_max: Maximum penalty weight
-        rho_growth: Factor by which rho increases each outer iteration
-        outer_max_iter: Maximum augmented Lagrangian outer iterations
-        inner_max_iter: Maximum L-BFGS-B iterations per AL step
-        constraint_tol: Tolerance for Bellman constraint violation
-        inner_tol: Convergence tolerance for inner L-BFGS-B
+        solver: Optimization method. "slsqp" handles equality constraints
+            natively via scipy SLSQP (recommended, matches Su-Judd and ruspy).
+            "augmented_lagrangian" converts to unconstrained L-BFGS-B subproblems.
+        max_iter: Maximum optimizer iterations (SLSQP) or inner iterations (AL).
+        tol: Convergence tolerance for the optimizer.
+        constraint_tol: Tolerance for Bellman constraint violation.
+        rho_initial: Initial AL penalty weight (AL solver only).
+        rho_max: Maximum AL penalty weight (AL solver only).
+        rho_growth: Factor by which rho increases each AL outer iteration.
+        outer_max_iter: Maximum AL outer iterations (AL solver only).
     """
 
+    solver: str = "slsqp"
+    max_iter: int = 500
+    tol: float = 1e-10
+    constraint_tol: float = 1e-8
     rho_initial: float = 1.0
     rho_max: float = 1e6
     rho_growth: float = 10.0
     outer_max_iter: int = 50
-    inner_max_iter: int = 500
-    constraint_tol: float = 1e-8
-    inner_tol: float = 1e-10
 
 
 class MPECEstimator(BaseEstimator):
     """MPEC estimator for dynamic discrete choice models.
 
     Avoids nested fixed-point solving by treating V as decision variables
-    alongside theta. Uses augmented Lagrangian to enforce the Bellman
-    equilibrium constraint V = T(V; theta).
+    alongside theta (Su and Judd 2012). Two solver backends are available.
 
-    The augmented Lagrangian objective is:
+    SLSQP (default, recommended): Handles the Bellman equality constraint
+    natively via sequential quadratic programming, matching the approach
+    in ruspy and the spirit of the original paper. No penalty tuning needed.
 
-        L_rho(theta, V, lambda) = -LL(theta, V)
-                                  + lambda^T [V - T(V; theta)]
-                                  + (rho/2) ||V - T(V; theta)||^2
+    Augmented Lagrangian (fallback): Converts the constrained problem into
+    a sequence of unconstrained L-BFGS-B subproblems with increasing
+    penalty on the Bellman constraint violation.
 
-    Each outer iteration minimizes L_rho over (theta, V) jointly via
-    L-BFGS-B, then updates the Lagrange multipliers and penalty weight.
+    Both solvers recover the same MLE and produce identical standard errors
+    at convergence because the Bellman constraint is satisfied exactly.
 
     Example:
         >>> estimator = MPECEstimator(verbose=True)
@@ -118,9 +123,24 @@ class MPECEstimator(BaseEstimator):
         initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
-        """Run MPEC optimization via augmented Lagrangian."""
-        start_time = time.time()
+        """Run MPEC optimization."""
         cfg = self._config
+        if cfg.solver == "slsqp":
+            return self._optimize_slsqp(panel, utility, problem, transitions, initial_params)
+        elif cfg.solver == "augmented_lagrangian":
+            return self._optimize_al(panel, utility, problem, transitions, initial_params)
+        else:
+            raise ValueError(f"Unknown MPEC solver: {cfg.solver!r}. Use 'slsqp' or 'augmented_lagrangian'.")
+
+    def _setup_common(
+        self,
+        panel: Panel,
+        utility: UtilityFunction,
+        problem: DDCProblem,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None,
+    ):
+        """Shared initialization for both solvers."""
         beta = problem.discount_factor
         sigma = problem.scale_parameter
 
@@ -131,7 +151,6 @@ class MPECEstimator(BaseEstimator):
         n_params = utility.num_parameters
         n_states = problem.num_states
 
-        # Initialize theta
         if initial_params is None:
             initial_params = utility.get_initial_parameters()
             if bool(jnp.all(initial_params == 0)):
@@ -148,24 +167,184 @@ class MPECEstimator(BaseEstimator):
         )
         V = jnp.array(init_result.V, dtype=jnp.float64)
 
-        # Augmented Lagrangian multipliers
-        lam = jnp.zeros(n_states, dtype=jnp.float64)
-        rho = cfg.rho_initial
+        # Bounds for theta
+        lower, upper = utility.get_parameter_bounds()
+        if lower is not None:
+            theta_bounds = list(zip(np.asarray(lower), np.asarray(upper)))
+        else:
+            theta_bounds = [(None, None)] * n_params
+        V_bounds = [(None, None)] * n_states
+        bounds = theta_bounds + V_bounds
 
-        # Build JAX functions for the augmented Lagrangian
-        def bellman_constraint(theta_V):
-            """Compute V - T(V; theta), should be zero at equilibrium."""
+        return (beta, sigma, transitions_f64, features, obs_states, obs_actions,
+                n_params, n_states, theta, V, operator, bounds)
+
+    def _optimize_slsqp(
+        self,
+        panel: Panel,
+        utility: UtilityFunction,
+        problem: DDCProblem,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
+    ) -> EstimationResult:
+        """SLSQP solver with native equality constraints (recommended).
+
+        Handles the Bellman constraint V = T(V; theta) directly within the
+        optimizer, matching the approach in ruspy and the spirit of Su and
+        Judd (2012). No augmented Lagrangian penalty tuning required.
+        """
+        start_time = time.time()
+        cfg = self._config
+        (beta, sigma, transitions_f64, features, obs_states, obs_actions,
+         n_params, n_states, theta, V, operator, bounds) = self._setup_common(
+            panel, utility, problem, transitions, initial_params)
+
+        n_evals = 0
+
+        # JIT-compiled JAX functions
+        @jax.jit
+        def _bellman_constraint(theta_V):
             th = theta_V[:n_params]
             v = theta_V[n_params:]
             u = jnp.einsum("sak,k->sa", features, th)
-            # Compute T(V; theta) = sigma * logsumexp(Q/sigma)
+            EV = jnp.einsum("ast,t->as", transitions_f64, v)
+            Q = u + beta * EV.T
+            TV = sigma * jax.scipy.special.logsumexp(Q / sigma, axis=1)
+            return v - TV
+
+        @jax.jit
+        def _neg_log_likelihood(theta_V):
+            th = theta_V[:n_params]
+            v = theta_V[n_params:]
+            u = jnp.einsum("sak,k->sa", features, th)
+            EV = jnp.einsum("ast,t->as", transitions_f64, v)
+            Q = u + beta * EV.T
+            log_probs = jax.nn.log_softmax(Q / sigma, axis=1)
+            return -log_probs[obs_states, obs_actions].sum()
+
+        _nll_grad = jax.jit(jax.grad(_neg_log_likelihood))
+        _constraint_jac = jax.jit(jax.jacobian(_bellman_constraint))
+
+        def obj_scipy(x):
+            nonlocal n_evals
+            n_evals += 1
+            return float(_neg_log_likelihood(jnp.array(x, dtype=jnp.float64)))
+
+        def grad_scipy(x):
+            return np.asarray(_nll_grad(jnp.array(x, dtype=jnp.float64)))
+
+        def constraint_fn(x):
+            return np.asarray(_bellman_constraint(jnp.array(x, dtype=jnp.float64)))
+
+        def constraint_jac_fn(x):
+            return np.asarray(_constraint_jac(jnp.array(x, dtype=jnp.float64)))
+
+        x0 = np.concatenate([np.asarray(theta), np.asarray(V)])
+
+        self._log("Starting MPEC with SLSQP solver")
+
+        result = optimize.minimize(
+            obj_scipy, x0,
+            method="SLSQP",
+            jac=grad_scipy,
+            bounds=bounds,
+            constraints={
+                "type": "eq",
+                "fun": constraint_fn,
+                "jac": constraint_jac_fn,
+            },
+            options={
+                "maxiter": cfg.max_iter,
+                "ftol": cfg.tol,
+            },
+        )
+
+        theta = jnp.array(result.x[:n_params], dtype=jnp.float64)
+        V = jnp.array(result.x[n_params:], dtype=jnp.float64)
+
+        c = _bellman_constraint(jnp.array(result.x, dtype=jnp.float64))
+        violation = float(jnp.abs(c).max())
+        converged = violation < cfg.constraint_tol and result.success
+
+        # Compute final policy and log-likelihood
+        final_utility = jnp.einsum("sak,k->sa", features, theta)
+        EV_final = jnp.einsum("ast,t->as", transitions_f64, V)
+        Q_final = final_utility + beta * EV_final.T
+        final_policy = jax.nn.softmax(Q_final / sigma, axis=1)
+        log_probs_final = jax.nn.log_softmax(Q_final / sigma, axis=1)
+        final_ll = float(log_probs_final[obs_states, obs_actions].sum())
+
+        self._log(
+            f"SLSQP finished: LL = {final_ll:.4f}, "
+            f"|constraint| = {violation:.2e}, converged = {converged}"
+        )
+
+        # Standard errors via analytical score
+        hessian = None
+        gradient_contributions = None
+        final_params = jnp.array(theta, dtype=jnp.float32)
+
+        if self._compute_hessian:
+            self._log("Computing standard errors via analytical score")
+            scores = _compute_mpec_score(
+                final_params, panel, features, operator,
+                V, final_policy, beta, sigma,
+            )
+            gradient_contributions = scores
+            hessian = -(scores.T @ scores)
+
+        elapsed = time.time() - start_time
+
+        return EstimationResult(
+            parameters=final_params,
+            log_likelihood=final_ll,
+            value_function=jnp.array(V, dtype=jnp.float32),
+            policy=jnp.array(final_policy, dtype=jnp.float32),
+            hessian=hessian,
+            gradient_contributions=gradient_contributions,
+            converged=converged,
+            num_iterations=result.nit,
+            num_function_evals=n_evals,
+            message="converged" if converged else result.message,
+            optimization_time=elapsed,
+            metadata={
+                "method": "slsqp",
+                "final_constraint_violation": violation,
+            },
+        )
+
+    def _optimize_al(
+        self,
+        panel: Panel,
+        utility: UtilityFunction,
+        problem: DDCProblem,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
+    ) -> EstimationResult:
+        """Augmented Lagrangian solver (fallback).
+
+        Converts the constrained problem into a sequence of unconstrained
+        L-BFGS-B subproblems with increasing penalty on constraint violation.
+        """
+        start_time = time.time()
+        cfg = self._config
+        (beta, sigma, transitions_f64, features, obs_states, obs_actions,
+         n_params, n_states, theta, V, operator, bounds) = self._setup_common(
+            panel, utility, problem, transitions, initial_params)
+
+        lam = jnp.zeros(n_states, dtype=jnp.float64)
+        rho = cfg.rho_initial
+
+        def bellman_constraint(theta_V):
+            th = theta_V[:n_params]
+            v = theta_V[n_params:]
+            u = jnp.einsum("sak,k->sa", features, th)
             EV = jnp.einsum("ast,t->as", transitions_f64, v)
             Q = u + beta * EV.T
             TV = sigma * jax.scipy.special.logsumexp(Q / sigma, axis=1)
             return v - TV
 
         def neg_log_likelihood(theta_V):
-            """Negative log-likelihood given theta and V directly."""
             th = theta_V[:n_params]
             v = theta_V[n_params:]
             u = jnp.einsum("sak,k->sa", features, th)
@@ -175,25 +354,21 @@ class MPECEstimator(BaseEstimator):
             return -log_probs[obs_states, obs_actions].sum()
 
         def augmented_lagrangian(theta_V, lam_val, rho_val):
-            """Augmented Lagrangian objective."""
             c = bellman_constraint(theta_V)
             nll = neg_log_likelihood(theta_V)
             return nll + jnp.dot(lam_val, c) + (rho_val / 2.0) * jnp.dot(c, c)
 
-        # JIT-compile gradient of the augmented Lagrangian
         al_grad_fn = jax.jit(jax.grad(augmented_lagrangian))
 
         converged = False
         n_inner_total = 0
         n_evals = 0
+        violation = float("inf")
 
         self._log("Starting MPEC augmented Lagrangian optimization")
 
         for outer_iter in range(cfg.outer_max_iter):
-            # Pack decision variables
             x0 = np.concatenate([np.asarray(theta), np.asarray(V)])
-
-            # Current lambda and rho as JAX arrays
             lam_jax = jnp.array(lam, dtype=jnp.float64)
             rho_jax = jnp.float64(rho)
 
@@ -208,37 +383,25 @@ class MPECEstimator(BaseEstimator):
                 g = al_grad_fn(jnp.array(x, dtype=jnp.float64), lam_jax, rho_jax)
                 return np.asarray(g)
 
-            # Set bounds: theta unbounded (or from utility), V unbounded
-            lower, upper = utility.get_parameter_bounds()
-            if lower is not None:
-                theta_bounds = list(zip(np.asarray(lower), np.asarray(upper)))
-            else:
-                theta_bounds = [(None, None)] * n_params
-            V_bounds = [(None, None)] * n_states
-            bounds = theta_bounds + V_bounds
-
             result = optimize.minimize(
                 obj_scipy, x0,
                 method="L-BFGS-B",
                 jac=grad_scipy,
                 bounds=bounds,
                 options={
-                    "maxiter": cfg.inner_max_iter,
-                    "ftol": cfg.inner_tol,
-                    "gtol": cfg.inner_tol,
+                    "maxiter": cfg.max_iter,
+                    "ftol": cfg.tol,
+                    "gtol": cfg.tol,
                 },
             )
             n_inner_total += result.nit
 
-            # Unpack solution
             theta = jnp.array(result.x[:n_params], dtype=jnp.float64)
             V = jnp.array(result.x[n_params:], dtype=jnp.float64)
 
-            # Check constraint violation
             c = bellman_constraint(jnp.array(result.x, dtype=jnp.float64))
             violation = float(jnp.abs(c).max())
 
-            # Log-likelihood at current solution
             u_current = jnp.einsum("sak,k->sa", features, theta)
             EV = jnp.einsum("ast,t->as", transitions_f64, V)
             Q = u_current + beta * EV.T
@@ -258,13 +421,9 @@ class MPECEstimator(BaseEstimator):
                 )
                 break
 
-            # Update multipliers
             lam = lam + rho * c
-
-            # Increase penalty
             rho = min(rho * cfg.rho_growth, cfg.rho_max)
 
-        # Compute final policy from converged (theta, V)
         final_utility = jnp.einsum("sak,k->sa", features, theta)
         EV_final = jnp.einsum("ast,t->as", transitions_f64, V)
         Q_final = final_utility + beta * EV_final.T
@@ -272,8 +431,6 @@ class MPECEstimator(BaseEstimator):
         log_probs_final = jax.nn.log_softmax(Q_final / sigma, axis=1)
         final_ll = float(log_probs_final[obs_states, obs_actions].sum())
 
-        # Standard errors via analytical score (same formula as NFXP since
-        # V satisfies the Bellman equation at convergence)
         hessian = None
         gradient_contributions = None
         final_params = jnp.array(theta, dtype=jnp.float32)

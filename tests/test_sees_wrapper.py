@@ -79,7 +79,7 @@ def fitted_model_fast(bus_df_fast):
         discount=_DISCOUNT_FAST,
         basis_type="fourier",
         basis_dim=4,
-        penalty_lambda=0.01,
+        penalty_weight=10.0,
         max_iter=100,
         verbose=False,
     )

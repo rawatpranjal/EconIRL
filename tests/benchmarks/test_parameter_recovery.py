@@ -116,8 +116,8 @@ def test_mpec_rust_bus():
     panel, utility, problem, transitions, true_params = _simulate_and_prepare(env)
 
     config = MPECConfig(
-        outer_max_iter=50,
-        inner_max_iter=500,
+        solver="slsqp",
+        max_iter=500,
         constraint_tol=1e-8,
     )
     estimator = MPECEstimator(config=config, compute_hessian=False, verbose=False)
@@ -165,7 +165,7 @@ def test_sees_rust_bus():
     estimator = SEESEstimator(
         basis_type="fourier",
         basis_dim=8,
-        penalty_lambda=0.01,
+        penalty_weight=10.0,
         compute_se=False,
         verbose=False,
     )

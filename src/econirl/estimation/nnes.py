@@ -484,27 +484,23 @@ class NNESNFXPEstimator(BaseEstimator):
             all_states_data = panel.get_all_states()
             all_actions_data = panel.get_all_actions()
 
-            def log_likelihood(params: jnp.ndarray) -> float:
+            def _neg_ll_jax(params):
                 flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
                 q_vals = flow_u + beta * _ev_sa
                 log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
-                return float(log_probs[all_states_data, all_actions_data].sum())
+                return -log_probs[all_states_data, all_actions_data].sum()
+
+            _neg_ll_jit = jax.jit(_neg_ll_jax)
+            _neg_ll_grad = jax.jit(jax.grad(_neg_ll_jax))
+
+            def log_likelihood(params: jnp.ndarray) -> float:
+                return -float(_neg_ll_jit(params))
 
             def objective(params_np):
-                params = jnp.array(params_np, dtype=jnp.float32)
-                return -log_likelihood(params)
+                return float(_neg_ll_jit(jnp.array(params_np, dtype=jnp.float32)))
 
             def gradient(params_np):
-                eps = 1e-5
-                n = len(params_np)
-                grad = np.zeros(n)
-                for i in range(n):
-                    p_plus = params_np.copy()
-                    p_minus = params_np.copy()
-                    p_plus[i] += eps
-                    p_minus[i] -= eps
-                    grad[i] = (objective(p_plus) - objective(p_minus)) / (2 * eps)
-                return grad
+                return np.asarray(_neg_ll_grad(jnp.array(params_np, dtype=jnp.float32)))
 
             last_result = optimize.minimize(
                 objective,
@@ -977,27 +973,23 @@ class NNESEstimator(BaseEstimator):
             all_states_data = panel.get_all_states()
             all_actions_data = panel.get_all_actions()
 
-            def log_likelihood(params: jnp.ndarray) -> float:
+            def _neg_ll_npl(params):
                 flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
                 q_vals = flow_u + beta * _ev_sa
                 log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
-                return float(log_probs[all_states_data, all_actions_data].sum())
+                return -log_probs[all_states_data, all_actions_data].sum()
+
+            _neg_ll_npl_jit = jax.jit(_neg_ll_npl)
+            _neg_ll_npl_grad = jax.jit(jax.grad(_neg_ll_npl))
+
+            def log_likelihood(params: jnp.ndarray) -> float:
+                return -float(_neg_ll_npl_jit(params))
 
             def objective(params_np):
-                params = jnp.array(params_np, dtype=jnp.float32)
-                return -log_likelihood(params)
+                return float(_neg_ll_npl_jit(jnp.array(params_np, dtype=jnp.float32)))
 
             def gradient(params_np):
-                eps = 1e-5
-                n = len(params_np)
-                grad = np.zeros(n)
-                for i in range(n):
-                    p_plus = params_np.copy()
-                    p_minus = params_np.copy()
-                    p_plus[i] += eps
-                    p_minus[i] -= eps
-                    grad[i] = (objective(p_plus) - objective(p_minus)) / (2 * eps)
-                return grad
+                return np.asarray(_neg_ll_npl_grad(jnp.array(params_np, dtype=jnp.float32)))
 
             last_result = optimize.minimize(
                 objective,
@@ -1070,5 +1062,5 @@ class NNESEstimator(BaseEstimator):
             },
         )
 
-# Backward compatibility alias
-NNESEstimator = NNESNFXPEstimator
+# Backward compatibility alias for the old Bellman-residual variant
+NNESBellmanEstimator = NNESNFXPEstimator

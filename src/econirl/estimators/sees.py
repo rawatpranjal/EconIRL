@@ -69,8 +69,8 @@ class SEES:
         Sieve basis type. Options: "fourier", "polynomial".
     basis_dim : int, default=8
         Number of basis functions for the value function approximation.
-    penalty_lambda : float, default=0.01
-        L2 penalty on basis coefficients alpha.
+    penalty_weight : float, default=0.01
+        Weight on the Bellman equilibrium penalty (Luo and Sang 2024).
     max_iter : int, default=500
         Maximum L-BFGS-B iterations.
     verbose : bool, default=False
@@ -114,7 +114,7 @@ class SEES:
         se_method: Literal["robust", "asymptotic"] = "asymptotic",
         basis_type: str = "fourier",
         basis_dim: int = 8,
-        penalty_lambda: float = 0.01,
+        penalty_weight: float = 0.01,
         max_iter: int = 500,
         verbose: bool = False,
     ):
@@ -125,7 +125,7 @@ class SEES:
         self.se_method = se_method
         self.basis_type = basis_type
         self.basis_dim = basis_dim
-        self.penalty_lambda = penalty_lambda
+        self.penalty_weight = penalty_weight
         self.max_iter = max_iter
         self.verbose = verbose
 
@@ -244,7 +244,7 @@ class SEES:
         config = SEESConfig(
             basis_type=self.basis_type,
             basis_dim=self.basis_dim,
-            penalty_lambda=self.penalty_lambda,
+            penalty_weight=self.penalty_weight,
             max_iter=self.max_iter,
             compute_se=True,
             se_method=self.se_method,

@@ -365,7 +365,7 @@ def get_default_estimator_specs() -> list[EstimatorSpec]:
             kwargs=dict(
                 basis_type="fourier",
                 basis_dim=8,
-                penalty_lambda=0.01,
+                penalty_weight=10.0,
                 compute_se=False,
             ),
             name="SEES",
@@ -710,7 +710,7 @@ def get_scaling_estimator_specs(n_states: int) -> list[EstimatorSpec]:
             kwargs=dict(
                 basis_type="fourier",
                 basis_dim=min(16, max(8, n_states // 5)),
-                penalty_lambda=0.01,
+                penalty_weight=10.0,
                 compute_se=False,
             ),
             name="SEES",

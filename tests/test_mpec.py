@@ -171,6 +171,7 @@ class TestMPECConfig:
     def test_custom_config(self, small_bus_setup):
         env, panel, utility = small_bus_setup
         config = MPECConfig(
+            solver="augmented_lagrangian",
             rho_initial=10.0,
             rho_growth=5.0,
             outer_max_iter=20,

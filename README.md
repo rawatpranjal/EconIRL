@@ -91,8 +91,8 @@ Assume the econometrician knows the model and recover flow utility parameters by
 |-----------|-------|--------|
 | NFXP      | [Rust (1987)](https://doi.org/10.2307/1911259) | Full-solution MLE via nested fixed point |
 | CCP       | [Hotz & Miller (1993)](https://doi.org/10.2307/2298122) | Two-step conditional choice probability with NPL iterations |
-| SEES      | [Luo & Sang (2024)](https://arxiv.org/abs/2404.12843) | Sieve basis V(s) approximation + penalized joint MLE |
-| NNES      | [Nguyen (2025)](https://arxiv.org/abs/2501.14375) | Neural V(s) network (Bellman residual) + structural MLE |
+| SEES      | [Luo & Sang (2024)](https://arxiv.org/abs/2204.13488) | Sieve basis V(s) approximation + penalized joint MLE |
+| NNES      | [Nguyen (2025)](https://huuhoang2211.github.io/hoangnguyen.com/NNES_DDC_JMP_20251005.pdf) | Neural V(s) network (NPL Bellman) + structural MLE |
 
 ### Entropy-Based IRL
 
