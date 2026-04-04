@@ -540,6 +540,7 @@ class CCPEstimator(BaseEstimator):
                 desc="CCP",
                 value_and_grad=True,
                 param_names=list(utility.parameter_names),
+                jit=False,
             )
 
             current_params = jnp.array(result.x, dtype=jnp.float32)

@@ -910,17 +910,19 @@ class TDCCPEstimator(BaseEstimator):
     # and g(a,x) captures the discounted future entropy.
     # ==================================================================
 
-    def _pseudo_log_likelihood(
+    def _pseudo_log_likelihood_jax(
         self,
-        params: np.ndarray,
-        h_table: np.ndarray,
-        g_table: np.ndarray,
-        feature_matrix: np.ndarray,
-        obs_states: np.ndarray,
-        obs_actions: np.ndarray,
+        params: jnp.ndarray,
+        h_table: jnp.ndarray,
+        g_table: jnp.ndarray,
+        feature_matrix: jnp.ndarray,
+        obs_states: jnp.ndarray,
+        obs_actions: jnp.ndarray,
         sigma: float,
-    ) -> float:
+    ) -> jnp.ndarray:
         """Compute the pseudo-log-likelihood Q(theta) from equation (2.1).
+
+        Pure JAX implementation so jax.grad can differentiate through it.
 
         v(a,x) = z(a,x)^T * theta + h(a,x)^T * theta + g(a,x)
 
@@ -928,25 +930,12 @@ class TDCCPEstimator(BaseEstimator):
 
         where the softmax is over all actions a' at state x_i.
         """
-        num_states = feature_matrix.shape[0]
-        num_actions = feature_matrix.shape[1]
+        flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
+        h_weighted = jnp.einsum("sak,k->sa", h_table, params)
+        v = flow_u + h_weighted + g_table
 
-        # Compute v(a, x) for all (state, action) pairs
-        # z(a,x)^T theta: flow utility
-        flow_u = np.einsum("sak,k->sa", feature_matrix, params)
-        # h(a,x)^T theta: discounted future features weighted by theta
-        h_weighted = np.einsum("sak,k->sa", h_table, params)
-        # g(a,x): discounted future entropy (no theta dependence)
-        v = flow_u + h_weighted + g_table  # (S, A)
-
-        # Log-softmax for observed (state, action) pairs
-        v_scaled = v / sigma
-        # Numerically stable log-softmax
-        v_max = v_scaled.max(axis=1, keepdims=True)
-        log_sum_exp = np.log(np.exp(v_scaled - v_max).sum(axis=1)) + v_max.squeeze()
-        log_probs = v_scaled[obs_states, obs_actions] - log_sum_exp[obs_states]
-
-        return float(log_probs.sum())
+        log_probs = jax.nn.log_softmax(v / sigma, axis=1)
+        return log_probs[obs_states, obs_actions].sum()
 
     def _partial_mle(
         self,
@@ -968,28 +957,17 @@ class TDCCPEstimator(BaseEstimator):
         applied separately.
         """
         sigma = problem.scale_parameter
-        feature_matrix = np.array(utility.feature_matrix)
-        obs_states = np.array(panel.get_all_states())
-        obs_actions = np.array(panel.get_all_actions())
+        feature_matrix_jax = jnp.array(utility.feature_matrix, dtype=jnp.float64)
+        h_table_jax = jnp.array(h_table, dtype=jnp.float64)
+        g_table_jax = jnp.array(g_table, dtype=jnp.float64)
+        obs_states_jax = jnp.array(panel.get_all_states())
+        obs_actions_jax = jnp.array(panel.get_all_actions())
 
-        def objective(params_np):
-            return -self._pseudo_log_likelihood(
-                params_np, h_table, g_table, feature_matrix,
-                obs_states, obs_actions, sigma,
+        def neg_ll(params):
+            return -self._pseudo_log_likelihood_jax(
+                params, h_table_jax, g_table_jax, feature_matrix_jax,
+                obs_states_jax, obs_actions_jax, sigma,
             )
-
-        def objective_and_grad(params_np):
-            eps = 1e-5
-            n = len(params_np)
-            val = objective(params_np)
-            grad = np.zeros(n)
-            for i in range(n):
-                p_plus = params_np.copy()
-                p_minus = params_np.copy()
-                p_plus[i] += eps
-                p_minus[i] -= eps
-                grad[i] = (objective(p_plus) - objective(p_minus)) / (2 * eps)
-            return val, grad
 
         if initial_params is None:
             initial_params = np.array(utility.get_initial_parameters())
@@ -997,12 +975,11 @@ class TDCCPEstimator(BaseEstimator):
         lower, upper = utility.get_parameter_bounds()
 
         result = minimize_lbfgsb(
-            objective_and_grad,
-            np.asarray(initial_params),
-            bounds=(np.asarray(lower), np.asarray(upper)),
+            neg_ll,
+            jnp.asarray(initial_params, dtype=jnp.float64),
+            bounds=(jnp.asarray(lower, dtype=jnp.float64), jnp.asarray(upper, dtype=jnp.float64)),
             maxiter=self._config.outer_max_iter,
             tol=self._config.outer_tol,
-            value_and_grad=True,
             desc="TD-CCP partial MLE",
         )
 

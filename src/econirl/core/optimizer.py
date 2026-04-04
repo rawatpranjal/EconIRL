@@ -42,6 +42,7 @@ def minimize_lbfgsb(
     desc: str = "L-BFGS-B",
     value_and_grad: bool = False,
     param_names: Sequence[str] | None = None,
+    jit: bool = True,
 ) -> OptimizeResult:
     """Bounded L-BFGS optimization using jaxopt.
 
@@ -72,6 +73,10 @@ def minimize_lbfgsb(
         If True, fun returns (value, gradient) instead of just the value.
     param_names : list of str, optional
         Names for the first few parameters. Shown in tqdm postfix.
+    jit : bool
+        If True (default), JIT-compile the solver steps. Set to False when the
+        objective function uses Python control flow (float(), bool(), in-place
+        assignment) that is not compatible with JAX tracing.
 
     Returns
     -------
@@ -80,21 +85,18 @@ def minimize_lbfgsb(
     """
     x0 = jnp.asarray(x0, dtype=jnp.float64)
 
-    # Build solver. Always use jit=False so we can run step-by-step without
-    # unrolling, avoiding catastrophic compile times on complex objectives.
-    # maxiter=1 since we drive the loop ourselves.
     if bounds is not None:
         lower = jnp.asarray(bounds[0], dtype=jnp.float64)
         upper = jnp.asarray(bounds[1], dtype=jnp.float64)
         solver = jaxopt.LBFGSB(
             fun=fun, value_and_grad=value_and_grad,
-            maxiter=maxiter, tol=tol, jit=True,
+            maxiter=maxiter, tol=tol, jit=jit,
         )
         init_kw = {"bounds": (lower, upper)}
     else:
         solver = jaxopt.LBFGS(
             fun=fun, value_and_grad=value_and_grad,
-            maxiter=maxiter, tol=tol, jit=True,
+            maxiter=maxiter, tol=tol, jit=jit,
         )
         init_kw = {}
 
@@ -112,9 +114,10 @@ def minimize_lbfgsb(
 
         fval = float(state.value)
         gnorm = float(jnp.linalg.norm(state.grad))
+        rel_change = abs(fval - prev_val) / max(abs(prev_val), 1e-12)
+        prev_val = fval
 
         if verbose:
-            rel_change = abs(fval - prev_val) / max(abs(prev_val), 1e-12)
             postfix = {
                 "obj": f"{fval:.4f}",
                 "|g|": f"{gnorm:.1e}",
@@ -127,11 +130,15 @@ def minimize_lbfgsb(
                         postfix[name] = f"{float(p[j]):.5f}"
             pbar.set_postfix(postfix)
 
-        prev_val = fval
-
         if gnorm < tol:
             if verbose:
                 pbar.set_postfix({**postfix, "status": "converged"})
+            break
+
+        # Stop if objective has plateaued (relative change tiny for 5 iters)
+        if i >= 5 and rel_change < tol * 0.01:
+            if verbose:
+                pbar.set_postfix({**postfix, "status": "plateaued"})
             break
 
     pbar.close()

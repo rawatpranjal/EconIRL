@@ -671,6 +671,7 @@ class MCEIRLEstimator(BaseEstimator):
                 verbose=self.config.verbose,
                 desc="MCE-IRL L-BFGS-B",
                 value_and_grad=True,
+                jit=False,
             )
             final_params = jnp.array(result_opt.x, dtype=jnp.float32)
             converged = result_opt.success

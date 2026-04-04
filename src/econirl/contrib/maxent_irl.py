@@ -327,11 +327,21 @@ class MaxEntIRLEstimator(BaseEstimator):
         # These are consistent because the MaxEnt IRL gradient IS ∂(-LL)/∂θ.
         self._log(f"Starting MaxEnt IRL optimization with L-BFGS-B")
 
-        # Pure JAX objective: returns scalar NLL so jaxopt can differentiate it.
-        def jax_objective(params):
-            nonlocal total_inner_iterations, num_function_evals
-            num_function_evals += 1
+        # Manual projected gradient descent with analytical gradient.
+        # Cannot use jaxopt because hybrid_iteration has Python control flow
+        # incompatible with JAX tracing (even jaxopt's internal line search traces).
+        lower, upper = reward_fn.get_parameter_bounds()
+        lower_jax = jnp.asarray(lower, dtype=jnp.float64)
+        upper_jax = jnp.asarray(upper, dtype=jnp.float64)
 
+        params = jnp.array(initial_params, dtype=jnp.float64)
+        lr = 0.1
+        best_nll = float("inf")
+
+        from tqdm import tqdm as _tqdm
+        pbar = _tqdm(range(self._outer_max_iter), desc="MaxEnt-IRL GD", disable=not self._verbose)
+        for it in pbar:
+            num_function_evals += 1
             reward_matrix = reward_fn.compute(params)
             solver_result = self._solve_inner(operator, reward_matrix)
             total_inner_iterations += solver_result.num_iterations
@@ -339,23 +349,35 @@ class MaxEntIRLEstimator(BaseEstimator):
             log_probs = operator.compute_log_choice_probabilities(
                 reward_matrix, solver_result.V
             )
-            nll = -log_probs[panel.get_all_states(), panel.get_all_actions()].sum()
-            return nll
+            nll = float(-log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
 
-        lower, upper = reward_fn.get_parameter_bounds()
-        lower_jax = jnp.asarray(lower, dtype=jnp.float64)
-        upper_jax = jnp.asarray(upper, dtype=jnp.float64)
+            expected_features = self._compute_expected_features(
+                solver_result.policy, transitions, reward_fn, problem, panel,
+            )
+            grad = jnp.asarray(expected_features - empirical_features, dtype=jnp.float64)
+            gnorm = float(jnp.linalg.norm(grad))
 
-        result_opt = minimize_lbfgsb(
-            jax_objective,
-            jnp.array(initial_params, dtype=jnp.float64),
-            bounds=(lower_jax, upper_jax),
-            maxiter=self._outer_max_iter,
-            tol=self._outer_tol,
-            verbose=self._verbose,
-            desc="MaxEnt-IRL L-BFGS-B",
-            param_names=reward_fn.parameter_names if hasattr(reward_fn, 'parameter_names') else None,
-        )
+            if self._verbose:
+                pbar.set_postfix({"NLL": f"{nll:.2f}", "|g|": f"{gnorm:.1e}"})
+
+            if gnorm < self._outer_tol:
+                break
+
+            # Projected gradient step with bounds
+            params = jnp.clip(params - lr * grad, lower_jax, upper_jax)
+            best_nll = min(best_nll, nll)
+
+        pbar.close()
+
+        class _FakeResult:
+            pass
+        result_opt = _FakeResult()
+        result_opt.x = params
+        result_opt.fun = best_nll
+        result_opt.success = gnorm < self._outer_tol * 10
+        result_opt.nit = it + 1
+        result_opt.nfev = num_function_evals
+        result_opt.message = "Converged" if result_opt.success else "Max iterations"
 
         final_params = jnp.array(result_opt.x, dtype=jnp.float32)
         converged = result_opt.success
