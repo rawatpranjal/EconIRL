@@ -403,8 +403,58 @@ Not every estimator supports every counterfactual type. The table below shows wh
      - Yes
      - Yes
      - Yes
+   * - ``MPEC``
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - ``SEES``
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - ``MCEIRLNeural``
+     - Yes
+     - Yes (tabularized)
+     - No
+     - Yes (tabularized)
+   * - ``MaxEntIRL``
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - ``MaxMarginIRL``
+     - Yes
+     - Yes
+     - Yes
+     - Yes
+   * - ``GCL``
+     - Yes
+     - Yes (tabularized)
+     - No
+     - Yes (tabularized)
+   * - ``GAIL``
+     - Yes
+     - No
+     - No
+     - No
+   * - ``f-IRL``
+     - Yes
+     - Yes
+     - No
+     - Yes
+   * - ``IQ-Learn``
+     - Yes
+     - Yes
+     - No
+     - Yes
+   * - ``AIRL-Het``
+     - Yes
+     - Yes (tabularized)
+     - No
+     - Yes (tabularized)
 
-Type 1 works for every estimator because it only requires the policy. Types 2 and 4 require the structural reward separated from continuation values. Neural estimators like NeuralGLADIUS and NeuralAIRL can handle these types by tabularizing their neural reward into an explicit matrix over all state-action pairs. Type 3 requires structural parameters in levels, which neural estimators do not provide because "change theta_c by 20 percent" has no meaning for a neural reward network. Behavioral cloning recovers no reward at all and can only handle Type 1.
+Type 1 works for every estimator because it only requires the policy. Types 2 and 4 require the structural reward separated from continuation values. Neural estimators like NeuralGLADIUS and NeuralAIRL can handle these types by tabularizing their neural reward into an explicit matrix over all state-action pairs. Type 3 requires structural parameters in levels, which neural estimators do not provide because "change theta_c by 20 percent" has no meaning for a neural reward network. Behavioral cloning recovers no reward at all and can only handle Type 1. GAIL recovers no reward function at all, only a policy via occupancy matching, so it supports only Type 1.
 
 
 Unified Dispatcher
