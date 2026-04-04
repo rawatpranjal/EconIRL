@@ -1,8 +1,12 @@
-"""MPEC vs NFXP Monte Carlo comparison (Su & Judd 2012 style).
+"""MPEC vs NFXP-NK Monte Carlo comparison.
 
-Runs 5 Monte Carlo replications on the Rust bus engine and compares
-NFXP (SA-then-NK hybrid) against MPEC (SLSQP with native constraints).
-Both recover the same MLE; the comparison is about computation.
+Runs a grid over discount factors and state space sizes to show the
+crossover between MPEC and NFXP-NK. Inspired by Su and Judd (2012)
+and the comment by Iskhakov, Rust and Schjerning (2016) showing that
+NFXP-NK (hybrid SA-then-NK polyalgorithm) eliminates the speed
+advantage that Su and Judd observed against the weaker NFXP-SA.
+
+Grid: 3 discount factors x 2 state sizes = 6 cells, 1 rep each.
 """
 
 import time
@@ -15,139 +19,143 @@ from econirl.estimation.mpec import MPECEstimator, MPECConfig
 from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel
 
-N_REPS = 5
 N_INDIVIDUALS = 200
 N_PERIODS = 100
 TRUE_OC = 0.001
 TRUE_RC = 3.0
-DISCOUNT = 0.9999
-N_BINS = 90
-SEED_BASE = 42
+SEED = 42
+
+GRID = [
+    # (beta, n_bins)
+    (0.95,   90),
+    (0.95,  200),
+    (0.99,   90),
+    (0.99,  200),
+    (0.9999, 90),
+    (0.9999, 200),
+]
 
 
-def run_one_rep(rep_id: int):
-    """Run one Monte Carlo replication."""
+def run_cell(beta: float, n_bins: int):
+    """Run one grid cell: NFXP-NK and MPEC-SLSQP."""
     env = RustBusEnvironment(
         operating_cost=TRUE_OC,
         replacement_cost=TRUE_RC,
-        num_mileage_bins=N_BINS,
-        discount_factor=DISCOUNT,
-        seed=SEED_BASE + rep_id,
+        num_mileage_bins=n_bins,
+        discount_factor=beta,
+        seed=SEED,
     )
     problem = env.problem_spec
     transitions = env.transition_matrices
     utility = LinearUtility.from_environment(env)
 
     panel = simulate_panel(
-        env, n_individuals=N_INDIVIDUALS, n_periods=N_PERIODS,
-        seed=SEED_BASE + rep_id + 1000,
+        env, n_individuals=N_INDIVIDUALS, n_periods=N_PERIODS, seed=SEED + 1000,
     )
 
     true_params = np.array([TRUE_OC, TRUE_RC])
     results = {}
 
-    # NFXP with hybrid (SA then NK) solver
+    # NFXP-NK (hybrid polyalgorithm from Rust 1987/2000)
     nfxp = NFXPEstimator(
         inner_solver="hybrid",
         inner_tol=1e-12,
-        inner_max_iter=100000,
+        inner_max_iter=300000,
         switch_tol=1e-3,
         outer_max_iter=200,
         compute_hessian=False,
         verbose=False,
     )
     t0 = time.time()
-    nfxp_result = nfxp.estimate(panel, utility, problem, transitions)
-    nfxp_time = time.time() - t0
+    try:
+        nfxp_result = nfxp.estimate(panel, utility, problem, transitions)
+        nfxp_time = time.time() - t0
+        results["NFXP-NK"] = {
+            "params": np.asarray(nfxp_result.parameters).tolist(),
+            "ll": float(nfxp_result.log_likelihood),
+            "time": nfxp_time,
+            "converged": bool(nfxp_result.converged),
+        }
+    except Exception as e:
+        results["NFXP-NK"] = {
+            "params": [float("nan")] * 2,
+            "ll": float("nan"),
+            "time": time.time() - t0,
+            "converged": False,
+            "error": str(e),
+        }
 
-    results["NFXP"] = {
-        "params": np.asarray(nfxp_result.parameters).tolist(),
-        "ll": float(nfxp_result.log_likelihood),
-        "time": nfxp_time,
-        "iterations": int(nfxp_result.num_iterations),
-        "converged": bool(nfxp_result.converged),
-    }
-
-    # MPEC with SLSQP
+    # MPEC-SLSQP
     mpec = MPECEstimator(
         config=MPECConfig(solver="slsqp", max_iter=500, constraint_tol=1e-8),
         compute_hessian=False,
         verbose=False,
     )
     t0 = time.time()
-    mpec_result = mpec.estimate(panel, utility, problem, transitions)
-    mpec_time = time.time() - t0
-
-    constraint_viol = mpec_result.metadata.get("final_constraint_violation", float("nan"))
-    results["MPEC"] = {
-        "params": np.asarray(mpec_result.parameters).tolist(),
-        "ll": float(mpec_result.log_likelihood),
-        "time": mpec_time,
-        "iterations": int(mpec_result.num_iterations),
-        "converged": bool(mpec_result.converged),
-        "constraint_violation": constraint_viol,
-    }
+    try:
+        mpec_result = mpec.estimate(panel, utility, problem, transitions)
+        mpec_time = time.time() - t0
+        results["MPEC"] = {
+            "params": np.asarray(mpec_result.parameters).tolist(),
+            "ll": float(mpec_result.log_likelihood),
+            "time": mpec_time,
+            "converged": bool(mpec_result.converged),
+            "constraint_violation": mpec_result.metadata.get(
+                "final_constraint_violation", float("nan")
+            ),
+        }
+    except Exception as e:
+        results["MPEC"] = {
+            "params": [float("nan")] * 2,
+            "ll": float("nan"),
+            "time": time.time() - t0,
+            "converged": False,
+            "error": str(e),
+        }
 
     return results
 
 
 def main():
+    print("MPEC vs NFXP-NK: grid over beta and state space size")
+    print(f"Data: {N_INDIVIDUALS} buses x {N_PERIODS} periods per cell")
+    print(f"True params: theta_c={TRUE_OC}, RC={TRUE_RC}")
+    print()
+
     all_results = []
-    true_params = np.array([TRUE_OC, TRUE_RC])
 
-    for rep in range(N_REPS):
-        print(f"--- Rep {rep + 1}/{N_REPS} ---")
-        res = run_one_rep(rep)
+    for beta, n_bins in GRID:
+        print(f"beta={beta}, N={n_bins}...", end=" ", flush=True)
+        res = run_cell(beta, n_bins)
+        res["beta"] = beta
+        res["n_bins"] = n_bins
         all_results.append(res)
-        for name in ["NFXP", "MPEC"]:
-            p = np.array(res[name]["params"])
-            print(f"  {name}: params={p}, LL={res[name]['ll']:.2f}, "
-                  f"time={res[name]['time']:.1f}s, converged={res[name]['converged']}")
 
-    # Summarize
-    print("\n" + "=" * 70)
-    print(f"MPEC vs NFXP: {N_REPS} Monte Carlo reps")
-    print(f"Environment: Rust bus, {N_BINS} bins, beta={DISCOUNT}")
-    print(f"Data: {N_INDIVIDUALS} buses x {N_PERIODS} periods = "
-          f"{N_INDIVIDUALS * N_PERIODS} obs per rep")
-    print("=" * 70)
+        nfxp = res["NFXP-NK"]
+        mpec = res["MPEC"]
+        print(f"NFXP: {nfxp['time']:.1f}s (conv={nfxp['converged']}) | "
+              f"MPEC: {mpec['time']:.1f}s (conv={mpec['converged']})")
 
-    header = f"{'Metric':<30} {'NFXP':>15} {'MPEC':>15}"
+    # Summary table
+    print("\n" + "=" * 90)
+    print("Summary: MPEC vs NFXP-NK across discount factors and state space sizes")
+    print("=" * 90)
+    header = (f"{'beta':>8} {'N':>5} | "
+              f"{'NFXP time':>10} {'NFXP conv':>10} {'NFXP LL':>12} | "
+              f"{'MPEC time':>10} {'MPEC conv':>10} {'MPEC LL':>12} | "
+              f"{'Ratio':>8}")
     print(header)
     print("-" * len(header))
 
-    for name in ["NFXP", "MPEC"]:
-        params = np.array([r[name]["params"] for r in all_results])
-        bias = params.mean(axis=0) - true_params
-        rmse = np.sqrt(((params - true_params) ** 2).mean(axis=0))
-        lls = [r[name]["ll"] for r in all_results]
-        times = [r[name]["time"] for r in all_results]
-        iters = [r[name]["iterations"] for r in all_results]
+    for res in all_results:
+        nfxp = res["NFXP-NK"]
+        mpec = res["MPEC"]
+        ratio = nfxp["time"] / max(mpec["time"], 0.01) if mpec["converged"] else float("nan")
+        print(f"{res['beta']:>8} {res['n_bins']:>5} | "
+              f"{nfxp['time']:>9.1f}s {str(nfxp['converged']):>10} {nfxp['ll']:>12.2f} | "
+              f"{mpec['time']:>9.1f}s {str(mpec['converged']):>10} {mpec['ll']:>12.2f} | "
+              f"{ratio:>7.1f}x")
 
-        if name == "NFXP":
-            nfxp_stats = {
-                "bias_oc": bias[0], "bias_rc": bias[1],
-                "rmse_oc": rmse[0], "rmse_rc": rmse[1],
-                "mean_ll": np.mean(lls), "mean_time": np.mean(times),
-                "mean_iters": np.mean(iters),
-            }
-        else:
-            mpec_stats = {
-                "bias_oc": bias[0], "bias_rc": bias[1],
-                "rmse_oc": rmse[0], "rmse_rc": rmse[1],
-                "mean_ll": np.mean(lls), "mean_time": np.mean(times),
-                "mean_iters": np.mean(iters),
-            }
-
-    print(f"{'Mean bias (theta_c)':<30} {nfxp_stats['bias_oc']:>15.6f} {mpec_stats['bias_oc']:>15.6f}")
-    print(f"{'Mean bias (RC)':<30} {nfxp_stats['bias_rc']:>15.4f} {mpec_stats['bias_rc']:>15.4f}")
-    print(f"{'RMSE (theta_c)':<30} {nfxp_stats['rmse_oc']:>15.6f} {mpec_stats['rmse_oc']:>15.6f}")
-    print(f"{'RMSE (RC)':<30} {nfxp_stats['rmse_rc']:>15.4f} {mpec_stats['rmse_rc']:>15.4f}")
-    print(f"{'Mean LL':<30} {nfxp_stats['mean_ll']:>15.2f} {mpec_stats['mean_ll']:>15.2f}")
-    print(f"{'Mean time (s)':<30} {nfxp_stats['mean_time']:>15.1f} {mpec_stats['mean_time']:>15.1f}")
-    print(f"{'Mean iterations':<30} {nfxp_stats['mean_iters']:>15.1f} {mpec_stats['mean_iters']:>15.1f}")
-
-    # Save results
     with open("mpec_vs_nfxp_results.json", "w") as f:
         json.dump(all_results, f, indent=2)
     print(f"\nResults saved to mpec_vs_nfxp_results.json")
