@@ -18,4 +18,11 @@ estimators/f_irl
 estimators/gladius
 estimators/iq_learn
 estimators/bc
+estimators/mpec
+estimators/gcl
+estimators/maxent_irl
+estimators/max_margin_irl
+estimators/mceirl_neural
+estimators/neural_airl
+estimators/airl_het
 ```
