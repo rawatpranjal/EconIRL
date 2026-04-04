@@ -43,6 +43,9 @@ autolab/FINDINGS.md
 # Large data files
 data/raw/
 data/samples/
+data/scania/
+data/processed/
+*.zip
 src/econirl/datasets/rdw_scrappage_data.csv
 src/econirl/datasets/rdw_intermediate/
 
