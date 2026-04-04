@@ -14,6 +14,7 @@ Head-to-head benchmarks showing when each estimator class has an advantage.
    mpec_vs_nfxp
    sees_vs_nfxp
    nnes_vs_nfxp
+   tdccp_vs_nfxp
 
 Post-Estimation
 ---------------
@@ -37,13 +38,25 @@ Why structural estimation matters: observational equivalence, reward identificat
    identification_study
    abstract_mdp_identification
 
-Replication and Workflows
---------------------------
+Theory and Replication
+-----------------------
 
-Paper replications and end-to-end estimation workflows.
+Theoretical comparisons and paper replications that validate econirl against published results.
 
 .. toctree::
    :maxdepth: 1
 
+   ddc_irl_equivalence
+   ziebart_mce_irl
+   mce_irl
    rust_1987_replication
+
+Workflows
+----------
+
+End-to-end estimation workflows.
+
+.. toctree::
+   :maxdepth: 1
+
    neural_airl_trajectory_panel

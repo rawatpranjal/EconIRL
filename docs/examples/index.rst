@@ -83,18 +83,6 @@ Sequential search, browsing, and purchase decisions in markets.
    trivago_search
    instacart
 
-Theory and Replication
------------------------
-
-Theoretical comparisons and paper replications that validate econirl against published results.
-
-.. toctree::
-   :maxdepth: 1
-
-   ddc_irl_equivalence
-   ziebart_mce_irl
-   mce_irl
-
 Gym Environments
 -----------------
 
