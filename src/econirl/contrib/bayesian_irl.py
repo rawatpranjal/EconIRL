@@ -167,7 +167,14 @@ class BayesianIRLEstimator(BaseEstimator):
 
         self._log(f"Starting MCMC: {self._n_samples} samples, burnin={self._burnin}")
 
-        for i in range(self._n_samples):
+        from tqdm import tqdm
+        pbar = tqdm(
+            range(self._n_samples),
+            desc="BayesianIRL MCMC",
+            disable=not self._verbose,
+            leave=True,
+        )
+        for i in pbar:
             # Propose new parameters
             key, subkey = jr.split(key)
             proposal = current_params + self._proposal_sigma * jr.normal(subkey, shape=(n_params,))
@@ -189,13 +196,9 @@ class BayesianIRLEstimator(BaseEstimator):
             samples[i] = np.asarray(current_params)
             log_posteriors[i] = current_log_post
 
-            if self._verbose and (i + 1) % 200 == 0:
+            if (i + 1) % 10 == 0:
                 accept_rate = n_accepted / (i + 1)
-                self._log(
-                    f"  Sample {i+1}/{self._n_samples}: "
-                    f"accept_rate={accept_rate:.2f}, "
-                    f"log_post={current_log_post:.2f}"
-                )
+                pbar.set_postfix({"acc": f"{accept_rate:.2f}", "lp": f"{current_log_post:.1f}"})
 
         # Discard burn-in (convert back to JAX arrays)
         post_burnin = jnp.array(samples[self._burnin:])

@@ -253,7 +253,14 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
 
         self._log(f"Training Deep MaxEnt IRL for {self._max_epochs} epochs")
 
-        for epoch in range(self._max_epochs):
+        from tqdm import tqdm
+        pbar = tqdm(
+            range(self._max_epochs),
+            desc="DeepMaxEnt",
+            disable=not self._verbose,
+            leave=True,
+        )
+        for epoch in pbar:
             # Forward: compute reward matrix from network
             reward_matrix = reward_net.reward_matrix(n_states, n_actions)
 
@@ -304,8 +311,7 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
                 best_V = jnp.array(sr.V)
                 best_reward = jnp.array(rm)
 
-            if self._verbose and (epoch + 1) % 50 == 0:
-                self._log(f"  Epoch {epoch+1}: LL={ll:.2f}, best_LL={best_ll:.2f}")
+            pbar.set_postfix({"LL": f"{ll:.2f}", "best": f"{best_ll:.2f}"})
 
         elapsed = time.time() - start_time
 

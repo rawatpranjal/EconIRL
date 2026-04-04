@@ -588,7 +588,14 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         all_state_indices = jnp.arange(n_states)
         reward_net = self._reward_net
 
-        for epoch in range(self.max_epochs):
+        from tqdm import tqdm
+        pbar = tqdm(
+            range(self.max_epochs),
+            desc="MCE-IRL-NN",
+            disable=not self.verbose,
+            leave=True,
+        )
+        for epoch in pbar:
             # 1. Compute reward matrix R(s,a) (no gradient tracking needed here)
             state_feat = self._state_encoder(all_state_indices)
             reward_matrix = self._compute_reward_matrix(
@@ -646,11 +653,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             loss_val = float(jnp.sum(grad_r ** 2))
             feature_diff = float(jnp.linalg.norm(empirical_sa - policy_sa))
 
-            if self.verbose and (epoch + 1) % 50 == 0:
-                print(
-                    f"  Epoch {epoch + 1}: loss={loss_val:.4f}, "
-                    f"feature_diff={feature_diff:.6f}"
-                )
+            pbar.set_postfix({"loss": f"{loss_val:.4f}", "fdiff": f"{feature_diff:.4f}"})
 
             # Early stopping with best model checkpoint
             if loss_val < best_loss - 1e-5:

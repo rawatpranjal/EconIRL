@@ -376,7 +376,14 @@ class MPECEstimator(BaseEstimator):
 
         self._log("Starting MPEC augmented Lagrangian optimization")
 
-        for outer_iter in range(cfg.outer_max_iter):
+        from tqdm import tqdm
+        pbar = tqdm(
+            range(cfg.outer_max_iter),
+            desc="MPEC AL",
+            disable=not self._verbose,
+            leave=True,
+        )
+        for outer_iter in pbar:
             x0 = np.concatenate([np.asarray(theta), np.asarray(V)])
             lam_jax = jnp.array(lam, dtype=jnp.float64)
             rho_jax = jnp.float64(rho)
@@ -417,6 +424,7 @@ class MPECEstimator(BaseEstimator):
             log_probs = jax.nn.log_softmax(Q / sigma, axis=1)
             ll = float(log_probs[obs_states, obs_actions].sum())
 
+            pbar.set_postfix({"LL": f"{ll:.2f}", "|c|": f"{violation:.1e}", "rho": f"{rho:.0e}"})
             self._log(
                 f"AL iter {outer_iter+1}: LL = {ll:.4f}, "
                 f"|constraint| = {violation:.2e}, rho = {rho:.1e}"

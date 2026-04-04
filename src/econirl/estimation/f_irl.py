@@ -213,7 +213,14 @@ class FIRLEstimator(BaseEstimator):
 
         self._log(f"f-IRL ({self._f_divergence}): {self._max_iter} iterations")
 
-        for it in range(self._max_iter):
+        from tqdm import tqdm
+        pbar = tqdm(
+            range(self._max_iter),
+            desc=f"f-IRL ({self._f_divergence})",
+            disable=not self._verbose,
+            leave=True,
+        )
+        for it in pbar:
             # Solve MDP under current reward
             solver_result = value_iteration(
                 operator, reward,
@@ -246,12 +253,8 @@ class FIRLEstimator(BaseEstimator):
                 best_V = jnp.array(solver_result.V)
                 best_reward = jnp.array(reward)
 
-            if self._verbose and (it + 1) % 100 == 0:
-                div = jnp.abs(expert_marginal - policy_marginal).sum().item()
-                self._log(
-                    f"  Iter {it+1}: LL={ll:.2f}, best_LL={best_ll:.2f}, "
-                    f"marginal_diff={div:.6f}"
-                )
+            div = jnp.abs(expert_marginal - policy_marginal).sum().item()
+            pbar.set_postfix({"LL": f"{ll:.2f}", "best": f"{best_ll:.2f}", "div": f"{div:.4f}"})
 
         elapsed = time.time() - start_time
 

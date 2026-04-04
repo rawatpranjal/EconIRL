@@ -336,9 +336,17 @@ class IQLearnEstimator(BaseEstimator):
             loss_history = []
             grad_norm = float("inf")
 
-            for t in range(1, self.config.max_iter + 1):
+            from tqdm import tqdm
+            pbar = tqdm(
+                range(1, self.config.max_iter + 1),
+                desc="IQ-Learn Adam",
+                disable=not self.config.verbose,
+                leave=True,
+            )
+            for t in pbar:
                 obj, grad_np = objective_and_gradient(theta_np)
                 loss_history.append(obj)
+                pbar.set_postfix({"loss": f"{obj:.4f}", "|g|": f"{grad_norm:.2e}"})
 
                 m = beta1 * m + (1 - beta1) * grad_np
                 v = beta2 * v + (1 - beta2) * grad_np**2
