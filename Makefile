@@ -1,4 +1,4 @@
-.PHONY: population plots finite-sample tests
+.PHONY: population plots finite-sample tests docs-test
 
 population:
 	python experiments/identification/run_population_only.py
@@ -18,6 +18,21 @@ tests:
 
 docs:
 	python -m sphinx -b html docs docs/_build/html
+
+docs-test:
+	python -c "\
+	from econirl import NFXP, CCP; \
+	from econirl.datasets import load_rust_bus; \
+	df = load_rust_bus(); \
+	nfxp = NFXP(discount=0.9999).fit(df, state='mileage_bin', action='replaced', id='bus_id'); \
+	ccp = CCP(discount=0.9999, num_policy_iterations=5).fit(df, state='mileage_bin', action='replaced', id='bus_id'); \
+	print('params:', nfxp.params_); \
+	print('se:', nfxp.se_); \
+	import numpy as np; \
+	proba = nfxp.predict_proba(np.array([0, 30, 60, 89])); \
+	print('proba:', proba); \
+	print('Quickstart smoke test passed') \
+	"
 
 distclean:
 	rm -rf dist build *.egg-info
