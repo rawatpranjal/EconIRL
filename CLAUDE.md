@@ -162,7 +162,7 @@ Example page titles must follow a consistent "Subject Problem" pattern with no c
 
 Tables in documentation must show actual numbers from running the code. Do not use qualitative placeholders like "positive" or "near zero" when you can run the script and report the estimate.
 
-Always build the docs locally after making documentation changes to verify rendering before committing. Run `python3 -m sphinx -b html docs docs/_build/html` from the project root and check the output for errors.
+After making documentation changes, commit and push, then trigger an RTD build with `curl -X POST -H "Authorization: Token $RTD_TOKEN" https://readthedocs.org/api/v3/projects/econirl/versions/latest/builds/`. Do not build docs locally.
 
 Keep `docs/conf.py` release version in sync with `pyproject.toml` and `src/econirl/__init__.py`.
 
