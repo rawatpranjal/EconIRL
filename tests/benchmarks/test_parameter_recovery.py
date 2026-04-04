@@ -29,6 +29,7 @@ from econirl.estimation import (
     AIRLEstimator,
     AIRLConfig,
 )
+from econirl.estimation.mpec import MPECEstimator, MPECConfig
 from econirl.preferences.linear import LinearUtility
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.simulation.synthetic import simulate_panel
@@ -97,6 +98,29 @@ def test_ccp_rust_bus():
     result = estimator.estimate(panel, utility, problem, transitions)
     rmse = _rmse(result.parameters, true_params)
     assert rmse < 0.2, f"CCP Rust bus RMSE={rmse:.4f} exceeds tolerance 0.2"
+
+
+# ---------------------------------------------------------------------------
+# MPEC on Rust bus
+# ---------------------------------------------------------------------------
+
+@pytest.mark.slow
+def test_mpec_rust_bus():
+    """MPEC should recover Rust bus parameters with RMSE < 0.2."""
+    env = RustBusEnvironment(
+        operating_cost=0.001, replacement_cost=3.0, discount_factor=0.9999
+    )
+    panel, utility, problem, transitions, true_params = _simulate_and_prepare(env)
+
+    config = MPECConfig(
+        outer_max_iter=50,
+        inner_max_iter=500,
+        constraint_tol=1e-8,
+    )
+    estimator = MPECEstimator(config=config, compute_hessian=False, verbose=False)
+    result = estimator.estimate(panel, utility, problem, transitions)
+    rmse = _rmse(result.parameters, true_params)
+    assert rmse < 0.2, f"MPEC Rust bus RMSE={rmse:.4f} exceeds tolerance 0.2"
 
 
 # ---------------------------------------------------------------------------
