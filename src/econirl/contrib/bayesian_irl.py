@@ -181,7 +181,7 @@ class BayesianIRLEstimator(BaseEstimator):
             # Metropolis-Hastings acceptance (symmetric proposal)
             log_alpha = proposal_log_post - current_log_post
             key, subkey = jr.split(key)
-            if float(jnp.log(jr.uniform(subkey, shape=(1,)))) < log_alpha:
+            if float(jnp.log(jr.uniform(subkey, shape=()))) < log_alpha:
                 current_params = proposal
                 current_log_post = proposal_log_post
                 n_accepted += 1

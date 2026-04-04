@@ -473,3 +473,65 @@ def test_airl_rust_bus():
     if result.parameters is not None and result.parameters.size == true_params.size:
         rmse = _rmse(result.parameters, true_params)
         assert rmse < 2.0, f"AIRL Rust bus RMSE={rmse:.4f} exceeds tolerance 2.0"
+
+
+# ---------------------------------------------------------------------------
+# MCE-IRL Neural on Rust bus (policy quality, not parameter recovery)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.slow
+def test_mceirl_neural_rust_bus():
+    """MCE-IRL Neural should learn a valid policy that captures mileage-replacement gradient.
+
+    Neural MCE-IRL recovers a neural reward, not structural theta. We test
+    policy quality: the learned policy should replace more at high mileage
+    than at low mileage, and the reward matrix should be finite.
+    """
+    from econirl.estimators.mceirl_neural import MCEIRLNeural
+
+    env = RustBusEnvironment(
+        operating_cost=0.001, replacement_cost=3.0, discount_factor=0.99
+    )
+    panel, _, problem, transitions, _ = _simulate_and_prepare(env)
+    df = panel.to_dataframe()
+
+    model = MCEIRLNeural(
+        n_states=problem.num_states,
+        n_actions=problem.num_actions,
+        discount=0.99,
+        reward_type="state_action",
+        reward_hidden_dim=32,
+        reward_num_layers=2,
+        max_epochs=100,
+        lr=1e-3,
+        seed=42,
+        verbose=False,
+    )
+    model.fit(
+        df,
+        state="state",
+        action="action",
+        id="id",
+        transitions=jnp.asarray(transitions),
+    )
+
+    # Policy is valid distribution
+    policy = model.policy_
+    assert policy is not None, "MCE-IRL Neural did not return a policy"
+    assert policy.shape == (problem.num_states, problem.num_actions)
+    row_sums = policy.sum(axis=1)
+    assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-4), (
+        "MCE-IRL Neural policy rows do not sum to 1"
+    )
+
+    # Directional check: should replace more at high mileage
+    low_mile_replace = float(policy[:10, 1].mean())
+    high_mile_replace = float(policy[-10:, 1].mean())
+    assert high_mile_replace > low_mile_replace, (
+        "MCE-IRL Neural should replace more at high mileage"
+    )
+
+    # Reward matrix should be finite
+    reward = model.reward_matrix_
+    assert reward is not None, "MCE-IRL Neural did not produce a reward matrix"
+    assert jnp.all(jnp.isfinite(reward)), "Reward matrix contains NaN or Inf"
