@@ -301,6 +301,13 @@ def test_maxent_irl_rust_bus():
     assert result.policy is not None, "MaxEnt IRL should produce a policy"
     assert result.converged or result.parameters is not None, "Should produce parameters"
 
+    # Directional check: high-mileage states should have higher replacement probability
+    low_mile_replace = float(result.policy[:10, 1].mean())
+    high_mile_replace = float(result.policy[-10:, 1].mean())
+    assert high_mile_replace > low_mile_replace, (
+        "Estimator should replace more at high mileage"
+    )
+
 
 # ---------------------------------------------------------------------------
 # TD-CCP on Rust bus
@@ -374,6 +381,15 @@ def test_gladius_rust_bus():
     rmse = _rmse(result.parameters, true_params)
     assert rmse < 1.0, f"GLADIUS Rust bus RMSE={rmse:.4f} exceeds tolerance 1.0"
 
+    # Known limitation: GLADIUS in IRL setting overestimates operating cost
+    # by ~40% due to Q-identification-up-to-state-dependent-constant (see CLAUDE.md).
+    # But the policy direction should still be correct.
+    low_mile_replace = float(result.policy[:10, 1].mean())
+    high_mile_replace = float(result.policy[-10:, 1].mean())
+    assert high_mile_replace > low_mile_replace, (
+        "GLADIUS should replace more at high mileage"
+    )
+
 
 # ---------------------------------------------------------------------------
 # GAIL on Rust bus
@@ -402,6 +418,13 @@ def test_gail_rust_bus():
     row_sums = result.policy.sum(axis=1)
     assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-4), (
         "GAIL policy rows do not sum to 1"
+    )
+
+    # Directional check: GAIL should learn the mileage-replacement gradient
+    low_mile_replace = float(result.policy[:10, 1].mean())
+    high_mile_replace = float(result.policy[-10:, 1].mean())
+    assert high_mile_replace > low_mile_replace, (
+        "GAIL should replace more at high mileage"
     )
 
     # If parameters are returned, check RMSE
@@ -437,6 +460,13 @@ def test_airl_rust_bus():
     row_sums = result.policy.sum(axis=1)
     assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-4), (
         "AIRL policy rows do not sum to 1"
+    )
+
+    # Directional check: AIRL should learn the mileage-replacement gradient
+    low_mile_replace = float(result.policy[:10, 1].mean())
+    high_mile_replace = float(result.policy[-10:, 1].mean())
+    assert high_mile_replace > low_mile_replace, (
+        "AIRL should replace more at high mileage"
     )
 
     # If parameters are returned, check RMSE
