@@ -30,9 +30,9 @@ from typing import Literal
 import jax
 import jax.numpy as jnp
 import numpy as np
-from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator
+from econirl.core.optimizer import minimize_lbfgsb
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod, compute_numerical_hessian
@@ -504,41 +504,42 @@ class CCPEstimator(BaseEstimator):
 
             prev_params = jnp.array(current_params)
 
-            # Define objective function for this iteration's CCPs
-            def objective(params_np):
-                params = jnp.array(params_np, dtype=jnp.float32)
-                ll = self._compute_log_likelihood(
-                    params, panel, utility, ccps, transitions, problem
-                )
-                return -ll  # Minimize negative log-likelihood
+            # Define combined value-and-grad function for this iteration's CCPs.
+            # The gradient is computed via finite differences because _compute_log_likelihood
+            # passes through Python loops that are not JAX-traceable end-to-end.
+            def neg_ll_and_grad(params_x):
+                def neg_ll(p):
+                    return -self._compute_log_likelihood(
+                        jnp.array(p, dtype=jnp.float32),
+                        panel, utility, ccps, transitions, problem,
+                    )
 
-            # Gradient via finite differences (adaptive step size)
-            def gradient(params_np):
-                grad = np.zeros(len(params_np))
-                for i in range(len(params_np)):
-                    eps_i = max(1e-5, abs(params_np[i]) * 1e-4)
-                    params_plus = params_np.copy()
-                    params_minus = params_np.copy()
-                    params_plus[i] += eps_i
-                    params_minus[i] -= eps_i
-                    grad[i] = (objective(params_plus) - objective(params_minus)) / (2 * eps_i)
-                return grad
+                val = neg_ll(params_x)
+                n = len(params_x)
+                grad = jnp.zeros(n, dtype=jnp.float64)
+                for i in range(n):
+                    eps_i = max(1e-5, float(jnp.abs(params_x[i])) * 1e-4)
+                    p_plus = params_x.at[i].add(eps_i)
+                    p_minus = params_x.at[i].add(-eps_i)
+                    grad = grad.at[i].set(
+                        (neg_ll(p_plus) - neg_ll(p_minus)) / (2 * eps_i)
+                    )
+                return val, grad
 
             # Maximize pseudo-likelihood
             lower, upper = utility.get_parameter_bounds()
-            bounds = list(zip(np.asarray(lower), np.asarray(upper)))
 
-            result = optimize.minimize(
-                objective,
-                np.asarray(current_params),
-                method="L-BFGS-B",
-                jac=gradient,
-                bounds=bounds,
-                options={
-                    "maxiter": self._outer_max_iter,
-                    "gtol": self._outer_tol,
-                    "disp": False,
-                },
+            result = minimize_lbfgsb(
+                neg_ll_and_grad,
+                jnp.array(current_params, dtype=jnp.float64),
+                bounds=(jnp.asarray(lower, dtype=jnp.float64),
+                        jnp.asarray(upper, dtype=jnp.float64)),
+                maxiter=self._outer_max_iter,
+                tol=self._outer_tol,
+                verbose=False,
+                desc="CCP",
+                value_and_grad=True,
+                param_names=list(utility.parameter_names),
             )
 
             current_params = jnp.array(result.x, dtype=jnp.float32)
@@ -546,11 +547,14 @@ class CCPEstimator(BaseEstimator):
 
             # Check convergence for NPL
             param_change = float(jnp.linalg.norm(current_params - prev_params))
-            pbar.set_postfix({"LL": f"{current_ll:.2f}", "d_param": f"{param_change:.1e}"})
+            postfix = {"LL": f"{current_ll:.2f}", "d_param": f"{param_change:.1e}"}
+            for j, nm in enumerate(utility.parameter_names[:3]):
+                postfix[nm] = f"{float(current_params[j]):.5f}"
+            pbar.set_postfix(postfix)
 
             if param_change < self._convergence_tol:
                 converged = True
-                pbar.set_postfix({"LL": f"{current_ll:.2f}", "status": "converged"})
+                pbar.set_postfix({**postfix, "status": "converged"})
                 pbar.close()
                 self._log("NPL converged!")
                 break

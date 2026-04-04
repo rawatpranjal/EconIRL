@@ -4,15 +4,12 @@ All structural estimators use bounded L-BFGS for the outer theta optimization.
 This module provides a unified interface backed by jaxopt.LBFGSB (bounded) and
 jaxopt.LBFGS (unbounded), replacing scipy.optimize.minimize throughout the
 codebase.
-
-For constrained problems (MPEC SLSQP, max margin), an augmented Lagrangian
-wrapper is provided.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Sequence
 
 import jax
 import jax.numpy as jnp
@@ -31,6 +28,46 @@ class OptimizeResult:
     message: str
 
 
+def _run_stepwise(solver, x0, maxiter, tol, desc, param_names, bounds_kw):
+    """Run jaxopt solver step by step with rich tqdm diagnostics."""
+    state = solver.init_state(x0, **bounds_kw) if bounds_kw else solver.init_state(x0)
+    params = x0
+    prev_val = float("inf")
+
+    pbar = tqdm(range(maxiter), desc=desc, leave=True)
+    for i in pbar:
+        if bounds_kw:
+            params, state = solver.update(params, state, **bounds_kw)
+        else:
+            params, state = solver.update(params, state)
+
+        fval = float(state.value)
+        gnorm = float(jnp.linalg.norm(state.grad))
+        rel_change = abs(fval - prev_val) / max(abs(prev_val), 1e-12)
+
+        postfix = {
+            "obj": f"{fval:.4f}",
+            "|g|": f"{gnorm:.1e}",
+            "dobj": f"{rel_change:.1e}",
+        }
+
+        # Show first few parameter values if names are given
+        if param_names is not None:
+            p = params.ravel()
+            for j, name in enumerate(param_names[:3]):
+                if j < len(p):
+                    postfix[name] = f"{float(p[j]):.5f}"
+
+        pbar.set_postfix(postfix)
+        prev_val = fval
+
+        if gnorm < tol:
+            pbar.set_postfix({**postfix, "status": "converged"})
+            break
+    pbar.close()
+    return params, state, i + 1
+
+
 def minimize_lbfgsb(
     fun: Callable,
     x0: jnp.ndarray,
@@ -40,6 +77,7 @@ def minimize_lbfgsb(
     verbose: bool = False,
     desc: str = "L-BFGS-B",
     value_and_grad: bool = False,
+    param_names: Sequence[str] | None = None,
 ) -> OptimizeResult:
     """Bounded L-BFGS optimization using jaxopt.
 
@@ -48,8 +86,7 @@ def minimize_lbfgsb(
     fun : callable
         Objective function. If value_and_grad is False, must be f(x) -> scalar
         and must be JAX-differentiable. If value_and_grad is True, must be
-        f(x) -> (scalar, grad_array), which allows analytical gradients that
-        are not JAX-traceable (e.g. functions using numpy or Python loops).
+        f(x) -> (scalar, grad_array).
     x0 : jnp.ndarray
         Initial parameter vector.
     bounds : tuple of (lower, upper) arrays, optional
@@ -59,12 +96,13 @@ def minimize_lbfgsb(
     tol : float
         Gradient tolerance for convergence.
     verbose : bool
-        If True, show tqdm progress bar.
+        If True, show tqdm progress bar with rich diagnostics.
     desc : str
         Description for the progress bar.
     value_and_grad : bool
         If True, fun returns (value, gradient) instead of just the value.
-        jaxopt will use the supplied gradient rather than computing via autodiff.
+    param_names : list of str, optional
+        Names for the first few parameters. Shown in tqdm postfix.
 
     Returns
     -------
@@ -74,70 +112,33 @@ def minimize_lbfgsb(
     x0 = jnp.asarray(x0, dtype=jnp.float64)
 
     if bounds is not None:
-        lower, upper = bounds
-        lower = jnp.asarray(lower, dtype=jnp.float64)
-        upper = jnp.asarray(upper, dtype=jnp.float64)
-
+        lower = jnp.asarray(bounds[0], dtype=jnp.float64)
+        upper = jnp.asarray(bounds[1], dtype=jnp.float64)
         solver = jaxopt.LBFGSB(
-            fun=fun,
-            value_and_grad=value_and_grad,
-            maxiter=maxiter,
-            tol=tol,
-            jit=False,
-            unroll=True,
+            fun=fun, value_and_grad=value_and_grad,
+            maxiter=maxiter, tol=tol, jit=False, unroll=True,
         )
-
-        if verbose:
-            # Run stepwise with tqdm
-            state = solver.init_state(x0, bounds=(lower, upper))
-            params = x0
-            pbar = tqdm(range(maxiter), desc=desc, leave=True)
-            for i in pbar:
-                params, state = solver.update(params, state, bounds=(lower, upper))
-                fval = float(state.value)
-                gnorm = float(jnp.linalg.norm(state.grad))
-                pbar.set_postfix({"obj": f"{fval:.4f}", "|g|": f"{gnorm:.2e}"})
-                if gnorm < tol:
-                    break
-            pbar.close()
-            nit = i + 1
-        else:
-            result = solver.run(x0, bounds=(lower, upper))
-            params = result.params
-            state = result.state
-            nit = maxiter  # jaxopt doesn't expose iteration count easily
+        bounds_kw = {"bounds": (lower, upper)}
     else:
         solver = jaxopt.LBFGS(
-            fun=fun,
-            value_and_grad=value_and_grad,
-            maxiter=maxiter,
-            tol=tol,
-            jit=False,
-            unroll=True,
+            fun=fun, value_and_grad=value_and_grad,
+            maxiter=maxiter, tol=tol, jit=False, unroll=True,
         )
+        bounds_kw = {}
 
-        if verbose:
-            state = solver.init_state(x0)
-            params = x0
-            pbar = tqdm(range(maxiter), desc=desc, leave=True)
-            for i in pbar:
-                params, state = solver.update(params, state)
-                fval = float(state.value)
-                gnorm = float(jnp.linalg.norm(state.grad))
-                pbar.set_postfix({"obj": f"{fval:.4f}", "|g|": f"{gnorm:.2e}"})
-                if gnorm < tol:
-                    break
-            pbar.close()
-            nit = i + 1
+    if verbose:
+        params, state, nit = _run_stepwise(
+            solver, x0, maxiter, tol, desc, param_names, bounds_kw,
+        )
+    else:
+        if bounds_kw:
+            result = solver.run(x0, **bounds_kw)
         else:
             result = solver.run(x0)
-            params = result.params
-            state = result.state
-            nit = maxiter
+        params = result.params
+        state = result.state
+        nit = maxiter
 
-    # Compute final gradient norm to determine convergence. When value_and_grad
-    # is True the function returns (val, grad), so extract the gradient directly
-    # rather than calling jax.grad which would fail on a non-traceable function.
     if value_and_grad:
         final_val, final_grad = fun(params)
         final_val = float(final_val)
@@ -146,7 +147,7 @@ def minimize_lbfgsb(
         final_val = float(fun(params))
         grad_norm = float(jnp.linalg.norm(jax.grad(fun)(params)))
 
-    converged = grad_norm < tol * 10  # slightly relaxed check
+    converged = grad_norm < tol * 10
 
     return OptimizeResult(
         x=params,

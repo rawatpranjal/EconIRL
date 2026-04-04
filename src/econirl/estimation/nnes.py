@@ -34,9 +34,9 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 import optax
-from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator
+from econirl.core.optimizer import minimize_lbfgsb
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
@@ -238,25 +238,40 @@ class NNESNFXPEstimator(BaseEstimator):
             # Fallback: return small positive values
             return jnp.full((feature_matrix.shape[2],), 0.01)
 
-        # Partial MLE with exact EV
-        def objective(params_np):
-            params = jnp.array(params_np, dtype=jnp.float32)
+        # Precompute EV transition products so the JAX objective is pure.
+        # ev_trans_feat[a, s, k] = sum_s' P(s'|s,a) * ev_features[s', k]
+        # ev_trans_ent[a, s]     = sum_s' P(s'|s,a) * ev_entropy[s']
+        ev_trans_feat = jnp.stack(
+            [transitions[a] @ ev_features for a in range(n_actions)], axis=0,
+        )  # (A, S, K)
+        ev_trans_ent = jnp.stack(
+            [transitions[a] @ ev_entropy for a in range(n_actions)], axis=0,
+        )  # (A, S)
+
+        # Pure JAX objective for minimize_lbfgsb
+        def _bootstrap_obj_jax(params):
             flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
-            continuation = jnp.zeros((n_states, n_actions))
-            for a in range(n_actions):
-                ev_next = transitions[a] @ ev_features  # (S, K)
-                feat_part = jnp.einsum("sk,k->s", ev_next, params)
-                ent_part = transitions[a] @ ev_entropy
-                continuation = continuation.at[:, a].set(beta * (feat_part + sigma * ent_part))
+            # continuation[s, a] = beta * (sum_k ev_trans_feat[a,s,k]*params[k]
+            #                               + sigma * ev_trans_ent[a,s])
+            feat_part = jnp.einsum("ask,k->sa", ev_trans_feat, params)
+            ent_part = ev_trans_ent.T  # (S, A)
+            continuation = beta * (feat_part + sigma * ent_part)
             v = flow_u + continuation
             log_probs = jax.nn.log_softmax(v / sigma, axis=1)
-            return -float(log_probs[all_states, all_actions].sum())
+            return -log_probs[all_states, all_actions].sum()
 
         # Start slightly above zero to avoid boundary stall
-        x0 = np.full(feature_matrix.shape[2], 0.01)
-        result = optimize.minimize(
-            objective, x0, method="L-BFGS-B",
-            bounds=bounds, options={"maxiter": 100},
+        x0 = jnp.full(feature_matrix.shape[2], 0.01, dtype=jnp.float32)
+        lower_b = jnp.array([b[0] for b in bounds], dtype=jnp.float32)
+        upper_b = jnp.array([b[1] for b in bounds], dtype=jnp.float32)
+        result = minimize_lbfgsb(
+            _bootstrap_obj_jax,
+            x0,
+            bounds=(lower_b, upper_b),
+            maxiter=100,
+            tol=1e-6,
+            verbose=False,
+            desc="NNES bootstrap",
         )
         return jnp.array(result.x, dtype=jnp.float32)
 
@@ -382,7 +397,11 @@ class NNESNFXPEstimator(BaseEstimator):
             avg_loss = epoch_loss / max(n_batches, 1)
             loss_history.append(avg_loss)
 
-            pbar.set_postfix({"loss": f"{avg_loss:.4f}", "best": f"{best_loss:.4f}"})
+            pbar.set_postfix({
+                "loss": f"{avg_loss:.4f}",
+                "best": f"{best_loss:.4f}",
+                "no_imp": patience_counter,
+            })
 
             # Early stopping with best model checkpoint
             if avg_loss < best_loss - 1e-8:
@@ -491,27 +510,20 @@ class NNESNFXPEstimator(BaseEstimator):
                 return -log_probs[all_states_data, all_actions_data].sum()
 
             _neg_ll_jit = jax.jit(_neg_ll_jax)
-            _neg_ll_grad = jax.jit(jax.grad(_neg_ll_jax))
 
             def log_likelihood(params: jnp.ndarray) -> float:
                 return -float(_neg_ll_jit(params))
 
-            def objective(params_np):
-                return float(_neg_ll_jit(jnp.array(params_np, dtype=jnp.float32)))
-
-            def gradient(params_np):
-                return np.asarray(_neg_ll_grad(jnp.array(params_np, dtype=jnp.float32)))
-
-            last_result = optimize.minimize(
-                objective,
-                np.asarray(current_params),
-                method="L-BFGS-B",
-                jac=gradient,
-                bounds=bounds,
-                options={
-                    "maxiter": self._outer_max_iter,
-                    "gtol": self._outer_tol,
-                },
+            lower_b = jnp.array([b[0] for b in bounds], dtype=jnp.float32)
+            upper_b = jnp.array([b[1] for b in bounds], dtype=jnp.float32)
+            last_result = minimize_lbfgsb(
+                _neg_ll_jit,
+                jnp.asarray(current_params, dtype=jnp.float32),
+                bounds=(lower_b, upper_b),
+                maxiter=self._outer_max_iter,
+                tol=self._outer_tol,
+                verbose=self._verbose,
+                desc=f"NNES-NFXP outer {outer_iter + 1}",
             )
 
             current_params = jnp.array(last_result.x, dtype=jnp.float32)
@@ -873,23 +885,34 @@ class NNESEstimator(BaseEstimator):
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
 
-        def objective(params_np):
-            params = jnp.array(params_np, dtype=jnp.float32)
+        # Precompute EV transition products so the JAX objective is pure.
+        ev_trans_feat = jnp.stack(
+            [transitions[a] @ ev_features for a in range(n_actions)], axis=0,
+        )  # (A, S, K)
+        ev_trans_ent = jnp.stack(
+            [transitions[a] @ ev_entropy for a in range(n_actions)], axis=0,
+        )  # (A, S)
+
+        def _bootstrap_obj_jax(params):
             flow_u = jnp.einsum("sak,k->sa", feature_matrix, params)
-            continuation = jnp.zeros((n_states, n_actions))
-            for a in range(n_actions):
-                ev_next = transitions[a] @ ev_features
-                feat_part = jnp.einsum("sk,k->s", ev_next, params)
-                ent_part = transitions[a] @ ev_entropy
-                continuation = continuation.at[:, a].set(beta * (feat_part + sigma * ent_part))
+            feat_part = jnp.einsum("ask,k->sa", ev_trans_feat, params)
+            ent_part = ev_trans_ent.T  # (S, A)
+            continuation = beta * (feat_part + sigma * ent_part)
             v = flow_u + continuation
             log_probs = jax.nn.log_softmax(v / sigma, axis=1)
-            return -float(log_probs[all_states, all_actions].sum())
+            return -log_probs[all_states, all_actions].sum()
 
-        x0 = np.full(feature_matrix.shape[2], 0.01)
-        result = optimize.minimize(
-            objective, x0, method="L-BFGS-B",
-            bounds=bounds, options={"maxiter": 100},
+        x0 = jnp.full(feature_matrix.shape[2], 0.01, dtype=jnp.float32)
+        lower_b = jnp.array([b[0] for b in bounds], dtype=jnp.float32)
+        upper_b = jnp.array([b[1] for b in bounds], dtype=jnp.float32)
+        result = minimize_lbfgsb(
+            _bootstrap_obj_jax,
+            x0,
+            bounds=(lower_b, upper_b),
+            maxiter=100,
+            tol=1e-6,
+            verbose=False,
+            desc="NNES bootstrap",
         )
         return jnp.array(result.x, dtype=jnp.float32)
 
@@ -980,27 +1003,20 @@ class NNESEstimator(BaseEstimator):
                 return -log_probs[all_states_data, all_actions_data].sum()
 
             _neg_ll_npl_jit = jax.jit(_neg_ll_npl)
-            _neg_ll_npl_grad = jax.jit(jax.grad(_neg_ll_npl))
 
             def log_likelihood(params: jnp.ndarray) -> float:
                 return -float(_neg_ll_npl_jit(params))
 
-            def objective(params_np):
-                return float(_neg_ll_npl_jit(jnp.array(params_np, dtype=jnp.float32)))
-
-            def gradient(params_np):
-                return np.asarray(_neg_ll_npl_grad(jnp.array(params_np, dtype=jnp.float32)))
-
-            last_result = optimize.minimize(
-                objective,
-                np.asarray(current_params),
-                method="L-BFGS-B",
-                jac=gradient,
-                bounds=bounds,
-                options={
-                    "maxiter": self._outer_max_iter,
-                    "gtol": self._outer_tol,
-                },
+            lower_b = jnp.array([b[0] for b in bounds], dtype=jnp.float32)
+            upper_b = jnp.array([b[1] for b in bounds], dtype=jnp.float32)
+            last_result = minimize_lbfgsb(
+                _neg_ll_npl_jit,
+                jnp.asarray(current_params, dtype=jnp.float32),
+                bounds=(lower_b, upper_b),
+                maxiter=self._outer_max_iter,
+                tol=self._outer_tol,
+                verbose=self._verbose,
+                desc=f"NNES-NPL outer {outer_iter + 1}",
             )
 
             current_params = jnp.array(last_result.x, dtype=jnp.float32)

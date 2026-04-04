@@ -26,7 +26,6 @@ from typing import Literal
 import jax
 import jax.numpy as jnp
 import numpy as np
-from scipy import optimize
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult

@@ -30,9 +30,9 @@ from typing import Literal
 import jax
 import jax.numpy as jnp
 import numpy as np
-from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator, bellman_operator_fn
+from econirl.core.optimizer import minimize_lbfgsb
 from econirl.core.solvers import (
     value_iteration, policy_iteration, hybrid_iteration,
     backward_induction, optimistix_solve,
@@ -325,11 +325,14 @@ class NFXPEstimator(BaseEstimator):
             grad_norm = float(jnp.abs(grad).max())
             ll_change = abs(ll - prev_ll) if prev_ll > -float("inf") else float("inf")
 
-            pbar.set_postfix({"LL": f"{ll:.2f}", "|grad|": f"{grad_norm:.1e}"})
+            postfix = {"LL": f"{ll:.2f}", "|g|": f"{grad_norm:.1e}", "dLL": f"{ll_change:.1e}"}
+            for j, nm in enumerate(utility.parameter_names[:3]):
+                postfix[nm] = f"{float(params[j]):.5f}"
+            pbar.set_postfix(postfix)
 
             if grad_norm < self._outer_tol or (iteration > 10 and ll_change < 1e-10):
                 converged = True
-                pbar.set_postfix({"LL": f"{ll:.2f}", "|grad|": f"{grad_norm:.1e}", "status": "converged"})
+                pbar.set_postfix({**postfix, "status": "converged"})
                 pbar.close()
                 self._log(f"BHHH converged at iter {iteration+1}: |grad| = {grad_norm:.2e}")
                 break
@@ -438,39 +441,40 @@ class NFXPEstimator(BaseEstimator):
         finite_horizon = problem.num_periods is not None
 
         if finite_horizon:
-            # Finite-horizon via backward induction + scipy
+            # Finite-horizon via backward induction + JAX-native L-BFGS-B
             num_periods = problem.num_periods
             self._log(f"Starting finite-horizon NFXP ({num_periods} periods)")
             total_inner = 0
             n_evals = 0
 
-            def objective_fh(params_np):
+            obs_states_fh = panel.get_all_states()
+            obs_actions_fh = panel.get_all_actions()
+
+            # Pure JAX objective so minimize_lbfgsb can differentiate through it.
+            def neg_ll_jax_fh(params):
                 nonlocal total_inner, n_evals
                 n_evals += 1
-                params = jnp.array(params_np, dtype=jnp.float32)
+                params = jnp.asarray(params, dtype=jnp.float32)
                 flow_u = jnp.array(utility.compute(params), dtype=jnp.float64)
                 utility_seq = jnp.stack([flow_u] * num_periods)
                 fh_result = backward_induction(operator, utility_seq)
-                # Compute LL using period-0 policy (simplification)
                 sigma = problem.scale_parameter
                 log_policy = jax.nn.log_softmax(fh_result.Q / sigma, axis=1)
-                all_s = panel.get_all_states()
-                all_a = panel.get_all_actions()
-                ll = float(log_policy[all_s, all_a].sum())
                 total_inner += num_periods
-                return -ll
-
-            # Use jax.grad for gradient
-            def neg_ll_jax(params_jnp):
-                return -objective_fh(np.asarray(params_jnp))
+                return -log_policy[obs_states_fh, obs_actions_fh].sum()
 
             lower, upper = utility.get_parameter_bounds()
-            bounds = list(zip(np.asarray(lower), np.asarray(upper))) if lower is not None else None
+            fh_bounds = (jnp.asarray(lower), jnp.asarray(upper)) if lower is not None else None
 
-            result = optimize.minimize(
-                objective_fh, np.asarray(initial_params),
-                method="L-BFGS-B", bounds=bounds,
-                options={"maxiter": self._outer_max_iter, "gtol": self._outer_tol},
+            result = minimize_lbfgsb(
+                neg_ll_jax_fh,
+                jnp.asarray(initial_params, dtype=jnp.float64),
+                bounds=fh_bounds,
+                maxiter=self._outer_max_iter,
+                tol=self._outer_tol,
+                verbose=self._verbose,
+                desc="NFXP FH",
+                param_names=list(utility.parameter_names),
             )
 
             final_params = jnp.array(result.x, dtype=jnp.float32)
@@ -487,9 +491,9 @@ class NFXPEstimator(BaseEstimator):
 
         else:
             # Scipy optimizer with jax.grad for automatic gradient.
-            # EV cache: scipy calls objective() and gradient() separately
-            # at the same params. Cache the Bellman solution to avoid
-            # solving twice per outer iteration.
+            # EV cache used by _solve_cached. minimize_lbfgsb calls jax.grad
+            # internally, which re-evaluates the objective. Cache the Bellman
+            # solution to avoid solving twice per outer iteration.
             total_inner = 0
             n_evals = 0
             ev_cache = {}  # mutable dict used as cache between closures
@@ -510,41 +514,34 @@ class NFXPEstimator(BaseEstimator):
                 ev_cache["V"] = V
                 return V
 
-            def objective(params_np):
-                nonlocal n_evals
-                n_evals += 1
-                params = jnp.array(params_np, dtype=jnp.float64)
-                u = jnp.einsum("sak,k->sa", features, params)
-                V = _solve_cached(params)
-                log_probs = _compute_log_probs(u, V, transitions_f64, beta, problem.scale_parameter)
-                ll = float(log_probs[obs_states, obs_actions].sum())
-                if self._verbose and n_evals % 10 == 0:
-                    self._log(f"Eval {n_evals}: LL = {ll:.4f}")
-                return -ll
-
-            # Automatic gradient via jax.grad through the optimistix fixed point
+            # Automatic gradient via jax.grad through the optimistix fixed point.
+            # minimize_lbfgsb calls jax.grad internally, so pass the pure JAX
+            # log-likelihood directly (negated for minimization).
             ll_fn = self._make_log_likelihood_fn(
                 features, transitions_f64, problem, obs_states, obs_actions,
             )
-            grad_fn = jax.grad(ll_fn)
 
-            def gradient(params_np):
-                g = grad_fn(jnp.array(params_np, dtype=jnp.float64))
-                return -np.asarray(g)  # negative for minimization
+            def neg_ll_jax(params):
+                nonlocal n_evals
+                n_evals += 1
+                return -ll_fn(params)
 
             self._log(f"Starting optimization with {self._optimizer}")
-            bounds = None
+            ih_bounds = None
             if self._optimizer == "L-BFGS-B":
                 lower, upper = utility.get_parameter_bounds()
                 if lower is not None:
-                    bounds = list(zip(np.asarray(lower), np.asarray(upper)))
+                    ih_bounds = (jnp.asarray(lower), jnp.asarray(upper))
 
-            result = optimize.minimize(
-                objective, np.asarray(initial_params),
-                method=self._optimizer,
-                jac=gradient,
-                bounds=bounds,
-                options={"maxiter": self._outer_max_iter, "gtol": self._outer_tol},
+            result = minimize_lbfgsb(
+                neg_ll_jax,
+                jnp.asarray(initial_params, dtype=jnp.float64),
+                bounds=ih_bounds,
+                maxiter=self._outer_max_iter,
+                tol=self._outer_tol,
+                verbose=self._verbose,
+                desc=f"NFXP {self._optimizer}",
+                param_names=list(utility.parameter_names),
             )
 
             final_params = jnp.array(result.x, dtype=jnp.float32)

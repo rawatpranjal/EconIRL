@@ -266,6 +266,7 @@ class SEESEstimator(BaseEstimator):
             tol=self._tol,
             verbose=self._verbose,
             desc="SEES L-BFGS-B",
+            param_names=utility.parameter_names,
         )
 
         x_opt = jnp.array(result.x, dtype=jnp.float32)

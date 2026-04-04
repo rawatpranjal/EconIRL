@@ -311,7 +311,13 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
                 best_V = jnp.array(sr.V)
                 best_reward = jnp.array(rm)
 
-            pbar.set_postfix({"LL": f"{ll:.2f}", "best": f"{best_ll:.2f}"})
+            r_range = float(jnp.max(rm) - jnp.min(rm))
+            pbar.set_postfix({
+                "LL": f"{ll:.2f}",
+                "best": f"{best_ll:.2f}",
+                "R_rng": f"{r_range:.2f}",
+                "P(R|hi)": f"{float(sr.policy[-10:, 1].mean()):.3f}",
+            })
 
         elapsed = time.time() - start_time
 

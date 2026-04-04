@@ -498,12 +498,12 @@ class GAILEstimator(BaseEstimator):
             policy_change = float(jnp.abs(policy - old_policy).max())
             policy_changes.append(policy_change)
 
-            pbar.set_postfix(
-                {
-                    "disc_loss": f"{disc_loss:.4f}",
-                    "policy_change": f"{policy_change:.4f}",
-                }
-            )
+            pbar.set_postfix({
+                "d_loss": f"{disc_loss:.4f}",
+                "d_pol": f"{policy_change:.4f}",
+                "P(R|hi)": f"{float(policy[-10:, 1].mean()):.3f}",
+                "best_ll": f"{best_ll:.1f}",
+            })
 
             if policy_change < self.config.convergence_tol:
                 converged = True

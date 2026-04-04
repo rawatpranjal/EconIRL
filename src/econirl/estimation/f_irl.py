@@ -254,7 +254,13 @@ class FIRLEstimator(BaseEstimator):
                 best_reward = jnp.array(reward)
 
             div = jnp.abs(expert_marginal - policy_marginal).sum().item()
-            pbar.set_postfix({"LL": f"{ll:.2f}", "best": f"{best_ll:.2f}", "div": f"{div:.4f}"})
+            r_range = float(jnp.max(reward) - jnp.min(reward))
+            pbar.set_postfix({
+                "LL": f"{ll:.2f}",
+                "best": f"{best_ll:.2f}",
+                "div": f"{div:.4f}",
+                "R_rng": f"{r_range:.2f}",
+            })
 
         elapsed = time.time() - start_time
 

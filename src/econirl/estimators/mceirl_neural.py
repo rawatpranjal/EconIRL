@@ -653,7 +653,12 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             loss_val = float(jnp.sum(grad_r ** 2))
             feature_diff = float(jnp.linalg.norm(empirical_sa - policy_sa))
 
-            pbar.set_postfix({"loss": f"{loss_val:.4f}", "fdiff": f"{feature_diff:.4f}"})
+            pbar.set_postfix({
+                "loss": f"{loss_val:.4f}",
+                "fdiff": f"{feature_diff:.4f}",
+                "best": f"{best_loss:.4f}",
+                "no_imp": patience_counter,
+            })
 
             # Early stopping with best model checkpoint
             if loss_val < best_loss - 1e-5:

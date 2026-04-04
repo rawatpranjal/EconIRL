@@ -46,9 +46,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from scipy import optimize
-
 from econirl.core.bellman import SoftBellmanOperator
+from econirl.core.optimizer import minimize_lbfgsb
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
@@ -320,17 +319,17 @@ class TDCCPEstimator(BaseEstimator):
         # For multiple actions, we fit A-1 log-odds relative to action 0.
         if num_actions == 2:
             # Binary logit: P(a=1|x) = sigmoid(X @ beta)
-            y = (all_actions == 1).astype(np.float64)
-            from scipy.optimize import minimize as sp_minimize
+            y_jax = jnp.array((all_actions == 1).astype(np.float64))
+            X_jax = jnp.array(X_poly, dtype=jnp.float64)
 
-            def neg_ll(beta):
-                logits = X_poly @ beta
-                # Numerically stable log-likelihood
-                ll = y * logits - np.logaddexp(0, logits)
+            def neg_ll_binary(beta):
+                logits = X_jax @ beta
+                ll = y_jax * logits - jnp.logaddexp(0.0, logits)
                 return -ll.sum()
 
-            result = sp_minimize(neg_ll, np.zeros(X_poly.shape[1]), method="L-BFGS-B")
-            beta = result.x
+            from econirl.core.optimizer import minimize_lbfgsb
+            result = minimize_lbfgsb(neg_ll_binary, jnp.zeros(X_poly.shape[1], dtype=jnp.float64), maxiter=200, tol=1e-6)
+            beta = np.asarray(result.x)
 
             # Predict P(a=1|s) for all states
             x_all = np.arange(num_states) / max(num_states - 1, 1)
@@ -343,19 +342,20 @@ class TDCCPEstimator(BaseEstimator):
             # Normalize action 0 as reference (beta_0 = 0).
             n_params = X_poly.shape[1] * (num_actions - 1)
 
-            def neg_ll(beta_flat):
-                beta = beta_flat.reshape(num_actions - 1, X_poly.shape[1])
-                # logits[i, a] for a = 1, ..., A-1; action 0 has logit 0
-                logits = X_poly @ beta.T  # (N, A-1)
-                logits_full = np.column_stack([np.zeros(len(all_states)), logits])
-                # log-softmax for numerical stability
-                log_sum_exp = np.log(np.exp(logits_full).sum(axis=1))
-                ll = logits_full[np.arange(len(all_actions)), all_actions] - log_sum_exp
+            X_jax_m = jnp.array(X_poly, dtype=jnp.float64)
+            actions_jax = jnp.array(all_actions)
+
+            def neg_ll_multi(beta_flat):
+                beta = beta_flat.reshape(num_actions - 1, X_jax_m.shape[1])
+                logits = X_jax_m @ beta.T  # (N, A-1)
+                logits_full = jnp.concatenate([jnp.zeros((len(actions_jax), 1)), logits], axis=1)
+                log_sum_exp = jax.scipy.special.logsumexp(logits_full, axis=1)
+                ll = logits_full[jnp.arange(len(actions_jax)), actions_jax] - log_sum_exp
                 return -ll.sum()
 
-            from scipy.optimize import minimize as sp_minimize
-            result = sp_minimize(neg_ll, np.zeros(n_params), method="L-BFGS-B")
-            beta = result.x.reshape(num_actions - 1, X_poly.shape[1])
+            from econirl.core.optimizer import minimize_lbfgsb
+            result = minimize_lbfgsb(neg_ll_multi, jnp.zeros(n_params, dtype=jnp.float64), maxiter=200, tol=1e-6)
+            beta = np.asarray(result.x).reshape(num_actions - 1, X_poly.shape[1])
 
             x_all = np.arange(num_states) / max(num_states - 1, 1)
             X_all = np.column_stack([x_all ** p for p in range(degree + 1)])
@@ -866,7 +866,11 @@ class TDCCPEstimator(BaseEstimator):
                 avg_loss = epoch_loss / max(n_batches, 1)
                 losses.append(avg_loss)
 
-            pbar.set_postfix({"loss": f"{avg_loss:.4f}"})
+            pbar.set_postfix({
+                "loss": f"{avg_loss:.4f}",
+                "avi": f"{avi_iter+1}/{cfg.avi_iterations}",
+                "ep/avi": cfg.epochs_per_avi,
+            })
 
             # ---------------------------------------------------------
             # Early stopping check (footnote 9 of the paper):
@@ -974,9 +978,10 @@ class TDCCPEstimator(BaseEstimator):
                 obs_states, obs_actions, sigma,
             )
 
-        def gradient(params_np):
+        def objective_and_grad(params_np):
             eps = 1e-5
             n = len(params_np)
+            val = objective(params_np)
             grad = np.zeros(n)
             for i in range(n):
                 p_plus = params_np.copy()
@@ -984,24 +989,21 @@ class TDCCPEstimator(BaseEstimator):
                 p_plus[i] += eps
                 p_minus[i] -= eps
                 grad[i] = (objective(p_plus) - objective(p_minus)) / (2 * eps)
-            return grad
+            return val, grad
 
         if initial_params is None:
             initial_params = np.array(utility.get_initial_parameters())
 
         lower, upper = utility.get_parameter_bounds()
-        bounds = list(zip(np.asarray(lower), np.asarray(upper)))
 
-        result = optimize.minimize(
-            objective,
+        result = minimize_lbfgsb(
+            objective_and_grad,
             np.asarray(initial_params),
-            method="L-BFGS-B",
-            jac=gradient,
-            bounds=bounds,
-            options={
-                "maxiter": self._config.outer_max_iter,
-                "gtol": self._config.outer_tol,
-            },
+            bounds=(np.asarray(lower), np.asarray(upper)),
+            maxiter=self._config.outer_max_iter,
+            tol=self._config.outer_tol,
+            value_and_grad=True,
+            desc="TD-CCP partial MLE",
         )
 
         params_opt = np.array(result.x)

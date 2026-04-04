@@ -198,7 +198,15 @@ class BayesianIRLEstimator(BaseEstimator):
 
             if (i + 1) % 10 == 0:
                 accept_rate = n_accepted / (i + 1)
-                pbar.set_postfix({"acc": f"{accept_rate:.2f}", "lp": f"{current_log_post:.1f}"})
+                p = np.asarray(current_params)
+                postfix = {
+                    "acc": f"{accept_rate:.2f}",
+                    "lp": f"{current_log_post:.1f}",
+                    "p0": f"{p[0]:.4f}",
+                }
+                if len(p) > 1:
+                    postfix["p1"] = f"{p[1]:.4f}"
+                pbar.set_postfix(postfix)
 
         # Discard burn-in (convert back to JAX arrays)
         post_burnin = jnp.array(samples[self._burnin:])

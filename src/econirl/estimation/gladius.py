@@ -758,7 +758,12 @@ class GLADIUSEstimator(BaseEstimator):
             avg_loss = epoch_loss / max(n_batches, 1)
             loss_history.append(avg_loss)
 
-            pbar.set_postfix({"loss": f"{avg_loss:.4f}", "best": f"{best_loss:.4f}"})
+            pbar.set_postfix({
+                "loss": f"{avg_loss:.4f}",
+                "best": f"{best_loss:.4f}",
+                "ce_w": f"{float(ce_weight):.2f}",
+                "no_imp": epochs_no_improve,
+            })
 
             # Early stopping
             if avg_loss < best_loss - 1e-6:

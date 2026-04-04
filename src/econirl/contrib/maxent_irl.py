@@ -354,6 +354,7 @@ class MaxEntIRLEstimator(BaseEstimator):
             tol=self._outer_tol,
             verbose=self._verbose,
             desc="MaxEnt-IRL L-BFGS-B",
+            param_names=reward_fn.parameter_names if hasattr(reward_fn, 'parameter_names') else None,
         )
 
         final_params = jnp.array(result_opt.x, dtype=jnp.float32)
