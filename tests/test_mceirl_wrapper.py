@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import Panel, Trajectory, TrajectoryPanel
@@ -143,8 +143,8 @@ class TestRewardSpec:
 
     def test_fit_with_reward_spec_argument(self, bus_df):
         n = _N_STATES
-        s = torch.arange(n, dtype=torch.float32)
-        state_features = torch.stack([s / 100, (s / 100) ** 2], dim=1)
+        s = jnp.arange(n, dtype=jnp.float32)
+        state_features = jnp.stack([s / 100, (s / 100) ** 2], axis=1)
         spec = RewardSpec(state_features, names=["linear", "quadratic"], n_actions=2)
 
         model = MCEIRL(

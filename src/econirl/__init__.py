@@ -1,3 +1,5 @@
+import econirl._jax_config  # noqa: F401  # enable float64 before any JAX usage
+
 """
 econirl: The StatsModels of IRL
 
@@ -62,43 +64,18 @@ from econirl.preferences.linear import LinearUtility
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.ccp import CCPEstimator
 
-# Sklearn-style Estimators — lazy imports (still on PyTorch, pending migration)
-try:
-    from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES, SEES, TDCCP
-except (ImportError, SyntaxError):
-    pass
-
-try:
-    from econirl.estimators import GLADIUS, NeuralGLADIUS
-except (ImportError, SyntaxError):
-    pass
-
-try:
-    from econirl.estimators import AIRL, NeuralAIRL
-except (ImportError, SyntaxError):
-    pass
-
-try:
-    from econirl.estimation import IQLearnEstimator as IQLearn
-except (ImportError, SyntaxError):
-    pass
-
-try:
-    from econirl.estimators import MCEIRLNeural
-except (ImportError, SyntaxError):
-    pass
+# Sklearn-style Estimators (JAX backend)
+from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES, SEES, TDCCP
+from econirl.estimators import GLADIUS, NeuralGLADIUS
+from econirl.estimators import AIRL, NeuralAIRL
+from econirl.estimation import IQLearnEstimator as IQLearn
+from econirl.estimators import MCEIRLNeural
 
 # Sklearn-style Utilities
-try:
-    from econirl.utilities import Utility, LinearCost, make_utility
-except ImportError:
-    pass
+from econirl.utilities import Utility, LinearCost, make_utility
 
 # Sklearn-style Transition Estimator
-try:
-    from econirl.transitions import TransitionEstimator
-except ImportError:
-    pass
+from econirl.transitions import TransitionEstimator
 
 # Datasets
 from econirl import datasets

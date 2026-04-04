@@ -9,7 +9,8 @@ These tests use small environments and run quickly (not marked slow).
 """
 
 import pytest
-import torch
+import numpy as np
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -101,16 +102,16 @@ def test_soft_bellman_is_contraction(small_rust_env):
     operator = SoftBellmanOperator(problem, transitions)
 
     # Two different starting value functions
-    V1 = torch.zeros(problem.num_states)
-    V2 = torch.randn(problem.num_states) * 5.0
+    V1 = jnp.zeros(problem.num_states)
+    V2 = jnp.array(np.random.randn(problem.num_states)) * 5.0
 
-    dist_before = torch.abs(V1 - V2).max().item()
+    dist_before = float(jnp.abs(V1 - V2).max())
 
     # Apply operator once to each
     result1 = operator.apply(flow_utility, V1)
     result2 = operator.apply(flow_utility, V2)
 
-    dist_after = torch.abs(result1.V - result2.V).max().item()
+    dist_after = float(jnp.abs(result1.V - result2.V).max())
 
     # Contraction: distance must decrease by at least factor beta
     beta = problem.discount_factor
@@ -132,16 +133,16 @@ def test_contraction_multiple_steps(small_rust_env):
 
     operator = SoftBellmanOperator(problem, transitions)
 
-    V1 = torch.zeros(problem.num_states)
-    V2 = torch.randn(problem.num_states) * 10.0
+    V1 = jnp.zeros(problem.num_states)
+    V2 = jnp.array(np.random.randn(problem.num_states)) * 10.0
 
-    prev_dist = torch.abs(V1 - V2).max().item()
+    prev_dist = float(jnp.abs(V1 - V2).max())
 
     for step in range(20):
         r1 = operator.apply(flow_utility, V1)
         r2 = operator.apply(flow_utility, V2)
         V1, V2 = r1.V, r2.V
-        dist = torch.abs(V1 - V2).max().item()
+        dist = float(jnp.abs(V1 - V2).max())
         assert dist <= prev_dist + 1e-8, (
             f"Distance increased at step {step}: {dist:.6f} > {prev_dist:.6f}"
         )
@@ -170,9 +171,9 @@ def test_policy_valid_distribution(small_rust_env):
     assert (policy >= 0).all(), "Policy contains negative probabilities"
 
     # Rows sum to 1
-    row_sums = policy.sum(dim=1)
-    assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-6), (
-        f"Policy rows do not sum to 1: max deviation = {(row_sums - 1).abs().max():.8f}"
+    row_sums = policy.sum(axis=1)
+    assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-6), (
+        f"Policy rows do not sum to 1: max deviation = {float(jnp.abs(row_sums - 1).max()):.8f}"
     )
 
 
@@ -193,14 +194,14 @@ def test_mce_feature_matching_at_convergence(small_rust_env):
     # Compute empirical feature expectations
     feature_matrix = utility.feature_matrix  # (S, A, K)
     n_obs = 0
-    empirical_features = torch.zeros(feature_matrix.shape[2])
+    empirical_features = jnp.zeros(feature_matrix.shape[2])
     for traj in panel.trajectories:
         for t in range(len(traj)):
-            s = traj.states[t].item()
-            a = traj.actions[t].item()
-            empirical_features += feature_matrix[s, a, :]
+            s = int(traj.states[t])
+            a = int(traj.actions[t])
+            empirical_features = empirical_features + feature_matrix[s, a, :]
             n_obs += 1
-    empirical_features /= n_obs
+    empirical_features = empirical_features / n_obs
 
     # Compute policy at true parameters
     flow_utility = utility.compute(true_params)
@@ -209,19 +210,19 @@ def test_mce_feature_matching_at_convergence(small_rust_env):
     policy = result.policy  # (S, A)
 
     # Compute expected features under policy, iterating over empirical states
-    expected_features = torch.zeros(feature_matrix.shape[2])
+    expected_features = jnp.zeros(feature_matrix.shape[2])
     n_obs2 = 0
     for traj in panel.trajectories:
         for t in range(len(traj)):
-            s = traj.states[t].item()
+            s = int(traj.states[t])
             for a_idx in range(problem.num_actions):
-                expected_features += policy[s, a_idx] * feature_matrix[s, a_idx, :]
+                expected_features = expected_features + policy[s, a_idx] * feature_matrix[s, a_idx, :]
             n_obs2 += 1
-    expected_features /= n_obs2
+    expected_features = expected_features / n_obs2
 
     # Features should approximately match
-    diff = torch.abs(empirical_features - expected_features)
-    max_diff = diff.max().item()
+    diff = jnp.abs(empirical_features - expected_features)
+    max_diff = float(diff.max())
     assert max_diff < 0.5, (
         f"Feature matching at true params failed: max |empirical - expected| = {max_diff:.4f}"
     )

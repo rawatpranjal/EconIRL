@@ -7,7 +7,7 @@ interface for the Nested Fixed Point algorithm from Rust (1987, 1988).
 import pytest
 import numpy as np
 import pandas as pd
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import Panel, Trajectory
 
@@ -86,9 +86,9 @@ class TestNFXPFit:
         for bus_id in df["bus_id"].unique():
             bus_df = df[df["bus_id"] == bus_id].sort_values("period")
             traj = Trajectory(
-                states=torch.tensor(bus_df["mileage_bin"].values, dtype=torch.long),
-                actions=torch.tensor(bus_df["replaced"].values, dtype=torch.long),
-                next_states=torch.tensor(bus_df["next_mileage"].values, dtype=torch.long),
+                states=jnp.array(bus_df["mileage_bin"].values, dtype=jnp.int32),
+                actions=jnp.array(bus_df["replaced"].values, dtype=jnp.int32),
+                next_states=jnp.array(bus_df["next_mileage"].values, dtype=jnp.int32),
                 individual_id=bus_id,
             )
             trajectories.append(traj)

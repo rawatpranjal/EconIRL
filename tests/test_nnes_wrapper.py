@@ -17,7 +17,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import Panel, TrajectoryPanel
@@ -159,7 +160,7 @@ class TestParameterRecoveryFull:
     """Slower parameter recovery test with more data and iterations."""
 
     def test_full_recovery(self):
-        torch.manual_seed(42)  # Fix torch seed for deterministic V-network init
+        np.random.seed(42)  # Fix seed for deterministic V-network init
         df = _generate_bus_dataframe(
             n_individuals=30,
             n_periods=50,
@@ -309,10 +310,10 @@ class TestRewardSpec:
 
     def test_fit_with_reward_spec_argument(self, bus_df_fast):
         n = _N_STATES_FAST
-        features = torch.zeros((n, 2, 2), dtype=torch.float32)
-        mileage = torch.arange(n, dtype=torch.float32)
-        features[:, 0, 0] = -mileage
-        features[:, 1, 1] = -1.0
+        features = jnp.zeros((n, 2, 2), dtype=jnp.float32)
+        mileage = jnp.arange(n, dtype=jnp.float32)
+        features = features.at[:, 0, 0].set(-mileage)
+        features = features.at[:, 1, 1].set(-1.0)
         spec = RewardSpec(features, names=["theta_c", "RC"])
 
         model = NNES(

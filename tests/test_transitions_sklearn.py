@@ -6,7 +6,7 @@ interface for estimating first-stage transition probabilities in DDC models.
 
 import pytest
 import numpy as np
-import torch
+import jax.numpy as jnp
 
 from econirl.transitions import TransitionEstimator
 from econirl.core.types import Panel, Trajectory
@@ -26,25 +26,25 @@ class TestTransitionEstimatorSklearn:
         # Create deterministic transitions for testing
         # Trajectory 1: states increase by 1 each period (action=0)
         traj1 = Trajectory(
-            states=torch.tensor([0, 1, 2, 3, 4]),
-            actions=torch.tensor([0, 0, 0, 0, 0]),  # all keep
-            next_states=torch.tensor([1, 2, 3, 4, 5]),
+            states=jnp.array([0, 1, 2, 3, 4], dtype=jnp.int32),
+            actions=jnp.array([0, 0, 0, 0, 0], dtype=jnp.int32),  # all keep
+            next_states=jnp.array([1, 2, 3, 4, 5], dtype=jnp.int32),
             individual_id=0,
         )
 
         # Trajectory 2: mix of increments
         traj2 = Trajectory(
-            states=torch.tensor([0, 1, 3, 4, 6]),
-            actions=torch.tensor([0, 0, 0, 0, 0]),  # all keep
-            next_states=torch.tensor([1, 3, 4, 6, 7]),  # +1, +2, +1, +2, +1
+            states=jnp.array([0, 1, 3, 4, 6], dtype=jnp.int32),
+            actions=jnp.array([0, 0, 0, 0, 0], dtype=jnp.int32),  # all keep
+            next_states=jnp.array([1, 3, 4, 6, 7], dtype=jnp.int32),  # +1, +2, +1, +2, +1
             individual_id=1,
         )
 
         # Trajectory 3: includes a replacement (action=1)
         traj3 = Trajectory(
-            states=torch.tensor([5, 6, 0, 1, 2]),
-            actions=torch.tensor([0, 1, 0, 0, 0]),  # keep, replace, keep, keep, keep
-            next_states=torch.tensor([6, 0, 1, 2, 3]),  # +1, reset, +1, +1, +1
+            states=jnp.array([5, 6, 0, 1, 2], dtype=jnp.int32),
+            actions=jnp.array([0, 1, 0, 0, 0], dtype=jnp.int32),  # keep, replace, keep, keep, keep
+            next_states=jnp.array([6, 0, 1, 2, 3], dtype=jnp.int32),  # +1, reset, +1, +1, +1
             individual_id=2,
         )
 
@@ -184,9 +184,9 @@ class TestTransitionEstimatorSklearn:
         """fit() should work when action column is not needed (all keeps)."""
         # All transitions are keeps
         traj = Trajectory(
-            states=torch.tensor([0, 1, 2]),
-            actions=torch.tensor([0, 0, 0]),
-            next_states=torch.tensor([1, 2, 3]),
+            states=jnp.array([0, 1, 2], dtype=jnp.int32),
+            actions=jnp.array([0, 0, 0], dtype=jnp.int32),
+            next_states=jnp.array([1, 2, 3], dtype=jnp.int32),
             individual_id=0,
         )
         panel = Panel(trajectories=[traj])
@@ -208,9 +208,9 @@ class TestTransitionEstimatorSklearn:
         """Increments larger than max_increase should be clamped."""
         # Trajectory with a large jump
         traj = Trajectory(
-            states=torch.tensor([0, 5]),  # Jump of 5
-            actions=torch.tensor([0, 0]),
-            next_states=torch.tensor([5, 8]),  # Another jump
+            states=jnp.array([0, 5], dtype=jnp.int32),  # Jump of 5
+            actions=jnp.array([0, 0], dtype=jnp.int32),
+            next_states=jnp.array([5, 8], dtype=jnp.int32),  # Another jump
             individual_id=0,
         )
         panel = Panel(trajectories=[traj])

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.preferences.action_reward import ActionDependentReward
@@ -18,15 +19,15 @@ from econirl.preferences.reward import LinearReward
 @pytest.fixture
 def sak_features():
     """(S=4, A=2, K=3) feature tensor with known values."""
-    torch.manual_seed(42)
-    return torch.randn(4, 2, 3)
+    np.random.seed(42)
+    return jnp.array(np.random.randn(4, 2, 3))
 
 
 @pytest.fixture
 def sk_features():
     """(S=4, K=3) state-only feature tensor."""
-    torch.manual_seed(99)
-    return torch.randn(4, 3)
+    np.random.seed(99)
+    return jnp.array(np.random.randn(4, 3))
 
 
 @pytest.fixture
@@ -36,7 +37,7 @@ def names():
 
 @pytest.fixture
 def params():
-    return torch.tensor([1.0, -0.5, 0.3])
+    return jnp.array([1.0, -0.5, 0.3])
 
 
 # ------------------------------------------------------------------ #
@@ -75,7 +76,7 @@ class TestConstructFromSK:
         fm = spec.feature_matrix
         # All actions should have the same features
         for a in range(3):
-            assert torch.allclose(fm[:, a, :], fm[:, 0, :])
+            assert jnp.allclose(fm[:, a, :], fm[:, 0, :])
 
     def test_is_state_only(self, sk_features, names):
         spec = RewardSpec(sk_features, names=names, n_actions=2)
@@ -87,7 +88,7 @@ class TestConstructFromSK:
 
     def test_wrong_ndim_raises(self, names):
         with pytest.raises(ValueError, match="must be 2D.*or 3D"):
-            RewardSpec(torch.randn(5), names=names)
+            RewardSpec(jnp.array(np.random.randn(5)), names=names)
 
 
 # ------------------------------------------------------------------ #
@@ -98,7 +99,7 @@ class TestStateDependentClassmethod:
     def test_same_as_sk_constructor(self, sk_features, names):
         spec_a = RewardSpec(sk_features, names=names, n_actions=2)
         spec_b = RewardSpec.state_dependent(sk_features, names=names, n_actions=2)
-        assert torch.allclose(spec_a.feature_matrix, spec_b.feature_matrix)
+        assert jnp.allclose(spec_a.feature_matrix, spec_b.feature_matrix)
         assert spec_b.is_state_only is True
 
     def test_rejects_3d(self, sak_features, names):
@@ -114,7 +115,7 @@ class TestStateActionDependentClassmethod:
     def test_same_as_sak_constructor(self, sak_features, names):
         spec_a = RewardSpec(sak_features, names=names)
         spec_b = RewardSpec.state_action_dependent(sak_features, names=names)
-        assert torch.allclose(spec_a.feature_matrix, spec_b.feature_matrix)
+        assert jnp.allclose(spec_a.feature_matrix, spec_b.feature_matrix)
         assert spec_b.is_state_only is False
 
     def test_rejects_2d(self, sk_features, names):
@@ -129,11 +130,11 @@ class TestStateActionDependentClassmethod:
 class TestCompute:
     def test_known_values(self):
         """R[s,a] = sum_k params[k] * features[s,a,k]."""
-        features = torch.tensor([
+        features = jnp.array([
             [[1.0, 0.0], [0.0, 1.0]],  # s=0
             [[2.0, 3.0], [4.0, 5.0]],  # s=1
         ])  # (S=2, A=2, K=2)
-        params = torch.tensor([1.0, 2.0])
+        params = jnp.array([1.0, 2.0])
         spec = RewardSpec(features, names=["a", "b"])
         R = spec.compute(params)
 
@@ -141,14 +142,14 @@ class TestCompute:
         # s=0, a=1: 0*1 + 1*2 = 2
         # s=1, a=0: 2*1 + 3*2 = 8
         # s=1, a=1: 4*1 + 5*2 = 14
-        expected = torch.tensor([[1.0, 2.0], [8.0, 14.0]])
-        assert torch.allclose(R, expected)
+        expected = jnp.array([[1.0, 2.0], [8.0, 14.0]])
+        assert jnp.allclose(R, expected)
 
     def test_matches_einsum(self, sak_features, names, params):
         spec = RewardSpec(sak_features, names=names)
         R = spec.compute(params)
-        expected = torch.einsum("sak,k->sa", sak_features, params)
-        assert torch.allclose(R, expected)
+        expected = jnp.einsum("sak,k->sa", sak_features, params)
+        assert jnp.allclose(R, expected)
 
 
 # ------------------------------------------------------------------ #
@@ -160,13 +161,13 @@ class TestComputeGradient:
         spec = RewardSpec(sak_features, names=names)
         grad = spec.compute_gradient(params)
         assert grad.shape == (4, 2, 3)
-        assert torch.allclose(grad, spec.feature_matrix)
+        assert jnp.allclose(grad, spec.feature_matrix)
 
     def test_is_independent_of_params(self, sak_features, names):
         spec = RewardSpec(sak_features, names=names)
-        g1 = spec.compute_gradient(torch.ones(3))
-        g2 = spec.compute_gradient(torch.zeros(3))
-        assert torch.allclose(g1, g2)
+        g1 = spec.compute_gradient(jnp.ones(3))
+        g2 = spec.compute_gradient(jnp.zeros(3))
+        assert jnp.allclose(g1, g2)
 
 
 # ------------------------------------------------------------------ #
@@ -191,13 +192,13 @@ class TestToLinearUtility:
         lu = spec.to_linear_utility()
 
         assert isinstance(lu, LinearUtility)
-        assert torch.allclose(spec.compute(params), lu.compute(params))
+        assert jnp.allclose(spec.compute(params), lu.compute(params))
         assert lu.parameter_names == spec.parameter_names
 
     def test_feature_matrix_matches(self, sak_features, names):
         spec = RewardSpec(sak_features, names=names)
         lu = spec.to_linear_utility()
-        assert torch.allclose(spec.feature_matrix, lu.feature_matrix)
+        assert jnp.allclose(spec.feature_matrix, lu.feature_matrix)
 
 
 # ------------------------------------------------------------------ #
@@ -210,7 +211,7 @@ class TestToActionDependentReward:
         adr = spec.to_action_dependent_reward()
 
         assert isinstance(adr, ActionDependentReward)
-        assert torch.allclose(spec.compute(params), adr.compute(params))
+        assert jnp.allclose(spec.compute(params), adr.compute(params))
         assert adr.parameter_names == spec.parameter_names
 
 
@@ -224,7 +225,7 @@ class TestToLinearReward:
         lr = spec.to_linear_reward()
 
         assert isinstance(lr, LinearReward)
-        assert torch.allclose(spec.compute(params), lr.compute(params))
+        assert jnp.allclose(spec.compute(params), lr.compute(params))
         assert lr.parameter_names == spec.parameter_names
 
     def test_raises_for_action_dependent(self, sak_features, names):
@@ -234,12 +235,13 @@ class TestToLinearReward:
 
     def test_works_for_identical_action_features(self, names, params):
         """Even a 3D tensor should convert if all actions are identical."""
-        sk = torch.randn(5, 3)
-        sak = sk.unsqueeze(1).expand(-1, 2, -1).clone()
+        np.random.seed(0)
+        sk = jnp.array(np.random.randn(5, 3))
+        sak = jnp.array(jnp.tile(sk[:, None, :], (1, 2, 1)))
         spec = RewardSpec(sak, names=names)
         lr = spec.to_linear_reward()
         assert isinstance(lr, LinearReward)
-        assert torch.allclose(spec.compute(params), lr.compute(params))
+        assert jnp.allclose(spec.compute(params), lr.compute(params))
 
 
 # ------------------------------------------------------------------ #
@@ -254,12 +256,12 @@ class TestValidateParameters:
     def test_wrong_shape_raises(self, sak_features, names):
         spec = RewardSpec(sak_features, names=names)
         with pytest.raises(ValueError, match="Expected parameters"):
-            spec.validate_parameters(torch.zeros(5))
+            spec.validate_parameters(jnp.zeros(5))
 
     def test_2d_raises(self, sak_features, names):
         spec = RewardSpec(sak_features, names=names)
         with pytest.raises(ValueError, match="Expected parameters"):
-            spec.validate_parameters(torch.zeros(3, 1))
+            spec.validate_parameters(jnp.zeros((3, 1)))
 
 
 # ------------------------------------------------------------------ #
@@ -269,7 +271,7 @@ class TestValidateParameters:
 class TestSubsetStates:
     def test_correct_subset(self, sak_features, names, params):
         spec = RewardSpec(sak_features, names=names)
-        idx = torch.tensor([0, 2])
+        idx = jnp.array([0, 2])
         sub = spec.subset_states(idx)
 
         assert sub.num_states == 2
@@ -277,12 +279,12 @@ class TestSubsetStates:
         assert sub.num_parameters == 3
 
         # Check feature values match
-        assert torch.allclose(sub.feature_matrix, sak_features[idx, :, :])
+        assert jnp.allclose(sub.feature_matrix, sak_features[idx, :, :])
 
         # Check compute works on subset
         R_full = spec.compute(params)
         R_sub = sub.compute(params)
-        assert torch.allclose(R_sub, R_full[idx, :])
+        assert jnp.allclose(R_sub, R_full[idx, :])
 
 
 # ------------------------------------------------------------------ #
@@ -294,8 +296,7 @@ class TestToDevice:
         spec = RewardSpec(sak_features, names=names)
         spec_cpu = spec.to("cpu")
 
-        assert spec_cpu.feature_matrix.device == torch.device("cpu")
-        assert torch.allclose(spec.feature_matrix, spec_cpu.feature_matrix)
+        assert jnp.allclose(spec.feature_matrix, spec_cpu.feature_matrix)
         assert spec_cpu.parameter_names == spec.parameter_names
         assert spec_cpu.is_state_only == spec.is_state_only
 
@@ -311,12 +312,12 @@ class TestToDevice:
 
 class TestEdgeCases:
     def test_names_mismatch_raises(self):
-        features = torch.randn(3, 2, 4)
+        features = jnp.array(np.random.randn(3, 2, 4))
         with pytest.raises(ValueError, match="names must have 4 elements"):
             RewardSpec(features, names=["a", "b"])
 
     def test_n_actions_conflict_raises(self):
-        features = torch.randn(3, 2, 4)
+        features = jnp.array(np.random.randn(3, 2, 4))
         with pytest.raises(ValueError, match="n_actions=5 was also provided"):
             RewardSpec(features, names=["a", "b", "c", "d"], n_actions=5)
 

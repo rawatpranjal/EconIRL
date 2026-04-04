@@ -1,7 +1,8 @@
 """Tests for GAIL estimator."""
 
 import pytest
-import torch
+import numpy as np
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.contrib.gail import GAILEstimator, GAILConfig
@@ -25,16 +26,16 @@ def simple_transitions(simple_problem):
     n_states = simple_problem.num_states
     n_actions = simple_problem.num_actions
     # Shape: (n_actions, n_states, n_states) = [a, from_s, to_s]
-    transitions = torch.zeros(n_actions, n_states, n_states)
+    transitions = jnp.zeros((n_actions, n_states, n_states))
 
     # Action 0: stay in same state
     for s in range(n_states):
-        transitions[0, s, s] = 1.0
+        transitions = transitions.at[0, s, s].set(1.0)
 
     # Action 1: move to next state (cyclic)
     for s in range(n_states):
         next_s = (s + 1) % n_states
-        transitions[1, s, next_s] = 1.0
+        transitions = transitions.at[1, s, next_s].set(1.0)
 
     return transitions
 
@@ -45,9 +46,9 @@ def simple_reward_fn(simple_problem):
     n_states = simple_problem.num_states
     n_actions = simple_problem.num_actions
     # Features: one-hot for action (action 0 is "good", action 1 is "bad")
-    features = torch.zeros(n_states, n_actions, 2)
-    features[:, 0, 0] = 1.0  # Action 0 feature
-    features[:, 1, 1] = 1.0  # Action 1 feature
+    features = jnp.zeros((n_states, n_actions, 2))
+    features = features.at[:, 0, 0].set(1.0)  # Action 0 feature
+    features = features.at[:, 1, 1].set(1.0)  # Action 1 feature
     return ActionDependentReward(
         feature_matrix=features,
         parameter_names=["action_0_reward", "action_1_reward"],
@@ -60,9 +61,9 @@ def expert_panel():
     trajectories = []
     for i in range(20):
         # Expert mostly takes action 0 (staying)
-        states = torch.tensor([0, 0, 0, 0, 0])
-        actions = torch.tensor([0, 0, 0, 0, 0])
-        next_states = torch.tensor([0, 0, 0, 0, 0])
+        states = jnp.array([0, 0, 0, 0, 0])
+        actions = jnp.array([0, 0, 0, 0, 0])
+        next_states = jnp.array([0, 0, 0, 0, 0])
         trajectories.append(Trajectory(
             states=states,
             actions=actions,
@@ -120,8 +121,8 @@ class TestGAILEstimator:
         )
 
         # Policy should sum to 1 for each state
-        policy_sum = result.policy.sum(dim=1)
-        assert torch.allclose(policy_sum, torch.ones(3), atol=1e-5)
+        policy_sum = result.policy.sum(axis=1)
+        assert jnp.allclose(policy_sum, jnp.ones(3), atol=1e-5)
 
     def test_gail_learns_expert_preference(
         self, simple_problem, simple_transitions, simple_reward_fn, expert_panel

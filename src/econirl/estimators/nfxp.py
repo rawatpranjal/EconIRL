@@ -39,7 +39,6 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-import torch
 from scipy.stats import norm as scipy_norm
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -361,16 +360,16 @@ class NFXP:
                     next_states[-1] = min(last_state + 1, self.n_states - 1)
 
             traj = Trajectory(
-                states=torch.tensor(states, dtype=torch.long),
-                actions=torch.tensor(actions, dtype=torch.long),
-                next_states=torch.tensor(next_states, dtype=torch.long),
+                states=np.array(states, dtype=np.int64),
+                actions=np.array(actions, dtype=np.int64),
+                next_states=np.array(next_states, dtype=np.int64),
                 individual_id=ind_id,
             )
             trajectories.append(traj)
 
         return Panel(trajectories=trajectories)
 
-    def _build_transition_tensor(self, keep_transitions: np.ndarray) -> torch.Tensor:
+    def _build_transition_tensor(self, keep_transitions: np.ndarray) -> np.ndarray:
         """Build full transition tensor for both actions.
 
         Parameters
@@ -380,14 +379,14 @@ class NFXP:
 
         Returns
         -------
-        torch.Tensor
+        numpy.ndarray
             Transition tensor of shape (n_actions, n_states, n_states).
         """
         n = self.n_states
-        transitions = torch.zeros((self.n_actions, n, n), dtype=torch.float32)
+        transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
 
         # Action 0 (keep): use provided transitions
-        transitions[0] = torch.tensor(keep_transitions, dtype=torch.float32)
+        transitions[0] = np.array(keep_transitions, dtype=np.float32)
 
         # Action 1 (replace): reset to state 0, then transition
         # After replacement, start at state 0 and apply the same transition
@@ -413,9 +412,9 @@ class NFXP:
         # U(s, keep) = -theta_c * s
         # U(s, replace) = -RC
         n = self.n_states
-        features = torch.zeros((n, self.n_actions, 2), dtype=torch.float32)
+        features = np.zeros((n, self.n_actions, 2), dtype=np.float32)
 
-        mileage = torch.arange(n, dtype=torch.float32)
+        mileage = np.arange(n, dtype=np.float32)
 
         # Keep action (a=0): feature = [-s, 0]
         features[:, 0, 0] = -mileage
@@ -706,9 +705,9 @@ class NFXP:
 
         # Build parameter vector in correct order
         param_names = self._result.parameter_names
-        param_vector = torch.tensor(
+        param_vector = np.array(
             [cf_params[name] for name in param_names],
-            dtype=torch.float32,
+            dtype=np.float32,
         )
 
         # Compute utility matrix with new parameters

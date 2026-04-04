@@ -43,16 +43,16 @@ class NeuralEstimatorMixin:
 
         Parameters
         ----------
-        features : torch.Tensor
+        features : array-like
             Feature matrix of shape (N, K) for observed transitions.
-        rewards : torch.Tensor
+        rewards : array-like
             Implied rewards of shape (N,) from the neural network.
 
         Returns
         -------
-        theta : torch.Tensor
+        theta : np.ndarray
             Projected parameters of shape (K,).
-        se : torch.Tensor
+        se : np.ndarray
             Pseudo standard errors of shape (K,).
         r_squared : float
             R-squared of the projection, indicating how well the linear

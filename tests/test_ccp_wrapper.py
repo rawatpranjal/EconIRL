@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import Panel, TrajectoryPanel
@@ -122,10 +122,10 @@ class TestRewardSpec:
 
     def test_fit_with_reward_spec_argument(self, bus_df):
         n = _N_STATES
-        features = torch.zeros((n, 2, 2), dtype=torch.float32)
-        mileage = torch.arange(n, dtype=torch.float32)
-        features[:, 0, 0] = -mileage
-        features[:, 1, 1] = -1.0
+        features = jnp.zeros((n, 2, 2), dtype=jnp.float32)
+        mileage = jnp.arange(n, dtype=jnp.float32)
+        features = features.at[:, 0, 0].set(-mileage)
+        features = features.at[:, 1, 1].set(-1.0)
         spec = RewardSpec(features, names=["theta_c", "RC"])
 
         model = CCP(n_states=n, discount=_DISCOUNT, verbose=False)
@@ -143,10 +143,10 @@ class TestRewardSpec:
 
     def test_fit_with_reward_spec_in_constructor(self, bus_df):
         n = _N_STATES
-        features = torch.zeros((n, 2, 2), dtype=torch.float32)
-        mileage = torch.arange(n, dtype=torch.float32)
-        features[:, 0, 0] = -mileage
-        features[:, 1, 1] = -1.0
+        features = jnp.zeros((n, 2, 2), dtype=jnp.float32)
+        mileage = jnp.arange(n, dtype=jnp.float32)
+        features = features.at[:, 0, 0].set(-mileage)
+        features = features.at[:, 1, 1].set(-1.0)
         spec = RewardSpec(features, names=["theta_c", "RC"])
 
         model = CCP(n_states=n, discount=_DISCOUNT, utility=spec, verbose=False)

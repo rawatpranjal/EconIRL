@@ -1,7 +1,7 @@
 """Tests for the Shanghai taxi route-choice dataset loader."""
 
 import pytest
-import torch
+import jax.numpy as jnp
 import numpy as np
 
 from econirl.datasets.shanghai_route import (
@@ -77,8 +77,8 @@ class TestTransitionMatrix:
         assert transition_matrix.shape == (N_ACTIONS, N_STATES, N_STATES)
 
     def test_rows_sum_to_one(self, transition_matrix):
-        row_sums = transition_matrix.sum(dim=2)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-6)
+        row_sums = transition_matrix.sum(axis=2)
+        assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-6)
 
     def test_deterministic(self, transition_matrix, transit):
         """Valid (s, a) pairs from transit should have exactly one non-zero successor."""
@@ -86,7 +86,7 @@ class TestTransitionMatrix:
             from_s, action, to_s = int(row[0]), int(row[1]), int(row[2])
             row_vals = transition_matrix[action, from_s]
             assert (row_vals > 0).sum() == 1
-            assert row_vals[to_s] == 1.0
+            assert float(row_vals[to_s]) == 1.0
 
     def test_non_negative(self, transition_matrix):
         assert (transition_matrix >= 0).all()
@@ -99,15 +99,15 @@ class TestEdgeFeatures:
     def test_length_normalized(self, edge_features):
         """Length feature (column 0) should be in [0, 1]."""
         lengths = edge_features[:, 0]
-        assert lengths.min() >= 0.0
-        assert lengths.max() <= 1.0 + 1e-6
+        assert float(lengths.min()) >= 0.0
+        assert float(lengths.max()) <= 1.0 + 1e-6
         # At least one edge should have max length = 1.0
-        assert lengths.max() > 0.99
+        assert float(lengths.max()) > 0.99
 
     def test_highway_onehot(self, edge_features):
         """Each edge should have exactly one highway type active."""
         highway_cols = edge_features[:, 1:]
-        row_sums = highway_cols.sum(dim=1)
+        row_sums = highway_cols.sum(axis=1)
         assert (row_sums == 1.0).all()
 
 
@@ -121,14 +121,14 @@ class TestStateActionFeatures:
         sa_features = build_state_action_features(edge_features, transit)
         for row in transit[:20]:  # Check first 20
             from_s, action, to_s = int(row[0]), int(row[1]), int(row[2])
-            assert sa_features[from_s, action].abs().sum() > 0
+            assert float(jnp.abs(sa_features[from_s, action]).sum()) > 0
 
     def test_matches_edge_features(self, edge_features, transit):
         """SA features at (from_s, action) should equal edge_features[to_s]."""
         sa_features = build_state_action_features(edge_features, transit)
         for row in transit[:20]:
             from_s, action, to_s = int(row[0]), int(row[1]), int(row[2])
-            assert torch.allclose(sa_features[from_s, action], edge_features[to_s])
+            assert jnp.allclose(sa_features[from_s, action], edge_features[to_s])
 
 
 class TestTrajectoryParsing:
@@ -161,7 +161,7 @@ class TestTrajectoryParsing:
 
         for traj in panel:
             if len(traj) > 1:
-                assert torch.equal(traj.next_states[:-1], traj.states[1:])
+                assert jnp.array_equal(traj.next_states[:-1], traj.states[1:])
 
 
 class TestDestinationFeature:
@@ -171,7 +171,7 @@ class TestDestinationFeature:
         # Distance feature should be non-negative
         assert (result[:, -1] >= 0).all()
         # Destination itself should have distance ~0
-        assert result[0, -1] < 0.01
+        assert float(result[0, -1]) < 0.01
 
     def test_sa_features_3d(self, edge_features, nodes_df, edges_df, transit):
         sa_features = build_state_action_features(edge_features, transit)

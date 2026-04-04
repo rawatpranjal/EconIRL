@@ -1,6 +1,7 @@
 """Test MCE IRL with action-dependent features."""
 import pytest
-import torch
+import jax.numpy as jnp
+import numpy as np
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
@@ -49,7 +50,7 @@ class TestMCEIRLActionFeatures:
         )
 
         # Parameters should be finite
-        assert torch.isfinite(result.parameters).all(), "Parameters should be finite"
+        assert jnp.isfinite(result.parameters).all(), "Parameters should be finite"
 
     def test_mce_irl_feature_expectations(self, rust_env):
         """Test that feature expectations are computed correctly for 3D features."""
@@ -112,10 +113,10 @@ class TestMCEIRLActionFeatures:
         # Parameters should stay close to true values (within factor of 5)
         # Note: MCE IRL identifies parameters up to scale, so exact match not expected
         for i, (est, true) in enumerate(zip(result.parameters, true_params)):
-            ratio = est.item() / true.item() if true.item() != 0 else float("inf")
+            ratio = float(est) / float(true) if float(true) != 0 else float("inf")
             assert 0.1 < ratio < 10, (
-                f"Parameter {i} ratio out of range: estimated={est.item():.6f}, "
-                f"true={true.item():.6f}, ratio={ratio:.2f}"
+                f"Parameter {i} ratio out of range: estimated={float(est):.6f}, "
+                f"true={float(true):.6f}, ratio={ratio:.2f}"
             )
 
     def test_mce_irl_recovers_ratio(self, rust_env):
@@ -151,6 +152,6 @@ class TestMCEIRLActionFeatures:
         # Allow 50% relative error on the ratio (IRL is hard!)
         relative_error = abs(estimated_ratio - true_ratio) / abs(true_ratio)
         assert relative_error < 0.5, (
-            f"Ratio mismatch: estimated={estimated_ratio:.6f}, "
-            f"true={true_ratio:.6f}, relative_error={relative_error:.2%}"
+            f"Ratio mismatch: estimated={float(estimated_ratio):.6f}, "
+            f"true={float(true_ratio):.6f}, relative_error={float(relative_error):.2%}"
         )

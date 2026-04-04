@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+import jax.numpy as jnp
 
 from econirl.estimators.tdccp import TDCCP
 from econirl.estimators.protocol import EstimatorProtocol
@@ -201,14 +202,12 @@ class TestRewardSpecInput:
     """Test fitting with a RewardSpec instead of string utility."""
 
     def test_fit_with_reward_spec(self, small_df):
-        import torch
-
         n_states = 5
         n_actions = 2
-        features = torch.zeros((n_states, n_actions, 2), dtype=torch.float32)
-        mileage = torch.arange(n_states, dtype=torch.float32)
-        features[:, 0, 0] = -mileage
-        features[:, 1, 1] = -1.0
+        features = jnp.zeros((n_states, n_actions, 2), dtype=jnp.float32)
+        mileage = jnp.arange(n_states, dtype=jnp.float32)
+        features = features.at[:, 0, 0].set(-mileage)
+        features = features.at[:, 1, 1].set(-1.0)
 
         spec = RewardSpec(features, ["cost", "replace_cost"])
 

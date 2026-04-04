@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.environments.gridworld import GridworldEnvironment
 from econirl.core.types import DDCProblem
@@ -75,7 +75,7 @@ class TestGridworldBasics:
             step_penalty=-0.1, terminal_reward=10.0, distance_weight=0.1
         )
         vec = env.get_true_parameter_vector()
-        assert torch.allclose(vec, torch.tensor([-0.1, 10.0, 0.1]))
+        np.testing.assert_allclose(np.asarray(vec), np.asarray(jnp.array([-0.1, 10.0, 0.1])))
 
 
 class TestTransitionMatrices:
@@ -94,17 +94,17 @@ class TestTransitionMatrices:
         for a in range(5):
             for s in range(25):
                 row = T[a, s, :]
-                assert torch.sum(row).item() == pytest.approx(1.0)
-                assert torch.max(row).item() == pytest.approx(1.0)
-                assert torch.count_nonzero(row).item() == 1
+                assert float(jnp.sum(row)) == pytest.approx(1.0)
+                assert float(jnp.max(row)) == pytest.approx(1.0)
+                assert int(jnp.count_nonzero(row)) == 1
 
     def test_rows_sum_to_one(self):
         """All rows should sum to 1 (valid probability distributions)."""
         env = GridworldEnvironment(grid_size=4)
         T = env.transition_matrices
         for a in range(5):
-            row_sums = T[a].sum(dim=1)
-            assert torch.allclose(row_sums, torch.ones(16))
+            row_sums = T[a].sum(axis=1)
+            np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones(16)))
 
     def test_terminal_state_is_absorbing(self):
         """All actions at the terminal state should self-loop."""
@@ -113,11 +113,11 @@ class TestTransitionMatrices:
         terminal = env.terminal_state
         for a in range(5):
             # The only nonzero entry in the terminal row should be the diagonal
-            assert T[a, terminal, terminal].item() == pytest.approx(1.0)
+            assert float(T[a, terminal, terminal]) == pytest.approx(1.0)
             # All other entries should be zero
-            row = T[a, terminal, :].clone()
-            row[terminal] = 0.0
-            assert torch.all(row == 0.0)
+            row = jnp.array(T[a, terminal, :])
+            row = row.at[terminal].set(0.0)
+            assert bool(jnp.all(row == 0.0))
 
     def test_wall_collisions_stay_in_place(self):
         """Hitting a wall should keep agent at same state."""
@@ -125,16 +125,16 @@ class TestTransitionMatrices:
         T = env.transition_matrices
 
         # Top-left corner (state 0): Left and Up should stay
-        assert T[env.LEFT, 0, 0].item() == pytest.approx(1.0)
-        assert T[env.UP, 0, 0].item() == pytest.approx(1.0)
+        assert float(T[env.LEFT, 0, 0]) == pytest.approx(1.0)
+        assert float(T[env.UP, 0, 0]) == pytest.approx(1.0)
 
         # Top-right corner (state 4): Right and Up should stay
-        assert T[env.RIGHT, 4, 4].item() == pytest.approx(1.0)
-        assert T[env.UP, 4, 4].item() == pytest.approx(1.0)
+        assert float(T[env.RIGHT, 4, 4]) == pytest.approx(1.0)
+        assert float(T[env.UP, 4, 4]) == pytest.approx(1.0)
 
         # Bottom-left corner (state 20): Left and Down should stay
-        assert T[env.LEFT, 20, 20].item() == pytest.approx(1.0)
-        assert T[env.DOWN, 20, 20].item() == pytest.approx(1.0)
+        assert float(T[env.LEFT, 20, 20]) == pytest.approx(1.0)
+        assert float(T[env.DOWN, 20, 20]) == pytest.approx(1.0)
 
     def test_movement_right(self):
         """Right action should move col+1 within bounds."""
@@ -142,10 +142,10 @@ class TestTransitionMatrices:
         T = env.transition_matrices
 
         # State 0 (row=0, col=0) -> Right -> State 1 (row=0, col=1)
-        assert T[env.RIGHT, 0, 1].item() == pytest.approx(1.0)
+        assert float(T[env.RIGHT, 0, 1]) == pytest.approx(1.0)
 
         # State 6 (row=1, col=1) -> Right -> State 7 (row=1, col=2)
-        assert T[env.RIGHT, 6, 7].item() == pytest.approx(1.0)
+        assert float(T[env.RIGHT, 6, 7]) == pytest.approx(1.0)
 
     def test_movement_down(self):
         """Down action should move row+1 within bounds."""
@@ -153,10 +153,10 @@ class TestTransitionMatrices:
         T = env.transition_matrices
 
         # State 0 (row=0, col=0) -> Down -> State 5 (row=1, col=0)
-        assert T[env.DOWN, 0, 5].item() == pytest.approx(1.0)
+        assert float(T[env.DOWN, 0, 5]) == pytest.approx(1.0)
 
         # State 12 (row=2, col=2) -> Down -> State 17 (row=3, col=2)
-        assert T[env.DOWN, 12, 17].item() == pytest.approx(1.0)
+        assert float(T[env.DOWN, 12, 17]) == pytest.approx(1.0)
 
     def test_stay_action(self):
         """Stay action should keep agent at the same state."""
@@ -164,7 +164,7 @@ class TestTransitionMatrices:
         T = env.transition_matrices
 
         for s in range(25):
-            assert T[env.STAY, s, s].item() == pytest.approx(1.0)
+            assert float(T[env.STAY, s, s]) == pytest.approx(1.0)
 
     def test_different_grid_sizes(self):
         """Transitions should work for various grid sizes."""
@@ -174,8 +174,8 @@ class TestTransitionMatrices:
             assert T.shape == (5, n * n, n * n)
             # Every row must be a valid probability distribution
             for a in range(5):
-                row_sums = T[a].sum(dim=1)
-                assert torch.allclose(row_sums, torch.ones(n * n))
+                row_sums = T[a].sum(axis=1)
+                np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones(n * n)))
 
 
 class TestFeatureMatrix:
@@ -196,7 +196,7 @@ class TestFeatureMatrix:
         for s in range(25):
             for a in range(5):
                 if s != terminal:
-                    assert F[s, a, 0].item() == pytest.approx(1.0)
+                    assert float(F[s, a, 0]) == pytest.approx(1.0)
 
     def test_step_penalty_feature_terminal(self):
         """Feature 0 should be 0.0 at the terminal state."""
@@ -205,7 +205,7 @@ class TestFeatureMatrix:
         terminal = env.terminal_state
 
         for a in range(5):
-            assert F[terminal, a, 0].item() == pytest.approx(0.0)
+            assert float(F[terminal, a, 0]) == pytest.approx(0.0)
 
     def test_terminal_reward_feature(self):
         """Feature 1 should be 1.0 only when action leads to terminal."""
@@ -217,11 +217,11 @@ class TestFeatureMatrix:
         for s in range(25):
             for a in range(5):
                 # Determine where the action leads
-                next_s = T[a, s, :].argmax().item()
+                next_s = int(T[a, s, :].argmax())
                 if next_s == terminal:
-                    assert F[s, a, 1].item() == pytest.approx(1.0)
+                    assert float(F[s, a, 1]) == pytest.approx(1.0)
                 else:
-                    assert F[s, a, 1].item() == pytest.approx(0.0)
+                    assert float(F[s, a, 1]) == pytest.approx(0.0)
 
     def test_distance_feature_terminal(self):
         """Feature 2 should be 0.0 at the terminal state."""
@@ -230,7 +230,7 @@ class TestFeatureMatrix:
         terminal = env.terminal_state
 
         for a in range(5):
-            assert F[terminal, a, 2].item() == pytest.approx(0.0)
+            assert float(F[terminal, a, 2]) == pytest.approx(0.0)
 
     def test_distance_feature_nonterminal(self):
         """Feature 2 should equal -manhattan_dist / (2*N) at non-terminal states."""
@@ -246,7 +246,7 @@ class TestFeatureMatrix:
             expected_dist = (N - 1 - row) + (N - 1 - col)
             expected_feature = -expected_dist / (2.0 * N)
             for a in range(5):
-                assert F[s, a, 2].item() == pytest.approx(expected_feature)
+                assert float(F[s, a, 2]) == pytest.approx(expected_feature)
 
     def test_utility_matrix_computation(self):
         """compute_utility_matrix should equal feature_matrix @ true_params."""
@@ -254,8 +254,8 @@ class TestFeatureMatrix:
         U = env.compute_utility_matrix()
         F = env.feature_matrix
         theta = env.get_true_parameter_vector()
-        expected = torch.einsum("sak,k->sa", F, theta)
-        assert torch.allclose(U, expected, atol=1e-6)
+        expected = jnp.einsum("sak,k->sa", F, theta)
+        np.testing.assert_allclose(np.asarray(U), np.asarray(expected), atol=1e-6)
 
 
 class TestValueIteration:
@@ -286,8 +286,8 @@ class TestValueIteration:
 
         assert result.policy.shape == (16, 5)
         # Each row should sum to 1
-        row_sums = result.policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones(16), atol=1e-5)
+        row_sums = result.policy.sum(axis=1)
+        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones(16)), atol=1e-5)
         # All probabilities non-negative
         assert (result.policy >= 0).all()
 
@@ -304,7 +304,7 @@ class TestValueIteration:
         result = value_iteration(operator, utility)
 
         terminal = env.terminal_state
-        assert result.V[terminal].item() >= result.V.max().item() - 1e-6
+        assert float(result.V[terminal]) >= float(result.V.max()) - 1e-6
 
     def test_value_decreases_with_distance(self):
         """States closer to terminal should generally have higher value."""
@@ -320,7 +320,7 @@ class TestValueIteration:
 
         # Compare a state adjacent to terminal vs one far away
         # State 23 (row=4, col=3) is adjacent, state 0 (row=0, col=0) is far
-        assert result.V[23].item() > result.V[0].item()
+        assert float(result.V[23]) > float(result.V[0])
 
 
 class TestStepAndReset:
@@ -418,11 +418,11 @@ class TestSimulatePanel:
 
         for traj in panel.trajectories:
             for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                ns = traj.next_states[t].item()
+                s = int(traj.states[t])
+                a = int(traj.actions[t])
+                ns = int(traj.next_states[t])
                 # In a deterministic environment, the transition should be 1.0
-                assert T[a, s, ns].item() == pytest.approx(1.0)
+                assert float(T[a, s, ns]) == pytest.approx(1.0)
 
 
 class TestCoordinateConversion:

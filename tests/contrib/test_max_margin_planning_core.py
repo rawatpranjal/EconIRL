@@ -1,8 +1,8 @@
 """Unit tests for Maximum Margin Planning estimator."""
 
 import pytest
-import torch
 import numpy as np
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.types import DDCProblem, Panel, Trajectory
@@ -34,22 +34,22 @@ def simple_transitions(simple_problem):
     n_states = simple_problem.num_states
     n_actions = simple_problem.num_actions
 
-    transitions = torch.zeros((n_actions, n_states, n_states))
+    transitions = jnp.zeros((n_actions, n_states, n_states))
 
     for s in range(n_states):
         # Action 0: move toward state 0
         if s > 0:
-            transitions[0, s, s - 1] = 0.7
-            transitions[0, s, s] = 0.3
+            transitions = transitions.at[0, s, s - 1].set(0.7)
+            transitions = transitions.at[0, s, s].set(0.3)
         else:
-            transitions[0, s, s] = 1.0
+            transitions = transitions.at[0, s, s].set(1.0)
 
         # Action 1: move toward state n-1
         if s < n_states - 1:
-            transitions[1, s, s + 1] = 0.7
-            transitions[1, s, s] = 0.3
+            transitions = transitions.at[1, s, s + 1].set(0.7)
+            transitions = transitions.at[1, s, s].set(0.3)
         else:
-            transitions[1, s, s] = 1.0
+            transitions = transitions.at[1, s, s].set(1.0)
 
     return transitions
 
@@ -66,16 +66,16 @@ def simple_reward_fn(simple_problem):
     n_actions = simple_problem.num_actions
 
     # Feature matrix: (n_states, n_actions, n_features)
-    feature_matrix = torch.zeros((n_states, n_actions, 2))
+    feature_matrix = jnp.zeros((n_states, n_actions, 2))
 
     for s in range(n_states):
         # Feature 0: normalized state (mileage proxy)
-        feature_matrix[s, 0, 0] = s / (n_states - 1)
-        feature_matrix[s, 1, 0] = s / (n_states - 1)
+        feature_matrix = feature_matrix.at[s, 0, 0].set(s / (n_states - 1))
+        feature_matrix = feature_matrix.at[s, 1, 0].set(s / (n_states - 1))
 
         # Feature 1: action indicator (replacement cost)
-        feature_matrix[s, 0, 1] = 0.0
-        feature_matrix[s, 1, 1] = 1.0
+        feature_matrix = feature_matrix.at[s, 0, 1].set(0.0)
+        feature_matrix = feature_matrix.at[s, 1, 1].set(1.0)
 
     return ActionDependentReward(
         feature_matrix=feature_matrix,
@@ -86,7 +86,7 @@ def simple_reward_fn(simple_problem):
 @pytest.fixture
 def true_params():
     """True parameters for testing."""
-    return torch.tensor([-0.5, -1.0], dtype=torch.float32)
+    return jnp.array([-0.5, -1.0], dtype=jnp.float32)
 
 
 @pytest.fixture
@@ -105,7 +105,6 @@ def expert_panel(simple_problem, simple_transitions, simple_reward_fn, true_para
     horizon = 20
     trajectories = []
 
-    torch.manual_seed(42)
     np.random.seed(42)
 
     for _ in range(n_trajectories):
@@ -120,12 +119,12 @@ def expert_panel(simple_problem, simple_transitions, simple_reward_fn, true_para
             states.append(s)
 
             # Sample action from policy
-            probs = policy[s].numpy()
+            probs = np.asarray(policy[s])
             a = np.random.choice(simple_problem.num_actions, p=probs)
             actions.append(a)
 
             # Transition
-            trans_probs = simple_transitions[a, s].numpy()
+            trans_probs = np.asarray(simple_transitions[a, s])
             s_next = np.random.choice(simple_problem.num_states, p=trans_probs)
             next_states.append(s_next)
 
@@ -134,9 +133,9 @@ def expert_panel(simple_problem, simple_transitions, simple_reward_fn, true_para
 
         trajectories.append(
             Trajectory(
-                states=torch.tensor(states, dtype=torch.long),
-                actions=torch.tensor(actions, dtype=torch.long),
-                next_states=torch.tensor(next_states, dtype=torch.long),
+                states=jnp.array(states, dtype=jnp.int32),
+                actions=jnp.array(actions, dtype=jnp.int32),
+                next_states=jnp.array(next_states, dtype=jnp.int32),
             )
         )
 
@@ -239,8 +238,8 @@ class TestExpertPolicyEstimation:
         assert (expert_policy >= 0).all()
 
         # Should sum to 1 across actions for each state
-        row_sums = expert_policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones(simple_problem.num_states))
+        row_sums = expert_policy.sum(axis=1)
+        assert jnp.allclose(row_sums, jnp.ones(simple_problem.num_states))
 
 
 # --- Loss Matrix Tests ---
@@ -277,9 +276,9 @@ class TestLossMatrix:
         estimator = MaxMarginPlanningEstimator(loss_type="policy_kl")
 
         # Create a policy where expert strongly prefers action 0
-        expert_policy = torch.zeros((simple_problem.num_states, simple_problem.num_actions))
-        expert_policy[:, 0] = 0.9  # Expert mostly takes action 0
-        expert_policy[:, 1] = 0.1  # Rarely takes action 1
+        expert_policy = jnp.zeros((simple_problem.num_states, simple_problem.num_actions))
+        expert_policy = expert_policy.at[:, 0].set(0.9)  # Expert mostly takes action 0
+        expert_policy = expert_policy.at[:, 1].set(0.1)  # Rarely takes action 1
 
         loss_matrix = estimator._compute_loss_matrix(
             expert_policy, simple_problem.num_states, simple_problem.num_actions
@@ -306,16 +305,16 @@ class TestLossMatrix:
         estimator = MaxMarginPlanningEstimator(loss_type="trajectory_hamming")
 
         # Create deterministic policy
-        expert_policy = torch.zeros((simple_problem.num_states, simple_problem.num_actions))
-        expert_policy[:, 0] = 1.0  # Expert always takes action 0
+        expert_policy = jnp.zeros((simple_problem.num_states, simple_problem.num_actions))
+        expert_policy = expert_policy.at[:, 0].set(1.0)  # Expert always takes action 0
 
         loss_matrix = estimator._compute_loss_matrix(
             expert_policy, simple_problem.num_states, simple_problem.num_actions
         )
 
         # Loss should be 0 for action 0, 1 for action 1
-        assert torch.allclose(loss_matrix[:, 0], torch.zeros(simple_problem.num_states))
-        assert torch.allclose(loss_matrix[:, 1], torch.ones(simple_problem.num_states))
+        assert jnp.allclose(loss_matrix[:, 0], jnp.zeros(simple_problem.num_states))
+        assert jnp.allclose(loss_matrix[:, 1], jnp.ones(simple_problem.num_states))
 
 
 # --- Loss-Augmented VI Tests ---
@@ -332,7 +331,7 @@ class TestLossAugmentedVI:
         operator = SoftBellmanOperator(simple_problem, simple_transitions)
 
         # Create reward and loss matrices
-        theta = torch.zeros(2)
+        theta = jnp.zeros(2)
         reward_matrix = simple_reward_fn.compute(theta)
         expert_policy = estimator._estimate_expert_policy(expert_panel, simple_problem)
         loss_matrix = estimator._compute_loss_matrix(
@@ -346,7 +345,7 @@ class TestLossAugmentedVI:
         # Policy should be valid probabilities
         assert policy.shape == (simple_problem.num_states, simple_problem.num_actions)
         assert (policy >= 0).all()
-        assert torch.allclose(policy.sum(dim=1), torch.ones(simple_problem.num_states))
+        assert jnp.allclose(policy.sum(axis=1), jnp.ones(simple_problem.num_states))
 
     def test_loss_augmentation_changes_policy(
         self, simple_problem, simple_transitions, simple_reward_fn, expert_panel
@@ -357,7 +356,7 @@ class TestLossAugmentedVI:
         estimator = MaxMarginPlanningEstimator(loss_scale=10.0)  # High scale
         operator = SoftBellmanOperator(simple_problem, simple_transitions)
 
-        theta = torch.zeros(2)
+        theta = jnp.zeros(2)
         reward_matrix = simple_reward_fn.compute(theta)
 
         # Solve without loss
@@ -374,7 +373,7 @@ class TestLossAugmentedVI:
         )
 
         # Policies should be different (loss encourages deviating from expert)
-        policy_diff = torch.abs(result_no_loss.policy - policy_with_loss).max()
+        policy_diff = jnp.abs(result_no_loss.policy - policy_with_loss).max()
         assert policy_diff > 0.01  # Should be meaningfully different
 
 
@@ -388,9 +387,9 @@ class TestSubgradientComputation:
         """Test subgradient has correct shape."""
         estimator = MaxMarginPlanningEstimator(regularization_lambda=0.1)
 
-        theta = torch.tensor([1.0, 2.0])
-        expert_features = torch.tensor([0.5, 0.3])
-        policy_features = torch.tensor([0.6, 0.4])
+        theta = jnp.array([1.0, 2.0])
+        expert_features = jnp.array([0.5, 0.3])
+        policy_features = jnp.array([0.6, 0.4])
 
         subgradient = estimator._compute_subgradient(theta, expert_features, policy_features)
 
@@ -400,30 +399,30 @@ class TestSubgradientComputation:
         """Test subgradient with zero regularization."""
         estimator = MaxMarginPlanningEstimator(regularization_lambda=0.0)
 
-        theta = torch.tensor([1.0, 2.0])
-        expert_features = torch.tensor([0.5, 0.3])
-        policy_features = torch.tensor([0.6, 0.4])
+        theta = jnp.array([1.0, 2.0])
+        expert_features = jnp.array([0.5, 0.3])
+        policy_features = jnp.array([0.6, 0.4])
 
         subgradient = estimator._compute_subgradient(theta, expert_features, policy_features)
 
-        # g = μ̂ - μ* when λ = 0
+        # g = mu_hat - mu* when lambda = 0
         expected = policy_features - expert_features
-        assert torch.allclose(subgradient, expected)
+        assert jnp.allclose(subgradient, expected)
 
     def test_subgradient_regularization_term(self):
         """Test that regularization term is included."""
         lambda_reg = 0.1
         estimator = MaxMarginPlanningEstimator(regularization_lambda=lambda_reg)
 
-        theta = torch.tensor([1.0, 2.0])
-        expert_features = torch.tensor([0.5, 0.3])
-        policy_features = torch.tensor([0.6, 0.4])
+        theta = jnp.array([1.0, 2.0])
+        expert_features = jnp.array([0.5, 0.3])
+        policy_features = jnp.array([0.6, 0.4])
 
         subgradient = estimator._compute_subgradient(theta, expert_features, policy_features)
 
-        # g = λθ + (μ̂ - μ*)
+        # g = lambda*theta + (mu_hat - mu*)
         expected = lambda_reg * theta + (policy_features - expert_features)
-        assert torch.allclose(subgradient, expected)
+        assert jnp.allclose(subgradient, expected)
 
 
 # --- Learning Rate Schedule Tests ---
@@ -531,8 +530,8 @@ class TestFullOptimization:
 
         # Policy should be valid probabilities
         assert (result.policy >= 0).all()
-        assert torch.allclose(
-            result.policy.sum(dim=1), torch.ones(simple_problem.num_states), atol=1e-6
+        assert jnp.allclose(
+            result.policy.sum(axis=1), jnp.ones(simple_problem.num_states), atol=1e-6
         )
 
     def test_optimization_with_initial_params(
@@ -548,7 +547,7 @@ class TestFullOptimization:
             utility=simple_reward_fn,
             problem=simple_problem,
             transitions=simple_transitions,
-            initial_params=true_params.clone(),
+            initial_params=jnp.array(true_params),
         )
 
         # Should complete without error
@@ -663,11 +662,11 @@ class TestIntegration:
         # Check that signs match (direction is correct)
         # Note: IRL only recovers reward up to scale, so we check direction
         estimated = result.parameters
-        true_direction = true_params / torch.norm(true_params)
-        estimated_direction = estimated / torch.norm(estimated)
+        true_direction = true_params / jnp.linalg.norm(true_params)
+        estimated_direction = estimated / jnp.linalg.norm(estimated)
 
         # Cosine similarity should be positive (same direction)
-        cos_sim = torch.dot(true_direction, estimated_direction).item()
+        cos_sim = float(jnp.dot(true_direction, estimated_direction))
 
         # Should recover correct direction (cosine similarity > 0.5)
         assert cos_sim > 0.0, f"Cosine similarity {cos_sim} should be positive"

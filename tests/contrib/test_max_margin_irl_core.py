@@ -10,8 +10,8 @@ Tests cover:
 """
 
 import pytest
-import torch
 import numpy as np
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.core.bellman import SoftBellmanOperator
@@ -37,7 +37,7 @@ def simple_problem() -> DDCProblem:
 
 
 @pytest.fixture
-def simple_transitions(simple_problem) -> torch.Tensor:
+def simple_transitions(simple_problem):
     """Simple deterministic transitions for testing.
 
     Action 0: move to next state (with wrap-around)
@@ -46,29 +46,29 @@ def simple_transitions(simple_problem) -> torch.Tensor:
     num_states = simple_problem.num_states
     num_actions = simple_problem.num_actions
 
-    transitions = torch.zeros((num_actions, num_states, num_states))
+    transitions = jnp.zeros((num_actions, num_states, num_states))
 
     # Action 0: move to next state
     for s in range(num_states):
         next_s = (s + 1) % num_states
-        transitions[0, s, next_s] = 1.0
+        transitions = transitions.at[0, s, next_s].set(1.0)
 
     # Action 1: reset to state 0
     for s in range(num_states):
-        transitions[1, s, 0] = 1.0
+        transitions = transitions.at[1, s, 0].set(1.0)
 
     return transitions
 
 
 @pytest.fixture
-def simple_state_features(simple_problem) -> torch.Tensor:
+def simple_state_features(simple_problem):
     """Simple state features: [state_index/num_states, is_goal_state]."""
     num_states = simple_problem.num_states
 
-    features = torch.zeros((num_states, 2))
+    features = jnp.zeros((num_states, 2))
     for s in range(num_states):
-        features[s, 0] = s / (num_states - 1)  # Normalized state index
-        features[s, 1] = 1.0 if s == num_states - 1 else 0.0  # Goal indicator
+        features = features.at[s, 0].set(s / (num_states - 1))  # Normalized state index
+        features = features.at[s, 1].set(1.0 if s == num_states - 1 else 0.0)  # Goal indicator
 
     return features
 
@@ -107,9 +107,9 @@ def simple_panel(simple_problem) -> Panel:
             state = next_state
 
         traj = Trajectory(
-            states=torch.tensor(states, dtype=torch.long),
-            actions=torch.tensor(actions, dtype=torch.long),
-            next_states=torch.tensor(next_states, dtype=torch.long),
+            states=jnp.array(states, dtype=jnp.int32),
+            actions=jnp.array(actions, dtype=jnp.int32),
+            next_states=jnp.array(next_states, dtype=jnp.int32),
             individual_id=i,
         )
         trajectories.append(traj)
@@ -200,24 +200,24 @@ class TestComputeFeatureExpectations:
         )
 
         # Manual computation
-        manual_exp = torch.zeros(2)
+        manual_exp = jnp.zeros(2)
         count = 0
         for traj in simple_panel.trajectories:
             for t in range(len(traj)):
-                state = traj.states[t].item()
-                manual_exp += simple_reward_fn.state_features[state]
+                state = int(traj.states[t])
+                manual_exp = manual_exp + simple_reward_fn.state_features[state]
                 count += 1
-        manual_exp /= count
+        manual_exp = manual_exp / count
 
-        assert torch.allclose(feature_exp, manual_exp, atol=1e-6)
+        assert jnp.allclose(feature_exp, manual_exp, atol=1e-6)
 
     def test_empty_trajectory_handling(self, simple_reward_fn):
         """Test handling of minimal data."""
         # Single observation
         traj = Trajectory(
-            states=torch.tensor([0]),
-            actions=torch.tensor([0]),
-            next_states=torch.tensor([1]),
+            states=jnp.array([0]),
+            actions=jnp.array([0]),
+            next_states=jnp.array([1]),
         )
         panel = Panel(trajectories=[traj])
 
@@ -226,7 +226,7 @@ class TestComputeFeatureExpectations:
 
         # Should equal features at state 0
         expected = simple_reward_fn.state_features[0]
-        assert torch.allclose(feature_exp, expected, atol=1e-6)
+        assert jnp.allclose(feature_exp, expected, atol=1e-6)
 
 
 # ============================================================================
@@ -243,7 +243,7 @@ class TestFindViolatingPolicy:
         """Test that returned policy is valid (sums to 1, non-negative)."""
         estimator = MaxMarginIRLEstimator()
 
-        theta = torch.tensor([1.0, 2.0])  # Reward progress and goal
+        theta = jnp.array([1.0, 2.0])
 
         policy, V = estimator._find_violating_policy(
             theta, simple_transitions, simple_reward_fn, simple_problem
@@ -256,8 +256,8 @@ class TestFindViolatingPolicy:
         assert (policy >= 0).all()
 
         # Check rows sum to 1
-        row_sums = policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-6)
+        row_sums = policy.sum(axis=1)
+        assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-6)
 
     def test_returns_value_function(
         self, simple_problem, simple_transitions, simple_reward_fn
@@ -265,14 +265,14 @@ class TestFindViolatingPolicy:
         """Test that returned value function has correct shape."""
         estimator = MaxMarginIRLEstimator()
 
-        theta = torch.tensor([1.0, 2.0])
+        theta = jnp.array([1.0, 2.0])
 
         policy, V = estimator._find_violating_policy(
             theta, simple_transitions, simple_reward_fn, simple_problem
         )
 
         assert V.shape == (simple_problem.num_states,)
-        assert torch.isfinite(V).all()
+        assert jnp.isfinite(V).all()
 
     def test_policy_responds_to_reward(
         self, simple_problem, simple_transitions, simple_reward_fn
@@ -281,13 +281,13 @@ class TestFindViolatingPolicy:
         estimator = MaxMarginIRLEstimator()
 
         # Reward that favors progress
-        theta1 = torch.tensor([1.0, 0.0])
+        theta1 = jnp.array([1.0, 0.0])
         policy1, _ = estimator._find_violating_policy(
             theta1, simple_transitions, simple_reward_fn, simple_problem
         )
 
         # Reward that only values goal
-        theta2 = torch.tensor([0.0, 10.0])
+        theta2 = jnp.array([0.0, 10.0])
         policy2, _ = estimator._find_violating_policy(
             theta2, simple_transitions, simple_reward_fn, simple_problem
         )
@@ -295,8 +295,8 @@ class TestFindViolatingPolicy:
         # Policies should be different
         # (Though both might prefer action 0 to reach goal, probabilities differ)
         # At minimum, check they're both valid
-        assert torch.isfinite(policy1).all()
-        assert torch.isfinite(policy2).all()
+        assert jnp.isfinite(policy1).all()
+        assert jnp.isfinite(policy2).all()
 
 
 # ============================================================================
@@ -311,26 +311,26 @@ class TestSolveQP:
         """Test QP solution with no constraints."""
         estimator = MaxMarginIRLEstimator()
 
-        expert_features = torch.tensor([0.5, 0.3, 0.2])
+        expert_features = jnp.array([0.5, 0.3, 0.2])
         violating_features = []
 
         theta, margin = estimator._solve_qp(expert_features, violating_features)
 
         # Should return normalized weights
-        assert torch.isclose(torch.norm(theta), torch.tensor(1.0), atol=1e-5)
+        assert jnp.isclose(jnp.linalg.norm(theta), jnp.array(1.0), atol=1e-5)
         assert margin == 0.0
 
     def test_single_constraint(self):
         """Test QP solution with single constraint."""
         estimator = MaxMarginIRLEstimator()
 
-        expert_features = torch.tensor([1.0, 0.0])
-        violating_features = [torch.tensor([0.0, 1.0])]
+        expert_features = jnp.array([1.0, 0.0])
+        violating_features = [jnp.array([0.0, 1.0])]
 
         theta, margin = estimator._solve_qp(expert_features, violating_features)
 
         # Theta should be normalized
-        assert torch.isclose(torch.norm(theta), torch.tensor(1.0), atol=1e-4)
+        assert jnp.isclose(jnp.linalg.norm(theta), jnp.array(1.0), atol=1e-4)
 
         # Margin should be positive (expert better than violating)
         assert margin >= -1e-6  # Allow small numerical tolerance
@@ -339,33 +339,33 @@ class TestSolveQP:
         """Test QP solution with multiple constraints."""
         estimator = MaxMarginIRLEstimator()
 
-        expert_features = torch.tensor([1.0, 1.0])
+        expert_features = jnp.array([1.0, 1.0])
         violating_features = [
-            torch.tensor([0.5, 0.0]),
-            torch.tensor([0.0, 0.5]),
-            torch.tensor([0.3, 0.3]),
+            jnp.array([0.5, 0.0]),
+            jnp.array([0.0, 0.5]),
+            jnp.array([0.3, 0.3]),
         ]
 
         theta, margin = estimator._solve_qp(expert_features, violating_features)
 
         # Check normalization
-        assert torch.isclose(torch.norm(theta), torch.tensor(1.0), atol=1e-4)
+        assert jnp.isclose(jnp.linalg.norm(theta), jnp.array(1.0), atol=1e-4)
 
         # Check all constraints are approximately satisfied
         for vf in violating_features:
-            constraint_value = torch.dot(theta, expert_features - vf).item()
+            constraint_value = float(jnp.dot(theta, expert_features - vf))
             assert constraint_value >= margin - 1e-4
 
     def test_returns_normalized_theta(self):
         """Test that theta is always normalized to unit norm."""
         estimator = MaxMarginIRLEstimator()
 
-        expert_features = torch.tensor([2.0, 3.0, 1.0])
-        violating_features = [torch.tensor([1.0, 1.0, 1.0])]
+        expert_features = jnp.array([2.0, 3.0, 1.0])
+        violating_features = [jnp.array([1.0, 1.0, 1.0])]
 
         theta, _ = estimator._solve_qp(expert_features, violating_features)
 
-        assert torch.isclose(torch.norm(theta), torch.tensor(1.0), atol=1e-4)
+        assert jnp.isclose(jnp.linalg.norm(theta), jnp.array(1.0), atol=1e-4)
 
 
 # ============================================================================
@@ -439,7 +439,7 @@ class TestOptimize:
         from econirl.preferences.linear import LinearUtility
 
         # Create a LinearUtility (not LinearReward)
-        features = torch.randn(simple_problem.num_states, simple_problem.num_actions, 2)
+        features = jnp.array(np.random.randn(simple_problem.num_states, simple_problem.num_actions, 2))
         utility = LinearUtility(
             feature_matrix=features,
             parameter_names=["a", "b"],
@@ -554,7 +554,7 @@ class TestEdgeCases:
     def test_single_feature(self, simple_problem, simple_transitions, simple_panel):
         """Test with single-feature reward."""
         # Single feature: just state index
-        features = torch.arange(simple_problem.num_states).float().unsqueeze(1)
+        features = jnp.arange(simple_problem.num_states, dtype=jnp.float32)[..., None]
         features = features / simple_problem.num_states
 
         reward_fn = LinearReward(
@@ -574,7 +574,7 @@ class TestEdgeCases:
     def test_many_features(self, simple_problem, simple_transitions, simple_panel):
         """Test with many features."""
         num_features = 10
-        features = torch.randn(simple_problem.num_states, num_features)
+        features = jnp.array(np.random.randn(simple_problem.num_states, num_features))
 
         reward_fn = LinearReward(
             state_features=features,
@@ -597,8 +597,8 @@ class TestEdgeCases:
         estimator = MaxMarginIRLEstimator(max_iterations=5, verbose=False)
 
         # Custom initial params
-        init_params = torch.tensor([0.8, 0.2])
-        init_params = init_params / torch.norm(init_params)  # Normalize
+        init_params = jnp.array([0.8, 0.2])
+        init_params = init_params / jnp.linalg.norm(init_params)  # Normalize
 
         result = estimator._optimize(
             simple_panel,
@@ -609,7 +609,7 @@ class TestEdgeCases:
         )
 
         # Should still return valid result
-        assert torch.isfinite(result.parameters).all()
+        assert jnp.isfinite(result.parameters).all()
 
     def test_verbose_mode(
         self, simple_panel, simple_reward_fn, simple_problem, simple_transitions, capsys
@@ -642,8 +642,8 @@ class TestComputeMargin:
         """Test that compute_margin returns a scalar."""
         estimator = MaxMarginIRLEstimator()
 
-        theta = torch.tensor([0.7, 0.7])
-        theta = theta / torch.norm(theta)
+        theta = jnp.array([0.7, 0.7])
+        theta = theta / jnp.linalg.norm(theta)
 
         margin = estimator.compute_margin(
             theta, simple_panel, simple_reward_fn, simple_problem, simple_transitions
@@ -657,8 +657,8 @@ class TestComputeMargin:
         """Test that margin is finite."""
         estimator = MaxMarginIRLEstimator()
 
-        theta = torch.tensor([1.0, 1.0])
-        theta = theta / torch.norm(theta)
+        theta = jnp.array([1.0, 1.0])
+        theta = theta / jnp.linalg.norm(theta)
 
         margin = estimator.compute_margin(
             theta, simple_panel, simple_reward_fn, simple_problem, simple_transitions

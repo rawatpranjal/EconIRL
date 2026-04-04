@@ -1,7 +1,7 @@
 """Shared fixtures for benchmark tests."""
 
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.environments import (
     RustBusEnvironment,

@@ -9,7 +9,6 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-import torch
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.contrib.gcl import GCLEstimator, GCLConfig
@@ -251,22 +250,22 @@ class GCL:
                     next_states[-1] = min(states[-1] + 1, self.n_states - 1)
 
             traj = Trajectory(
-                states=torch.tensor(states, dtype=torch.long),
-                actions=torch.tensor(actions, dtype=torch.long),
-                next_states=torch.tensor(next_states, dtype=torch.long),
+                states=np.array(states, dtype=np.int64),
+                actions=np.array(actions, dtype=np.int64),
+                next_states=np.array(next_states, dtype=np.int64),
                 individual_id=ind_id,
             )
             trajectories.append(traj)
 
         return Panel(trajectories=trajectories)
 
-    def _build_transition_tensor(self, keep_transitions: np.ndarray) -> torch.Tensor:
+    def _build_transition_tensor(self, keep_transitions: np.ndarray) -> np.ndarray:
         """Build transition tensor for both actions."""
         n = self.n_states
-        transitions = torch.zeros((self.n_actions, n, n), dtype=torch.float32)
+        transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
 
         # Action 0 (keep): use provided transitions
-        transitions[0] = torch.tensor(keep_transitions, dtype=torch.float32)
+        transitions[0] = np.array(keep_transitions, dtype=np.float32)
 
         # Action 1 (replace): reset to state 0, then transition
         for s in range(n):
@@ -285,18 +284,18 @@ class GCL:
             self.reward_matrix_ = np.array(self._result.metadata["reward_matrix"])
         else:
             # Fallback: reshape parameters
-            self.cost_matrix_ = self._result.parameters.detach().numpy().reshape(
+            self.cost_matrix_ = np.asarray(self._result.parameters).reshape(
                 self.n_states, self.n_actions
             )
             self.reward_matrix_ = -self.cost_matrix_
 
         # Policy
         if self._result.policy is not None:
-            self.policy_ = self._result.policy.detach().numpy()
+            self.policy_ = np.asarray(self._result.policy)
 
         # Value function
         if self._result.value_function is not None:
-            self.value_function_ = self._result.value_function.detach().numpy()
+            self.value_function_ = np.asarray(self._result.value_function)
 
         # Store the learned cost function
         if self._estimator is not None:

@@ -1,7 +1,7 @@
 """Integration tests for dataset estimation pipelines."""
 
 import pytest
-import torch
+import jax.numpy as jnp
 
 
 class TestDatasetEstimationPipelines:

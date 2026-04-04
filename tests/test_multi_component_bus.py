@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.environments.multi_component_bus import MultiComponentBusEnvironment
 
@@ -54,10 +54,10 @@ class TestTransitionMatrices:
         env = MultiComponentBusEnvironment(K=K, M=M, discount_factor=0.99)
         T = env.transition_matrices  # (2, N, N)
         for a in range(2):
-            row_sums = T[a].sum(dim=1)
-            assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5), (
+            row_sums = T[a].sum(axis=1)
+            np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5), (
                 f"Action {a}: row sums deviate from 1, "
-                f"max deviation = {(row_sums - 1).abs().max().item()}"
+                f"max deviation = {float(jnp.abs(row_sums - 1).max())}"
             )
 
     @pytest.mark.parametrize("K,M", [(1, 20), (2, 10), (3, 5)])
@@ -73,7 +73,7 @@ class TestTransitionMatrices:
         T_replace = env.transition_matrices[env.REPLACE]  # (N, N)
         first_row = T_replace[0]
         for s in range(1, env.num_states):
-            assert torch.allclose(T_replace[s], first_row, atol=1e-6), (
+            np.testing.assert_allclose(np.asarray(T_replace[s]), np.asarray(first_row), atol=1e-6), (
                 f"Replace row {s} differs from row 0"
             )
 
@@ -81,7 +81,7 @@ class TestTransitionMatrices:
         """Replace row should equal keep transition from state 0."""
         env = MultiComponentBusEnvironment(K=2, M=10, discount_factor=0.99)
         T = env.transition_matrices
-        assert torch.allclose(T[env.REPLACE, 0], T[env.KEEP, 0], atol=1e-6)
+        np.testing.assert_allclose(np.asarray(T[env.REPLACE, 0]), np.asarray(T[env.KEEP, 0]), atol=1e-6)
 
     def test_shape(self):
         """Transition matrices should have shape (2, N, N)."""
@@ -125,15 +125,15 @@ class TestFeatureMatrix:
         """At state 0, x(s) = 0, so keep features are [0, 0, 0]."""
         env = MultiComponentBusEnvironment(K=2, M=10, discount_factor=0.99)
         keep_features = env.feature_matrix[0, env.KEEP]
-        assert torch.allclose(keep_features, torch.zeros(3))
+        np.testing.assert_allclose(np.asarray(keep_features), np.asarray(jnp.zeros(3)))
 
     def test_replace_features_constant(self):
         """Replace features should be [-1, 0, 0] for every state."""
         env = MultiComponentBusEnvironment(K=2, M=10, discount_factor=0.99)
         for s in range(env.num_states):
             replace_f = env.feature_matrix[s, env.REPLACE]
-            expected = torch.tensor([-1.0, 0.0, 0.0])
-            assert torch.allclose(replace_f, expected), (
+            expected = jnp.array([-1.0, 0.0, 0.0])
+            np.testing.assert_allclose(np.asarray(replace_f), np.asarray(expected)), (
                 f"State {s}: replace features {replace_f} != {expected}"
             )
 
@@ -142,9 +142,9 @@ class TestFeatureMatrix:
         env = MultiComponentBusEnvironment(K=2, M=10, discount_factor=0.99)
         for s in range(env.num_states):
             x = env._state_feature(s)
-            expected = torch.tensor([0.0, -x, -(x ** 2)])
+            expected = jnp.array([0.0, -x, -(x ** 2)])
             actual = env.feature_matrix[s, env.KEEP]
-            assert torch.allclose(actual, expected, atol=1e-6), (
+            np.testing.assert_allclose(np.asarray(actual), np.asarray(expected), atol=1e-6), (
                 f"State {s}: keep features {actual} != {expected}"
             )
 
@@ -156,7 +156,7 @@ class TestFeatureMatrix:
         for s in range(env.num_states):
             for a in range(2):
                 expected = env._compute_flow_utility(s, a)
-                actual = utility_matrix[s, a].item()
+                actual = float(utility_matrix[s, a])
                 assert abs(actual - expected) < 1e-5, (
                     f"State {s}, action {a}: {actual} != {expected}"
                 )
@@ -184,7 +184,7 @@ class TestSimulation:
 
         # All actions should be 0 or 1
         all_actions = panel.get_all_actions()
-        assert set(all_actions.numpy().tolist()).issubset({0, 1})
+        assert set(np.asarray(all_actions).tolist()).issubset({0, 1})
 
     def test_step_and_reset(self):
         """Basic step / reset should work."""
@@ -289,7 +289,7 @@ class TestK1MatchesRust:
         T_multi = env_multi.transition_matrices  # (2, M, M)
         T_rust = env_rust.transition_matrices  # (2, M, M)
 
-        assert torch.allclose(T_multi[0], T_rust[0], atol=1e-5), (
+        np.testing.assert_allclose(np.asarray(T_multi[0]), np.asarray(T_rust[0]), atol=1e-5), (
             "K=1 keep transition does not match Rust bus"
         )
 
@@ -309,6 +309,6 @@ class TestK1MatchesRust:
         T_multi = env_multi.transition_matrices
         T_rust = env_rust.transition_matrices
 
-        assert torch.allclose(T_multi[1], T_rust[1], atol=1e-5), (
+        np.testing.assert_allclose(np.asarray(T_multi[1]), np.asarray(T_rust[1]), atol=1e-5), (
             "K=1 replace transition does not match Rust bus"
         )

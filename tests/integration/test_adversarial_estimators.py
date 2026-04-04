@@ -1,7 +1,7 @@
 """Integration tests for adversarial IRL estimators."""
 
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.environments.rust_bus import RustBusEnvironment
@@ -57,7 +57,7 @@ class TestAdversarialOnRustBus:
 
         # Policy should be valid distribution
         n_states = rust_env.problem_spec.num_states
-        assert torch.allclose(result.policy.sum(dim=1), torch.ones(n_states), atol=1e-5)
+        assert jnp.allclose(result.policy.sum(axis=1), jnp.ones(n_states), atol=1e-5)
 
         # Policy should favor maintenance (action 0) at low mileage
         # and replacement (action 1) at high mileage
@@ -79,7 +79,7 @@ class TestAdversarialOnRustBus:
         )
 
         n_states = rust_env.problem_spec.num_states
-        assert torch.allclose(result.policy.sum(dim=1), torch.ones(n_states), atol=1e-5)
+        assert jnp.allclose(result.policy.sum(axis=1), jnp.ones(n_states), atol=1e-5)
 
     @pytest.mark.slow
     def test_gail_vs_mce_irl_similar_policy(self, rust_env, medium_panel):
@@ -108,9 +108,9 @@ class TestAdversarialOnRustBus:
 
         # Policies should be similar (not identical due to different algorithms)
         # Check that they agree on action preference in most states
-        mce_preferred = mce_result.policy.argmax(dim=1)
-        gail_preferred = gail_result.policy.argmax(dim=1)
-        agreement = (mce_preferred == gail_preferred).float().mean()
+        mce_preferred = mce_result.policy.argmax(axis=1)
+        gail_preferred = gail_result.policy.argmax(axis=1)
+        agreement = (mce_preferred == gail_preferred).astype(jnp.float32).mean()
 
         # Should agree on at least 60% of states (relaxed due to reduced iterations)
-        assert agreement > 0.6, f"Agreement was only {agreement:.2f}"
+        assert agreement > 0.6, f"Agreement was only {float(agreement):.2f}"

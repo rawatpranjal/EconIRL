@@ -7,7 +7,7 @@ interface for the Maximum Margin IRL algorithm (Abbeel & Ng 2004).
 import pytest
 import numpy as np
 import pandas as pd
-import torch
+import jax.numpy as jnp
 
 
 class TestMaxMarginIRLInit:

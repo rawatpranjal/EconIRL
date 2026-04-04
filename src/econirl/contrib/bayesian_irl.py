@@ -27,7 +27,10 @@ from __future__ import annotations
 
 import time
 
-import torch
+import jax
+import jax.numpy as jnp
+import jax.random as jr
+import numpy as np
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -72,6 +75,7 @@ class BayesianIRLEstimator(BaseEstimator):
         inner_tol: float = 1e-8,
         inner_max_iter: int = 5000,
         compute_se: bool = False,
+        seed: int = 0,
         verbose: bool = False,
     ):
         super().__init__(
@@ -87,18 +91,19 @@ class BayesianIRLEstimator(BaseEstimator):
         self._inner_tol = inner_tol
         self._inner_max_iter = inner_max_iter
         self._compute_se = compute_se
+        self._seed = seed
 
     @property
     def name(self) -> str:
         return "Bayesian IRL (Ramachandran & Amir 2007)"
 
-    def _log_prior(self, params: torch.Tensor) -> float:
+    def _log_prior(self, params: jnp.ndarray) -> float:
         """Gaussian prior: log p(theta) = -||theta||^2 / (2 * sigma^2)."""
-        return (-0.5 * (params ** 2).sum() / (self._prior_sigma ** 2)).item()
+        return float(-0.5 * (params ** 2).sum() / (self._prior_sigma ** 2))
 
     def _log_likelihood(
         self,
-        params: torch.Tensor,
+        params: jnp.ndarray,
         panel: Panel,
         utility: BaseUtilityFunction,
         operator: SoftBellmanOperator,
@@ -122,7 +127,7 @@ class BayesianIRLEstimator(BaseEstimator):
 
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
-        ll = log_probs[all_states, all_actions].sum().item()
+        ll = float(log_probs[all_states, all_actions].sum())
 
         return self._confidence * ll
 
@@ -131,8 +136,8 @@ class BayesianIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run Metropolis-Hastings MCMC sampling."""
@@ -145,23 +150,27 @@ class BayesianIRLEstimator(BaseEstimator):
         if initial_params is None:
             current_params = utility.get_initial_parameters()
         else:
-            current_params = initial_params.clone()
+            current_params = jnp.array(initial_params)
 
         current_log_post = (
             self._log_likelihood(current_params, panel, utility, operator)
             + self._log_prior(current_params)
         )
 
-        # Storage for samples
-        samples = torch.zeros(self._n_samples, n_params)
-        log_posteriors = torch.zeros(self._n_samples)
+        # Storage for samples (use numpy arrays since we update in-place)
+        samples = np.zeros((self._n_samples, n_params))
+        log_posteriors = np.zeros(self._n_samples)
         n_accepted = 0
+
+        # Initialize JAX PRNG key
+        key = jr.PRNGKey(self._seed)
 
         self._log(f"Starting MCMC: {self._n_samples} samples, burnin={self._burnin}")
 
         for i in range(self._n_samples):
             # Propose new parameters
-            proposal = current_params + self._proposal_sigma * torch.randn(n_params)
+            key, subkey = jr.split(key)
+            proposal = current_params + self._proposal_sigma * jr.normal(subkey, shape=(n_params,))
 
             # Compute log-posterior of proposal
             proposal_log_post = (
@@ -171,12 +180,13 @@ class BayesianIRLEstimator(BaseEstimator):
 
             # Metropolis-Hastings acceptance (symmetric proposal)
             log_alpha = proposal_log_post - current_log_post
-            if torch.log(torch.rand(1)).item() < log_alpha:
+            key, subkey = jr.split(key)
+            if float(jnp.log(jr.uniform(subkey, shape=(1,)))) < log_alpha:
                 current_params = proposal
                 current_log_post = proposal_log_post
                 n_accepted += 1
 
-            samples[i] = current_params
+            samples[i] = np.asarray(current_params)
             log_posteriors[i] = current_log_post
 
             if self._verbose and (i + 1) % 200 == 0:
@@ -187,16 +197,16 @@ class BayesianIRLEstimator(BaseEstimator):
                     f"log_post={current_log_post:.2f}"
                 )
 
-        # Discard burn-in
-        post_burnin = samples[self._burnin:]
+        # Discard burn-in (convert back to JAX arrays)
+        post_burnin = jnp.array(samples[self._burnin:])
         accept_rate = n_accepted / self._n_samples
 
         # Posterior mean as point estimate
-        posterior_mean = post_burnin.mean(dim=0)
-        posterior_std = post_burnin.std(dim=0)
+        posterior_mean = post_burnin.mean(axis=0)
+        posterior_std = post_burnin.std(axis=0)
 
         self._log(f"MCMC complete: accept_rate={accept_rate:.3f}")
-        self._log(f"Posterior mean: {posterior_mean.numpy()}")
+        self._log(f"Posterior mean: {np.asarray(posterior_mean)}")
 
         # Compute final policy from posterior mean
         reward_matrix = utility.compute(posterior_mean)
@@ -212,7 +222,7 @@ class BayesianIRLEstimator(BaseEstimator):
         )
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
-        ll = log_probs[all_states, all_actions].sum().item()
+        ll = float(log_probs[all_states, all_actions].sum())
 
         elapsed = time.time() - start_time
 
@@ -240,8 +250,8 @@ class BayesianIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate reward parameters via Bayesian IRL.
@@ -267,7 +277,7 @@ class BayesianIRLEstimator(BaseEstimator):
             num_observations=n_obs,
             aic=-2 * result.log_likelihood + 2 * n_params,
             bic=-2 * result.log_likelihood
-            + n_params * torch.log(torch.tensor(n_obs)).item(),
+            + n_params * float(jnp.log(jnp.array(n_obs))),
             prediction_accuracy=self._compute_prediction_accuracy(
                 panel, result.policy
             ),

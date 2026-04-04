@@ -7,7 +7,7 @@ interface for Maximum Entropy Inverse Reinforcement Learning (Ziebart 2008).
 import pytest
 import numpy as np
 import pandas as pd
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import Panel, Trajectory
 

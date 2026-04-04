@@ -31,7 +31,6 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-import torch
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -293,16 +292,16 @@ class MaxEntIRL:
                     next_states[-1] = min(last_state + 1, self.n_states - 1)
 
             traj = Trajectory(
-                states=torch.tensor(states, dtype=torch.long),
-                actions=torch.tensor(actions, dtype=torch.long),
-                next_states=torch.tensor(next_states, dtype=torch.long),
+                states=np.array(states, dtype=np.int64),
+                actions=np.array(actions, dtype=np.int64),
+                next_states=np.array(next_states, dtype=np.int64),
                 individual_id=ind_id,
             )
             trajectories.append(traj)
 
         return Panel(trajectories=trajectories)
 
-    def _build_transition_tensor(self, keep_transitions: np.ndarray) -> torch.Tensor:
+    def _build_transition_tensor(self, keep_transitions: np.ndarray) -> np.ndarray:
         """Build full transition tensor for both actions.
 
         Parameters
@@ -312,14 +311,14 @@ class MaxEntIRL:
 
         Returns
         -------
-        torch.Tensor
+        numpy.ndarray
             Transition tensor of shape (n_actions, n_states, n_states).
         """
         n = self.n_states
-        transitions = torch.zeros((self.n_actions, n, n), dtype=torch.float32)
+        transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
 
         # Action 0 (keep): use provided transitions
-        transitions[0] = torch.tensor(keep_transitions, dtype=torch.float32)
+        transitions[0] = np.array(keep_transitions, dtype=np.float32)
 
         # Action 1 (replace): reset to state 0, then transition
         for s in range(n):
@@ -337,7 +336,7 @@ class MaxEntIRL:
         """
         # Use provided feature matrix or create default
         if self.feature_matrix is not None:
-            features = torch.tensor(self.feature_matrix, dtype=torch.float32)
+            features = np.array(self.feature_matrix, dtype=np.float32)
             if features.shape[0] != self.n_states:
                 raise ValueError(
                     f"feature_matrix has {features.shape[0]} rows but "
@@ -347,7 +346,7 @@ class MaxEntIRL:
         else:
             # Default: use state index as single feature
             # (simple linear reward in state)
-            features = torch.arange(self.n_states, dtype=torch.float32).unsqueeze(1)
+            features = np.arange(self.n_states, dtype=np.float32).reshape(-1, 1)
             n_features = 1
 
         # Determine feature names
@@ -373,28 +372,28 @@ class MaxEntIRL:
             return
 
         # Parameter estimates
-        params = self._result.parameters.numpy()
+        params = np.asarray(self._result.parameters)
         param_names = self._result.parameter_names
 
         self.params_ = {name: float(val) for name, val in zip(param_names, params)}
         self.coef_ = params.copy()
 
         # Standard errors
-        se = self._result.standard_errors.numpy()
+        se = np.asarray(self._result.standard_errors)
         self.se_ = {name: float(val) for name, val in zip(param_names, se)}
 
         # Compute reward for each state: R(s) = theta * phi(s)
-        reward_params = torch.tensor(params, dtype=torch.float32)
+        reward_params = np.array(params, dtype=np.float32)
         reward_matrix = self._reward_fn.compute(reward_params)
         # reward_matrix is (n_states, n_actions) but reward is same for all actions
-        self.reward_ = reward_matrix[:, 0].numpy()
+        self.reward_ = np.asarray(reward_matrix[:, 0])
 
         # Other attributes
         self.log_likelihood_ = float(self._result.log_likelihood)
         self.converged_ = bool(self._result.converged)
 
         if self._result.value_function is not None:
-            self.value_function_ = self._result.value_function.numpy()
+            self.value_function_ = np.asarray(self._result.value_function)
 
     def summary(self) -> str:
         """Generate a formatted summary of estimation results.
@@ -429,7 +428,7 @@ class MaxEntIRL:
         states = np.asarray(states, dtype=np.int64)
 
         # Get policy (choice probabilities) from result
-        policy = self._result.policy.numpy()
+        policy = np.asarray(self._result.policy)
 
         # Index into the policy for the requested states
         proba = policy[states]

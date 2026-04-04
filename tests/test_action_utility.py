@@ -10,7 +10,7 @@ Tests cover:
 """
 
 import pytest
-import torch
+import jax.numpy as jnp
 import numpy as np
 
 from econirl.preferences.action_utility import ActionDependentUtility
@@ -87,7 +87,7 @@ class TestRustUtilityComputation:
 
     def test_utility_shape(self, rust_utility):
         """Test that utility has correct shape."""
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         U = rust_utility.compute(params)
 
         assert U.shape == (10, 2)
@@ -95,62 +95,62 @@ class TestRustUtilityComputation:
     def test_keep_action_utility(self, rust_utility):
         """Test that keep action utility is -theta_c * s / scale."""
         theta_c = 0.01
-        params = torch.tensor([theta_c, 3.0])
+        params = jnp.array([theta_c, 3.0])
         U = rust_utility.compute(params)
 
         # U[:, 0] should be -theta_c * s / 10 (scale = num_states = 10)
-        expected_keep = -theta_c * torch.arange(10, dtype=torch.float32) / 10.0
-        assert torch.allclose(U[:, 0], expected_keep)
+        expected_keep = -theta_c * jnp.arange(10, dtype=jnp.float32) / 10.0
+        np.testing.assert_allclose(np.asarray(U[:, 0]), np.asarray(expected_keep))
 
     def test_replace_action_utility(self, rust_utility):
         """Test that replace action utility is -RC."""
         rc = 3.0
-        params = torch.tensor([0.01, rc])
+        params = jnp.array([0.01, rc])
         U = rust_utility.compute(params)
 
         # U[:, 1] should be -RC for all states
-        expected_replace = torch.full((10,), -rc)
-        assert torch.allclose(U[:, 1], expected_replace)
+        expected_replace = jnp.full((10,), -rc)
+        np.testing.assert_allclose(np.asarray(U[:, 1]), np.asarray(expected_replace))
 
     def test_utility_at_state_zero(self, rust_utility):
         """Test utility at state 0 (new engine)."""
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         U = rust_utility.compute(params)
 
         # At s=0: keep utility = 0, replace utility = -3.0
-        assert U[0, 0].item() == 0.0
-        assert U[0, 1].item() == pytest.approx(-3.0)
+        assert float(U[0, 0]) == 0.0
+        assert float(U[0, 1]) == pytest.approx(-3.0)
 
     def test_utility_at_high_mileage(self, rust_utility):
         """Test utility at high mileage state."""
-        params = torch.tensor([0.1, 3.0])  # Higher operating cost
+        params = jnp.array([0.1, 3.0])  # Higher operating cost
         U = rust_utility.compute(params)
 
         # At s=9: keep utility should be negative
         # U[9, keep] = -0.1 * 9 / 10 = -0.09
-        assert U[9, 0].item() == pytest.approx(-0.09)
+        assert float(U[9, 0]) == pytest.approx(-0.09)
 
     def test_utility_scales_with_theta_c(self, rust_utility):
         """Test that keep utility scales linearly with theta_c."""
-        params1 = torch.tensor([0.01, 3.0])
-        params2 = torch.tensor([0.02, 3.0])  # Double theta_c
+        params1 = jnp.array([0.01, 3.0])
+        params2 = jnp.array([0.02, 3.0])  # Double theta_c
 
         U1 = rust_utility.compute(params1)
         U2 = rust_utility.compute(params2)
 
         # Keep utility should double
-        assert torch.allclose(U2[:, 0], 2 * U1[:, 0])
+        np.testing.assert_allclose(np.asarray(U2[:, 0]), np.asarray(2 * U1[:, 0]))
 
     def test_utility_scales_with_rc(self, rust_utility):
         """Test that replace utility scales linearly with RC."""
-        params1 = torch.tensor([0.01, 3.0])
-        params2 = torch.tensor([0.01, 6.0])  # Double RC
+        params1 = jnp.array([0.01, 3.0])
+        params2 = jnp.array([0.01, 6.0])  # Double RC
 
         U1 = rust_utility.compute(params1)
         U2 = rust_utility.compute(params2)
 
         # Replace utility should double (in magnitude)
-        assert torch.allclose(U2[:, 1], 2 * U1[:, 1])
+        np.testing.assert_allclose(np.asarray(U2[:, 1]), np.asarray(2 * U1[:, 1]))
 
 
 class TestGradientComputation:
@@ -163,7 +163,7 @@ class TestGradientComputation:
 
     def test_gradient_shape(self, rust_utility):
         """Test that gradient has correct shape."""
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         grad = rust_utility.compute_gradient(params)
 
         # Shape: (num_states, num_actions, num_parameters)
@@ -171,69 +171,69 @@ class TestGradientComputation:
 
     def test_gradient_theta_c_keep(self, rust_utility):
         """Test dU/d(theta_c) for keep action."""
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         grad = rust_utility.compute_gradient(params)
 
         # dU[:, keep]/d(theta_c) = -s / scale
-        expected = -torch.arange(10, dtype=torch.float32) / 10.0
-        assert torch.allclose(grad[:, 0, 0], expected)
+        expected = -jnp.arange(10, dtype=jnp.float32) / 10.0
+        np.testing.assert_allclose(np.asarray(grad[:, 0, 0]), np.asarray(expected))
 
     def test_gradient_theta_c_replace(self, rust_utility):
         """Test dU/d(theta_c) for replace action (should be 0)."""
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         grad = rust_utility.compute_gradient(params)
 
         # dU[:, replace]/d(theta_c) = 0
-        assert torch.allclose(grad[:, 1, 0], torch.zeros(10))
+        np.testing.assert_allclose(np.asarray(grad[:, 1, 0]), np.asarray(jnp.zeros(10)))
 
     def test_gradient_rc_keep(self, rust_utility):
         """Test dU/d(RC) for keep action (should be 0)."""
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         grad = rust_utility.compute_gradient(params)
 
         # dU[:, keep]/d(RC) = 0
-        assert torch.allclose(grad[:, 0, 1], torch.zeros(10))
+        np.testing.assert_allclose(np.asarray(grad[:, 0, 1]), np.asarray(jnp.zeros(10)))
 
     def test_gradient_rc_replace(self, rust_utility):
         """Test dU/d(RC) for replace action."""
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         grad = rust_utility.compute_gradient(params)
 
         # dU[:, replace]/d(RC) = -1
-        assert torch.allclose(grad[:, 1, 1], torch.full((10,), -1.0))
+        np.testing.assert_allclose(np.asarray(grad[:, 1, 1]), np.asarray(jnp.full((10,), -1.0)))
 
     def test_gradient_numerical(self, rust_utility):
         """Test gradient against numerical approximation.
 
-        Uses central difference formula: df/dx ≈ (f(x+h) - f(x-h)) / (2h)
+        Uses central difference formula: df/dx approx (f(x+h) - f(x-h)) / (2h)
         """
-        params = torch.tensor([0.01, 3.0])
+        params = jnp.array([0.01, 3.0])
         analytical_grad = rust_utility.compute_gradient(params)
 
         # Compute numerical gradient
         eps = 1e-4
-        numerical_grad = torch.zeros_like(analytical_grad)
+        numerical_grad = jnp.zeros_like(analytical_grad)
 
         for k in range(rust_utility.num_parameters):
-            params_plus = params.clone()
-            params_minus = params.clone()
-            params_plus[k] = params[k] + eps
-            params_minus[k] = params[k] - eps
+            params_plus = jnp.array(params)
+            params_minus = jnp.array(params)
+            params_plus = params_plus.at[k].set(params[k] + eps)
+            params_minus = params_minus.at[k].set(params[k] - eps)
 
             U_plus = rust_utility.compute(params_plus)
             U_minus = rust_utility.compute(params_minus)
 
-            numerical_grad[:, :, k] = (U_plus - U_minus) / (2 * eps)
+            numerical_grad = numerical_grad.at[:, :, k].set((U_plus - U_minus) / (2 * eps))
 
         # Check element by element for diagnostics
         # dU/d(theta_c) for keep action should be -s/scale
-        assert torch.allclose(analytical_grad[:, 0, 0], numerical_grad[:, 0, 0], atol=1e-2)
+        np.testing.assert_allclose(np.asarray(analytical_grad[:, 0, 0]), np.asarray(numerical_grad[:, 0, 0]), atol=1e-2)
         # dU/d(theta_c) for replace action should be 0
-        assert torch.allclose(analytical_grad[:, 1, 0], numerical_grad[:, 1, 0], atol=1e-2)
+        np.testing.assert_allclose(np.asarray(analytical_grad[:, 1, 0]), np.asarray(numerical_grad[:, 1, 0]), atol=1e-2)
         # dU/d(RC) for keep action should be 0
-        assert torch.allclose(analytical_grad[:, 0, 1], numerical_grad[:, 0, 1], atol=1e-2)
+        np.testing.assert_allclose(np.asarray(analytical_grad[:, 0, 1]), np.asarray(numerical_grad[:, 0, 1]), atol=1e-2)
         # dU/d(RC) for replace action should be -1
-        assert torch.allclose(analytical_grad[:, 1, 1], numerical_grad[:, 1, 1], atol=1e-2)
+        np.testing.assert_allclose(np.asarray(analytical_grad[:, 1, 1]), np.asarray(numerical_grad[:, 1, 1]), atol=1e-2)
 
 
 class TestHessianComputation:
@@ -242,7 +242,7 @@ class TestHessianComputation:
     def test_hessian_shape(self):
         """Test that Hessian has correct shape."""
         utility = ActionDependentUtility.for_rust_model(num_states=10)
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         hessian = utility.compute_hessian(params)
 
         # Shape: (num_states, num_actions, num_parameters, num_parameters)
@@ -251,11 +251,11 @@ class TestHessianComputation:
     def test_hessian_is_zero(self):
         """Test that Hessian is zero for linear utility."""
         utility = ActionDependentUtility.for_rust_model(num_states=10)
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         hessian = utility.compute_hessian(params)
 
         # Linear utility has zero Hessian
-        assert torch.allclose(hessian, torch.zeros_like(hessian))
+        np.testing.assert_allclose(np.asarray(hessian), np.asarray(jnp.zeros_like(hessian)))
 
 
 class TestParameterBoundsAndInitialValues:
@@ -274,12 +274,12 @@ class TestParameterBoundsAndInitialValues:
         init_params = utility.get_initial_parameters()
 
         # theta_c should be small positive
-        assert init_params[0] > 0
-        assert init_params[0] < 1.0
+        assert float(init_params[0]) > 0
+        assert float(init_params[0]) < 1.0
 
         # RC should be moderate positive
-        assert init_params[1] > 0
-        assert init_params[1] < 10.0
+        assert float(init_params[1]) > 0
+        assert float(init_params[1]) < 10.0
 
     def test_parameter_bounds_shape(self):
         """Test that parameter bounds have correct shape."""
@@ -295,12 +295,12 @@ class TestParameterBoundsAndInitialValues:
         lower, upper = utility.get_parameter_bounds()
 
         # Lower bounds should be 0 (non-negative)
-        assert lower[0].item() == 0.0
-        assert lower[1].item() == 0.0
+        assert float(lower[0]) == 0.0
+        assert float(lower[1]) == 0.0
 
         # Upper bounds should be infinity
-        assert upper[0].item() == float("inf")
-        assert upper[1].item() == float("inf")
+        assert float(upper[0]) == float("inf")
+        assert float(upper[1]) == float("inf")
 
     def test_initial_within_bounds(self):
         """Test that initial parameters are within bounds."""
@@ -350,21 +350,11 @@ class TestDeviceMovement:
         utility = ActionDependentUtility.for_rust_model(num_states=10)
         utility_cpu = utility.to("cpu")
 
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         U = utility_cpu.compute(params)
 
-        assert U.device.type == "cpu"
-
-    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-    def test_to_cuda(self):
-        """Test moving to CUDA."""
-        utility = ActionDependentUtility.for_rust_model(num_states=10)
-        utility_cuda = utility.to("cuda")
-
-        params = torch.tensor([0.001, 3.0], device="cuda")
-        U = utility_cuda.compute(params)
-
-        assert U.device.type == "cuda"
+        # JAX arrays are always on the default device
+        assert U.shape == (10, 2)
 
 
 class TestValidation:
@@ -373,7 +363,7 @@ class TestValidation:
     def test_validate_correct_shape(self):
         """Test that validation passes for correct shape."""
         utility = ActionDependentUtility.for_rust_model(num_states=10)
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
 
         # Should not raise
         utility.validate_parameters(params)
@@ -383,7 +373,7 @@ class TestValidation:
         utility = ActionDependentUtility.for_rust_model(num_states=10)
 
         # Wrong number of parameters
-        params = torch.tensor([0.001])
+        params = jnp.array([0.001])
 
         with pytest.raises(ValueError, match="Expected parameters"):
             utility.validate_parameters(params)
@@ -393,7 +383,7 @@ class TestValidation:
         utility = ActionDependentUtility.for_rust_model(num_states=10)
 
         # Extra dimension
-        params = torch.tensor([[0.001, 3.0]])
+        params = jnp.array([[0.001, 3.0]])
 
         with pytest.raises(ValueError, match="Expected parameters"):
             utility.validate_parameters(params)
@@ -406,9 +396,9 @@ class TestCustomUtilityFunction:
         """Test that custom utility function is used."""
         def custom_utility(params, states):
             # Custom: U = -params[0] * states^2
-            U = torch.zeros((len(states), 2))
-            U[:, 0] = -params[0] * states ** 2
-            U[:, 1] = -params[1]
+            U = jnp.zeros((len(states), 2))
+            U = U.at[:, 0].set(-params[0] * states ** 2)
+            U = U.at[:, 1].set(-params[1])
             return U
 
         utility = ActionDependentUtility(
@@ -418,19 +408,19 @@ class TestCustomUtilityFunction:
             utility_fn=custom_utility,
         )
 
-        params = torch.tensor([0.1, 2.0])
+        params = jnp.array([0.1, 2.0])
         U = utility.compute(params)
 
         # Check custom formula
-        expected_keep = -0.1 * torch.arange(10, dtype=torch.float32) ** 2
-        assert torch.allclose(U[:, 0], expected_keep)
+        expected_keep = -0.1 * jnp.arange(10, dtype=jnp.float32) ** 2
+        np.testing.assert_allclose(np.asarray(U[:, 0]), np.asarray(expected_keep))
 
     def test_custom_gradient_fn(self):
         """Test that custom gradient function is used."""
         def custom_gradient(params, states):
-            grad = torch.zeros((len(states), 2, 2))
-            grad[:, 0, 0] = -states ** 2  # dU/da for keep
-            grad[:, 1, 1] = -1.0  # dU/db for replace
+            grad = jnp.zeros((len(states), 2, 2))
+            grad = grad.at[:, 0, 0].set(-states ** 2)  # dU/da for keep
+            grad = grad.at[:, 1, 1].set(-1.0)  # dU/db for replace
             return grad
 
         utility = ActionDependentUtility(
@@ -440,12 +430,12 @@ class TestCustomUtilityFunction:
             gradient_fn=custom_gradient,
         )
 
-        params = torch.tensor([0.1, 2.0])
+        params = jnp.array([0.1, 2.0])
         grad = utility.compute_gradient(params)
 
         # Check custom gradient
-        expected_keep_grad = -torch.arange(10, dtype=torch.float32) ** 2
-        assert torch.allclose(grad[:, 0, 0], expected_keep_grad)
+        expected_keep_grad = -jnp.arange(10, dtype=jnp.float32) ** 2
+        np.testing.assert_allclose(np.asarray(grad[:, 0, 0]), np.asarray(expected_keep_grad))
 
 
 class TestIntegrationWithRustEnvironment:
@@ -477,7 +467,7 @@ class TestIntegrationWithRustEnvironment:
         U_linear = linear_utility.compute(true_params)
 
         # Both should give same utility (up to numerical precision)
-        assert torch.allclose(U_action_utility, U_linear, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(U_action_utility), np.asarray(U_linear), atol=1e-5)
 
     def test_gradient_matches_environment_unscaled(self, rust_env_small):
         """Test that gradient matches LinearUtility gradient when unscaled."""
@@ -498,7 +488,7 @@ class TestIntegrationWithRustEnvironment:
         grad_linear = linear_utility.compute_gradient(true_params)
 
         # Gradients should match
-        assert torch.allclose(grad_action, grad_linear, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(grad_action), np.asarray(grad_linear), atol=1e-5)
 
     def test_scaled_utility_is_proportional(self, rust_env_small):
         """Test that scaled utility is proportional to unscaled.
@@ -529,10 +519,10 @@ class TestIntegrationWithRustEnvironment:
         U_scaled = utility_scaled.compute(true_params)
 
         # Keep action: U_scaled[:, 0] = U_unscaled[:, 0] / scale
-        assert torch.allclose(U_scaled[:, 0], U_unscaled[:, 0] / scale, atol=1e-5)
+        np.testing.assert_allclose(np.asarray(U_scaled[:, 0]), np.asarray(U_unscaled[:, 0] / scale), atol=1e-5)
 
         # Replace action: unchanged
-        assert torch.allclose(U_scaled[:, 1], U_unscaled[:, 1], atol=1e-5)
+        np.testing.assert_allclose(np.asarray(U_scaled[:, 1]), np.asarray(U_unscaled[:, 1]), atol=1e-5)
 
 
 # Import fixture from conftest

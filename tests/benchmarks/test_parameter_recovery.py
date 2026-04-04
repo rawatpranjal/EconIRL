@@ -7,7 +7,8 @@ All tests in this module are marked ``@pytest.mark.slow``.
 """
 
 import pytest
-import torch
+import numpy as np
+import jax.numpy as jnp
 
 from econirl.environments import (
     RustBusEnvironment,
@@ -37,9 +38,9 @@ from econirl.simulation.synthetic import simulate_panel
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _rmse(estimated: torch.Tensor, true: torch.Tensor) -> float:
+def _rmse(estimated: jnp.ndarray, true: jnp.ndarray) -> float:
     """Compute RMSE between estimated and true parameter vectors."""
-    return torch.sqrt(torch.mean((estimated - true) ** 2)).item()
+    return float(jnp.sqrt(jnp.mean((estimated - true) ** 2)))
 
 
 def _simulate_and_prepare(env, n_individuals=500, n_periods=100, seed=42):
@@ -150,10 +151,10 @@ def test_maxent_irl_rust_bus():
     # MaxEnt IRL uses state-only features (LinearReward with 2D features)
     from econirl.preferences.reward import LinearReward
     n_states = problem.num_states
-    state_features = torch.stack([
-        torch.arange(n_states, dtype=torch.float32) / n_states,       # mileage
-        torch.ones(n_states, dtype=torch.float32),                     # constant
-    ], dim=1)
+    state_features = jnp.stack([
+        jnp.arange(n_states, dtype=jnp.float32) / n_states,       # mileage
+        jnp.ones(n_states, dtype=jnp.float32),                     # constant
+    ], axis=1)
     reward = LinearReward(
         state_features=state_features,
         parameter_names=["operating_cost", "replacement_cost"],
@@ -272,13 +273,13 @@ def test_gail_rust_bus():
     # GAIL returns a policy; check it is a valid probability distribution
     assert result.policy is not None, "GAIL did not return a policy"
     assert result.policy.shape == (problem.num_states, problem.num_actions)
-    row_sums = result.policy.sum(dim=1)
-    assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-4), (
+    row_sums = result.policy.sum(axis=1)
+    assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-4), (
         "GAIL policy rows do not sum to 1"
     )
 
     # If parameters are returned, check RMSE
-    if result.parameters is not None and result.parameters.numel() == true_params.numel():
+    if result.parameters is not None and result.parameters.size == true_params.size:
         rmse = _rmse(result.parameters, true_params)
         assert rmse < 2.0, f"GAIL Rust bus RMSE={rmse:.4f} exceeds tolerance 2.0"
 
@@ -307,12 +308,12 @@ def test_airl_rust_bus():
     # AIRL returns a policy; check validity
     assert result.policy is not None, "AIRL did not return a policy"
     assert result.policy.shape == (problem.num_states, problem.num_actions)
-    row_sums = result.policy.sum(dim=1)
-    assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-4), (
+    row_sums = result.policy.sum(axis=1)
+    assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-4), (
         "AIRL policy rows do not sum to 1"
     )
 
     # If parameters are returned, check RMSE
-    if result.parameters is not None and result.parameters.numel() == true_params.numel():
+    if result.parameters is not None and result.parameters.size == true_params.size:
         rmse = _rmse(result.parameters, true_params)
         assert rmse < 2.0, f"AIRL Rust bus RMSE={rmse:.4f} exceeds tolerance 2.0"

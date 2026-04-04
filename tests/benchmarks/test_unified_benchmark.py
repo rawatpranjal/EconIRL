@@ -2,7 +2,7 @@
 
 import pandas as pd
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.estimation import (
     CCPEstimator,

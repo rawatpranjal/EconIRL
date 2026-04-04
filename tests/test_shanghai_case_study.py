@@ -1,7 +1,7 @@
 """Regression tests for Shanghai route-choice case study."""
 
 import numpy as np
-import torch
+import jax.numpy as jnp
 import pytest
 from econirl.datasets.shanghai_route import (
     load_shanghai_network, load_shanghai_trajectories,
@@ -52,7 +52,7 @@ def problem():
 def problem_neural():
     return DDCProblem(
         num_states=714, num_actions=8, discount_factor=0.95, scale_parameter=1.0,
-        state_dim=1, state_encoder=lambda s: (s.float() / 713.0).unsqueeze(-1),
+        state_dim=1, state_encoder=lambda s: (s.astype(jnp.float32) / 713.0)[..., None],
     )
 
 
@@ -68,8 +68,8 @@ class TestDataLoads:
 
     def test_transitions_valid(self, transitions):
         assert transitions.shape == (8, 714, 714)
-        row_sums = transitions.sum(dim=2)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = transitions.sum(axis=2)
+        assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-5)
 
     def test_features_shape(self, features):
         assert features.shape == (714, 8, 7)
@@ -80,7 +80,7 @@ class TestBCRuns:
         policy = small_panel.compute_choice_frequencies(714, 8)
         assert policy.shape == (714, 8)
         # Check it sums to 1 where we have data
-        visited = policy.sum(dim=1) > 0
+        visited = policy.sum(axis=1) > 0
         assert visited.any()
 
 
@@ -135,7 +135,7 @@ class TestStructuralOutperformsRandom:
         all_a = small_panel.get_all_actions()
 
         # CCP log-likelihood
-        ccp_ll = torch.log(result.policy[all_s, all_a] + 1e-10).mean().item()
+        ccp_ll = float(jnp.log(result.policy[all_s, all_a] + 1e-10).mean())
         # Uniform log-likelihood
         uniform_ll = np.log(1.0 / 8.0)
 

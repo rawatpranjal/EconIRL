@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install .[dev]
+      - run: python -c "import econirl; print(econirl.__version__)"
+      - run: python -m pytest tests/ -v -m "not slow" --timeout=120
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install .
+      - name: Verify no torch in core code
+        run: |
+          # Fail if any non-contrib source file imports torch
+          if grep -r "import torch" src/econirl/ --include="*.py" | grep -v "contrib/"; then
+            echo "ERROR: torch imports found in core code"
+            exit 1
+          fi
+          echo "No torch imports in core code"
+      - name: Smoke test imports and data loading
+        run: |
+          python -c "
+          import econirl
+          print(f'version: {econirl.__version__}')
+          from econirl import NFXP, CCP, MCEIRL, NNES, SEES, TDCCP
+          from econirl import MaxEntIRL, MaxMarginIRL
+          from econirl import NeuralGLADIUS, NeuralAIRL, MCEIRLNeural, IQLearn
+          from econirl import TransitionEstimator, LinearCost
+          from econirl.datasets import load_rust_bus
+          df = load_rust_bus()
+          print(f'{len(df)} observations loaded')
+          import jax
+          assert jax.config.jax_enable_x64, 'float64 not enabled'
+          print('All smoke tests passed')
+          "

@@ -7,7 +7,7 @@ Tests cover:
 """
 
 import pytest
-import torch
+import jax.numpy as jnp
 import numpy as np
 
 from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
@@ -28,7 +28,7 @@ class TestMCEIRLConvergence:
         problem, transitions = simple_problem
 
         # State features: normalized state index
-        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        features = jnp.arange(10, dtype=jnp.float32).reshape(-1, 1) / 10
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -61,7 +61,7 @@ class TestMCEIRLConvergence:
         """MCE IRL should return valid probability distribution over actions."""
         problem, transitions = simple_problem
 
-        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        features = jnp.arange(10, dtype=jnp.float32).reshape(-1, 1) / 10
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -90,15 +90,15 @@ class TestMCEIRLConvergence:
         assert (policy >= 0).all(), "Policy has negative probabilities"
 
         # Policy rows should sum to 1
-        row_sums = policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5), \
-            f"Policy rows don't sum to 1: {row_sums}"
+        row_sums = policy.sum(axis=1)
+        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5,
+            err_msg=f"Policy rows don't sum to 1: {row_sums}")
 
     def test_value_function_is_finite(self, simple_problem, synthetic_panel):
         """MCE IRL should return finite value function."""
         problem, transitions = simple_problem
 
-        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        features = jnp.arange(10, dtype=jnp.float32).reshape(-1, 1) / 10
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -123,7 +123,7 @@ class TestMCEIRLConvergence:
 
         assert result.value_function is not None
         assert result.value_function.shape == (10,)
-        assert torch.isfinite(result.value_function).all(), \
+        assert jnp.isfinite(result.value_function).all(), \
             "Value function has non-finite values"
 
 
@@ -139,7 +139,7 @@ class TestFeatureMatching:
         """MCE IRL should approximately match empirical feature expectations."""
         problem, transitions = simple_problem
 
-        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        features = jnp.arange(10, dtype=jnp.float32).reshape(-1, 1) / 10
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -166,17 +166,17 @@ class TestFeatureMatching:
         # Verify that estimation produced valid results
         # The MCE IRL algorithm should converge to a policy that explains the data
         assert result.policy is not None
-        assert torch.isfinite(result.policy).all()
+        assert jnp.isfinite(result.policy).all()
 
         # The policy should be a valid probability distribution
-        row_sums = result.policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = result.policy.sum(axis=1)
+        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
 
     def test_estimation_produces_valid_policy(self, simple_problem, synthetic_panel):
         """MCE IRL should produce a valid policy that explains data."""
         problem, transitions = simple_problem
 
-        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        features = jnp.arange(10, dtype=jnp.float32).reshape(-1, 1) / 10
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -202,14 +202,14 @@ class TestFeatureMatching:
         assert (result.policy <= 1).all()
 
         # Policy rows should sum to 1
-        row_sums = result.policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = result.policy.sum(axis=1)
+        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
 
     def test_value_function_properties(self, simple_problem, synthetic_panel):
         """Value function should have expected properties."""
         problem, transitions = simple_problem
 
-        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        features = jnp.arange(10, dtype=jnp.float32).reshape(-1, 1) / 10
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -232,7 +232,7 @@ class TestFeatureMatching:
 
         # Value function should be finite
         assert result.value_function is not None
-        assert torch.isfinite(result.value_function).all()
+        assert jnp.isfinite(result.value_function).all()
 
         # Value function should have correct shape
         assert result.value_function.shape == (problem.num_states,)
@@ -297,10 +297,10 @@ class TestMCEIRLMultipleFeatures:
             discount_factor=0.9,
         )
 
-        transitions = torch.zeros((2, n_states, n_states))
+        transitions = jnp.zeros((2, n_states, n_states))
         for s in range(n_states):
-            transitions[0, s, min(s + 1, n_states - 1)] = 1.0
-            transitions[1, s, 0] = 1.0
+            transitions = transitions.at[0, s, min(s + 1, n_states - 1)].set(1.0)
+            transitions = transitions.at[1, s, 0].set(1.0)
 
         return problem, transitions
 
@@ -330,9 +330,9 @@ class TestMCEIRLMultipleFeatures:
                 s = next_s
 
             traj = Trajectory(
-                states=torch.tensor(states, dtype=torch.long),
-                actions=torch.tensor(actions, dtype=torch.long),
-                next_states=torch.tensor(next_states, dtype=torch.long),
+                states=jnp.array(states, dtype=jnp.int32),
+                actions=jnp.array(actions, dtype=jnp.int32),
+                next_states=jnp.array(next_states, dtype=jnp.int32),
                 individual_id=i,
             )
             trajectories.append(traj)
@@ -345,9 +345,9 @@ class TestMCEIRLMultipleFeatures:
         n_states = problem.num_states
 
         # Two features: linear and quadratic state position
-        feature1 = torch.arange(n_states, dtype=torch.float32) / n_states
+        feature1 = jnp.arange(n_states, dtype=jnp.float32) / n_states
         feature2 = feature1 ** 2
-        features = torch.stack([feature1, feature2], dim=1)
+        features = jnp.stack([feature1, feature2], axis=1)
 
         reward_fn = LinearReward(
             state_features=features,
@@ -373,7 +373,7 @@ class TestMCEIRLMultipleFeatures:
 
         # Check basic properties
         assert result.parameters.shape == (2,)
-        assert torch.isfinite(result.parameters).all()
+        assert jnp.isfinite(result.parameters).all()
         assert result.policy.shape == (n_states, 2)
 
     def test_parameter_estimates_have_expected_sign(self, multi_feature_problem, multi_feature_panel):
@@ -381,9 +381,9 @@ class TestMCEIRLMultipleFeatures:
         problem, transitions = multi_feature_problem
         n_states = problem.num_states
 
-        feature1 = torch.arange(n_states, dtype=torch.float32) / n_states
+        feature1 = jnp.arange(n_states, dtype=jnp.float32) / n_states
         feature2 = feature1 ** 2
-        features = torch.stack([feature1, feature2], dim=1)
+        features = jnp.stack([feature1, feature2], axis=1)
 
         reward_fn = LinearReward(
             state_features=features,
@@ -408,7 +408,7 @@ class TestMCEIRLMultipleFeatures:
         )
 
         # Parameters should be non-zero (the algorithm found something)
-        assert not torch.allclose(result.parameters, torch.zeros(2))
+        assert not jnp.allclose(result.parameters, jnp.zeros(2))
 
 
 class TestMCEIRLEdgeCases:
@@ -423,21 +423,21 @@ class TestMCEIRLEdgeCases:
             discount_factor=0.9,
         )
 
-        transitions = torch.zeros((2, n_states, n_states))
+        transitions = jnp.zeros((2, n_states, n_states))
         for s in range(n_states):
-            transitions[0, s, min(s + 1, n_states - 1)] = 1.0
-            transitions[1, s, 0] = 1.0
+            transitions = transitions.at[0, s, min(s + 1, n_states - 1)].set(1.0)
+            transitions = transitions.at[1, s, 0].set(1.0)
 
         # Single trajectory
         traj = Trajectory(
-            states=torch.tensor([0, 1, 2, 3, 4, 0, 1, 2]),
-            actions=torch.tensor([0, 0, 0, 0, 1, 0, 0, 1]),
-            next_states=torch.tensor([1, 2, 3, 4, 0, 1, 2, 0]),
+            states=jnp.array([0, 1, 2, 3, 4, 0, 1, 2], dtype=jnp.int32),
+            actions=jnp.array([0, 0, 0, 0, 1, 0, 0, 1], dtype=jnp.int32),
+            next_states=jnp.array([1, 2, 3, 4, 0, 1, 2, 0], dtype=jnp.int32),
             individual_id=0,
         )
         panel = Panel(trajectories=[traj])
 
-        features = torch.arange(n_states, dtype=torch.float32).unsqueeze(1) / n_states
+        features = jnp.arange(n_states, dtype=jnp.float32).reshape(-1, 1) / n_states
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -473,10 +473,10 @@ class TestMCEIRLEdgeCases:
             discount_factor=0.99,  # High discount
         )
 
-        transitions = torch.zeros((2, n_states, n_states))
+        transitions = jnp.zeros((2, n_states, n_states))
         for s in range(n_states):
-            transitions[0, s, min(s + 1, n_states - 1)] = 1.0
-            transitions[1, s, 0] = 1.0
+            transitions = transitions.at[0, s, min(s + 1, n_states - 1)].set(1.0)
+            transitions = transitions.at[1, s, 0].set(1.0)
 
         # Generate some data
         np.random.seed(42)
@@ -493,16 +493,16 @@ class TestMCEIRLEdgeCases:
                 s = next_s
 
             traj = Trajectory(
-                states=torch.tensor(states, dtype=torch.long),
-                actions=torch.tensor(actions, dtype=torch.long),
-                next_states=torch.tensor(next_states, dtype=torch.long),
+                states=jnp.array(states, dtype=jnp.int32),
+                actions=jnp.array(actions, dtype=jnp.int32),
+                next_states=jnp.array(next_states, dtype=jnp.int32),
                 individual_id=i,
             )
             trajectories.append(traj)
 
         panel = Panel(trajectories=trajectories)
 
-        features = torch.arange(n_states, dtype=torch.float32).unsqueeze(1) / n_states
+        features = jnp.arange(n_states, dtype=jnp.float32).reshape(-1, 1) / n_states
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -525,9 +525,9 @@ class TestMCEIRLEdgeCases:
         )
 
         # Should produce finite values
-        assert torch.isfinite(result.value_function).all()
-        assert torch.isfinite(result.policy).all()
-        assert torch.isfinite(result.parameters).all()
+        assert jnp.isfinite(result.value_function).all()
+        assert jnp.isfinite(result.policy).all()
+        assert jnp.isfinite(result.parameters).all()
 
     def test_all_same_action(self):
         """Test MCE IRL when agent always takes the same action."""
@@ -538,25 +538,25 @@ class TestMCEIRLEdgeCases:
             discount_factor=0.9,
         )
 
-        transitions = torch.zeros((2, n_states, n_states))
+        transitions = jnp.zeros((2, n_states, n_states))
         for s in range(n_states):
-            transitions[0, s, min(s + 1, n_states - 1)] = 1.0
-            transitions[1, s, 0] = 1.0
+            transitions = transitions.at[0, s, min(s + 1, n_states - 1)].set(1.0)
+            transitions = transitions.at[1, s, 0].set(1.0)
 
         # All actions are 0 (keep)
         trajectories = []
         for i in range(5):
             traj = Trajectory(
-                states=torch.tensor([0, 1, 2, 3, 4, 4, 4, 4]),
-                actions=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0]),
-                next_states=torch.tensor([1, 2, 3, 4, 4, 4, 4, 4]),
+                states=jnp.array([0, 1, 2, 3, 4, 4, 4, 4], dtype=jnp.int32),
+                actions=jnp.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=jnp.int32),
+                next_states=jnp.array([1, 2, 3, 4, 4, 4, 4, 4], dtype=jnp.int32),
                 individual_id=i,
             )
             trajectories.append(traj)
 
         panel = Panel(trajectories=trajectories)
 
-        features = torch.arange(n_states, dtype=torch.float32).unsqueeze(1) / n_states
+        features = jnp.arange(n_states, dtype=jnp.float32).reshape(-1, 1) / n_states
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -591,7 +591,7 @@ class TestMCEIRLInference:
         """Fit MCE IRL and return result."""
         problem, transitions = simple_problem
 
-        features = torch.arange(10, dtype=torch.float32).unsqueeze(1) / 10
+        features = jnp.arange(10, dtype=jnp.float32).reshape(-1, 1) / 10
         reward_fn = LinearReward(
             state_features=features,
             parameter_names=["cost"],
@@ -620,7 +620,7 @@ class TestMCEIRLInference:
         se = fitted_result.standard_errors
         assert se is not None
         assert len(se) == 1  # One parameter
-        assert torch.isfinite(se).all(), f"SE not finite: {se}"
+        assert jnp.isfinite(se).all(), f"SE not finite: {se}"
 
     def test_confidence_interval_valid(self, fitted_result):
         """95% CI should be valid."""
@@ -645,7 +645,7 @@ class TestMCEIRLInference:
         assert hessian is not None, "Hessian should be computed"
 
         # Compute eigenvalues
-        eigenvalues = torch.linalg.eigvalsh(hessian)
+        eigenvalues = jnp.linalg.eigvalsh(hessian)
 
         # All eigenvalues should be <= 0 (with small tolerance for numerical error)
         assert (eigenvalues <= 1e-8).all(), (

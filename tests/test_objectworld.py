@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.environments.objectworld import ObjectworldEnvironment, _build_grid_transitions
 from econirl.core.types import DDCProblem, Panel
@@ -42,15 +42,15 @@ class TestTransitions:
         env = ObjectworldEnvironment(grid_size=8, seed=0)
         T = env.transition_matrices
         for a in range(5):
-            row_sums = T[a].sum(dim=1)
-            assert torch.allclose(row_sums, torch.ones(64))
+            row_sums = T[a].sum(axis=1)
+            assert jnp.allclose(row_sums, jnp.ones(64))
 
     def test_deterministic(self):
         """Each row should have a single 1.0 entry (deterministic transitions)."""
         env = ObjectworldEnvironment(grid_size=8, seed=0)
         T = env.transition_matrices
         for a in range(5):
-            assert T[a].max(dim=1).values.min().item() == pytest.approx(1.0)
+            assert float(T[a].max(axis=1).min()) == pytest.approx(1.0)
 
 
 class TestContinuousFeatures:
@@ -68,8 +68,8 @@ class TestContinuousFeatures:
         env = ObjectworldEnvironment(grid_size=8, n_colors=2, seed=0,
                                      feature_type="continuous")
         F = env.feature_matrix
-        assert F.min().item() >= 0.0
-        assert F.max().item() <= 1.0
+        assert float(F.min()) >= 0.0
+        assert float(F.max()) <= 1.0
 
 
 class TestDiscreteFeatures:
@@ -89,7 +89,7 @@ class TestDiscreteFeatures:
                                      feature_type="discrete",
                                      max_distance=8)
         F = env.feature_matrix
-        unique_vals = torch.unique(F)
+        unique_vals = jnp.unique(F)
         assert all(v in [0.0, 1.0] for v in unique_vals.tolist())
 
 
@@ -107,7 +107,7 @@ class TestReward:
         env = ObjectworldEnvironment(grid_size=8, seed=0)
         R = env.true_reward
         for val in R:
-            assert val.item() in {-1.0, 0.0, 1.0}
+            assert float(val) in {-1.0, 0.0, 1.0}
 
 
 class TestSeedReproducibility:
@@ -117,14 +117,14 @@ class TestSeedReproducibility:
         """Same seed should produce identical reward and features."""
         env1 = ObjectworldEnvironment(grid_size=8, seed=42)
         env2 = ObjectworldEnvironment(grid_size=8, seed=42)
-        assert torch.equal(env1.true_reward, env2.true_reward)
-        assert torch.equal(env1.feature_matrix, env2.feature_matrix)
+        assert jnp.array_equal(env1.true_reward, env2.true_reward)
+        assert jnp.array_equal(env1.feature_matrix, env2.feature_matrix)
 
     def test_different_seed_different_result(self):
         """Different seeds should produce different rewards."""
         env1 = ObjectworldEnvironment(grid_size=8, seed=0)
         env2 = ObjectworldEnvironment(grid_size=8, seed=999)
-        assert not torch.equal(env1.true_reward, env2.true_reward)
+        assert not jnp.array_equal(env1.true_reward, env2.true_reward)
 
 
 class TestProblemSpec:
@@ -174,8 +174,8 @@ class TestBuildGridTransitions:
         """All rows should sum to 1."""
         T = _build_grid_transitions(4)
         for a in range(5):
-            row_sums = T[a].sum(dim=1)
-            assert torch.allclose(row_sums, torch.ones(16))
+            row_sums = T[a].sum(axis=1)
+            assert jnp.allclose(row_sums, jnp.ones(16))
 
     def test_no_absorbing_state(self):
         """Unlike GridworldEnvironment, no state should be absorbing for all actions.
@@ -186,8 +186,8 @@ class TestBuildGridTransitions:
         T = _build_grid_transitions(4)
         # State 5 (row=1, col=1) in a 4x4 grid is interior.
         # Left should go to state 4, Right to 6, Up to 1, Down to 9.
-        assert T[0, 5, 4].item() == pytest.approx(1.0)  # Left
-        assert T[1, 5, 6].item() == pytest.approx(1.0)  # Right
-        assert T[2, 5, 1].item() == pytest.approx(1.0)  # Up
-        assert T[3, 5, 9].item() == pytest.approx(1.0)  # Down
-        assert T[4, 5, 5].item() == pytest.approx(1.0)  # Stay
+        assert float(T[0, 5, 4]) == pytest.approx(1.0)  # Left
+        assert float(T[1, 5, 6]) == pytest.approx(1.0)  # Right
+        assert float(T[2, 5, 1]) == pytest.approx(1.0)  # Up
+        assert float(T[3, 5, 9]) == pytest.approx(1.0)  # Down
+        assert float(T[4, 5, 5]) == pytest.approx(1.0)  # Stay

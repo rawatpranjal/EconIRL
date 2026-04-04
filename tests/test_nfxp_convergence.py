@@ -14,8 +14,9 @@ Reference:
     For beta=0.9999, reaching tolerance 1e-10 requires:
         log(1e-10) / log(0.9999) ~ 230,000 iterations
 """
+import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.preferences.linear import LinearUtility
 from econirl.estimation.nfxp import NFXPEstimator
@@ -58,7 +59,7 @@ class TestNFXPConvergence:
         true_params = rust_env.get_true_parameter_vector()
 
         # Check recovery: RMSE should be small
-        rmse = torch.sqrt(torch.mean((result.parameters - true_params) ** 2)).item()
+        rmse = float(jnp.sqrt(jnp.mean((result.parameters - true_params) ** 2)))
         assert rmse < 0.1, (
             f"NFXP RMSE={rmse:.6f} exceeds tolerance 0.1. "
             f"Estimates: {result.parameters.tolist()}, True: {true_params.tolist()}"
@@ -66,8 +67,8 @@ class TestNFXPConvergence:
 
         # Also check each parameter is close (absolute tolerance)
         for i, name in enumerate(result.parameter_names):
-            est = result.parameters[i].item()
-            true_val = true_params[i].item()
+            est = float(result.parameters[i])
+            true_val = float(true_params[i])
             abs_error = abs(est - true_val)
             assert abs_error < 0.1, (
                 f"Parameter {name}: estimate={est:.6f}, "

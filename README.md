@@ -14,11 +14,13 @@ Load a bundled dataset and fit one estimator in under a second.
 
 ```python
 from econirl.datasets import load_rust_bus
-from econirl.estimation import BehavioralCloningEstimator
+from econirl import CCP
 
 df = load_rust_bus()
-print(df.head())
-print(f"{len(df)} observations, {df['bus_id'].nunique()} buses")
+model = CCP(n_states=90, discount=0.9999)
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
+print(model.params_)
+print(model.summary())
 ```
 
 ## Benchmark

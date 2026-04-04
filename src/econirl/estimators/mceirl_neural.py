@@ -30,12 +30,12 @@ from __future__ import annotations
 
 from typing import Callable
 
+import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
+import optax
 import pandas as pd
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from scipy.stats import norm as scipy_norm
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -46,56 +46,67 @@ from econirl.estimators.neural_base import NeuralEstimatorMixin
 
 
 # ---------------------------------------------------------------------------
-# Internal network modules
+# Internal network modules (Equinox)
 # ---------------------------------------------------------------------------
 
 
-class _StateRewardNetwork(nn.Module):
+class _StateRewardNetwork(eqx.Module):
     """R(s) reward network.
 
-    Input: state features of shape (B, state_dim).
-    Output: scalar reward of shape (B,).
+    Input: state features of shape (state_dim,).
+    Output: scalar reward.
     """
+
+    layers: list
+    output_layer: eqx.nn.Linear
 
     def __init__(
         self,
         state_dim: int,
         hidden_dim: int,
         num_layers: int,
+        *,
+        key: jax.Array,
     ):
-        super().__init__()
-        layers: list[nn.Module] = []
+        keys = jax.random.split(key, num_layers + 1)
+        layers = []
         in_dim = state_dim
-        for _ in range(num_layers):
-            layers.append(nn.Linear(in_dim, hidden_dim))
-            layers.append(nn.ReLU())
+        for i in range(num_layers):
+            layers.append(eqx.nn.Linear(in_dim, hidden_dim, key=keys[i]))
             in_dim = hidden_dim
-        layers.append(nn.Linear(in_dim, 1))
-        self.net = nn.Sequential(*layers)
+        self.layers = layers
+        self.output_layer = eqx.nn.Linear(in_dim, 1, key=keys[-1])
 
-    def forward(self, state_feat: torch.Tensor) -> torch.Tensor:
-        """Compute R(s).
+    def __call__(self, state_feat: jax.Array) -> jax.Array:
+        """Compute R(s) for a single state.
 
         Parameters
         ----------
-        state_feat : torch.Tensor
-            State features of shape (B, state_dim).
+        state_feat : jax.Array
+            State features of shape (state_dim,).
 
         Returns
         -------
-        torch.Tensor
-            Rewards of shape (B,).
+        jax.Array
+            Scalar reward.
         """
-        return self.net(state_feat).squeeze(-1)
+        x = state_feat
+        for layer in self.layers:
+            x = jax.nn.relu(layer(x))
+        return self.output_layer(x).squeeze(-1)
 
 
-class _StateActionRewardNetwork(nn.Module):
+class _StateActionRewardNetwork(eqx.Module):
     """R(s,a) reward network.
 
-    Input: concatenation of state features (B, state_dim) and action
-    one-hot encoding (B, n_actions).
-    Output: scalar reward of shape (B,).
+    Input: concatenation of state features (state_dim,) and action
+    one-hot encoding (n_actions,).
+    Output: scalar reward.
     """
+
+    layers: list
+    output_layer: eqx.nn.Linear
+    _n_actions: int = eqx.field(static=True)
 
     def __init__(
         self,
@@ -103,64 +114,65 @@ class _StateActionRewardNetwork(nn.Module):
         n_actions: int,
         hidden_dim: int,
         num_layers: int,
+        *,
+        key: jax.Array,
     ):
-        super().__init__()
         self._n_actions = n_actions
         input_dim = state_dim + n_actions
-        layers: list[nn.Module] = []
+        keys = jax.random.split(key, num_layers + 1)
+        layers = []
         in_dim = input_dim
-        for _ in range(num_layers):
-            layers.append(nn.Linear(in_dim, hidden_dim))
-            layers.append(nn.ReLU())
+        for i in range(num_layers):
+            layers.append(eqx.nn.Linear(in_dim, hidden_dim, key=keys[i]))
             in_dim = hidden_dim
-        layers.append(nn.Linear(in_dim, 1))
-        self.net = nn.Sequential(*layers)
+        self.layers = layers
+        self.output_layer = eqx.nn.Linear(in_dim, 1, key=keys[-1])
 
-    def forward(
-        self, state_feat: torch.Tensor, action_onehot: torch.Tensor
-    ) -> torch.Tensor:
-        """Compute R(s,a).
+    def __call__(
+        self, state_feat: jax.Array, action_onehot: jax.Array
+    ) -> jax.Array:
+        """Compute R(s,a) for a single (state, action) pair.
 
         Parameters
         ----------
-        state_feat : torch.Tensor
-            State features of shape (B, state_dim).
-        action_onehot : torch.Tensor
-            One-hot action encoding of shape (B, n_actions).
+        state_feat : jax.Array
+            State features of shape (state_dim,).
+        action_onehot : jax.Array
+            One-hot action encoding of shape (n_actions,).
 
         Returns
         -------
-        torch.Tensor
-            Rewards of shape (B,).
+        jax.Array
+            Scalar reward.
         """
-        x = torch.cat([state_feat, action_onehot], dim=-1)
-        return self.net(x).squeeze(-1)
+        x = jnp.concatenate([state_feat, action_onehot])
+        for layer in self.layers:
+            x = jax.nn.relu(layer(x))
+        return self.output_layer(x).squeeze(-1)
 
-    def all_actions(self, state_feat: torch.Tensor) -> torch.Tensor:
+    def all_actions(self, state_feat: jax.Array) -> jax.Array:
         """Compute R(s,a) for all actions at every state.
 
         Parameters
         ----------
-        state_feat : torch.Tensor
+        state_feat : jax.Array
             State features of shape (S, state_dim).
 
         Returns
         -------
-        torch.Tensor
+        jax.Array
             Reward matrix of shape (S, A).
         """
         S = state_feat.shape[0]
         A = self._n_actions
-        # One-hot action identities: (A, A)
-        eye = torch.eye(A, device=state_feat.device, dtype=state_feat.dtype)
-        # Expand state_feat to (S, A, state_dim)
-        sf = state_feat.unsqueeze(1).expand(-1, A, -1)
-        # Expand actions to (S, A, A)
-        act = eye.unsqueeze(0).expand(S, -1, -1)
-        # Concatenate along last dim -> (S, A, state_dim + A)
-        x = torch.cat([sf, act], dim=-1)
-        # Flatten, forward, reshape
-        return self.net(x.reshape(S * A, -1)).reshape(S, A)
+        eye = jnp.eye(A)
+        # Expand state features: (S, state_dim) -> (S*A, state_dim)
+        sf_expanded = jnp.repeat(state_feat, A, axis=0)
+        # Tile action one-hots: (A, A) -> (S*A, A)
+        act_expanded = jnp.tile(eye, (S, 1))
+        # Apply network to all (state, action) pairs in one vmap call
+        rewards = jax.vmap(self)(sf_expanded, act_expanded)
+        return rewards.reshape(S, A)
 
 
 # ---------------------------------------------------------------------------
@@ -211,13 +223,15 @@ class MCEIRLNeural(NeuralEstimatorMixin):
     inner_max_iter : int, default=5000
         Maximum iterations for inner solver.
     state_encoder : callable, optional
-        Function mapping state indices (long tensor) to feature vectors.
+        Function mapping state indices (int array) to feature vectors.
         Receives shape (B,) and should return shape (B, state_dim).
         If None, a default normalizing encoder is created.
     state_dim : int, optional
         Dimension of state features.  Required if state_encoder is provided.
     feature_names : list of str, optional
         Names for features when projecting rewards onto linear features.
+    seed : int, default=0
+        Random seed for network initialization.
     verbose : bool, default=False
         Whether to print progress during training.
 
@@ -282,10 +296,11 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         inner_tol: float = 1e-8,
         inner_max_iter: int = 5000,
         # Encoders
-        state_encoder: Callable[[torch.Tensor], torch.Tensor] | None = None,
+        state_encoder: Callable | None = None,
         state_dim: int | None = None,
         # Projection
         feature_names: list[str] | None = None,
+        seed: int = 0,
         verbose: bool = False,
     ):
         if reward_type not in ("state", "state_action"):
@@ -307,6 +322,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         self.state_encoder = state_encoder
         self.state_dim = state_dim
         self.feature_names = feature_names
+        self.seed = seed
         self.verbose = verbose
 
         # Fitted attributes (set after fit())
@@ -322,7 +338,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         self.n_epochs_: int | None = None
 
         # Internal state
-        self._reward_net: nn.Module | None = None
+        self._reward_net = None
         self._state_encoder: Callable | None = None
         self._state_dim: int | None = None
         self._n_states: int | None = None
@@ -334,8 +350,8 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         state: str | None = None,
         action: str | None = None,
         id: str | None = None,
-        features: RewardSpec | torch.Tensor | None = None,
-        transitions: torch.Tensor | np.ndarray | None = None,
+        features: RewardSpec | np.ndarray | None = None,
+        transitions: np.ndarray | None = None,
         context: object = None,
     ) -> "MCEIRLNeural":
         """Fit the MCEIRLNeural estimator to data.
@@ -351,11 +367,11 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             Column name for the action variable (required for DataFrame).
         id : str, optional
             Column name for the individual identifier (required for DataFrame).
-        features : RewardSpec or torch.Tensor, optional
+        features : RewardSpec or numpy.ndarray, optional
             Feature specification for parameter projection.  If provided,
             the neural reward is projected onto these features to extract
             interpretable theta.
-        transitions : torch.Tensor or numpy.ndarray
+        transitions : numpy.ndarray
             Transition matrices P(s'|s,a), shape (n_actions, n_states, n_states).
             Required for v1 (exact soft value iteration).
         context : ignored
@@ -369,24 +385,21 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         if transitions is None:
             raise ValueError(
                 "MCEIRLNeural v1 requires transitions. "
-                "Pass transitions as (n_actions, n_states, n_states) tensor."
+                "Pass transitions as (n_actions, n_states, n_states) array."
             )
 
-        # --- Step 1: Extract tensors from data ---
+        # --- Step 1: Extract arrays from data ---
         all_states, all_actions, all_next = self._extract_data(
             data, state, action, id
         )
 
-        n_states = self.n_states or int(all_states.max().item()) + 1
-        n_actions = self.n_actions or int(all_actions.max().item()) + 1
+        n_states = self.n_states or int(all_states.max()) + 1
+        n_actions = self.n_actions or int(all_actions.max()) + 1
         self._n_states = n_states
         self._n_actions = n_actions
 
-        # Convert transitions to tensor
-        if isinstance(transitions, np.ndarray):
-            transitions_t = torch.tensor(transitions, dtype=torch.float32)
-        else:
-            transitions_t = transitions.float()
+        # Convert transitions to JAX
+        transitions_jax = jnp.asarray(transitions, dtype=jnp.float32)
 
         # --- Step 2: Build encoder ---
         self._build_encoder(n_states)
@@ -397,27 +410,30 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         )
 
         # --- Step 4: Build reward network ---
+        key = jax.random.PRNGKey(self.seed)
         if self.reward_type == "state_action":
             self._reward_net = _StateActionRewardNetwork(
                 self._state_dim,
                 n_actions,
                 self.reward_hidden_dim,
                 self.reward_num_layers,
+                key=key,
             )
         else:
             self._reward_net = _StateRewardNetwork(
                 self._state_dim,
                 self.reward_hidden_dim,
                 self.reward_num_layers,
+                key=key,
             )
 
         # --- Step 5: Training loop ---
         self._train_mce(
-            transitions_t, empirical_sa, n_states, n_actions,
+            transitions_jax, empirical_sa, n_states, n_actions,
         )
 
         # --- Step 6: Extract policy, value, and reward ---
-        self._extract_final(transitions_t, n_states, n_actions)
+        self._extract_final(transitions_jax, n_states, n_actions)
 
         # --- Step 7: Feature projection ---
         if features is not None:
@@ -441,8 +457,8 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         state: str | None,
         action: str | None,
         id: str | None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Extract state/action/next_state tensors from input data."""
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Extract state/action/next_state arrays from input data."""
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
@@ -452,13 +468,13 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             panel = TrajectoryPanel.from_dataframe(
                 data, state=state, action=action, id=id
             )
-            all_states = torch.tensor(np.asarray(panel.all_states), dtype=torch.long)
-            all_actions = torch.tensor(np.asarray(panel.all_actions), dtype=torch.long)
-            all_next = torch.tensor(np.asarray(panel.all_next_states), dtype=torch.long)
+            all_states = np.asarray(panel.all_states, dtype=np.int64)
+            all_actions = np.asarray(panel.all_actions, dtype=np.int64)
+            all_next = np.asarray(panel.all_next_states, dtype=np.int64)
         elif isinstance(data, (Panel, TrajectoryPanel)):
-            all_states = torch.tensor(np.asarray(data.get_all_states()), dtype=torch.long)
-            all_actions = torch.tensor(np.asarray(data.get_all_actions()), dtype=torch.long)
-            all_next = torch.tensor(np.asarray(data.get_all_next_states()), dtype=torch.long)
+            all_states = np.asarray(data.get_all_states(), dtype=np.int64)
+            all_actions = np.asarray(data.get_all_actions(), dtype=np.int64)
+            all_next = np.asarray(data.get_all_next_states(), dtype=np.int64)
         else:
             raise TypeError(
                 f"data must be a DataFrame, Panel, or TrajectoryPanel, "
@@ -478,9 +494,12 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             self._state_dim = self.state_dim or 1
         else:
             max_s = max(n_states - 1, 1)
-            self._state_encoder = lambda s, _ms=max_s: (
-                s.float() / _ms
-            ).unsqueeze(-1)
+
+            def _default_encoder(s, _ms=max_s):
+                s_float = jnp.asarray(s, dtype=jnp.float32)
+                return (s_float / _ms).reshape(-1, 1)
+
+            self._state_encoder = _default_encoder
             self._state_dim = 1
 
     # ------------------------------------------------------------------
@@ -489,36 +508,51 @@ class MCEIRLNeural(NeuralEstimatorMixin):
 
     def _compute_empirical_occupancy(
         self,
-        states: torch.Tensor,
-        actions: torch.Tensor,
+        states: np.ndarray,
+        actions: np.ndarray,
         n_states: int,
         n_actions: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute empirical state-action occupancy from demonstrations.
 
         Returns
         -------
-        torch.Tensor
+        jnp.ndarray
             State-action occupancy of shape (n_states, n_actions).
             Normalized to sum to 1.
         """
-        sa_counts = torch.zeros(n_states, n_actions, dtype=torch.float32)
+        sa_counts = np.zeros((n_states, n_actions), dtype=np.float32)
         for s, a in zip(states, actions):
-            sa_counts[s.long(), a.long()] += 1
-        # Normalize
+            sa_counts[int(s), int(a)] += 1
         total = sa_counts.sum()
         if total > 0:
             sa_counts = sa_counts / total
-        return sa_counts
+        return jnp.array(sa_counts)
 
     # ------------------------------------------------------------------
     # Training
     # ------------------------------------------------------------------
 
+    def _compute_reward_matrix(
+        self,
+        reward_net,
+        state_feat: jax.Array,
+        n_states: int,
+        n_actions: int,
+    ) -> jax.Array:
+        """Compute R(s,a) for all states and actions."""
+        if self.reward_type == "state_action":
+            return reward_net.all_actions(state_feat)
+        else:
+            rewards_s = jax.vmap(reward_net)(state_feat)
+            return jnp.broadcast_to(
+                rewards_s[:, None], (n_states, n_actions)
+            )
+
     def _train_mce(
         self,
-        transitions: torch.Tensor,
-        empirical_sa: torch.Tensor,
+        transitions: jnp.ndarray,
+        empirical_sa: jnp.ndarray,
         n_states: int,
         n_actions: int,
     ) -> None:
@@ -526,23 +560,17 @@ class MCEIRLNeural(NeuralEstimatorMixin):
 
         Training loop:
         1. Forward: compute R(s,a) for all states and actions
-           - state_action: reward_net.all_actions(state_feat)
-           - state: reward_net(state_feat), broadcast to all actions
         2. Solve soft Bellman: V, policy = soft_value_iteration(R, transitions)
         3. Compute state visitation: D(s) = forward_pass(policy, transitions)
         4. Expected occupancy: E_policy[sa] = D(s) * pi(a|s)
-        5. Loss: -sum(empirical_sa * R_sa) + sum(policy_sa * R_sa)
-        6. Backprop through reward network
+        5. Gradient: grad_R = policy_sa - empirical_sa
+        6. Backprop through reward network via surrogate loss
         """
-        optimizer = torch.optim.Adam(
-            self._reward_net.parameters(),
-            lr=self.lr,
-            weight_decay=1e-5,
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(1.0),
+            optax.adamw(learning_rate=self.lr, weight_decay=1e-5),
         )
-        # LR scheduler for training stability
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", patience=50, factor=0.5
-        )
+        opt_state = optimizer.init(eqx.filter(self._reward_net, eqx.is_array))
 
         problem = DDCProblem(
             num_states=n_states,
@@ -550,103 +578,84 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             discount_factor=self.discount,
             scale_parameter=1.0,
         )
-        # SoftBellmanOperator uses JAX, so convert transitions from torch
-        if isinstance(transitions, torch.Tensor):
-            transitions_jax = jnp.array(transitions.numpy())
-        else:
-            transitions_jax = jnp.array(np.asarray(transitions))
-        bellman = SoftBellmanOperator(problem=problem, transitions=transitions_jax)
+        bellman = SoftBellmanOperator(problem=problem, transitions=transitions)
 
         best_loss = float("inf")
-        best_state_dict = None
+        best_net = self._reward_net
         patience_counter = 0
         patience = 100
 
-        all_state_indices = torch.arange(n_states)
+        all_state_indices = jnp.arange(n_states)
+        reward_net = self._reward_net
 
         for epoch in range(self.max_epochs):
-            # 1. Compute reward matrix R(s,a)
+            # 1. Compute reward matrix R(s,a) (no gradient tracking needed here)
             state_feat = self._state_encoder(all_state_indices)
+            reward_matrix = self._compute_reward_matrix(
+                reward_net, state_feat, n_states, n_actions
+            )
 
-            if self.reward_type == "state_action":
-                reward_matrix = self._reward_net.all_actions(
-                    state_feat
-                )  # (S, A)
-            else:
-                rewards_s = self._reward_net(state_feat)  # (S,)
-                reward_matrix = rewards_s.unsqueeze(1).expand(
-                    -1, n_actions
-                )  # (S, A)
-
-            # 2. Solve soft Bellman (detach -- no grad through VI)
-            # Convert reward from PyTorch to JAX for the solver
-            with torch.no_grad():
-                reward_jax = jnp.array(reward_matrix.detach().numpy())
-                if self.inner_solver == "hybrid":
-                    result = hybrid_iteration(
-                        bellman,
-                        reward_jax,
-                        tol=self.inner_tol,
-                        max_iter=self.inner_max_iter,
-                    )
-                else:
-                    result = value_iteration(
-                        bellman,
-                        reward_jax,
-                        tol=self.inner_tol,
-                        max_iter=self.inner_max_iter,
-                    )
-                # Convert policy from JAX back to PyTorch
-                policy = torch.tensor(
-                    np.asarray(result.policy), dtype=torch.float32
+            # 2. Solve soft Bellman (no gradient through VI)
+            if self.inner_solver == "hybrid":
+                result = hybrid_iteration(
+                    bellman,
+                    reward_matrix,
+                    tol=self.inner_tol,
+                    max_iter=self.inner_max_iter,
                 )
+            else:
+                result = value_iteration(
+                    bellman,
+                    reward_matrix,
+                    tol=self.inner_tol,
+                    max_iter=self.inner_max_iter,
+                )
+            policy = result.policy
 
             # 3. Compute state visitation frequencies via forward pass
-            with torch.no_grad():
-                D = self._forward_pass(
-                    policy, transitions, n_states, self.discount
-                )
+            D = self._forward_pass(
+                policy, transitions, n_states, self.discount
+            )
 
             # 4. State-action occupancy under current policy
-            policy_sa = D.unsqueeze(1) * policy  # (S, A) = D(s) * pi(a|s)
+            policy_sa = D[:, None] * policy
 
-            # 5. Feature matching loss on (s,a) occupancies:
-            #    L = -sum_{s,a} mu_D(s,a) * R(s,a)
-            #    Gradient w.r.t. R(s,a): policy_sa - empirical_sa
-            #    Per Wulfmeier et al. (2016) Algorithm 1 Eq. 11:
-            #    Apply this gradient directly to the reward network via
-            #    backprop, rather than optimizing a scalar loss (which
-            #    causes reward values to grow unboundedly).
-            grad_r = policy_sa - empirical_sa  # (S, A)
+            # 5. Feature matching gradient w.r.t. R(s,a)
+            grad_r = policy_sa - empirical_sa
 
-            optimizer.zero_grad()
-            reward_matrix.backward(gradient=grad_r)
+            # 6. Compute network parameter gradients via surrogate loss.
+            #    The surrogate loss L = sum(R * grad_r) has gradient
+            #    dL/d_params = sum(grad_r * dR/d_params), which is exactly
+            #    the chain rule for the MCE-IRL objective.
+            def surrogate_loss(net):
+                R = self._compute_reward_matrix(
+                    net, state_feat, n_states, n_actions
+                )
+                return jnp.sum(R * grad_r)
 
-            # Gradient clipping
-            nn.utils.clip_grad_norm_(self._reward_net.parameters(), 1.0)
+            loss_val_jax, grads = eqx.filter_value_and_grad(surrogate_loss)(
+                reward_net
+            )
 
-            optimizer.step()
+            updates, opt_state = optimizer.update(
+                grads, opt_state, eqx.filter(reward_net, eqx.is_array)
+            )
+            reward_net = eqx.apply_updates(reward_net, updates)
 
-            # Monitor feature matching residual as the "loss"
-            loss_val = torch.sum(grad_r ** 2).item()
-            scheduler.step(loss_val)
-
-            # Monitor feature matching gap
-            feature_diff = torch.norm(empirical_sa - policy_sa).item()
+            # Monitor feature matching residual
+            loss_val = float(jnp.sum(grad_r ** 2))
+            feature_diff = float(jnp.linalg.norm(empirical_sa - policy_sa))
 
             if self.verbose and (epoch + 1) % 50 == 0:
-                current_lr = optimizer.param_groups[0]["lr"]
                 print(
                     f"  Epoch {epoch + 1}: loss={loss_val:.4f}, "
-                    f"feature_diff={feature_diff:.6f}, lr={current_lr:.2e}"
+                    f"feature_diff={feature_diff:.6f}"
                 )
 
             # Early stopping with best model checkpoint
             if loss_val < best_loss - 1e-5:
                 best_loss = loss_val
-                best_state_dict = {
-                    k: v.clone() for k, v in self._reward_net.state_dict().items()
-                }
+                best_net = reward_net
                 patience_counter = 0
             else:
                 patience_counter += 1
@@ -656,28 +665,26 @@ class MCEIRLNeural(NeuralEstimatorMixin):
                     break
 
         # Restore best model
-        if best_state_dict is not None:
-            self._reward_net.load_state_dict(best_state_dict)
-
+        self._reward_net = best_net
         self.converged_ = patience_counter >= patience or epoch == self.max_epochs - 1
         self.n_epochs_ = epoch + 1
 
     def _forward_pass(
         self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
         n_states: int,
         discount: float,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute state visitation frequencies via forward message passing.
 
         D(s) = rho_0(s) + gamma * sum_{s',a} D(s') pi(a|s') P(s|s',a)
 
         Parameters
         ----------
-        policy : torch.Tensor
+        policy : jnp.ndarray
             Policy pi(a|s), shape (n_states, n_actions).
-        transitions : torch.Tensor
+        transitions : jnp.ndarray
             Transition matrices P(s'|s,a), shape (n_actions, n_states, n_states).
         n_states : int
             Number of states.
@@ -686,26 +693,24 @@ class MCEIRLNeural(NeuralEstimatorMixin):
 
         Returns
         -------
-        torch.Tensor
+        jnp.ndarray
             State visitation frequencies, shape (n_states,).
         """
-        # Initial uniform distribution
-        rho0 = torch.ones(n_states, dtype=torch.float32) / n_states
-        D = rho0.clone()
+        rho0 = jnp.ones(n_states, dtype=jnp.float32) / n_states
+        D = rho0
 
         # Policy-weighted transition: P_pi(s'|s) = sum_a pi(a|s) P(s'|s,a)
-        P_pi = torch.einsum("sa,ast->st", policy, transitions)
+        P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
         for _ in range(500):
             D_new = rho0 + discount * (P_pi.T @ D)
-            delta = torch.abs(D_new - D).max().item()
+            delta = float(jnp.abs(D_new - D).max())
             D = D_new
             if delta < 1e-8:
                 break
 
         # Normalize
-        D = D / D.sum()
-        return D
+        return D / D.sum()
 
     # ------------------------------------------------------------------
     # Post-training extraction
@@ -713,68 +718,54 @@ class MCEIRLNeural(NeuralEstimatorMixin):
 
     def _extract_final(
         self,
-        transitions: torch.Tensor,
+        transitions: jnp.ndarray,
         n_states: int,
         n_actions: int,
     ) -> None:
         """Extract policy, value function, and reward from trained network."""
-        self._reward_net.eval()
+        all_state_indices = jnp.arange(n_states)
+        state_feat = self._state_encoder(all_state_indices)
 
-        with torch.no_grad():
-            all_state_indices = torch.arange(n_states)
-            state_feat = self._state_encoder(all_state_indices)
+        reward_matrix = self._compute_reward_matrix(
+            self._reward_net, state_feat, n_states, n_actions
+        )
 
-            if self.reward_type == "state_action":
-                reward_matrix = self._reward_net.all_actions(
-                    state_feat
-                )  # (S, A)
-            else:
-                rewards_s = self._reward_net(state_feat)  # (S,)
-                reward_matrix = rewards_s.unsqueeze(1).expand(
-                    -1, n_actions
-                )  # (S, A)
+        problem = DDCProblem(
+            num_states=n_states,
+            num_actions=n_actions,
+            discount_factor=self.discount,
+            scale_parameter=1.0,
+        )
+        bellman = SoftBellmanOperator(
+            problem=problem, transitions=transitions
+        )
 
-            problem = DDCProblem(
-                num_states=n_states,
-                num_actions=n_actions,
-                discount_factor=self.discount,
-                scale_parameter=1.0,
+        if self.inner_solver == "hybrid":
+            result = hybrid_iteration(
+                bellman,
+                reward_matrix,
+                tol=self.inner_tol,
+                max_iter=self.inner_max_iter,
             )
-            # Convert to JAX for the solver
-            if isinstance(transitions, torch.Tensor):
-                trans_jax = jnp.array(transitions.numpy())
-            else:
-                trans_jax = jnp.array(np.asarray(transitions))
-            bellman = SoftBellmanOperator(
-                problem=problem, transitions=trans_jax
+        else:
+            result = value_iteration(
+                bellman,
+                reward_matrix,
+                tol=self.inner_tol,
+                max_iter=self.inner_max_iter,
             )
-            reward_jax = jnp.array(reward_matrix.numpy())
 
-            if self.inner_solver == "hybrid":
-                result = hybrid_iteration(
-                    bellman,
-                    reward_jax,
-                    tol=self.inner_tol,
-                    max_iter=self.inner_max_iter,
-                )
-            else:
-                result = value_iteration(
-                    bellman,
-                    reward_jax,
-                    tol=self.inner_tol,
-                    max_iter=self.inner_max_iter,
-                )
-
-            self.policy_ = np.asarray(result.policy)
-            self.value_ = np.asarray(result.V)
-            if self.reward_type == "state_action":
-                self.reward_ = reward_matrix.numpy()  # (S, A)
-            else:
-                self.reward_ = rewards_s.numpy()  # (S,)
+        self.policy_ = np.asarray(result.policy)
+        self.value_ = np.asarray(result.V)
+        if self.reward_type == "state_action":
+            self.reward_ = np.asarray(reward_matrix)
+        else:
+            rewards_s = jax.vmap(self._reward_net)(state_feat)
+            self.reward_ = np.asarray(rewards_s)
 
     def _project_onto_features(
         self,
-        features: RewardSpec | torch.Tensor,
+        features: RewardSpec | np.ndarray,
         n_states: int,
         n_actions: int,
     ) -> None:
@@ -789,9 +780,9 @@ class MCEIRLNeural(NeuralEstimatorMixin):
 
         Parameters
         ----------
-        features : RewardSpec or torch.Tensor
+        features : RewardSpec or numpy.ndarray
             Feature specification.  RewardSpec provides (S, A, K) matrix.
-            A Tensor of shape (S, K) or (S, A, K) is also accepted.
+            An array of shape (S, K) or (S, A, K) is also accepted.
         n_states : int
             Number of states.
         n_actions : int
@@ -799,35 +790,35 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         """
         # Extract feature matrix and names
         if isinstance(features, RewardSpec):
-            feat_3d = features.feature_matrix  # (S, A, K)
+            feat_3d = np.asarray(features.feature_matrix)
             names = features.parameter_names
-        elif features.ndim == 3:
-            feat_3d = features  # (S, A, K)
-            names = self.feature_names or [
-                f"f{i}" for i in range(features.shape[-1])
-            ]
-        elif features.ndim == 2:
-            # (S, K) -> broadcast to (S, A, K)
-            feat_3d = features.unsqueeze(1).expand(-1, n_actions, -1)
-            names = self.feature_names or [
-                f"f{i}" for i in range(features.shape[-1])
-            ]
         else:
-            raise ValueError(
-                f"features must be 2D (S, K) or 3D (S, A, K), "
-                f"got {features.ndim}D"
-            )
+            feat_arr = np.asarray(features)
+            if feat_arr.ndim == 3:
+                feat_3d = feat_arr
+            elif feat_arr.ndim == 2:
+                # (S, K) -> broadcast to (S, A, K)
+                feat_3d = np.broadcast_to(
+                    feat_arr[:, None, :],
+                    (feat_arr.shape[0], n_actions, feat_arr.shape[1]),
+                ).copy()
+            else:
+                raise ValueError(
+                    f"features must be 2D (S, K) or 3D (S, A, K), "
+                    f"got {feat_arr.ndim}D"
+                )
+            names = self.feature_names or [
+                f"f{i}" for i in range(feat_3d.shape[-1])
+            ]
 
-        rewards = torch.tensor(self.reward_, dtype=torch.float32)
+        rewards = self.reward_.astype(np.float32)
 
         if self.reward_type == "state_action":
-            # R(s,a) is (S, A) -- project onto flattened (S*A, K)
-            phi = feat_3d.reshape(-1, feat_3d.shape[-1]).float()  # (S*A, K)
-            r_flat = rewards.reshape(-1)  # (S*A,)
+            phi = feat_3d.reshape(-1, feat_3d.shape[-1]).astype(np.float32)
+            r_flat = rewards.reshape(-1)
         else:
-            # R(s) is (S,) -- project onto state features from action 0
-            phi = feat_3d[:, 0, :].float()  # (S, K)
-            r_flat = rewards  # (S,)
+            phi = feat_3d[:, 0, :].astype(np.float32)
+            r_flat = rewards
 
         theta, se, r2 = self._project_parameters(phi, r_flat)
 
@@ -835,7 +826,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         self.se_ = {n: float(v) for n, v in zip(names, se)}
         self.pvalues_ = self._compute_pvalues(self.params_, self.se_)
         self.projection_r2_ = r2
-        self.coef_ = theta.numpy()
+        self.coef_ = theta
 
     # ------------------------------------------------------------------
     # Prediction methods

@@ -9,7 +9,7 @@ import math
 
 import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.datasets.trivago_search import (
@@ -102,31 +102,30 @@ class TestDataLoads:
         for traj in panel.trajectories[:5]:
             assert len(traj.states) == len(traj.actions)
             assert len(traj.states) == len(traj.next_states)
-            assert traj.states.dtype == torch.long
-            assert traj.actions.dtype == torch.long
+            assert traj.states.dtype == jnp.int32
 
     def test_states_in_range(self, panel):
         """All states should be in [0, N_STATES)."""
         all_states = panel.get_all_states()
-        assert all_states.min().item() >= 0
-        assert all_states.max().item() < N_STATES
+        assert int(all_states.min()) >= 0
+        assert int(all_states.max()) < N_STATES
 
     def test_actions_in_range(self, panel):
         """All actions should be in [0, N_ACTIONS)."""
         all_actions = panel.get_all_actions()
-        assert all_actions.min().item() >= 0
-        assert all_actions.max().item() < N_ACTIONS
+        assert int(all_actions.min()) >= 0
+        assert int(all_actions.max()) < N_ACTIONS
 
     def test_transitions_valid(self, transitions):
         """Transition matrix should be properly normalized."""
         assert transitions.shape == (N_ACTIONS, N_STATES, N_STATES)
-        row_sums = transitions.sum(dim=2)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = transitions.sum(axis=2)
+        assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-5)
 
     def test_absorbing_state_self_loops(self, transitions):
         """Absorbing state should self-loop for all actions."""
         for a in range(N_ACTIONS):
-            assert transitions[a, ABSORBING_STATE, ABSORBING_STATE].item() > 0.99
+            assert float(transitions[a, ABSORBING_STATE, ABSORBING_STATE]) > 0.99
 
     def test_features_shape(self, features):
         """Feature matrix should have correct shape."""
@@ -150,10 +149,10 @@ class TestBCRuns:
         assert policy.shape == (N_STATES, N_ACTIONS)
 
         # Where we have data, rows should sum to ~1
-        visited_mask = policy.sum(dim=1) > 0
+        visited_mask = policy.sum(axis=1) > 0
         assert visited_mask.any(), "Should have data in at least some states"
-        visited_sums = policy[visited_mask].sum(dim=1)
-        assert torch.allclose(visited_sums, torch.ones_like(visited_sums), atol=1e-5)
+        visited_sums = policy[visited_mask].sum(axis=1)
+        assert jnp.allclose(visited_sums, jnp.ones_like(visited_sums), atol=1e-5)
 
     def test_bc_policy_nonnegative(self, train_panel):
         """BC probabilities should be non-negative."""
@@ -232,7 +231,7 @@ class TestStructuralOutperformsUniform:
         all_s = train_panel.get_all_states()
         all_a = train_panel.get_all_actions()
 
-        bc_ll = torch.log(bc_policy[all_s, all_a].clamp(min=1e-10)).mean().item()
+        bc_ll = float(jnp.log(jnp.clip(bc_policy[all_s, all_a], a_min=1e-10)).mean())
         uniform_ll = math.log(1.0 / N_ACTIONS)  # -1.386
 
         assert bc_ll > uniform_ll, (

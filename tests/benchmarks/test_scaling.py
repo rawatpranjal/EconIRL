@@ -9,7 +9,7 @@ All tests are marked ``@pytest.mark.slow``.
 import time
 
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.environments import MultiComponentBusEnvironment
 from econirl.estimation import (

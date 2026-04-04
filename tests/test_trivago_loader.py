@@ -1,7 +1,7 @@
 """Tests for the Trivago hotel search DDC dataset loader."""
 
 import pytest
-import torch
+import jax.numpy as jnp
 import numpy as np
 
 from econirl.datasets.trivago_search import (
@@ -161,11 +161,11 @@ class TestBuildPanel:
             assert len(traj) >= 1
 
     def test_trajectory_types(self, panel):
-        """Trajectory tensors should be long dtype."""
+        """Trajectory tensors should be int32 dtype."""
         for traj in panel:
-            assert traj.states.dtype == torch.long
-            assert traj.actions.dtype == torch.long
-            assert traj.next_states.dtype == torch.long
+            assert traj.states.dtype == jnp.int32
+            assert traj.actions.dtype == jnp.int32
+            assert traj.next_states.dtype == jnp.int32
 
     def test_states_in_range_panel(self, panel):
         all_states = panel.get_all_states()
@@ -175,7 +175,7 @@ class TestBuildPanel:
     def test_terminal_trajectories(self, panel):
         """Last action in each trajectory should be clickout or abandon."""
         for traj in panel:
-            last_action = traj.actions[-1].item()
+            last_action = int(traj.actions[-1])
             assert last_action in (ACTION_CLICKOUT, ACTION_ABANDON), (
                 f"Last action should be terminal, got {last_action}"
             )
@@ -193,21 +193,21 @@ class TestBuildFeatures:
         features = build_trivago_features()
         # For mid/late step buckets, browse step_cost should be negative
         # State with step_bucket=1 (mid): s = 1 * 12 + 0 * 3 + 0 = 12
-        assert features[12, ACTION_BROWSE, 0] < 0
+        assert float(features[12, ACTION_BROWSE, 0]) < 0
 
     def test_browse_indicator(self):
         features = build_trivago_features()
         # Browse action should have browse_indicator = -1
-        assert features[0, ACTION_BROWSE, 1] == -1.0
+        assert float(features[0, ACTION_BROWSE, 1]) == -1.0
         # Non-browse actions should have browse_indicator = 0
-        assert features[0, ACTION_REFINE, 1] == 0.0
-        assert features[0, ACTION_CLICKOUT, 1] == 0.0
+        assert float(features[0, ACTION_REFINE, 1]) == 0.0
+        assert float(features[0, ACTION_CLICKOUT, 1]) == 0.0
 
     def test_clickout_has_positive_indicator(self):
         features = build_trivago_features()
         # Clickout should have clickout_indicator = 1 for all non-absorbing states
         for s in range(N_STATES - 1):
-            assert features[s, ACTION_CLICKOUT, 3] == 1.0
+            assert float(features[s, ACTION_CLICKOUT, 3]) == 1.0
 
     def test_abandon_is_zero(self):
         features = build_trivago_features()
@@ -230,8 +230,8 @@ class TestBuildTransitions:
 
     def test_rows_sum_to_one(self, mdp_dict):
         transitions = build_trivago_transitions(mdp_dict)
-        row_sums = transitions.sum(dim=2)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = transitions.sum(axis=2)
+        assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-5)
 
     def test_non_negative(self, mdp_dict):
         transitions = build_trivago_transitions(mdp_dict)
@@ -241,16 +241,16 @@ class TestBuildTransitions:
         """Clickout from any state should transition to absorbing."""
         transitions = build_trivago_transitions(mdp_dict)
         for s in range(N_STATES):
-            assert transitions[ACTION_CLICKOUT, s, ABSORBING_STATE] == 1.0
+            assert float(transitions[ACTION_CLICKOUT, s, ABSORBING_STATE]) == 1.0
 
     def test_abandon_to_absorbing(self, mdp_dict):
         """Abandon from any state should transition to absorbing."""
         transitions = build_trivago_transitions(mdp_dict)
         for s in range(N_STATES):
-            assert transitions[ACTION_ABANDON, s, ABSORBING_STATE] == 1.0
+            assert float(transitions[ACTION_ABANDON, s, ABSORBING_STATE]) == 1.0
 
     def test_absorbing_self_loop(self, mdp_dict):
         """Absorbing state should self-loop for all actions."""
         transitions = build_trivago_transitions(mdp_dict)
         for a in range(N_ACTIONS):
-            assert transitions[a, ABSORBING_STATE, ABSORBING_STATE] == 1.0
+            assert float(transitions[a, ABSORBING_STATE, ABSORBING_STATE]) == 1.0

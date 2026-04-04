@@ -8,7 +8,7 @@ nonlinear feature interactions.
 import pytest
 import numpy as np
 import pandas as pd
-import torch
+import jax.numpy as jnp
 
 from econirl.environments.binaryworld import BinaryworldEnvironment
 from econirl.environments.objectworld import ObjectworldEnvironment
@@ -27,16 +27,16 @@ def _panel_to_df(panel: Panel) -> pd.DataFrame:
         for t in range(len(traj.states)):
             rows.append({
                 "agent_id": traj.individual_id,
-                "state": traj.states[t].item(),
-                "action": traj.actions[t].item(),
+                "state": int(traj.states[t]),
+                "action": int(traj.actions[t]),
             })
     return pd.DataFrame(rows)
 
 
 def _compute_evd(
-    true_reward: torch.Tensor,
-    learned_policy: torch.Tensor,
-    transitions: torch.Tensor,
+    true_reward: jnp.ndarray,
+    learned_policy: jnp.ndarray,
+    transitions: jnp.ndarray,
     problem: DDCProblem,
 ) -> float:
     """Compute Expected Value Difference between optimal and learned policy.
@@ -54,21 +54,21 @@ def _compute_evd(
     gamma = problem.discount_factor
 
     # Build the reward matrix (S, A) from the state-only reward
-    reward_sa = true_reward.unsqueeze(1).expand(n_states, n_actions).double()
+    reward_sa = jnp.tile(true_reward[:, None], (1, n_actions)).astype(jnp.float64)
 
     # Optimal value under true reward
     operator = SoftBellmanOperator(problem, transitions)
-    opt_result = policy_iteration(operator, reward_sa.float(), tol=1e-10, max_iter=200)
-    v_star = opt_result.V.double()
+    opt_result = policy_iteration(operator, reward_sa.astype(jnp.float32), tol=1e-10, max_iter=200)
+    v_star = opt_result.V.astype(jnp.float64)
 
     # Value of learned policy under true reward
-    pi = learned_policy.double()
-    r_pi = (pi * reward_sa).sum(dim=1)
-    P_pi = torch.einsum("sa,ast->st", pi, transitions.double())
-    I = torch.eye(n_states, dtype=torch.float64)
-    v_learned = torch.linalg.solve(I - gamma * P_pi, r_pi)
+    pi = learned_policy.astype(jnp.float64)
+    r_pi = (pi * reward_sa).sum(axis=1)
+    P_pi = jnp.einsum("sa,ast->st", pi, transitions.astype(jnp.float64))
+    I = jnp.eye(n_states, dtype=jnp.float64)
+    v_learned = jnp.linalg.solve(I - gamma * P_pi, r_pi)
 
-    return (v_star - v_learned).mean().item()
+    return float((v_star - v_learned).mean())
 
 
 @pytest.mark.slow
@@ -83,7 +83,6 @@ class TestWulfmeierBinaryworld:
     """
 
     def test_deep_beats_linear_on_binaryworld(self):
-        torch.manual_seed(42)
         np.random.seed(42)
 
         # Create environment and generate demonstrations
@@ -101,11 +100,11 @@ class TestWulfmeierBinaryworld:
         # binary neighborhood feature vectors. The neural network needs these
         # features as input to learn the nonlinear count-based reward.
         state_features = features[:, 0, :]  # (S, 9) -- same across actions
-        def binaryworld_encoder(states: torch.Tensor) -> torch.Tensor:
-            return state_features[states.long()]
+        def binaryworld_encoder(states: jnp.ndarray) -> jnp.ndarray:
+            return state_features[states.astype(jnp.int32)]
 
         # --- Deep MCE-IRL (neural reward) ---
-        torch.manual_seed(42)
+        np.random.seed(42)
         deep_model = MCEIRLNeural(
             n_states=n_states,
             n_actions=n_actions,
@@ -124,10 +123,10 @@ class TestWulfmeierBinaryworld:
             state="state",
             action="action",
             id="agent_id",
-            transitions=transitions.numpy(),
+            transitions=np.asarray(transitions),
             features=features,
         )
-        deep_policy = torch.tensor(deep_model.policy_, dtype=torch.float32)
+        deep_policy = jnp.array(deep_model.policy_).astype(jnp.float32)
 
         deep_evd = _compute_evd(
             env.true_reward, deep_policy, transitions, env.problem_spec
@@ -184,7 +183,6 @@ class TestWulfmeierObjectworld:
     """
 
     def test_deep_runs_on_objectworld(self):
-        torch.manual_seed(42)
         np.random.seed(42)
 
         # Create environment and generate demonstrations
@@ -202,11 +200,11 @@ class TestWulfmeierObjectworld:
 
         # Build a state encoder from the environment features
         state_features = features[:, 0, :]  # (S, K) -- same across actions
-        def objectworld_encoder(states: torch.Tensor) -> torch.Tensor:
-            return state_features[states.long()]
+        def objectworld_encoder(states: jnp.ndarray) -> jnp.ndarray:
+            return state_features[states.astype(jnp.int32)]
 
         # Run deep MCE-IRL
-        torch.manual_seed(42)
+        np.random.seed(42)
         deep_model = MCEIRLNeural(
             n_states=n_states,
             n_actions=n_actions,
@@ -225,10 +223,10 @@ class TestWulfmeierObjectworld:
             state="state",
             action="action",
             id="agent_id",
-            transitions=transitions.numpy(),
+            transitions=np.asarray(transitions),
             features=features,
         )
-        deep_policy = torch.tensor(deep_model.policy_, dtype=torch.float32)
+        deep_policy = jnp.array(deep_model.policy_).astype(jnp.float32)
 
         evd = _compute_evd(
             env.true_reward, deep_policy, transitions, env.problem_spec

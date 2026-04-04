@@ -8,7 +8,9 @@ econirl requires Python 3.10 or later.
 
 Dependencies:
 
-- PyTorch >= 2.0
+- JAX >= 0.4.30
+- Equinox >= 0.11
+- Optax >= 0.2
 - Gymnasium >= 0.29
 - NumPy >= 1.24
 - Pandas >= 2.0
@@ -29,7 +31,7 @@ For the latest development version:
 
 .. code-block:: bash
 
-   git clone https://github.com/econirl/econirl.git
+   git clone https://github.com/rawatpranjal/econirl.git
    cd econirl
    pip install -e .
 

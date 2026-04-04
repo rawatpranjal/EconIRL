@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.environments.binaryworld import BinaryworldEnvironment
 from econirl.core.types import DDCProblem, Panel
@@ -42,15 +42,15 @@ class TestTransitions:
         env = BinaryworldEnvironment(grid_size=8, seed=0)
         T = env.transition_matrices
         for a in range(5):
-            row_sums = T[a].sum(dim=1)
-            assert torch.allclose(row_sums, torch.ones(64))
+            row_sums = T[a].sum(axis=1)
+            assert jnp.allclose(row_sums, jnp.ones(64))
 
     def test_deterministic(self):
         """Each row should have a single 1.0 entry (deterministic transitions)."""
         env = BinaryworldEnvironment(grid_size=8, seed=0)
         T = env.transition_matrices
         for a in range(5):
-            assert T[a].max(dim=1).values.min().item() == pytest.approx(1.0)
+            assert float(T[a].max(axis=1).min()) == pytest.approx(1.0)
 
 
 class TestFeatures:
@@ -66,7 +66,7 @@ class TestFeatures:
         """Feature values should be only 0 or 1."""
         env = BinaryworldEnvironment(grid_size=8, seed=0)
         F = env.feature_matrix
-        unique_vals = torch.unique(F)
+        unique_vals = jnp.unique(F)
         assert all(v in [0.0, 1.0] for v in unique_vals.tolist())
 
     def test_features_identical_across_actions(self):
@@ -74,7 +74,7 @@ class TestFeatures:
         env = BinaryworldEnvironment(grid_size=8, seed=0)
         F = env.feature_matrix
         for a in range(1, 5):
-            assert torch.equal(F[:, 0, :], F[:, a, :])
+            assert jnp.array_equal(F[:, 0, :], F[:, a, :])
 
 
 class TestReward:
@@ -91,7 +91,7 @@ class TestReward:
         env = BinaryworldEnvironment(grid_size=8, seed=0)
         R = env.true_reward
         for val in R:
-            assert val.item() in {-1.0, 0.0, 1.0}
+            assert float(val) in {-1.0, 0.0, 1.0}
 
     def test_reward_matches_blue_count(self):
         """Critical test: every state reward must match blue count rule.
@@ -105,7 +105,7 @@ class TestReward:
         F = env.feature_matrix
         for s in range(env.num_states):
             # Features for action 0 are the 9 binary neighborhood values
-            neighborhood = F[s, 0, :].numpy()
+            neighborhood = np.asarray(F[s, 0, :])
             blue_count = int(neighborhood.sum())
             if blue_count == 4:
                 expected = 1.0
@@ -113,9 +113,9 @@ class TestReward:
                 expected = -1.0
             else:
                 expected = 0.0
-            assert R[s].item() == expected, (
+            assert float(R[s]) == expected, (
                 f"State {s}: blue_count={blue_count}, "
-                f"expected reward={expected}, got={R[s].item()}"
+                f"expected reward={expected}, got={float(R[s])}"
             )
 
 
@@ -136,7 +136,7 @@ class TestNeighborhood:
         assert neighborhood.shape == (9,)
         # All 9 should be valid binary values
         for val in neighborhood:
-            assert val.item() in {0.0, 1.0}
+            assert float(val) in {0.0, 1.0}
 
     def test_corner_cell_zero_padding(self):
         """Corner cell (0,0) has at most 4 in-bounds neighbors.
@@ -149,7 +149,7 @@ class TestNeighborhood:
         F = env.feature_matrix
         # State for cell (0,0): state index 0
         neighborhood = F[0, 0, :]
-        blue_count = int(neighborhood.sum().item())
+        blue_count = int(float(neighborhood.sum()))
         # The 3x3 neighborhood around (0,0) has 5 out-of-bounds cells,
         # so at most 4 can be blue
         assert blue_count <= 4, (
@@ -164,15 +164,15 @@ class TestSeedReproducibility:
         """Same seed should produce identical color map, reward, and features."""
         env1 = BinaryworldEnvironment(grid_size=8, seed=42)
         env2 = BinaryworldEnvironment(grid_size=8, seed=42)
-        assert torch.equal(env1.true_reward, env2.true_reward)
-        assert torch.equal(env1.feature_matrix, env2.feature_matrix)
+        assert jnp.array_equal(env1.true_reward, env2.true_reward)
+        assert jnp.array_equal(env1.feature_matrix, env2.feature_matrix)
 
     def test_different_seed_different_result(self):
         """Different seeds should produce different color maps."""
         env1 = BinaryworldEnvironment(grid_size=8, seed=0)
         env2 = BinaryworldEnvironment(grid_size=8, seed=999)
         # With different random color assignments, rewards will differ
-        assert not torch.equal(env1.true_reward, env2.true_reward)
+        assert not jnp.array_equal(env1.true_reward, env2.true_reward)
 
 
 class TestProblemSpec:
@@ -216,4 +216,4 @@ class TestDemonstrations:
         panel2 = env.simulate_demonstrations(n_demos=4, max_steps=50, seed=0)
         states1 = panel1.get_all_states()
         states2 = panel2.get_all_states()
-        assert torch.equal(states1, states2)
+        assert jnp.array_equal(states1, states2)

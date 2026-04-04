@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.estimators.mceirl_neural import MCEIRLNeural
@@ -33,23 +33,23 @@ _DISCOUNT = 0.9
 def _make_gridworld_transitions(
     n_states: int = _N_STATES,
     n_actions: int = _N_ACTIONS,
-) -> torch.Tensor:
+) -> jnp.ndarray:
     """Create simple deterministic-ish transitions.
 
     Action 0: move right (state+1, wrapping at end)
     Action 1: stay in place
     """
-    T = torch.zeros(n_actions, n_states, n_states, dtype=torch.float32)
+    T = jnp.zeros((n_actions, n_states, n_states), dtype=jnp.float32)
 
     for s in range(n_states):
         # Action 0: move right with some noise
         next_s = (s + 1) % n_states
-        T[0, s, next_s] = 0.9
-        T[0, s, s] = 0.1
+        T = T.at[0, s, next_s].set(0.9)
+        T = T.at[0, s, s].set(0.1)
 
         # Action 1: stay
-        T[1, s, s] = 0.9
-        T[1, s, (s + 1) % n_states] = 0.1
+        T = T.at[1, s, s].set(0.9)
+        T = T.at[1, s, (s + 1) % n_states].set(0.1)
 
     return T
 
@@ -65,7 +65,7 @@ def _make_gridworld_data(
     import pandas as pd
 
     np.random.seed(seed)
-    T = _make_gridworld_transitions(n_states, n_actions).numpy()
+    T = np.asarray(_make_gridworld_transitions(n_states, n_actions))
     data = []
 
     for i in range(n_individuals):
@@ -93,8 +93,8 @@ def _make_gridworld_data(
 
 def _make_features(n_states: int = _N_STATES) -> RewardSpec:
     """Create state features for projection."""
-    s = torch.arange(n_states, dtype=torch.float32)
-    state_features = torch.stack([s / n_states, (s / n_states) ** 2], dim=1)
+    s = jnp.arange(n_states, dtype=jnp.float32)
+    state_features = jnp.stack([s / n_states, (s / n_states) ** 2], axis=1)
     return RewardSpec(
         state_features, names=["linear", "quadratic"], n_actions=_N_ACTIONS
     )

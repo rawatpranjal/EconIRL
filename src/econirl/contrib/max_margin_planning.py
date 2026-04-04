@@ -30,8 +30,9 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+import jax
+import jax.numpy as jnp
 import numpy as np
-import torch
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -170,7 +171,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         self,
         panel: Panel,
         problem: DDCProblem,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Estimate expert policy from demonstration data using CCP estimation.
 
         Computes the empirical conditional choice probabilities:
@@ -181,38 +182,38 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             problem: Problem specification.
 
         Returns:
-            Expert policy tensor of shape (num_states, num_actions).
+            Expert policy array of shape (num_states, num_actions).
         """
         n_states = problem.num_states
         n_actions = problem.num_actions
 
         # Count state-action pairs
-        state_action_counts = torch.zeros((n_states, n_actions), dtype=torch.float32)
-        state_counts = torch.zeros(n_states, dtype=torch.float32)
+        state_action_counts = jnp.zeros((n_states, n_actions), dtype=jnp.float32)
+        state_counts = jnp.zeros(n_states, dtype=jnp.float32)
 
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
-        state_action_counts.index_put_((all_states, all_actions), torch.ones(len(all_states), dtype=torch.float32), accumulate=True)
-        state_counts.index_put_((all_states,), torch.ones(len(all_states), dtype=torch.float32), accumulate=True)
+        state_action_counts = state_action_counts.at[all_states, all_actions].add(jnp.ones(len(all_states), dtype=jnp.float32))
+        state_counts = state_counts.at[all_states].add(jnp.ones(len(all_states), dtype=jnp.float32))
 
         # Convert to probabilities with smoothing for unvisited states
-        expert_policy = torch.zeros((n_states, n_actions), dtype=torch.float32)
+        expert_policy = jnp.zeros((n_states, n_actions), dtype=jnp.float32)
 
         for s in range(n_states):
             if state_counts[s] > 0:
-                expert_policy[s, :] = state_action_counts[s, :] / state_counts[s]
+                expert_policy = expert_policy.at[s, :].set(state_action_counts[s, :] / state_counts[s])
             else:
                 # Uniform distribution for unvisited states
-                expert_policy[s, :] = 1.0 / n_actions
+                expert_policy = expert_policy.at[s, :].set(1.0 / n_actions)
 
         return expert_policy
 
     def _compute_loss_matrix(
         self,
-        expert_policy: torch.Tensor,
+        expert_policy: jnp.ndarray,
         n_states: int,
         n_actions: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute loss matrix Δ(s,a) based on expert policy.
 
         The loss encourages the learned policy to match the expert.
@@ -230,7 +231,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             # KL-based loss: Δ(s,a) = -log(π*(a|s) + ε)
             # High loss for actions the expert rarely takes
             eps = 1e-10
-            loss_matrix = -torch.log(expert_policy + eps)
+            loss_matrix = -jnp.log(expert_policy + eps)
         elif self.config.loss_type == "trajectory_hamming":
             # Soft 0-1 loss: Δ(s,a) = 1 - π*(a|s)
             # 0 for actions expert always takes, 1 for actions never taken
@@ -242,10 +243,10 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
     def _loss_augmented_value_iteration(
         self,
-        reward_matrix: torch.Tensor,
-        loss_matrix: torch.Tensor,
+        reward_matrix: jnp.ndarray,
+        loss_matrix: jnp.ndarray,
         operator: SoftBellmanOperator,
-    ) -> tuple[torch.Tensor, torch.Tensor, bool]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray, bool]:
         """Solve MDP with loss-augmented reward.
 
         The key MMP innovation: during training, we solve the MDP with
@@ -286,7 +287,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         self,
         panel: Panel,
         reward_fn: BaseUtilityFunction,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute expert feature expectations from demonstration data.
 
         The feature expectation is the average feature over all state-action
@@ -318,9 +319,9 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
         if is_action_dependent:
             all_actions = panel.get_all_actions()
-            feature_sum = feature_matrix[all_states, all_actions, :].sum(dim=0)
+            feature_sum = feature_matrix[all_states, all_actions, :].sum(axis=0)
         else:
-            feature_sum = feature_matrix[all_states, :].sum(dim=0)
+            feature_sum = feature_matrix[all_states, :].sum(axis=0)
 
         if total_count > 0:
             return feature_sum / total_count
@@ -328,12 +329,12 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
     def _compute_policy_features(
         self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        initial_distribution: torch.Tensor | None = None,
-    ) -> torch.Tensor:
+        initial_distribution: jnp.ndarray | None = None,
+    ) -> jnp.ndarray:
         """Compute feature expectations under a given policy.
 
         Uses the stationary distribution under the policy to compute:
@@ -356,26 +357,26 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
         # Compute policy-induced transition matrix
         # P_π[s, s'] = Σ_a π(a|s) * P(s'|s,a)
-        P_pi = torch.einsum("sa,ast->st", policy, transitions)
+        P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
         # Compute discounted state visitation frequencies
         if initial_distribution is None:
-            d_0 = torch.ones(n_states, dtype=torch.float32) / n_states
+            d_0 = jnp.ones(n_states, dtype=jnp.float32) / n_states
         else:
             d_0 = initial_distribution
 
         # Solve d = (1 - γ)(I - γ P_π^T)^{-1} d_0
-        I = torch.eye(n_states, dtype=torch.float32)
+        I = jnp.eye(n_states, dtype=jnp.float32)
         try:
-            inv_matrix = torch.linalg.solve(I - gamma * P_pi.T, d_0)
+            inv_matrix = jnp.linalg.solve(I - gamma * P_pi.T, d_0)
             d_pi = (1 - gamma) * inv_matrix
             d_pi = d_pi / d_pi.sum()  # Normalize
-        except RuntimeError:
+        except Exception:
             # Fallback: iterative computation
-            d_pi = d_0.clone()
+            d_pi = jnp.array(d_0)
             for _ in range(1000):
                 d_new = d_0 * (1 - gamma) + gamma * (P_pi.T @ d_pi)
-                if torch.abs(d_new - d_pi).max() < 1e-10:
+                if jnp.abs(d_new - d_pi).max() < 1e-10:
                     break
                 d_pi = d_new
             d_pi = d_pi / d_pi.sum()
@@ -384,11 +385,11 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         if isinstance(reward_fn, (ActionDependentReward, LinearUtility)):
             feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
             # μ_π = Σ_s d_π(s) Σ_a π(a|s) φ(s,a,k)
-            policy_weighted_features = torch.einsum("sa,sak->sk", policy, feature_matrix)
-            feature_expectations = torch.einsum("s,sk->k", d_pi, policy_weighted_features)
+            policy_weighted_features = jnp.einsum("sa,sak->sk", policy, feature_matrix)
+            feature_expectations = jnp.einsum("s,sk->k", d_pi, policy_weighted_features)
         elif isinstance(reward_fn, LinearReward):
             # μ_π = Σ_s d_π(s) φ(s)
-            feature_expectations = torch.einsum("s,sk->k", d_pi, reward_fn.state_features)
+            feature_expectations = jnp.einsum("s,sk->k", d_pi, reward_fn.state_features)
         else:
             raise TypeError(
                 f"MaxMarginPlanningEstimator requires LinearReward, "
@@ -399,10 +400,10 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
     def _compute_subgradient(
         self,
-        theta: torch.Tensor,
-        expert_features: torch.Tensor,
-        policy_features: torch.Tensor,
-    ) -> torch.Tensor:
+        theta: jnp.ndarray,
+        expert_features: jnp.ndarray,
+        policy_features: jnp.ndarray,
+    ) -> jnp.ndarray:
         """Compute subgradient of the MMP objective.
 
         The subgradient is:
@@ -455,9 +456,9 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
-        true_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
+        true_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run Maximum Margin Planning optimization.
@@ -494,7 +495,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         if initial_params is None:
             theta = reward_fn.get_initial_parameters()
         else:
-            theta = initial_params.clone()
+            theta = jnp.array(initial_params)
 
         # Estimate expert policy from demonstrations
         expert_policy = self._estimate_expert_policy(panel, problem)
@@ -514,7 +515,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         # Tracking
         converged = False
         best_obj = float("inf")
-        best_theta = theta.clone()
+        best_theta = jnp.array(theta)
         inner_not_converged = 0
 
         # Progress bar
@@ -541,20 +542,20 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
             # Step 3: Compute subgradient
             subgradient = self._compute_subgradient(theta, expert_features, policy_features)
-            grad_norm = torch.norm(subgradient).item()
+            grad_norm = float(jnp.linalg.norm(subgradient))
 
             # Objective value (for tracking)
             # L(θ) = (λ/2)||θ||² + structured hinge loss
-            reg_loss = 0.5 * self.config.regularization_lambda * torch.sum(theta ** 2)
-            hinge_loss = torch.dot(theta, policy_features - expert_features)
+            reg_loss = 0.5 * self.config.regularization_lambda * jnp.sum(theta ** 2)
+            hinge_loss = jnp.dot(theta, policy_features - expert_features)
             # Add the actual loss value: Σ Δ(π*, π̂)
-            loss_value = torch.sum(loss_matrix * policy)
-            obj = (reg_loss + hinge_loss + self.config.loss_scale * loss_value).item()
+            loss_value = jnp.sum(loss_matrix * policy)
+            obj = float(reg_loss + hinge_loss + self.config.loss_scale * loss_value)
 
             # Track best
             if obj < best_obj:
                 best_obj = obj
-                best_theta = theta.clone()
+                best_theta = jnp.array(theta)
 
             # Update progress bar
             postfix = {
@@ -562,7 +563,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
                 "||g||": f"{grad_norm:.4f}",
             }
             if true_params is not None:
-                rmse = torch.sqrt(torch.mean((theta - true_params) ** 2)).item()
+                rmse = float(jnp.sqrt(jnp.mean((theta - true_params) ** 2)))
                 postfix["RMSE"] = f"{rmse:.4f}"
             pbar.set_postfix(postfix)
 
@@ -602,13 +603,13 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
         # Compute log-likelihood on expert data
         log_probs = operator.compute_log_choice_probabilities(final_reward, final_V)
-        ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+        ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
 
         # Feature matching quality
         final_policy_features = self._compute_policy_features(
             final_policy, transitions, reward_fn, problem, initial_dist
         )
-        feature_diff = torch.norm(expert_features - final_policy_features).item()
+        feature_diff = float(jnp.linalg.norm(expert_features - final_policy_features))
 
         # Compute Hessian for inference
         hessian = None
@@ -649,14 +650,14 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
     def _numerical_hessian(
         self,
-        params: torch.Tensor,
+        params: jnp.ndarray,
         panel: Panel,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
+        transitions: jnp.ndarray,
         operator: SoftBellmanOperator,
         eps: float = 1e-3,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute numerical Hessian of the log-likelihood.
 
         Uses central differences for numerical stability.
@@ -674,9 +675,9 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             Hessian matrix of shape (n_params, n_params).
         """
         n_params = len(params)
-        hessian = torch.zeros((n_params, n_params), dtype=params.dtype)
+        hessian = jnp.zeros((n_params, n_params), dtype=params.dtype)
 
-        def ll_at(p: torch.Tensor) -> float:
+        def ll_at(p: jnp.ndarray) -> float:
             """Compute log-likelihood at parameters p."""
             reward_matrix = reward_fn.compute(p)
             if self.config.inner_solver == "hybrid":
@@ -694,66 +695,53 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, result.V)
 
-            ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+            ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
             return ll
 
         # Compute Hessian using central differences
         for i in range(n_params):
-            h_i = max(eps, min(abs(params[i].item()) * eps, 0.1))
+            h_i = max(eps, min(abs(float(params[i])) * eps, 0.1))
 
             for j in range(i, n_params):
-                h_j = max(eps, min(abs(params[j].item()) * eps, 0.1))
+                h_j = max(eps, min(abs(float(params[j])) * eps, 0.1))
 
                 if i == j:
                     # Diagonal: f''(x) ≈ (f(x+h) - 2f(x) + f(x-h)) / h²
-                    p_plus = params.clone()
-                    p_plus[i] += h_i
-                    p_minus = params.clone()
-                    p_minus[i] -= h_i
+                    p_plus = params.at[i].add(h_i)
+                    p_minus = params.at[i].add(-h_i)
 
                     ll_plus = ll_at(p_plus)
                     ll_0 = ll_at(params)
                     ll_minus = ll_at(p_minus)
 
-                    hessian[i, i] = (ll_plus - 2 * ll_0 + ll_minus) / (h_i * h_i)
+                    hessian = hessian.at[i, i].set((ll_plus - 2 * ll_0 + ll_minus) / (h_i * h_i))
                 else:
                     # Off-diagonal: 4-point formula
-                    p_pp = params.clone()
-                    p_pp[i] += h_i
-                    p_pp[j] += h_j
-
-                    p_pm = params.clone()
-                    p_pm[i] += h_i
-                    p_pm[j] -= h_j
-
-                    p_mp = params.clone()
-                    p_mp[i] -= h_i
-                    p_mp[j] += h_j
-
-                    p_mm = params.clone()
-                    p_mm[i] -= h_i
-                    p_mm[j] -= h_j
+                    p_pp = params.at[i].add(h_i).at[j].add(h_j)
+                    p_pm = params.at[i].add(h_i).at[j].add(-h_j)
+                    p_mp = params.at[i].add(-h_i).at[j].add(h_j)
+                    p_mm = params.at[i].add(-h_i).at[j].add(-h_j)
 
                     h_ij = (ll_at(p_pp) - ll_at(p_pm) - ll_at(p_mp) + ll_at(p_mm)) / (4 * h_i * h_j)
-                    hessian[i, j] = h_ij
-                    hessian[j, i] = h_ij
+                    hessian = hessian.at[i, j].set(h_ij)
+                    hessian = hessian.at[j, i].set(h_ij)
 
         # Ensure Hessian is negative semi-definite at maximum
-        eigenvalues, eigenvectors = torch.linalg.eigh(hessian)
+        eigenvalues, eigenvectors = jnp.linalg.eigh(hessian)
         if (eigenvalues > 0).any():
             self._log("Warning: Hessian not negative semi-definite, projecting")
-            eigenvalues_clamped = torch.clamp(eigenvalues, max=-1e-8)
-            hessian = eigenvectors @ torch.diag(eigenvalues_clamped) @ eigenvectors.T
+            eigenvalues_clamped = jnp.clip(eigenvalues, a_max=-1e-8)
+            hessian = eigenvectors @ jnp.diag(eigenvalues_clamped) @ eigenvectors.T
 
         return hessian
 
     def compute_margin(
         self,
-        theta: torch.Tensor,
+        theta: jnp.ndarray,
         panel: Panel,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
+        transitions: jnp.ndarray,
     ) -> float:
         """Compute the structured margin for given parameters.
 
@@ -797,6 +785,6 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         )
 
         # Margin = θ' (μ* - μ_π)
-        margin = torch.dot(theta, expert_features - policy_features).item()
+        margin = float(jnp.dot(theta, expert_features - policy_features))
 
         return margin

@@ -95,7 +95,6 @@ def run_monte_carlo(
     """
     if seed is not None:
         np.random.seed(seed)
-        torch.manual_seed(seed)
 
     # Create environment with true parameters
     env = RustBusEnvironment(

@@ -8,7 +8,7 @@ Aguirregabiria & Mira 2002).
 import pytest
 import numpy as np
 import pandas as pd
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import Panel, Trajectory
 

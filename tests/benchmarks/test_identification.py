@@ -8,8 +8,10 @@ Verifies that:
 These tests use small environments and run quickly (not marked slow).
 """
 
+import numpy as np
 import pytest
-import torch
+
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -54,10 +56,10 @@ def id_setup(id_env):
         ll_val = 0.0
         for traj in panel.trajectories:
             for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                ll_val += log_probs[s, a].item()
-        return torch.tensor(ll_val)
+                s = int(traj.states[t])
+                a = int(traj.actions[t])
+                ll_val += float(log_probs[s, a])
+        return ll_val
 
     hessian = compute_numerical_hessian(true_params, _ll)
     return panel, utility, problem, transitions, true_params, hessian
@@ -86,11 +88,10 @@ def test_negative_hessian_positive_eigenvalues(id_setup):
     """Eigenvalues of -H should all be positive at the true parameters."""
     _, _, _, _, _, hessian = id_setup
     neg_hessian = -hessian
-    eigenvalues = torch.linalg.eigvalsh(neg_hessian)
+    eigenvalues = jnp.linalg.eigvalsh(neg_hessian)
 
-    # All eigenvalues should be positive (negative Hessian is positive definite)
-    assert eigenvalues.min().item() > -1e-4, (
-        f"Negative Hessian has non-positive eigenvalue: min = {eigenvalues.min():.6f}"
+    assert float(eigenvalues.min()) > -1e-4, (
+        f"Negative Hessian has non-positive eigenvalue: min = {float(eigenvalues.min()):.6f}"
     )
 
 
@@ -101,7 +102,6 @@ def test_identification_status_well_identified(id_setup):
     assert diag.is_positive_definite, (
         f"Model not positive definite: status = {diag.status}"
     )
-    # Status should not indicate under-identification
     assert "Under-identified" not in diag.status, (
         f"Model incorrectly flagged: {diag.status}"
     )
@@ -118,19 +118,19 @@ def test_collinear_features_detected(id_env):
     problem = env.problem_spec
     transitions = env.transition_matrices
 
-    # Build a feature matrix with a collinear third column (exact copy of col0)
-    original_features = env.feature_matrix  # (S, A, 2)
+    original_features = np.asarray(env.feature_matrix)  # (S, A, 2)
     S, A, _ = original_features.shape
-    collinear_col = original_features[:, :, 0:1].clone()  # exact copy
-    bad_features = torch.cat([original_features, collinear_col], dim=2)  # (S, A, 3)
+    collinear_col = original_features[:, :, 0:1].copy()
+    bad_features = jnp.concatenate(
+        [jnp.asarray(original_features), jnp.asarray(collinear_col)], axis=2
+    )  # (S, A, 3)
 
     utility = LinearUtility(
         feature_matrix=bad_features,
         parameter_names=["operating_cost", "replacement_cost", "collinear"],
     )
 
-    # Use arbitrary parameters for the collinear model
-    params = torch.tensor([0.001, 3.0, 0.0005], dtype=torch.float32)
+    params = jnp.array([0.001, 3.0, 0.0005], dtype=jnp.float32)
     operator = SoftBellmanOperator(problem, transitions)
 
     def _ll(p):
@@ -140,19 +140,17 @@ def test_collinear_features_detected(id_env):
         ll_val = 0.0
         for traj in panel.trajectories:
             for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                ll_val += log_probs[s, a].item()
-        return torch.tensor(ll_val)
+                s = int(traj.states[t])
+                a = int(traj.actions[t])
+                ll_val += float(log_probs[s, a])
+        return ll_val
 
     hessian = compute_numerical_hessian(params, _ll)
     diag = check_identification(hessian, utility.parameter_names)
 
-    # The Hessian should have high condition number or be under-identified
-    # Exact collinearity means the last eigenvalue should be near zero
-    eigenvalues = torch.linalg.eigvalsh(-hessian)
-    min_eigenvalue = eigenvalues.min().item()
-    max_eigenvalue = eigenvalues.max().item()
+    eigenvalues = jnp.linalg.eigvalsh(-hessian)
+    min_eigenvalue = float(eigenvalues.min())
+    max_eigenvalue = float(eigenvalues.max())
     ratio = min_eigenvalue / max(max_eigenvalue, 1e-10)
 
     assert ratio < 0.01 or diag.rank < 3 or diag.hessian_condition_number > 1e4, (
@@ -172,7 +170,6 @@ def test_condition_number_finite(id_setup):
     assert diag.hessian_condition_number < float("inf"), (
         "Condition number is infinite (singular Hessian)"
     )
-    # Condition number for the Rust bus should be reasonable
     assert diag.hessian_condition_number < 1e8, (
         f"Condition number is very large: {diag.hessian_condition_number:.2e}"
     )

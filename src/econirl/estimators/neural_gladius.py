@@ -27,40 +27,16 @@ from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import Panel, TrajectoryPanel
 from econirl.estimators.neural_base import NeuralEstimatorMixin
 
-try:
-    import torch
-except ImportError:  # pragma: no cover
-    torch = None
-
-
-def _is_torch_tensor(values: object) -> bool:
-    return torch is not None and isinstance(values, torch.Tensor)
-
-
 def _to_numpy(values: object) -> np.ndarray:
-    if _is_torch_tensor(values):
-        return values.detach().cpu().numpy()
     return np.asarray(values)
 
 
 def _to_jax_float(values: object) -> jax.Array:
-    if _is_torch_tensor(values):
-        return jnp.asarray(values.detach().cpu().numpy(), dtype=jnp.float32)
     return jnp.asarray(values, dtype=jnp.float32)
 
 
 def _to_jax_int(values: object) -> jax.Array:
-    if _is_torch_tensor(values):
-        return jnp.asarray(values.detach().cpu().numpy(), dtype=jnp.int32)
     return jnp.asarray(values, dtype=jnp.int32)
-
-
-def _return_like(values: jax.Array, *templates: object) -> object:
-    if any(_is_torch_tensor(template) for template in templates):
-        if torch is None:  # pragma: no cover
-            raise RuntimeError("Torch is required for torch tensor outputs.")
-        return torch.tensor(np.asarray(values).copy())
-    return values
 
 
 class _MLP(eqx.Module):
@@ -136,7 +112,7 @@ class _ContextQNetwork(eqx.Module):
         ao = _to_jax_float(action_onehot)
         x = jnp.concatenate([sf, cf, ao], axis=-1)
         out = jnp.squeeze(self.net(x), axis=-1)
-        return _return_like(out, state_feat, ctx_feat, action_onehot)
+        return out
 
     def all_actions(
         self,
@@ -152,7 +128,7 @@ class _ContextQNetwork(eqx.Module):
         a_exp = jnp.repeat(actions[None, :, :], sf.shape[0], axis=0)
         x = jnp.concatenate([sf_exp, cf_exp, a_exp], axis=-1)
         out = jnp.squeeze(jax.vmap(self.net)(x), axis=-1)
-        return _return_like(out, state_feat, ctx_feat)
+        return out
 
     def eval(self) -> _ContextQNetwork:
         return self
@@ -340,13 +316,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         return jnp.asarray(contexts, dtype=jnp.int32)
 
     def _call_encoder(self, encoder: Callable[[object], object], values: object) -> jax.Array:
-        try:
-            encoded = encoder(values)
-        except Exception as err:
-            if torch is None:
-                raise err
-            torch_values = torch.tensor(_to_numpy(values).copy(), dtype=torch.long)
-            encoded = encoder(torch_values)
+        encoded = encoder(values)
         return _to_jax_float(encoded)
 
     def _build_encoders(
@@ -733,7 +703,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         q_vals = jnp.asarray(self._q_net(s_feat, ctx_feat, a_oh), dtype=jnp.float32)
         ev_vals = jnp.asarray(self._ev_net(s_feat, ctx_feat, a_oh), dtype=jnp.float32)
         rewards = q_vals - self.discount * ev_vals
-        return _return_like(rewards, states, actions, contexts)
+        return rewards
 
     def conf_int(self, alpha: float = 0.05) -> dict[str, tuple[float, float]]:
         if self.params_ is None or self.se_ is None:

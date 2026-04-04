@@ -1,7 +1,8 @@
 """Tests for inference (parameter recovery) metrics."""
 
 import pytest
-import torch
+import jax.numpy as jnp
+import numpy as np
 
 from econirl.evaluation.inference import InferenceMetrics, inference_metrics
 
@@ -11,8 +12,8 @@ class TestInferenceMetrics:
 
     def test_perfect_recovery(self):
         """Perfect parameter recovery should give zero MSE."""
-        theta_true = torch.tensor([1.0, 2.0, 3.0])
-        theta_hat = torch.tensor([1.0, 2.0, 3.0])
+        theta_true = jnp.array([1.0, 2.0, 3.0])
+        theta_hat = jnp.array([1.0, 2.0, 3.0])
 
         result = inference_metrics(theta_true, theta_hat)
 
@@ -25,8 +26,8 @@ class TestInferenceMetrics:
 
     def test_known_mse(self):
         """Test MSE computation with known values."""
-        theta_true = torch.tensor([1.0, 2.0])
-        theta_hat = torch.tensor([1.0, 3.0])  # Error of 1 on second param
+        theta_true = jnp.array([1.0, 2.0])
+        theta_hat = jnp.array([1.0, 3.0])  # Error of 1 on second param
 
         result = inference_metrics(theta_true, theta_hat)
 
@@ -37,18 +38,18 @@ class TestInferenceMetrics:
 
     def test_bias_computation(self):
         """Test per-parameter bias."""
-        theta_true = torch.tensor([1.0, 2.0, 3.0])
-        theta_hat = torch.tensor([1.5, 1.5, 3.5])
+        theta_true = jnp.array([1.0, 2.0, 3.0])
+        theta_hat = jnp.array([1.5, 1.5, 3.5])
 
         result = inference_metrics(theta_true, theta_hat)
 
-        expected_bias = torch.tensor([0.5, -0.5, 0.5])
-        assert torch.allclose(result.bias, expected_bias)
+        expected_bias = jnp.array([0.5, -0.5, 0.5])
+        np.testing.assert_allclose(np.asarray(result.bias), np.asarray(expected_bias))
 
     def test_normalize_option(self):
         """Test that normalize=True normalizes before comparison."""
-        theta_true = torch.tensor([1.0, 0.0])
-        theta_hat = torch.tensor([2.0, 0.0])  # Same direction, different scale
+        theta_true = jnp.array([1.0, 0.0])
+        theta_hat = jnp.array([2.0, 0.0])  # Same direction, different scale
 
         result = inference_metrics(theta_true, theta_hat, normalize=True)
 
@@ -57,8 +58,8 @@ class TestInferenceMetrics:
 
     def test_mask_option(self):
         """Test that mask excludes parameters from metrics."""
-        theta_true = torch.tensor([1.0, 2.0, 100.0])  # Third param is way off
-        theta_hat = torch.tensor([1.0, 2.0, 0.0])
+        theta_true = jnp.array([1.0, 2.0, 100.0])  # Third param is way off
+        theta_hat = jnp.array([1.0, 2.0, 0.0])
 
         # Without mask: huge MSE
         result_no_mask = inference_metrics(theta_true, theta_hat)
@@ -72,9 +73,9 @@ class TestInferenceMetrics:
 
     def test_coverage_with_standard_errors(self):
         """Test confidence interval coverage computation."""
-        theta_true = torch.tensor([1.0, 2.0])
-        theta_hat = torch.tensor([1.1, 2.1])
-        se = torch.tensor([0.5, 0.5])  # Large SEs should contain true values
+        theta_true = jnp.array([1.0, 2.0])
+        theta_hat = jnp.array([1.1, 2.1])
+        se = jnp.array([0.5, 0.5])  # Large SEs should contain true values
 
         result = inference_metrics(theta_true, theta_hat, standard_errors=se)
 

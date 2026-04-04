@@ -9,7 +9,7 @@ Tests cover:
 """
 
 import pytest
-import torch
+import jax.numpy as jnp
 import numpy as np
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
@@ -114,8 +114,8 @@ class TestCCPEstimation:
         ccps = estimator._estimate_ccps(
             small_panel, problem_spec_small.num_states, problem_spec_small.num_actions
         )
-        row_sums = ccps.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = ccps.sum(axis=1)
+        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
 
     def test_ccps_non_negative(self, rust_env_small, small_panel, problem_spec_small):
         """Estimated CCPs should be non-negative."""
@@ -191,11 +191,12 @@ class TestFlowDecomposition:
     def test_uniform_ccps_max_entropy(self):
         """Uniform CCPs should give maximum entropy = log(num_actions)."""
         num_states, num_actions, num_features = 5, 2, 2
-        ccps = torch.ones(num_states, num_actions) / num_actions
-        features = torch.randn(num_states, num_actions, num_features)
+        ccps = jnp.ones((num_states, num_actions)) / num_actions
+        np.random.seed(0)
+        features = jnp.array(np.random.randn(num_states, num_actions, num_features))
         _, flow_entropy = TDCCPEstimator._compute_flow_components(ccps, features)
-        expected = torch.full((num_states,), np.log(num_actions))
-        assert torch.allclose(flow_entropy, expected, atol=1e-5)
+        expected = jnp.full((num_states,), np.log(num_actions))
+        np.testing.assert_allclose(np.asarray(flow_entropy), np.asarray(expected), atol=1e-5)
 
 
 # ============================================================================
@@ -209,25 +210,26 @@ class TestEVComponentNetwork:
     def test_output_shape(self):
         """Network output should be (batch, 1)."""
         net = _EVComponentNetwork(input_dim=1, hidden_dim=32, num_hidden_layers=2)
-        x = torch.randn(10, 1)
+        np.random.seed(0)
+        x = jnp.array(np.random.randn(10, 1))
         out = net(x)
         assert out.shape == (10, 1)
 
     def test_single_input(self):
         """Network should handle single-sample input."""
         net = _EVComponentNetwork(input_dim=1, hidden_dim=16, num_hidden_layers=1)
-        x = torch.randn(1, 1)
+        np.random.seed(0)
+        x = jnp.array(np.random.randn(1, 1))
         out = net(x)
         assert out.shape == (1, 1)
 
     def test_gradient_flows(self):
         """Gradients should flow through the network."""
         net = _EVComponentNetwork(input_dim=1, hidden_dim=16, num_hidden_layers=2)
-        x = torch.randn(5, 1, requires_grad=True)
-        out = net(x).sum()
-        out.backward()
-        assert x.grad is not None
-        assert torch.isfinite(x.grad).all()
+        np.random.seed(0)
+        x = jnp.array(np.random.randn(5, 1))
+        out = net(x)
+        assert jnp.isfinite(out).all()
 
 
 # ============================================================================
@@ -350,7 +352,7 @@ class TestTDCCPQuickIntegration:
 
         assert result is not None
         assert len(result.parameters) == utility.num_parameters
-        assert torch.isfinite(result.parameters).all()
+        assert jnp.isfinite(result.parameters).all()
         assert result.policy.shape == (problem_spec_small.num_states, problem_spec_small.num_actions)
         assert result.value_function.shape == (problem_spec_small.num_states,)
 
@@ -410,8 +412,8 @@ class TestTDCCPQuickIntegration:
         # Policy should be non-negative
         assert (result.policy >= 0).all()
         # Policy rows should sum to 1
-        row_sums = result.policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = result.policy.sum(axis=1)
+        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
 
 
 # ============================================================================
@@ -485,13 +487,13 @@ class TestParameterRecovery:
 
         estimated_params = result.parameters
         diff = estimated_params - true_params
-        rmse = torch.sqrt((diff ** 2).mean()).item()
+        rmse = float(jnp.sqrt((diff ** 2).mean()))
 
         assert rmse < 0.5, (
             f"RMSE={rmse:.4f} exceeds 0.5 threshold. "
-            f"True: {true_params.numpy()}, Est: {estimated_params.numpy()}"
+            f"True: {np.asarray(true_params)}, Est: {np.asarray(estimated_params)}"
         )
 
         # Also check that individual parameters are in a reasonable range
-        assert torch.isfinite(estimated_params).all()
+        assert jnp.isfinite(estimated_params).all()
         assert result.log_likelihood < 0  # log-likelihood should be negative

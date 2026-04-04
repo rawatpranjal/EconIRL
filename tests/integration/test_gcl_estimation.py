@@ -9,7 +9,7 @@ These tests verify the GCL estimator works end-to-end on:
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 
@@ -33,20 +33,20 @@ class TestGCLSimpleMDP:
         n_states, n_actions = 3, 2
 
         # Create transitions
-        transitions = torch.zeros((n_actions, n_states, n_states))
+        transitions = jnp.zeros((n_actions, n_states, n_states))
         # Action 0: advance state
-        transitions[0, 0, 1] = 1.0
-        transitions[0, 1, 2] = 1.0
-        transitions[0, 2, 2] = 1.0  # Stay at terminal
+        transitions = transitions.at[0, 0, 1].set(1.0)
+        transitions = transitions.at[0, 1, 2].set(1.0)
+        transitions = transitions.at[0, 2, 2].set(1.0)  # Stay at terminal
         # Action 1: reset to state 0
-        transitions[1, :, 0] = 1.0
+        transitions = transitions.at[1, :, 0].set(1.0)
 
         # Create demonstrations that show "advance then reset" behavior
         trajectories = [
             Trajectory(
-                states=torch.tensor([0, 1, 2]),
-                actions=torch.tensor([0, 0, 1]),
-                next_states=torch.tensor([1, 2, 0]),
+                states=jnp.array([0, 1, 2]),
+                actions=jnp.array([0, 0, 1]),
+                next_states=jnp.array([1, 2, 0]),
             )
             for _ in range(10)  # Multiple copies for stability
         ]
@@ -78,8 +78,8 @@ class TestGCLSimpleMDP:
         assert np.isfinite(result.log_likelihood)
 
         # Policy should be valid distributions
-        policy_sums = result.policy.sum(dim=1)
-        assert torch.allclose(policy_sums, torch.ones(n_states), atol=1e-5)
+        policy_sums = result.policy.sum(axis=1)
+        assert jnp.allclose(policy_sums, jnp.ones(n_states), atol=1e-5)
 
     def test_gcl_learns_replacement_pattern(self):
         """Test that GCL learns a replacement pattern.
@@ -97,28 +97,28 @@ class TestGCLSimpleMDP:
         n_states, n_actions = 5, 2
 
         # Create transitions
-        transitions = torch.zeros((n_actions, n_states, n_states))
+        transitions = jnp.zeros((n_actions, n_states, n_states))
         for s in range(n_states):
             if s < n_states - 1:
-                transitions[0, s, s + 1] = 1.0  # Keep -> advance
+                transitions = transitions.at[0, s, s + 1].set(1.0)  # Keep -> advance
             else:
-                transitions[0, s, s] = 1.0  # Stay at max
-            transitions[1, s, 0] = 1.0  # Replace -> reset
+                transitions = transitions.at[0, s, s].set(1.0)  # Stay at max
+            transitions = transitions.at[1, s, 0].set(1.0)  # Replace -> reset
 
         # Demonstrations: keep until state 3 or 4, then replace
         trajectories = []
         for _ in range(15):
             # Pattern 1: replace at state 3
             trajectories.append(Trajectory(
-                states=torch.tensor([0, 1, 2, 3]),
-                actions=torch.tensor([0, 0, 0, 1]),
-                next_states=torch.tensor([1, 2, 3, 0]),
+                states=jnp.array([0, 1, 2, 3]),
+                actions=jnp.array([0, 0, 0, 1]),
+                next_states=jnp.array([1, 2, 3, 0]),
             ))
             # Pattern 2: replace at state 4
             trajectories.append(Trajectory(
-                states=torch.tensor([0, 1, 2, 3, 4]),
-                actions=torch.tensor([0, 0, 0, 0, 1]),
-                next_states=torch.tensor([1, 2, 3, 4, 0]),
+                states=jnp.array([0, 1, 2, 3, 4]),
+                actions=jnp.array([0, 0, 0, 0, 1]),
+                next_states=jnp.array([1, 2, 3, 4, 0]),
             ))
         panel = Panel(trajectories=trajectories)
 
@@ -144,7 +144,7 @@ class TestGCLSimpleMDP:
 
         # The learned policy should show increasing probability of replacement
         # as the state (wear) increases
-        policy = result.policy.detach().numpy()
+        policy = np.asarray(result.policy)
 
         # In high states, replacement probability should be higher than in low states
         # This is a soft check - the exact values depend on convergence

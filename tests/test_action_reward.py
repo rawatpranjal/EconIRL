@@ -1,6 +1,7 @@
 """Tests for action-dependent reward functions."""
 import pytest
-import torch
+import jax.numpy as jnp
+import numpy as np
 from econirl.preferences.action_reward import ActionDependentReward
 
 
@@ -14,10 +15,10 @@ class TestActionDependentReward:
         n_features = 2
 
         # Feature matrix: (states, actions, features)
-        features = torch.zeros((n_states, n_actions, n_features))
+        features = jnp.zeros((n_states, n_actions, n_features))
         for s in range(n_states):
-            features[s, 0, 0] = -s  # Keep: operating cost
-            features[s, 1, 1] = -1  # Replace: fixed cost
+            features = features.at[s, 0, 0].set(-s)  # Keep: operating cost
+            features = features.at[s, 1, 1].set(-1)  # Replace: fixed cost
 
         reward = ActionDependentReward(
             feature_matrix=features,
@@ -31,26 +32,26 @@ class TestActionDependentReward:
     def test_compute_rust_utility(self):
         """Compute action-dependent reward for Rust model."""
         n_states = 90
-        features = torch.zeros((n_states, 2, 2))
+        features = jnp.zeros((n_states, 2, 2))
         for s in range(n_states):
-            features[s, 0, 0] = -s
-            features[s, 1, 1] = -1
+            features = features.at[s, 0, 0].set(-s)
+            features = features.at[s, 1, 1].set(-1)
 
         reward = ActionDependentReward(
             feature_matrix=features,
             parameter_names=["theta_c", "RC"],
         )
 
-        params = torch.tensor([0.001, 3.0])
+        params = jnp.array([0.001, 3.0])
         R = reward.compute(params)
 
         assert R.shape == (n_states, 2)
 
         # Check values match Rust model
-        assert torch.isclose(R[0, 0], torch.tensor(0.0), atol=1e-6)  # U(0, keep)
-        assert torch.isclose(R[0, 1], torch.tensor(-3.0), atol=1e-6)  # U(0, replace)
-        assert torch.isclose(R[5, 0], torch.tensor(-0.005), atol=1e-6)  # U(5, keep)
-        assert torch.isclose(R[5, 1], torch.tensor(-3.0), atol=1e-6)  # U(5, replace)
+        assert jnp.isclose(R[0, 0], jnp.array(0.0), atol=1e-6)  # U(0, keep)
+        assert jnp.isclose(R[0, 1], jnp.array(-3.0), atol=1e-6)  # U(0, replace)
+        assert jnp.isclose(R[5, 0], jnp.array(-0.005), atol=1e-6)  # U(5, keep)
+        assert jnp.isclose(R[5, 1], jnp.array(-3.0), atol=1e-6)  # U(5, replace)
 
     def test_compute_gradient(self):
         """Gradient is the feature matrix."""
@@ -58,24 +59,26 @@ class TestActionDependentReward:
         n_actions = 2
         n_features = 3
 
-        features = torch.randn((n_states, n_actions, n_features))
+        np.random.seed(0)
+        features = jnp.array(np.random.randn(n_states, n_actions, n_features))
         reward = ActionDependentReward(
             feature_matrix=features,
             parameter_names=["a", "b", "c"],
         )
 
-        params = torch.randn(n_features)
+        np.random.seed(1)
+        params = jnp.array(np.random.randn(n_features))
         grad = reward.compute_gradient(params)
 
         assert grad.shape == (n_states, n_actions, n_features)
         # For linear reward, gradient is the feature matrix
-        assert torch.allclose(grad, features)
+        np.testing.assert_allclose(np.asarray(grad), np.asarray(features))
 
     def test_invalid_feature_matrix_shape(self):
         """Reject non-3D feature matrices."""
         with pytest.raises(ValueError, match="must be 3D"):
             ActionDependentReward(
-                feature_matrix=torch.zeros((10, 5)),  # 2D, should be 3D
+                feature_matrix=jnp.zeros((10, 5)),  # 2D, should be 3D
                 parameter_names=["a", "b", "c", "d", "e"],
             )
 
@@ -83,7 +86,7 @@ class TestActionDependentReward:
         """Reject mismatched parameter names length."""
         with pytest.raises(ValueError, match="parameter_names length"):
             ActionDependentReward(
-                feature_matrix=torch.zeros((10, 2, 3)),
+                feature_matrix=jnp.zeros((10, 2, 3)),
                 parameter_names=["a", "b"],  # Should have 3 names
             )
 
@@ -91,13 +94,13 @@ class TestActionDependentReward:
         """Test factory method from_rust_environment."""
         # Create a mock environment
         class MockEnv:
-            feature_matrix = torch.zeros((90, 2, 2))
+            feature_matrix = jnp.zeros((90, 2, 2))
             parameter_names = ["theta_c", "RC"]
 
             def __init__(self):
                 for s in range(90):
-                    self.feature_matrix[s, 0, 0] = -s
-                    self.feature_matrix[s, 1, 1] = -1
+                    self.feature_matrix = self.feature_matrix.at[s, 0, 0].set(-s)
+                    self.feature_matrix = self.feature_matrix.at[s, 1, 1].set(-1)
 
         env = MockEnv()
         reward = ActionDependentReward.from_rust_environment(env)
@@ -108,7 +111,7 @@ class TestActionDependentReward:
 
     def test_parameter_validation(self):
         """Validate parameter shape."""
-        features = torch.zeros((10, 2, 3))
+        features = jnp.zeros((10, 2, 3))
         reward = ActionDependentReward(
             feature_matrix=features,
             parameter_names=["a", "b", "c"],
@@ -116,11 +119,11 @@ class TestActionDependentReward:
 
         # Wrong shape should raise
         with pytest.raises(ValueError, match="Expected parameters"):
-            reward.compute(torch.zeros(2))  # Should be 3
+            reward.compute(jnp.zeros(2))  # Should be 3
 
     def test_get_initial_parameters(self):
         """Initial parameters are zeros."""
-        features = torch.zeros((10, 2, 3))
+        features = jnp.zeros((10, 2, 3))
         reward = ActionDependentReward(
             feature_matrix=features,
             parameter_names=["a", "b", "c"],
@@ -128,11 +131,11 @@ class TestActionDependentReward:
 
         initial = reward.get_initial_parameters()
         assert initial.shape == (3,)
-        assert torch.allclose(initial, torch.zeros(3))
+        np.testing.assert_allclose(np.asarray(initial), np.asarray(jnp.zeros(3)))
 
     def test_repr(self):
         """String representation is informative."""
-        features = torch.zeros((10, 2, 3))
+        features = jnp.zeros((10, 2, 3))
         reward = ActionDependentReward(
             feature_matrix=features,
             parameter_names=["a", "b", "c"],

@@ -16,7 +16,8 @@ Tests cover:
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+import jax
+import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.estimators.neural_gladius import NeuralGLADIUS
@@ -56,13 +57,13 @@ def small_data():
 def small_features():
     """Feature matrix (10 states, 3 actions, 2 features) for projection."""
     n_states, n_actions, n_features = 10, 3, 2
-    features = torch.zeros((n_states, n_actions, n_features))
+    features = jnp.zeros((n_states, n_actions, n_features))
     # Feature 0: state index (normalized)
     for s in range(n_states):
-        features[s, :, 0] = -s / 9.0
+        features = features.at[s, :, 0].set(-s / 9.0)
     # Feature 1: action cost (action 0 = 0, action 1 = -0.5, action 2 = -1)
     for a in range(n_actions):
-        features[:, a, 1] = -a / 2.0
+        features = features.at[:, a, 1].set(-a / 2.0)
     return RewardSpec(features, names=["state_cost", "action_cost"])
 
 
@@ -209,7 +210,7 @@ class TestFitWithContext:
     def test_context_tensor(self, small_data):
         """Passing a context tensor should work."""
         N = len(small_data)
-        ctx = torch.randint(0, 5, (N,))
+        ctx = jnp.array(np.random.randint(0, 5, (N,)))
         model = NeuralGLADIUS(
             n_actions=3,
             discount=0.95,
@@ -287,23 +288,23 @@ class TestPredictReward:
 
     def test_returns_correct_shape(self, fitted_model):
         """predict_reward should return (N,) tensor."""
-        states = torch.tensor([0, 3, 7])
-        actions = torch.tensor([0, 1, 2])
+        states = jnp.array([0, 3, 7])
+        actions = jnp.array([0, 1, 2])
         rewards = fitted_model.predict_reward(states, actions)
         assert rewards.shape == (3,)
 
-    def test_returns_tensor(self, fitted_model):
-        """predict_reward should return a tensor."""
-        states = torch.tensor([0, 5])
-        actions = torch.tensor([1, 0])
+    def test_returns_array(self, fitted_model):
+        """predict_reward should return an array."""
+        states = jnp.array([0, 5])
+        actions = jnp.array([1, 0])
         rewards = fitted_model.predict_reward(states, actions)
-        assert isinstance(rewards, torch.Tensor)
+        assert hasattr(rewards, 'shape')
 
     def test_with_context(self, fitted_model):
         """predict_reward should accept context argument."""
-        states = torch.tensor([0, 5])
-        actions = torch.tensor([1, 0])
-        contexts = torch.tensor([0, 3])
+        states = jnp.array([0, 5])
+        actions = jnp.array([1, 0])
+        contexts = jnp.array([0, 3])
         rewards = fitted_model.predict_reward(states, actions, contexts)
         assert rewards.shape == (2,)
 
@@ -311,7 +312,7 @@ class TestPredictReward:
         """predict_reward should raise if not fitted."""
         model = NeuralGLADIUS()
         with pytest.raises(RuntimeError, match="not fitted"):
-            model.predict_reward(torch.tensor([0]), torch.tensor([0]))
+            model.predict_reward(jnp.array([0]), jnp.array([0]))
 
 
 class TestConfInt:
@@ -405,7 +406,7 @@ class TestCustomEncoders:
         """Custom context encoder should be used."""
         # One-hot context encoder for 10 possible contexts
         def ctx_encoder(c):
-            return torch.nn.functional.one_hot(c, 10).float()
+            return jax.nn.one_hot(c, 10).astype(jnp.float32)
 
         model = NeuralGLADIUS(
             n_actions=3,
@@ -432,7 +433,7 @@ class TestCustomEncoders:
         """Custom state encoder should be used."""
         # One-hot state encoder
         def state_encoder(s):
-            return torch.nn.functional.one_hot(s, 10).float()
+            return jax.nn.one_hot(s, 10).astype(jnp.float32)
 
         model = NeuralGLADIUS(
             n_actions=3,
@@ -494,7 +495,7 @@ class TestRawTensorFeatures:
 
     def test_raw_tensor_features(self, small_data):
         """Should accept raw (S, A, K) tensor as features."""
-        features = torch.randn(10, 3, 2)
+        features = jnp.array(np.random.randn(10, 3, 2))
         model = NeuralGLADIUS(
             n_actions=3,
             discount=0.95,
@@ -518,7 +519,7 @@ class TestRawTensorFeatures:
 
     def test_auto_feature_names(self, small_data):
         """Without feature_names, should auto-generate f0, f1, ..."""
-        features = torch.randn(10, 3, 3)
+        features = jnp.array(np.random.randn(10, 3, 3))
         model = NeuralGLADIUS(
             n_actions=3,
             discount=0.95,

@@ -23,9 +23,9 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+import jax
 import jax.numpy as jnp
 import numpy as np
-import torch
 from scipy import optimize
 
 from econirl.core.types import DDCProblem, Panel
@@ -112,8 +112,8 @@ class IQLearnEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: np.ndarray | jnp.ndarray,
+        initial_params: np.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate reward function using IQ-Learn.
@@ -140,7 +140,7 @@ class IQLearnEstimator(BaseEstimator):
                 for a in range(problem.num_actions)
             ]
 
-        standard_errors = torch.full_like(result.parameters, float("nan"))
+        standard_errors = jnp.full_like(result.parameters, float("nan"))
 
         n_obs = panel.num_observations
         n_params = len(result.parameters)
@@ -151,9 +151,9 @@ class IQLearnEstimator(BaseEstimator):
             num_parameters=n_params,
             num_observations=n_obs,
             aic=-2 * ll + 2 * n_params,
-            bic=-2 * ll + n_params * torch.log(torch.tensor(n_obs)).item(),
+            bic=-2 * ll + n_params * np.log(n_obs),
             prediction_accuracy=self._compute_prediction_accuracy(
-                panel, jnp.array(result.policy.numpy())
+                panel, jnp.asarray(result.policy)
             ),
         )
 
@@ -187,27 +187,27 @@ class IQLearnEstimator(BaseEstimator):
         self,
         panel: Panel,
         n_states: int,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute empirical initial state distribution from data."""
-        counts = torch.zeros(n_states, dtype=torch.float64)
-        init_states = torch.tensor(
-            [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
-            dtype=torch.long,
-        )
-        counts.scatter_add_(
-            0, init_states, torch.ones_like(init_states, dtype=torch.float64)
-        )
-        if counts.sum() > 0:
-            return counts / counts.sum()
-        return torch.ones(n_states, dtype=torch.float64) / n_states
+        counts = np.zeros(n_states, dtype=np.float64)
+        for traj in panel.trajectories:
+            if len(traj) > 0:
+                s0 = int(np.asarray(traj.states[0]))
+                counts[s0] += 1
+        total = counts.sum()
+        if total > 0:
+            counts = counts / total
+        else:
+            counts = np.ones(n_states, dtype=np.float64) / n_states
+        return jnp.array(counts)
 
     def _optimize(
         self,
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: np.ndarray | jnp.ndarray,
+        initial_params: np.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run IQ-Learn optimization.
@@ -223,41 +223,39 @@ class IQLearnEstimator(BaseEstimator):
         sigma = problem.scale_parameter
         alpha = self.config.alpha
 
-        # Extract expert (s, a, s') from panel — handle JAX and torch arrays
-        def _to_torch_long(arr):
-            if isinstance(arr, torch.Tensor):
-                return arr.long()
-            return torch.tensor(np.array(arr), dtype=torch.long)
+        # Extract expert (s, a, s') from panel
+        expert_states = np.asarray(panel.get_all_states(), dtype=np.int64)
+        expert_actions = np.asarray(panel.get_all_actions(), dtype=np.int64)
+        expert_next_states = np.asarray(panel.get_all_next_states(), dtype=np.int64)
 
-        expert_states = _to_torch_long(panel.get_all_states())
-        expert_actions = _to_torch_long(panel.get_all_actions())
-        expert_next_states = _to_torch_long(panel.get_all_next_states())
+        # Convert to JAX for use inside objective
+        expert_states_jax = jnp.array(expert_states)
+        expert_actions_jax = jnp.array(expert_actions)
 
         # Initial state distribution (needed for simple divergence)
         initial_dist = self._compute_initial_distribution(panel, n_states)
 
         # Transitions as float64 for numerical precision
-        trans_f64 = transitions.double()
+        trans_f64 = jnp.asarray(transitions, dtype=jnp.float64)
 
         # Setup Q parameterization
         if self.config.q_type == "linear":
             if isinstance(utility, ActionDependentReward):
-                fm = utility.feature_matrix
-                if not isinstance(fm, torch.Tensor):
-                    fm = torch.tensor(np.array(fm), dtype=torch.float64)
-                feature_matrix = fm.double()
+                fm = np.asarray(utility.feature_matrix, dtype=np.float64)
+                feature_matrix = jnp.array(fm)
                 n_params = feature_matrix.shape[2]
             elif isinstance(utility, LinearReward):
-                sf = utility.state_features
-                if not isinstance(sf, torch.Tensor):
-                    sf = torch.tensor(np.array(sf), dtype=torch.float64)
-                feature_matrix = sf.double().unsqueeze(1).expand(-1, n_actions, -1).clone()
-                n_params = sf.shape[1]
+                sf = np.asarray(utility.state_features, dtype=np.float64)
+                sf_jax = jnp.array(sf)
+                feature_matrix = jnp.broadcast_to(
+                    sf_jax[:, None, :], (n_states, n_actions, sf_jax.shape[1])
+                )
+                n_params = sf_jax.shape[1]
             else:
                 raise TypeError(f"Unsupported utility type for linear q_type: {type(utility)}")
 
             if initial_params is not None:
-                theta_init = initial_params.double().numpy()
+                theta_init = np.asarray(initial_params, dtype=np.float64)
             else:
                 theta_init = np.zeros(n_params)
         else:
@@ -265,50 +263,50 @@ class IQLearnEstimator(BaseEstimator):
             feature_matrix = None
             n_params = n_states * n_actions
             if initial_params is not None:
-                theta_init = initial_params.double().numpy()
+                theta_init = np.asarray(initial_params, dtype=np.float64)
             else:
                 theta_init = np.zeros(n_params)
 
         divergence = self.config.divergence
 
-        def objective_and_gradient(theta_np):
-            """Compute IQ-Learn objective and gradient via autograd."""
-            theta = torch.tensor(theta_np, dtype=torch.float64, requires_grad=True)
-
+        def objective(theta):
+            """Compute IQ-Learn objective (JAX, differentiable)."""
             # Build Q table
             if feature_matrix is not None:
-                Q = torch.einsum("sak,k->sa", feature_matrix, theta)
+                Q = jnp.einsum("sak,k->sa", feature_matrix, theta)
             else:
                 Q = theta.reshape(n_states, n_actions)
 
             # V*(s) = sigma * logsumexp(Q(s,:) / sigma)
-            V_star = sigma * torch.logsumexp(Q / sigma, dim=1)
+            V_star = sigma * jax.scipy.special.logsumexp(Q / sigma, axis=1)
 
             # E_{s'~P(.|s,a)}[V*(s')] = sum_{s'} P(s'|s,a) V*(s')
-            # transitions shape: (A, S, S') -> einsum to get (S, A)
-            EV = torch.einsum("ast,t->as", trans_f64, V_star)  # (A, S)
-            EV = EV.T  # (S, A)
+            # transitions shape: (A, S, S') -> einsum to get (A, S)
+            EV = jnp.einsum("ast,t->as", trans_f64, V_star).T  # (S, A)
 
             # Temporal difference: Q(s,a) - gamma * E[V*(s')]
             td = Q - gamma * EV
 
             # Expert terms
-            Q_expert = Q[expert_states, expert_actions]
-            V_expert = V_star[expert_states]
+            Q_expert = Q[expert_states_jax, expert_actions_jax]
+            V_expert = V_star[expert_states_jax]
 
             if divergence == "chi2":
-                # Chi-squared offline objective (Eq. 12):
-                # min_Q -E_rho[Q(s,a) - V*(s)] + (1/4alpha) E_rho[td^2]
-                td_expert = td[expert_states, expert_actions]
+                td_expert = td[expert_states_jax, expert_actions_jax]
                 loss = -(Q_expert - V_expert).mean() + (1.0 / (4 * alpha)) * (td_expert**2).mean()
             else:
-                # Simple objective (Eq. 9 with phi=identity):
-                # min_Q -E_rho[td] + (1-gamma) E_p0[V*(s0)]
-                td_expert = td[expert_states, expert_actions]
-                loss = -td_expert.mean() + (1 - gamma) * (initial_dist @ V_star)
+                td_expert = td[expert_states_jax, expert_actions_jax]
+                loss = -td_expert.mean() + (1 - gamma) * jnp.dot(initial_dist, V_star)
 
-            loss.backward()
-            return loss.item(), theta.grad.numpy().astype(np.float64)
+            return loss
+
+        obj_and_grad = jax.value_and_grad(objective)
+
+        def objective_and_gradient(theta_np):
+            """Wrapper for scipy: numpy in, numpy out."""
+            theta_jax = jnp.array(theta_np)
+            loss, grad = obj_and_grad(theta_jax)
+            return float(loss), np.asarray(grad, dtype=np.float64)
 
         # Optimize
         if self.config.optimizer == "L-BFGS-B":
@@ -322,92 +320,88 @@ class IQLearnEstimator(BaseEstimator):
                     "gtol": self.config.convergence_tol,
                 },
             )
-            theta_opt = torch.tensor(result_scipy.x, dtype=torch.float64)
+            theta_opt = jnp.array(result_scipy.x)
             converged = result_scipy.success
             num_iterations = result_scipy.nit
             num_fevals = result_scipy.nfev
             message = result_scipy.message if isinstance(result_scipy.message, str) else result_scipy.message.decode()
             final_obj = result_scipy.fun
         else:
-            # Adam optimizer
-            theta_t = torch.tensor(theta_init, dtype=torch.float64, requires_grad=False)
-            m = torch.zeros_like(theta_t)
-            v = torch.zeros_like(theta_t)
+            # Adam optimizer (manual implementation)
+            theta_np = theta_init.copy()
+            m = np.zeros_like(theta_np)
+            v = np.zeros_like(theta_np)
             lr = self.config.learning_rate
             beta1, beta2, eps = 0.9, 0.999, 1e-8
             loss_history = []
+            grad_norm = float("inf")
 
             for t in range(1, self.config.max_iter + 1):
-                obj, grad_np = objective_and_gradient(theta_t.numpy())
-                grad = torch.tensor(grad_np, dtype=torch.float64)
+                obj, grad_np = objective_and_gradient(theta_np)
                 loss_history.append(obj)
 
-                m = beta1 * m + (1 - beta1) * grad
-                v = beta2 * v + (1 - beta2) * grad**2
+                m = beta1 * m + (1 - beta1) * grad_np
+                v = beta2 * v + (1 - beta2) * grad_np**2
                 m_hat = m / (1 - beta1**t)
                 v_hat = v / (1 - beta2**t)
-                theta_t = theta_t - lr * m_hat / (v_hat.sqrt() + eps)
+                theta_np = theta_np - lr * m_hat / (np.sqrt(v_hat) + eps)
 
-                if grad.norm().item() < self.config.convergence_tol:
+                grad_norm = float(np.linalg.norm(grad_np))
+                if grad_norm < self.config.convergence_tol:
                     break
 
-            theta_opt = theta_t
-            converged = grad.norm().item() < self.config.convergence_tol
+            theta_opt = jnp.array(theta_np)
+            converged = grad_norm < self.config.convergence_tol
             num_iterations = t
             num_fevals = t
             message = "Converged" if converged else "Max iterations reached"
             final_obj = loss_history[-1] if loss_history else float("nan")
 
         # Extract results from optimal Q
-        with torch.no_grad():
-            if feature_matrix is not None:
-                Q_table = torch.einsum("sak,k->sa", feature_matrix, theta_opt).float()
-            else:
-                Q_table = theta_opt.reshape(n_states, n_actions).float()
+        if feature_matrix is not None:
+            Q_table = jnp.einsum("sak,k->sa", feature_matrix, theta_opt).astype(jnp.float32)
+        else:
+            Q_table = theta_opt.reshape(n_states, n_actions).astype(jnp.float32)
 
-            # Policy: softmax(Q/sigma)
-            policy = torch.softmax(Q_table / sigma, dim=1)
+        # Policy: softmax(Q/sigma)
+        policy = jax.nn.softmax(Q_table / sigma, axis=1)
 
-            # Value function: V*(s) = sigma * logsumexp(Q/sigma)
-            V = (sigma * torch.logsumexp(Q_table / sigma, dim=1))
+        # Value function: V*(s) = sigma * logsumexp(Q/sigma)
+        V = sigma * jax.scipy.special.logsumexp(Q_table / sigma, axis=1)
 
-            # Reward via inverse Bellman: r(s,a) = Q(s,a) - gamma * E[V*(s')]
-            EV = torch.einsum("ast,t->as", transitions.float(), V).T
-            reward_table = Q_table - gamma * EV
+        # Reward via inverse Bellman: r(s,a) = Q(s,a) - gamma * E[V*(s')]
+        transitions_f32 = jnp.asarray(transitions, dtype=jnp.float32)
+        EV = jnp.einsum("ast,t->as", transitions_f32, V).T
+        reward_table = Q_table - gamma * EV
 
-            # Log-likelihood
-            log_probs = torch.log_softmax(Q_table / sigma, dim=1)
-            ll = log_probs[expert_states, expert_actions].sum().item()
+        # Log-likelihood
+        log_probs = jax.nn.log_softmax(Q_table / sigma, axis=1)
+        ll = float(log_probs[expert_states_jax, expert_actions_jax].sum())
 
-            # Project reward onto feature space for structural parameters
-            reward_params = None
-            feat = None
-            if hasattr(utility, 'feature_matrix'):
-                fm = utility.feature_matrix
-                if not isinstance(fm, torch.Tensor):
-                    fm = torch.tensor(np.array(fm), dtype=torch.float32)
-                feat = fm.float()
-            elif isinstance(utility, LinearReward) and hasattr(utility, 'state_features'):
-                sf = utility.state_features
-                if not isinstance(sf, torch.Tensor):
-                    sf = torch.tensor(np.array(sf), dtype=torch.float32)
-                feat = sf.unsqueeze(1).expand(-1, n_actions, -1)
+        # Project reward onto feature space for structural parameters
+        reward_params = None
+        feat = None
+        if hasattr(utility, 'feature_matrix'):
+            feat = jnp.asarray(utility.feature_matrix, dtype=jnp.float32)
+        elif isinstance(utility, LinearReward) and hasattr(utility, 'state_features'):
+            sf = jnp.asarray(utility.state_features, dtype=jnp.float32)
+            feat = jnp.broadcast_to(sf[:, None, :], (n_states, n_actions, sf.shape[1]))
 
-            if feat is not None:
-                Phi = feat.reshape(-1, feat.shape[2])  # (S*A, K)
-                r_flat = reward_table.flatten()          # (S*A,)
-                # Add constant column to absorb additive offset from shaping
-                Phi_aug = torch.cat([Phi, torch.ones(Phi.shape[0], 1)], dim=1)
-                params_aug = torch.linalg.lstsq(Phi_aug, r_flat).solution
-                reward_params = params_aug[:-1]  # Drop constant term
+        if feat is not None:
+            Phi = feat.reshape(-1, feat.shape[2])  # (S*A, K)
+            r_flat = reward_table.flatten()          # (S*A,)
+            # Add constant column to absorb additive offset from shaping
+            Phi_aug = jnp.concatenate([Phi, jnp.ones((Phi.shape[0], 1))], axis=1)
+            params_aug = jnp.linalg.lstsq(Phi_aug, r_flat, rcond=None)[0]
+            reward_params = params_aug[:-1]  # Drop constant term
 
         # Parameters to return
         if self.config.q_type == "linear":
-            parameters = theta_opt.float()
+            parameters = theta_opt.astype(jnp.float32)
         elif reward_params is not None:
-            parameters = reward_params
+            parameters = reward_params.astype(jnp.float32)
         else:
-            parameters = reward_table.flatten()
+            parameters = reward_table.flatten().astype(jnp.float32)
 
         optimization_time = time.time() - start_time
 
@@ -426,9 +420,9 @@ class IQLearnEstimator(BaseEstimator):
                 "q_type": self.config.q_type,
                 "divergence": self.config.divergence,
                 "alpha": self.config.alpha,
-                "q_table": Q_table.tolist(),
-                "reward_table": reward_table.tolist(),
-                "reward_params": reward_params.tolist() if reward_params is not None else None,
+                "q_table": np.asarray(Q_table).tolist(),
+                "reward_table": np.asarray(reward_table).tolist(),
+                "reward_params": np.asarray(reward_params).tolist() if reward_params is not None else None,
                 "final_objective": final_obj,
             },
         )

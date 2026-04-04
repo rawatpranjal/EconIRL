@@ -30,7 +30,9 @@ from __future__ import annotations
 import time
 from typing import Literal
 
-import torch
+import jax
+import jax.numpy as jnp
+import numpy as np
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration, policy_iteration
@@ -64,7 +66,7 @@ class MaxEntIRLEstimator(BaseEstimator):
 
     Example:
         >>> # Create state features for IRL
-        >>> features = torch.randn(100, 5)
+        >>> features = jnp.array(np.random.randn(100, 5))
         >>> reward_fn = LinearReward(
         ...     state_features=features,
         ...     parameter_names=["f1", "f2", "f3", "f4", "f5"],
@@ -123,7 +125,7 @@ class MaxEntIRLEstimator(BaseEstimator):
     def _solve_inner(
         self,
         operator: SoftBellmanOperator,
-        reward_matrix: torch.Tensor,
+        reward_matrix: jnp.ndarray,
     ):
         """Solve the inner dynamic programming problem."""
         if self._inner_solver == "policy":
@@ -146,7 +148,7 @@ class MaxEntIRLEstimator(BaseEstimator):
         self,
         panel: Panel,
         reward_fn,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute empirical feature expectations from demonstrations.
 
         Handles both state-only (2D) and action-dependent (3D) features.
@@ -154,26 +156,26 @@ class MaxEntIRLEstimator(BaseEstimator):
         if isinstance(reward_fn, ActionDependentReward):
             feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
             n_features = feature_matrix.shape[2]
-            all_states = torch.cat([traj.states for traj in panel.trajectories])
-            all_actions = torch.cat([traj.actions for traj in panel.trajectories])
-            feature_sum = feature_matrix[all_states, all_actions, :].sum(dim=0)
+            all_states = jnp.concatenate([traj.states for traj in panel.trajectories])
+            all_actions = jnp.concatenate([traj.actions for traj in panel.trajectories])
+            feature_sum = feature_matrix[all_states, all_actions, :].sum(axis=0)
             total_obs = len(all_states)
             return feature_sum / total_obs if total_obs > 0 else feature_sum
         else:
             state_features = reward_fn.state_features  # (num_states, num_features)
-            all_states = torch.cat([traj.states for traj in panel.trajectories])
-            feature_sum = state_features[all_states].sum(dim=0)
+            all_states = jnp.concatenate([traj.states for traj in panel.trajectories])
+            feature_sum = state_features[all_states].sum(axis=0)
             total_obs = len(all_states)
             return feature_sum / total_obs if total_obs > 0 else feature_sum
 
     def _compute_state_visitation_frequency(
         self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
         problem: DDCProblem,
-        initial_distribution: torch.Tensor | None = None,
+        initial_distribution: jnp.ndarray | None = None,
         horizon: int = 100,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute expected state visitation frequencies under policy.
 
         Uses forward message passing to compute:
@@ -197,25 +199,25 @@ class MaxEntIRLEstimator(BaseEstimator):
 
         # Initial state distribution
         if initial_distribution is None:
-            mu = torch.ones(num_states, dtype=policy.dtype) / num_states
+            mu = jnp.ones(num_states, dtype=policy.dtype) / num_states
         else:
-            mu = initial_distribution.clone()
+            mu = jnp.array(initial_distribution)
 
         # Accumulate visitation frequencies
-        visitation = mu.clone()
+        visitation = jnp.array(mu)
 
         # Forward pass
         for t in range(1, horizon):
             # Compute policy-weighted transition matrix: P_pi(s'|s) = sum_a pi(a|s) P(s'|s,a)
             # transitions: (num_actions, num_states, num_states) = [a, from_s, to_s]
             # policy: (num_states, num_actions) = [s, a]
-            P_pi = torch.einsum("sa,ast->st", policy, transitions)
+            P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
             # Update: mu_new(s') = sum_s mu(s) P_pi(s'|s)
-            mu_new = torch.einsum("s,st->t", mu, P_pi)
+            mu_new = jnp.einsum("s,st->t", mu, P_pi)
 
             # Discount and accumulate
-            visitation += (beta ** t) * mu_new
+            visitation = visitation + (beta ** t) * mu_new
             mu = mu_new
 
         # Normalize to get average visitation frequency
@@ -225,12 +227,12 @@ class MaxEntIRLEstimator(BaseEstimator):
 
     def _compute_expected_features(
         self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
         reward_fn,
         problem: DDCProblem,
         panel: Panel | None = None,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute expected feature expectations under the current policy.
 
         Handles both state-only (2D) and action-dependent (3D) features.
@@ -238,12 +240,12 @@ class MaxEntIRLEstimator(BaseEstimator):
         # Compute initial state distribution from data if available
         initial_distribution = None
         if panel is not None:
-            initial_counts = torch.zeros(problem.num_states, dtype=torch.float32)
-            init_states = torch.tensor(
-                [traj.states[0].item() for traj in panel.trajectories if len(traj) > 0],
-                dtype=torch.long,
+            initial_counts = jnp.zeros(problem.num_states, dtype=jnp.float32)
+            init_states = jnp.array(
+                [int(traj.states[0]) for traj in panel.trajectories if len(traj) > 0],
+                dtype=jnp.int64,
             )
-            initial_counts.scatter_add_(0, init_states, torch.ones_like(init_states, dtype=torch.float32))
+            initial_counts = initial_counts.at[init_states].add(jnp.ones_like(init_states, dtype=jnp.float32))
             if initial_counts.sum() > 0:
                 initial_distribution = initial_counts / initial_counts.sum()
 
@@ -258,19 +260,19 @@ class MaxEntIRLEstimator(BaseEstimator):
         if isinstance(reward_fn, ActionDependentReward):
             # 3D: E_π[φ] = Σ_s d(s) Σ_a π(a|s) φ(s,a)
             feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
-            return torch.einsum("s,sa,sak->k", visitation, policy, feature_matrix)
+            return jnp.einsum("s,sa,sak->k", visitation, policy, feature_matrix)
         else:
             # 2D: E_π[φ] = Σ_s d(s) φ(s)
             state_features = reward_fn.state_features
-            return torch.einsum("s,sk->k", visitation, state_features)
+            return jnp.einsum("s,sk->k", visitation, state_features)
 
     def _optimize(
         self,
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run MaxEnt IRL optimization.
@@ -328,7 +330,7 @@ class MaxEntIRLEstimator(BaseEstimator):
             nonlocal total_inner_iterations, num_function_evals
             num_function_evals += 1
 
-            params = torch.tensor(params_np, dtype=torch.float32)
+            params = jnp.array(params_np, dtype=jnp.float32)
             reward_matrix = reward_fn.compute(params)
             solver_result = self._solve_inner(operator, reward_matrix)
             total_inner_iterations += solver_result.num_iterations
@@ -337,7 +339,7 @@ class MaxEntIRLEstimator(BaseEstimator):
             log_probs = operator.compute_log_choice_probabilities(
                 reward_matrix, solver_result.V
             )
-            nll = -log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+            nll = float(-log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
 
             # Gradient of NLL = expected - empirical features
             expected_features = self._compute_expected_features(
@@ -347,21 +349,20 @@ class MaxEntIRLEstimator(BaseEstimator):
                 problem,
                 panel,
             )
-            grad = (expected_features - empirical_features).numpy().astype(float)
+            grad = np.asarray(expected_features - empirical_features, dtype=float)
 
             if self._verbose and num_function_evals % 10 == 0:
                 self._log(f"Eval {num_function_evals}: NLL={nll:.2f}, ||grad||={np.linalg.norm(grad):.6f}")
 
             return nll, grad
 
-        import numpy as np
         lower, upper = reward_fn.get_parameter_bounds()
-        bounds = list(zip(lower.numpy(), upper.numpy()))
+        bounds = list(zip(np.asarray(lower), np.asarray(upper)))
 
         from scipy import optimize
         result = optimize.minimize(
             objective_and_gradient,
-            initial_params.numpy(),
+            np.asarray(initial_params),
             method="L-BFGS-B",
             jac=True,
             bounds=bounds,
@@ -372,7 +373,7 @@ class MaxEntIRLEstimator(BaseEstimator):
             },
         )
 
-        final_params = torch.tensor(result.x, dtype=torch.float32)
+        final_params = jnp.array(result.x, dtype=jnp.float32)
         converged = result.success
 
         # Compute final value function and policy
@@ -387,14 +388,14 @@ class MaxEntIRLEstimator(BaseEstimator):
             problem,
             panel,
         )
-        feature_diff = torch.norm(empirical_features - final_expected).item()
+        feature_diff = float(jnp.linalg.norm(empirical_features - final_expected))
 
         # Compute log-likelihood (using CCP likelihood as proxy)
         log_probs = operator.compute_log_choice_probabilities(
             reward_matrix, solver_result.V
         )
 
-        ll = log_probs[panel.get_all_states(), panel.get_all_actions()].sum().item()
+        ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
 
         # Compute Hessian for standard errors
         hessian = None
@@ -411,8 +412,8 @@ class MaxEntIRLEstimator(BaseEstimator):
                     reward_mat, solver_res.V
                 )
 
-                total_ll = log_p[panel.get_all_states(), panel.get_all_actions()].sum().item()
-                return torch.tensor(total_ll)
+                total_ll = float(log_p[panel.get_all_states(), panel.get_all_actions()].sum())
+                return jnp.array(total_ll)
 
             hessian = compute_numerical_hessian(final_params, ll_fn)
 
@@ -450,12 +451,12 @@ class MaxEntIRLEstimator(BaseEstimator):
 
     def _compute_gradient_contributions(
         self,
-        params: torch.Tensor,
+        params: jnp.ndarray,
         panel: Panel,
         reward_fn: LinearReward,
         operator: SoftBellmanOperator,
         eps: float = 1e-5,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute per-observation gradient contributions.
 
         These are needed for robust and clustered standard errors.
@@ -474,7 +475,7 @@ class MaxEntIRLEstimator(BaseEstimator):
         n_obs = panel.num_observations
         n_params = len(params)
 
-        gradients = torch.zeros((n_obs, n_params))
+        gradients = np.zeros((n_obs, n_params))
 
         # Pre-compute log probabilities at current params
         reward_matrix = reward_fn.compute(params)
@@ -485,8 +486,9 @@ class MaxEntIRLEstimator(BaseEstimator):
 
         # Compute gradient for each parameter
         for k in range(n_params):
-            params_plus = params.clone()
+            params_plus = np.asarray(params, dtype=np.float32)
             params_plus[k] += eps
+            params_plus = jnp.array(params_plus)
 
             reward_plus = reward_fn.compute(params_plus)
             solver_plus = self._solve_inner(operator, reward_plus)
@@ -494,8 +496,9 @@ class MaxEntIRLEstimator(BaseEstimator):
                 reward_plus, solver_plus.V
             )
 
-            params_minus = params.clone()
+            params_minus = np.asarray(params, dtype=np.float32)
             params_minus[k] -= eps
+            params_minus = jnp.array(params_minus)
 
             reward_minus = reward_fn.compute(params_minus)
             solver_minus = self._solve_inner(operator, reward_minus)
@@ -506,18 +509,20 @@ class MaxEntIRLEstimator(BaseEstimator):
             # Compute gradients for all observations at once
             all_states = panel.get_all_states()
             all_actions = panel.get_all_actions()
-            gradients[:, k] = (log_probs_plus[all_states, all_actions] - log_probs_minus[all_states, all_actions]) / (2 * eps)
+            gradients[:, k] = np.asarray(
+                (log_probs_plus[all_states, all_actions] - log_probs_minus[all_states, all_actions]) / (2 * eps)
+            )
 
-        return gradients
+        return jnp.array(gradients)
 
     def compute_feature_expectations(
         self,
-        params: torch.Tensor,
+        params: jnp.ndarray,
         reward_fn: LinearReward,
         problem: DDCProblem,
-        transitions: torch.Tensor,
+        transitions: jnp.ndarray,
         panel: Panel | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute both empirical and expected feature expectations.
 
         Useful for diagnostics and checking feature matching quality.
@@ -551,6 +556,6 @@ class MaxEntIRLEstimator(BaseEstimator):
         if panel is not None:
             empirical = self._compute_empirical_features(panel, reward_fn)
         else:
-            empirical = torch.zeros_like(expected)
+            empirical = jnp.zeros_like(expected)
 
         return empirical, expected

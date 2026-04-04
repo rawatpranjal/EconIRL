@@ -23,8 +23,9 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+import jax
+import jax.numpy as jnp
 import numpy as np
-import torch
 from scipy import optimize
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -49,10 +50,10 @@ class MaxMarginResult:
         num_iterations: Number of constraint generation iterations
     """
 
-    theta: torch.Tensor
+    theta: jnp.ndarray
     margin: float
-    violating_policies: list[torch.Tensor]
-    feature_expectations: list[torch.Tensor]
+    violating_policies: list[jnp.ndarray]
+    feature_expectations: list[jnp.ndarray]
     num_iterations: int
 
 
@@ -136,7 +137,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
         self,
         panel: Panel,
         reward_fn: BaseUtilityFunction,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute expert feature expectations from demonstration data.
 
         The feature expectation is the discounted sum of features visited:
@@ -154,7 +155,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
             Feature expectations tensor of shape (num_features,)
         """
         num_features = reward_fn.num_parameters
-        feature_expectations = torch.zeros(num_features, dtype=torch.float32)
+        feature_expectations = jnp.zeros(num_features, dtype=jnp.float32)
 
         # Get feature matrix - handle both 2D (state-only) and 3D (action-dependent)
         if isinstance(reward_fn, ActionDependentReward):
@@ -187,12 +188,12 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
     def _compute_policy_feature_expectations(
         self,
-        policy: torch.Tensor,
-        transitions: torch.Tensor,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        initial_distribution: torch.Tensor | None = None,
-    ) -> torch.Tensor:
+        initial_distribution: jnp.ndarray | None = None,
+    ) -> jnp.ndarray:
         """Compute feature expectations under a given policy.
 
         Uses the stationary distribution under the policy to compute:
@@ -216,28 +217,28 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
         # Compute policy-induced transition matrix
         # P_pi[s, s'] = sum_a pi(a|s) * P(s'|s,a)
-        P_pi = torch.einsum("sa,ast->st", policy, transitions)
+        P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
         # Compute discounted state visitation frequencies
         # d = (1 - gamma) * (I - gamma * P_pi)^{-1} * d_0
         if initial_distribution is None:
-            d_0 = torch.ones(num_states) / num_states
+            d_0 = jnp.ones(num_states) / num_states
         else:
             d_0 = initial_distribution
 
         # Use matrix inversion for small state spaces
-        I = torch.eye(num_states, dtype=torch.float32)
+        I = jnp.eye(num_states, dtype=jnp.float32)
         try:
-            inv_matrix = torch.linalg.solve(I - gamma * P_pi, d_0)
+            inv_matrix = jnp.linalg.solve(I - gamma * P_pi, d_0)
             # Normalize to get proper distribution
             d_pi = (1 - gamma) * inv_matrix
             d_pi = d_pi / d_pi.sum()  # Ensure normalization
-        except RuntimeError:
+        except Exception:
             # Fallback: use iterative computation
-            d_pi = d_0.clone()
+            d_pi = jnp.array(d_0)
             for _ in range(1000):
                 d_new = d_0 * (1 - gamma) + gamma * (P_pi.T @ d_pi)
-                if torch.abs(d_new - d_pi).max() < 1e-10:
+                if jnp.abs(d_new - d_pi).max() < 1e-10:
                     break
                 d_pi = d_new
             d_pi = d_pi / d_pi.sum()
@@ -247,12 +248,12 @@ class MaxMarginIRLEstimator(BaseEstimator):
             # Action-dependent: mu_pi = sum_s d_pi(s) * sum_a pi(a|s) * phi(s, a, k)
             feature_matrix = reward_fn.feature_matrix  # (n_states, n_actions, n_features)
             # First compute sum_a pi(a|s) * phi(s, a, k) -> (n_states, n_features)
-            policy_weighted_features = torch.einsum("sa,sak->sk", policy, feature_matrix)
+            policy_weighted_features = jnp.einsum("sa,sak->sk", policy, feature_matrix)
             # Then compute sum_s d_pi(s) * policy_weighted_features
-            feature_expectations = torch.einsum("s,sk->k", d_pi, policy_weighted_features)
+            feature_expectations = jnp.einsum("s,sk->k", d_pi, policy_weighted_features)
         elif isinstance(reward_fn, LinearReward):
             # State-only: mu_pi = sum_s d_pi(s) * phi(s)
-            feature_expectations = torch.einsum("s,sk->k", d_pi, reward_fn.state_features)
+            feature_expectations = jnp.einsum("s,sk->k", d_pi, reward_fn.state_features)
         else:
             raise TypeError(
                 f"MaxMarginIRLEstimator requires LinearReward or ActionDependentReward, "
@@ -263,11 +264,11 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
     def _find_violating_policy(
         self,
-        theta: torch.Tensor,
-        transitions: torch.Tensor,
+        theta: jnp.ndarray,
+        transitions: jnp.ndarray,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Find the most violating policy under current reward weights.
 
         Solves the MDP with reward R(s,a) = theta * phi(s,a) and returns
@@ -299,10 +300,10 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
     def _solve_qp(
         self,
-        expert_features: torch.Tensor,
-        violating_features: list[torch.Tensor],
+        expert_features: jnp.ndarray,
+        violating_features: list[jnp.ndarray],
         anchor_idx: int | None = None,
-    ) -> tuple[torch.Tensor, float]:
+    ) -> tuple[jnp.ndarray, float]:
         """Solve QP to find reward weights maximizing margin.
 
         With unit norm constraint (anchor_idx=None):
@@ -334,14 +335,14 @@ class MaxMarginIRLEstimator(BaseEstimator):
         if num_constraints == 0:
             # No constraints yet, return initial weights
             if anchor_idx is not None:
-                theta = torch.ones(num_features)
+                theta = jnp.ones(num_features)
             else:
-                theta = torch.ones(num_features) / np.sqrt(num_features)
+                theta = jnp.ones(num_features) / np.sqrt(num_features)
             return theta, 0.0
 
         # Convert to numpy for scipy
-        mu_E = expert_features.numpy()
-        mus = [mu.numpy() for mu in violating_features]
+        mu_E = np.asarray(expert_features)
+        mus = [np.asarray(mu) for mu in violating_features]
 
         # Variables: [theta (num_features), t (1)]
         # Objective: minimize -t
@@ -438,12 +439,12 @@ class MaxMarginIRLEstimator(BaseEstimator):
             options={"maxiter": 1000, "disp": False},
         )
 
-        theta = torch.tensor(result.x[:-1], dtype=torch.float32)
+        theta = jnp.array(result.x[:-1], dtype=jnp.float32)
         margin = result.x[-1]
 
         # Only normalize for unit norm constraint (not anchor normalization)
         if anchor_idx is None:
-            theta_norm = torch.norm(theta)
+            theta_norm = jnp.linalg.norm(theta)
             if theta_norm > 0:
                 theta = theta / theta_norm
 
@@ -454,8 +455,8 @@ class MaxMarginIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
-        initial_params: torch.Tensor | None = None,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
         """Run Max Margin IRL optimization.
@@ -486,23 +487,23 @@ class MaxMarginIRLEstimator(BaseEstimator):
         if initial_params is None:
             if self._anchor_idx is not None:
                 # Anchor normalization: set anchor param to 1.0
-                theta = torch.ones(num_features)
+                theta = jnp.ones(num_features)
             else:
                 # Unit norm constraint
-                theta = torch.ones(num_features) / np.sqrt(num_features)
+                theta = jnp.ones(num_features) / np.sqrt(num_features)
         else:
-            theta = initial_params.clone()
+            theta = jnp.array(initial_params)
             if self._anchor_idx is None:
                 # Only normalize for unit norm constraint
-                theta = theta / torch.norm(theta)
+                theta = theta / jnp.linalg.norm(theta)
 
         # Compute expert feature expectations
         expert_features = self._compute_feature_expectations(panel, reward_fn)
         self._log(f"Expert feature expectations: {expert_features}")
 
         # Constraint generation loop
-        violating_policies: list[torch.Tensor] = []
-        violating_features: list[torch.Tensor] = []
+        violating_policies: list[jnp.ndarray] = []
+        violating_features: list[jnp.ndarray] = []
         prev_margin = float("-inf")
         converged = False
 
@@ -511,7 +512,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
             policy, V = self._find_violating_policy(
                 theta, transitions, reward_fn, problem
             )
-            violating_policies.append(policy.clone())
+            violating_policies.append(jnp.array(policy))
 
             # Compute feature expectations of violating policy
             # Use empirical initial distribution from panel
@@ -583,11 +584,11 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
     def _compute_numerical_hessian(
         self,
-        theta: torch.Tensor,
-        expert_features: torch.Tensor,
-        violating_features: list[torch.Tensor],
+        theta: jnp.ndarray,
+        expert_features: jnp.ndarray,
+        violating_features: list[jnp.ndarray],
         eps: float = 1e-5,
-    ) -> torch.Tensor:
+    ) -> jnp.ndarray:
         """Compute numerical Hessian of the margin objective.
 
         For Max Margin IRL, the objective is the margin, which depends
@@ -603,7 +604,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
             Hessian matrix of shape (num_features, num_features)
         """
         num_features = len(theta)
-        hessian = torch.zeros((num_features, num_features), dtype=torch.float32)
+        hessian = jnp.zeros((num_features, num_features), dtype=jnp.float32)
 
         # The Hessian of the margin w.r.t. theta is approximately zero
         # because the objective is linear in theta (for fixed constraints)
@@ -614,20 +615,20 @@ class MaxMarginIRLEstimator(BaseEstimator):
         if len(violating_features) > 0:
             # Use variance of feature differences as Hessian diagonal
             diffs = [expert_features - vf for vf in violating_features]
-            diff_stack = torch.stack(diffs)
-            variances = diff_stack.var(dim=0)
+            diff_stack = jnp.stack(diffs)
+            variances = diff_stack.var(axis=0)
             # Avoid zero variance
-            variances = torch.clamp(variances, min=1e-6)
-            hessian = torch.diag(1.0 / variances)
+            variances = jnp.clip(variances, a_min=1e-6)
+            hessian = jnp.diag(1.0 / variances)
         else:
-            hessian = torch.eye(num_features)
+            hessian = jnp.eye(num_features)
 
         return hessian
 
     def get_violating_policies(
         self,
         result: EstimationResult,
-    ) -> list[torch.Tensor]:
+    ) -> list[jnp.ndarray]:
         """Extract the violating policies found during optimization.
 
         Useful for analyzing which alternative policies were considered.
@@ -644,11 +645,11 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
     def compute_margin(
         self,
-        theta: torch.Tensor,
+        theta: jnp.ndarray,
         panel: Panel,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: torch.Tensor,
+        transitions: jnp.ndarray,
     ) -> float:
         """Compute the margin for given reward weights.
 
@@ -678,6 +679,6 @@ class MaxMarginIRLEstimator(BaseEstimator):
         )
 
         # Margin = theta' * (mu_E - mu_pi)
-        margin = torch.dot(theta, expert_features - policy_features).item()
+        margin = float(jnp.dot(theta, expert_features - policy_features))
 
         return margin

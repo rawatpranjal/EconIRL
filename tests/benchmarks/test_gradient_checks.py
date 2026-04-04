@@ -7,8 +7,10 @@ gradients. Also checks Hessian symmetry.
 These tests use small environments and run quickly (not marked slow).
 """
 
+import numpy as np
 import pytest
-import torch
+
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -54,53 +56,46 @@ def test_nfxp_numerical_gradient(quick_setup):
     panel, utility, problem, transitions, true_params = quick_setup
     operator = SoftBellmanOperator(problem, transitions)
 
-    # Log-likelihood function
     def _ll(params):
-        params_f32 = params.to(torch.float32)
+        params_f32 = jnp.asarray(params, dtype=jnp.float32)
         flow_utility = utility.compute(params_f32)
         result = value_iteration(operator, flow_utility, tol=1e-10, max_iter=10000)
         log_probs = operator.compute_log_choice_probabilities(flow_utility, result.V)
         ll_val = 0.0
         for traj in panel.trajectories:
             for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                ll_val += log_probs[s, a].item()
-        return torch.tensor(ll_val, dtype=torch.float64)
+                s = int(traj.states[t])
+                a = int(traj.actions[t])
+                ll_val += float(log_probs[s, a])
+        return ll_val
 
-    # Numerical gradient via central differences
-    params = true_params.to(torch.float64)
-    eps = 1e-4  # Larger step for float32 internal precision
+    params = np.asarray(true_params, dtype=np.float64)
+    eps = 1e-4
     n_params = len(params)
-    grad = torch.zeros(n_params, dtype=torch.float64)
+    grad = np.zeros(n_params, dtype=np.float64)
     for i in range(n_params):
-        p_plus = params.clone()
-        p_minus = params.clone()
+        p_plus = params.copy()
+        p_minus = params.copy()
         p_plus[i] += eps
         p_minus[i] -= eps
         grad[i] = (_ll(p_plus) - _ll(p_minus)) / (2 * eps)
 
-    # Gradient should be non-zero (LL varies with parameters)
-    assert torch.any(torch.abs(grad) > 1e-6), (
+    assert np.any(np.abs(grad) > 1e-6), (
         f"Gradient is effectively zero: {grad}"
     )
 
-    # LL at true params should be near a local max, so gradient should be small
-    # relative to the gradient at perturbed params
-    grad_norm = torch.norm(grad).item()
-    perturbed = params.clone()
+    grad_norm = np.linalg.norm(grad)
+    perturbed = params.copy()
     perturbed[0] += 0.01
-    grad_perturbed = torch.zeros(n_params, dtype=torch.float64)
+    grad_perturbed = np.zeros(n_params, dtype=np.float64)
     for i in range(n_params):
-        p_plus = perturbed.clone()
-        p_minus = perturbed.clone()
+        p_plus = perturbed.copy()
+        p_minus = perturbed.copy()
         p_plus[i] += eps
         p_minus[i] -= eps
         grad_perturbed[i] = (_ll(p_plus) - _ll(p_minus)) / (2 * eps)
-    grad_perturbed_norm = torch.norm(grad_perturbed).item()
+    grad_perturbed_norm = np.linalg.norm(grad_perturbed)
 
-    # Gradient at true params should not be larger than at perturbed point
-    # (true params are near the MLE for large enough data)
     assert grad_norm < grad_perturbed_norm * 100, (
         f"Gradient at true params ({grad_norm:.4f}) is unexpectedly large "
         f"compared to perturbed ({grad_perturbed_norm:.4f})"
@@ -119,44 +114,40 @@ def test_ccp_numerical_gradient(quick_setup):
     panel, utility, problem, transitions, true_params = quick_setup
     ccp_est = CCPEstimator(num_policy_iterations=1, compute_hessian=False)
 
-    # Estimate CCPs from data
     ccps = ccp_est._estimate_ccps_from_data(
         panel, problem.num_states, problem.num_actions
     )
 
     def _ll(params):
-        params_f32 = params.to(torch.float32)
-        return torch.tensor(
+        params_f32 = jnp.asarray(params, dtype=jnp.float32)
+        return float(
             ccp_est._compute_log_likelihood(
                 params_f32, panel, utility, ccps, transitions, problem
-            ),
-            dtype=torch.float64,
+            )
         )
 
-    params = true_params.to(torch.float64)
-    eps = 1e-4  # Larger step for float32 internal precision
+    params = np.asarray(true_params, dtype=np.float64)
+    eps = 1e-4
     n_params = len(params)
 
-    grad_a = torch.zeros(n_params, dtype=torch.float64)
-    grad_b = torch.zeros(n_params, dtype=torch.float64)
+    grad_a = np.zeros(n_params, dtype=np.float64)
+    grad_b = np.zeros(n_params, dtype=np.float64)
     for i in range(n_params):
-        p_plus = params.clone(); p_minus = params.clone()
+        p_plus = params.copy(); p_minus = params.copy()
         p_plus[i] += eps; p_minus[i] -= eps
         grad_a[i] = (_ll(p_plus) - _ll(p_minus)) / (2 * eps)
 
-        p_plus2 = params.clone(); p_minus2 = params.clone()
+        p_plus2 = params.copy(); p_minus2 = params.copy()
         p_plus2[i] += eps / 2; p_minus2[i] -= eps / 2
         grad_b[i] = (_ll(p_plus2) - _ll(p_minus2)) / eps
 
-    # Gradient should be non-zero
-    assert torch.any(torch.abs(grad_a) > 1e-6), (
+    assert np.any(np.abs(grad_a) > 1e-6), (
         f"CCP gradient is effectively zero: {grad_a}"
     )
 
-    # Signs should agree (directional consistency)
     for i in range(n_params):
-        if abs(grad_a[i].item()) > 1.0:
-            assert grad_a[i].item() * grad_b[i].item() > 0, (
+        if abs(grad_a[i]) > 1.0:
+            assert grad_a[i] * grad_b[i] > 0, (
                 f"CCP gradient sign mismatch at parameter {i}: "
                 f"grad_a={grad_a[i]:.4f}, grad_b={grad_b[i]:.4f}"
             )
@@ -178,16 +169,15 @@ def test_hessian_symmetry(quick_setup):
         ll_val = 0.0
         for traj in panel.trajectories:
             for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                ll_val += log_probs[s, a].item()
-        return torch.tensor(ll_val)
+                s = int(traj.states[t])
+                a = int(traj.actions[t])
+                ll_val += float(log_probs[s, a])
+        return ll_val
 
     hessian = compute_numerical_hessian(true_params, _ll)
 
-    # Check symmetry: H should equal H^T
-    asym = torch.abs(hessian - hessian.T)
-    max_asym = asym.max().item()
+    asym = jnp.abs(hessian - hessian.T)
+    max_asym = float(asym.max())
     assert max_asym < 1e-4, (
         f"Hessian is not symmetric: max |H - H^T| = {max_asym:.8f}"
     )
@@ -209,16 +199,14 @@ def test_hessian_negative_definite_at_true(quick_setup):
         ll_val = 0.0
         for traj in panel.trajectories:
             for t in range(len(traj)):
-                s = traj.states[t].item()
-                a = traj.actions[t].item()
-                ll_val += log_probs[s, a].item()
-        return torch.tensor(ll_val)
+                s = int(traj.states[t])
+                a = int(traj.actions[t])
+                ll_val += float(log_probs[s, a])
+        return ll_val
 
     hessian = compute_numerical_hessian(true_params, _ll)
-    eigenvalues = torch.linalg.eigvalsh(hessian)
+    eigenvalues = jnp.linalg.eigvalsh(hessian)
 
-    # All eigenvalues of the Hessian of LL should be <= 0 (negative semi-definite)
-    # Allow a small positive tolerance for numerical errors
-    assert eigenvalues.max().item() < 1e-2, (
-        f"Hessian at true params is not NSD: max eigenvalue = {eigenvalues.max():.6f}"
+    assert float(eigenvalues.max()) < 1e-2, (
+        f"Hessian at true params is not NSD: max eigenvalue = {float(eigenvalues.max()):.6f}"
     )

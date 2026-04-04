@@ -7,7 +7,7 @@ interface for Maximum Causal Entropy Inverse Reinforcement Learning (Ziebart 201
 import pytest
 import numpy as np
 import pandas as pd
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import Panel, Trajectory
 from econirl.estimators.mce_irl import MCEIRL

@@ -30,40 +30,16 @@ from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import Panel, TrajectoryPanel
 from econirl.estimators.neural_base import NeuralEstimatorMixin
 
-try:
-    import torch
-except ImportError:  # pragma: no cover
-    torch = None
-
-
-def _is_torch_tensor(values: object) -> bool:
-    return torch is not None and isinstance(values, torch.Tensor)
-
-
 def _to_numpy(values: object) -> np.ndarray:
-    if _is_torch_tensor(values):
-        return values.detach().cpu().numpy()
     return np.asarray(values)
 
 
 def _to_jax_float(values: object) -> jax.Array:
-    if _is_torch_tensor(values):
-        return jnp.asarray(values.detach().cpu().numpy(), dtype=jnp.float32)
     return jnp.asarray(values, dtype=jnp.float32)
 
 
 def _to_jax_int(values: object) -> jax.Array:
-    if _is_torch_tensor(values):
-        return jnp.asarray(values.detach().cpu().numpy(), dtype=jnp.int32)
     return jnp.asarray(values, dtype=jnp.int32)
-
-
-def _return_like(values: jax.Array, *templates: object) -> object:
-    if any(_is_torch_tensor(template) for template in templates):
-        if torch is None:  # pragma: no cover
-            raise RuntimeError("Torch is required for torch tensor outputs.")
-        return torch.tensor(np.asarray(values).copy())
-    return values
 
 
 def _bce_with_logits(logits: jax.Array, targets: jax.Array) -> jax.Array:
@@ -150,7 +126,7 @@ class _RewardNetwork(eqx.Module):
         ao = _to_jax_float(action_onehot)
         x = jnp.concatenate([sf, cf, ao], axis=-1)
         out = jnp.squeeze(self.net(x), axis=-1)
-        return _return_like(out, state_feat, ctx_feat, action_onehot)
+        return out
 
     def all_actions(
         self,
@@ -166,7 +142,7 @@ class _RewardNetwork(eqx.Module):
         a_exp = jnp.repeat(actions[None, :, :], sf.shape[0], axis=0)
         x = jnp.concatenate([sf_exp, cf_exp, a_exp], axis=-1)
         out = jnp.squeeze(jax.vmap(self.net)(x), axis=-1)
-        return _return_like(out, state_feat, ctx_feat)
+        return out
 
     def eval(self) -> _RewardNetwork:
         return self
@@ -197,7 +173,7 @@ class _ShapingNetwork(eqx.Module):
         cf = _to_jax_float(ctx_feat)
         x = jnp.concatenate([sf, cf], axis=-1)
         out = jnp.squeeze(self.net(x), axis=-1)
-        return _return_like(out, state_feat, ctx_feat)
+        return out
 
     def eval(self) -> _ShapingNetwork:
         return self
@@ -235,7 +211,7 @@ class _PolicyNetwork(eqx.Module):
     def __call__(self, state_feat: object, ctx_feat: object) -> object:
         logits = self.logits(state_feat, ctx_feat)
         probs = jax.nn.softmax(logits, axis=-1)
-        return _return_like(probs, state_feat, ctx_feat)
+        return probs
 
     def log_prob(
         self,
@@ -247,7 +223,7 @@ class _PolicyNetwork(eqx.Module):
         actions_j = _to_jax_int(actions)
         log_probs = jax.nn.log_softmax(logits, axis=-1)
         out = log_probs[jnp.arange(actions_j.shape[0]), actions_j]
-        return _return_like(out, state_feat, ctx_feat, actions)
+        return out
 
     def eval(self) -> _PolicyNetwork:
         return self
@@ -445,13 +421,7 @@ class NeuralAIRL(NeuralEstimatorMixin):
         return jnp.asarray(contexts, dtype=jnp.int32)
 
     def _call_encoder(self, encoder: Callable[[object], object], values: object) -> jax.Array:
-        try:
-            encoded = encoder(values)
-        except Exception as err:
-            if torch is None:
-                raise err
-            torch_values = torch.tensor(_to_numpy(values).copy(), dtype=torch.long)
-            encoded = encoder(torch_values)
+        encoded = encoder(values)
         return _to_jax_float(encoded)
 
     def _build_encoders(
@@ -792,7 +762,7 @@ class NeuralAIRL(NeuralEstimatorMixin):
         ctx_feat = self._context_encoder(contexts_j)
         a_oh = jax.nn.one_hot(actions_j, self.n_actions, dtype=jnp.float32)
         rewards = jnp.asarray(self._reward_net(s_feat, ctx_feat, a_oh), dtype=jnp.float32)
-        return _return_like(rewards, states, actions, contexts)
+        return rewards
 
     def conf_int(self, alpha: float = 0.05) -> dict[str, tuple[float, float]]:
         if self.params_ is None or self.se_ is None:

@@ -9,7 +9,7 @@ Tests cover:
 """
 
 import pytest
-import torch
+import jax.numpy as jnp
 import numpy as np
 
 from econirl.core.types import DDCProblem, Panel
@@ -30,8 +30,8 @@ class TestCCPEstimation:
             small_panel, problem_spec_small.num_states, problem_spec_small.num_actions
         )
 
-        row_sums = ccps.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-5)
+        row_sums = ccps.sum(axis=1)
+        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
 
     def test_ccps_non_negative(self, rust_env_small, small_panel, problem_spec_small):
         """Test that estimated CCPs are non-negative."""
@@ -52,21 +52,21 @@ class TestCCPEstimation:
         )
 
         # Compute empirical frequencies manually
-        counts = torch.zeros((problem_spec_small.num_states, problem_spec_small.num_actions))
+        counts = jnp.zeros((problem_spec_small.num_states, problem_spec_small.num_actions))
         for traj in panel.trajectories:
             for t in range(len(traj)):
-                state = traj.states[t].item()
-                action = traj.actions[t].item()
-                counts[state, action] += 1
+                state = int(traj.states[t])
+                action = int(traj.actions[t])
+                counts = counts.at[state, action].add(1)
 
-        state_counts = counts.sum(dim=1, keepdim=True)
-        state_counts = torch.where(state_counts > 0, state_counts, torch.ones_like(state_counts))
+        state_counts = counts.sum(axis=1, keepdims=True)
+        state_counts = jnp.where(state_counts > 0, state_counts, jnp.ones_like(state_counts))
         empirical_ccps = counts / state_counts
 
         # Should match exactly (or close, with smoothing=0)
-        visited_states = counts.sum(dim=1) > 0
-        assert torch.allclose(
-            ccps[visited_states], empirical_ccps[visited_states], atol=1e-5
+        visited_states = counts.sum(axis=1) > 0
+        np.testing.assert_allclose(
+            np.asarray(ccps[visited_states]), np.asarray(empirical_ccps[visited_states]), atol=1e-5
         )
 
 
@@ -74,24 +74,24 @@ class TestEmaxCorrection:
     """Tests for emax correction computation."""
 
     def test_emax_formula(self, rust_env_small):
-        """Test that emax correction follows e(a,x) = γ - log(P(a|x))."""
+        """Test that emax correction follows e(a,x) = gamma - log(P(a|x))."""
         estimator = CCPEstimator(num_policy_iterations=1)
 
         # Create simple CCPs
-        ccps = torch.tensor([[0.5, 0.5], [0.8, 0.2], [0.1, 0.9]])
+        ccps = jnp.array([[0.5, 0.5], [0.8, 0.2], [0.1, 0.9]])
         e = estimator._compute_emax_correction(ccps)
 
-        expected = EULER_GAMMA - torch.log(ccps)
-        assert torch.allclose(e, expected, atol=1e-6)
+        expected = EULER_GAMMA - jnp.log(ccps)
+        np.testing.assert_allclose(np.asarray(e), np.asarray(expected), atol=1e-6)
 
     def test_emax_handles_small_probs(self):
         """Test that emax handles very small probabilities without overflow."""
         estimator = CCPEstimator(num_policy_iterations=1, ccp_smoothing=1e-10)
 
-        ccps = torch.tensor([[0.999, 0.001], [1e-8, 1 - 1e-8]])
+        ccps = jnp.array([[0.999, 0.001], [1e-8, 1 - 1e-8]])
         e = estimator._compute_emax_correction(ccps)
 
-        assert torch.isfinite(e).all()
+        assert jnp.isfinite(e).all()
 
 
 class TestHotzMillerEstimation:
@@ -218,8 +218,8 @@ class TestCCPvsNFXP:
         )
 
         # Parameters should be close
-        param_diff = torch.abs(npl_result.parameters - nfxp_result.parameters)
-        assert param_diff.max() < 0.1, \
+        param_diff = jnp.abs(npl_result.parameters - nfxp_result.parameters)
+        assert float(param_diff.max()) < 0.1, \
             f"NPL: {npl_result.parameters}, NFXP: {nfxp_result.parameters}"
 
     def test_all_methods_recover_true_params(self, rust_env_small, utility_small,
@@ -241,8 +241,8 @@ class TestCCPvsNFXP:
 
             # Check parameter recovery (within 50% relative error)
             for i, param_name in enumerate(result.parameter_names):
-                estimate = result.parameters[i].item()
-                true_val = true_params[i].item()
+                estimate = float(result.parameters[i])
+                true_val = float(true_params[i])
                 rel_error = abs(estimate - true_val) / (abs(true_val) + 1e-8)
 
                 assert rel_error < 0.5, \
@@ -286,9 +286,9 @@ class TestCCPInference:
 
         lower, upper = result.confidence_interval(alpha=0.05)
 
-        # With small test data, SEs may be NaN → CIs are NaN → skip check
+        # With small test data, SEs may be NaN -> CIs are NaN -> skip check
         for i in range(len(result.parameters)):
-            if torch.isfinite(lower[i]) and torch.isfinite(upper[i]):
+            if jnp.isfinite(lower[i]) and jnp.isfinite(upper[i]):
                 assert lower[i] <= result.parameters[i] <= upper[i]
 
     def test_summary_output(self, rust_env_small, small_panel, utility_small,
@@ -327,7 +327,7 @@ class TestCCPEdgeCases:
         )
 
         assert result is not None
-        assert torch.isfinite(result.parameters).all()
+        assert jnp.isfinite(result.parameters).all()
 
     def test_unvisited_states(self, rust_env_small, problem_spec_small, transitions_small):
         """Test handling of states never visited in data."""
@@ -351,17 +351,17 @@ class TestCCPEdgeCases:
         )
 
         # Count which states were visited
-        visited = torch.zeros(problem_spec_small.num_states)
+        visited = jnp.zeros(problem_spec_small.num_states)
         for traj in panel.trajectories:
             for state in traj.states:
-                visited[state.item()] = 1
+                visited = visited.at[int(state)].set(1)
 
         # Unvisited states should have uniform CCPs
         unvisited_mask = visited == 0
         if unvisited_mask.any():
             uniform_prob = 1.0 / problem_spec_small.num_actions
-            assert torch.allclose(
-                ccps[unvisited_mask],
-                torch.full_like(ccps[unvisited_mask], uniform_prob),
+            np.testing.assert_allclose(
+                np.asarray(ccps[unvisited_mask]),
+                np.asarray(jnp.full_like(ccps[unvisited_mask], uniform_prob)),
                 atol=1e-5
             )

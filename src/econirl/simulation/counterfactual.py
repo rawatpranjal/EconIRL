@@ -39,13 +39,7 @@ from econirl.preferences.base import UtilityFunction
 
 
 def _to_jax(x):
-    """Convert any array-like (torch Tensor, numpy, etc.) to JAX array."""
-    try:
-        import torch
-        if isinstance(x, torch.Tensor):
-            return jnp.array(x.detach().cpu().numpy())
-    except ImportError:
-        pass
+    """Convert any array-like (numpy, list, etc.) to JAX array."""
     return jnp.asarray(x)
 
 

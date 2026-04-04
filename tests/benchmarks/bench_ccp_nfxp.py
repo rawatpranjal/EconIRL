@@ -14,7 +14,7 @@ Usage:
 """
 
 import time
-import torch
+import jax.numpy as jnp
 import numpy as np
 
 from econirl.environments.rust_bus import RustBusEnvironment
@@ -103,7 +103,7 @@ def run_benchmark(
 
     # Good initial values (near true params) help optimization
     # In practice, you might use a preliminary consistent estimator
-    initial_params = true_params.clone()
+    initial_params = jnp.array(true_params)
 
     # Run estimators
     results = {}
@@ -135,9 +135,9 @@ def run_benchmark(
     print("-" * (20 + 13 + 16 * len(estimators)))
 
     for i, pname in enumerate(param_names):
-        print(f"{pname:20} {true_params[i].item():12.5f} ", end="")
+        print(f"{pname:20} {float(true_params[i]):12.5f} ", end="")
         for name in estimators.keys():
-            est = results[name].parameters[i].item()
+            est = float(results[name].parameters[i])
             print(f"{est:15.5f}", end=" ")
         print()
 
@@ -152,7 +152,7 @@ def run_benchmark(
     for i, pname in enumerate(param_names):
         print(f"{pname:20} ", end="")
         for name in estimators.keys():
-            se = results[name].standard_errors[i].item()
+            se = float(results[name].standard_errors[i])
             if np.isfinite(se):
                 print(f"{se:15.6f}", end=" ")
             else:
@@ -208,9 +208,9 @@ def run_benchmark(
     for name in estimators.keys():
         result = results[name]
         for i, pname in enumerate(param_names):
-            est = result.parameters[i].item()
-            true_val = true_params[i].item()
-            se = result.standard_errors[i].item()
+            est = float(result.parameters[i])
+            true_val = float(true_params[i])
+            se = float(result.standard_errors[i])
             bias = est - true_val
 
             if np.isfinite(se) and se > 0:

@@ -1,7 +1,8 @@
 """Tests for IQ-Learn estimator."""
 
+import numpy as np
 import pytest
-import torch
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
@@ -24,13 +25,13 @@ def simple_transitions(simple_problem):
     """Create simple deterministic transitions."""
     n_states = simple_problem.num_states
     n_actions = simple_problem.num_actions
-    transitions = torch.zeros(n_actions, n_states, n_states)
+    transitions = jnp.zeros((n_actions, n_states, n_states))
 
     for s in range(n_states):
-        transitions[0, s, s] = 1.0
+        transitions = transitions.at[0, s, s].set(1.0)
     for s in range(n_states):
         next_s = (s + 1) % n_states
-        transitions[1, s, next_s] = 1.0
+        transitions = transitions.at[1, s, next_s].set(1.0)
 
     return transitions
 
@@ -40,9 +41,9 @@ def simple_reward_fn(simple_problem):
     """Create simple action-dependent reward function."""
     n_states = simple_problem.num_states
     n_actions = simple_problem.num_actions
-    features = torch.zeros(n_states, n_actions, 2)
-    features[:, 0, 0] = 1.0
-    features[:, 1, 1] = 1.0
+    features = jnp.zeros((n_states, n_actions, 2))
+    features = features.at[:, 0, 0].set(1.0)
+    features = features.at[:, 1, 1].set(1.0)
     return ActionDependentReward(
         feature_matrix=features,
         parameter_names=["action_0_reward", "action_1_reward"],
@@ -54,9 +55,9 @@ def expert_panel():
     """Create expert demonstrations favoring action 0."""
     trajectories = []
     for i in range(20):
-        states = torch.tensor([0, 0, 0, 0, 0])
-        actions = torch.tensor([0, 0, 0, 0, 0])
-        next_states = torch.tensor([0, 0, 0, 0, 0])
+        states = jnp.array([0, 0, 0, 0, 0])
+        actions = jnp.array([0, 0, 0, 0, 0])
+        next_states = jnp.array([0, 0, 0, 0, 0])
         trajectories.append(Trajectory(
             states=states,
             actions=actions,
@@ -113,8 +114,8 @@ class TestIQLearnEstimator:
             transitions=simple_transitions,
         )
 
-        policy_sum = result.policy.sum(dim=1)
-        assert torch.allclose(policy_sum, torch.ones(3), atol=1e-5)
+        policy_sum = result.policy.sum(axis=1)
+        assert jnp.allclose(policy_sum, jnp.ones(3), atol=1e-5)
 
     def test_recovers_reward_structure(
         self, simple_problem, simple_transitions, simple_reward_fn, expert_panel
@@ -166,8 +167,8 @@ class TestIQLearnEstimator:
         )
 
         assert result.policy is not None
-        policy_sum = result.policy.sum(dim=1)
-        assert torch.allclose(policy_sum, torch.ones(3), atol=1e-5)
+        policy_sum = result.policy.sum(axis=1)
+        assert jnp.allclose(policy_sum, jnp.ones(3), atol=1e-5)
 
     def test_metadata_contains_reward_table(
         self, simple_problem, simple_transitions, simple_reward_fn, expert_panel
@@ -201,16 +202,16 @@ class TestIQLearnEstimator:
             transitions=simple_transitions,
         )
 
-        Q_table = torch.tensor(result.metadata["q_table"])
-        reward_table = torch.tensor(result.metadata["reward_table"])
+        Q_table = jnp.array(result.metadata["q_table"])
+        reward_table = jnp.array(result.metadata["reward_table"])
         gamma = simple_problem.discount_factor
         sigma = simple_problem.scale_parameter
 
-        V = sigma * torch.logsumexp(Q_table / sigma, dim=1)
-        EV = torch.einsum("ast,t->as", simple_transitions, V).T
+        V = sigma * jax.scipy.special.logsumexp(Q_table / sigma, axis=1)
+        EV = jnp.einsum("ast,t->as", simple_transitions, V).T
         expected_reward = Q_table - gamma * EV
 
-        assert torch.allclose(reward_table, expected_reward, atol=1e-5)
+        assert jnp.allclose(reward_table, expected_reward, atol=1e-5)
 
     def test_adam_optimizer(
         self, simple_problem, simple_transitions, simple_reward_fn, expert_panel
@@ -229,5 +230,5 @@ class TestIQLearnEstimator:
         )
 
         assert result.policy is not None
-        policy_sum = result.policy.sum(dim=1)
-        assert torch.allclose(policy_sum, torch.ones(3), atol=1e-5)
+        policy_sum = result.policy.sum(axis=1)
+        assert jnp.allclose(policy_sum, jnp.ones(3), atol=1e-5)

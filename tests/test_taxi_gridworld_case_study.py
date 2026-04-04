@@ -7,9 +7,10 @@ the true reward parameters.
 
 import sys
 
+import numpy as np
 import pytest
-import torch
-import torch.nn.functional as F
+import jax
+import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import hybrid_iteration
@@ -34,7 +35,7 @@ def _build_features(grid_size: int):
     deltas = [(0, -1), (0, 1), (-1, 0), (1, 0), (0, 0)]
 
     names = ["move_cost", "goal_approach", "northward", "eastward"]
-    features = torch.zeros(n_states, 5, 4)
+    features = jnp.zeros((n_states, 5, 4))
 
     for s in range(n_states):
         r, c = s // grid_size, s % grid_size
@@ -45,12 +46,12 @@ def _build_features(grid_size: int):
                 nr, nc = r, c
             ns = nr * grid_size + nc
             nd = abs(nr - goal_r) + abs(nc - goal_c)
-            features[s, a, 0] = -1.0 if ns != s else 0.0
-            features[s, a, 1] = (1.0 if nd < d else -1.0) if ns != s else 0.0
-            features[s, a, 2] = 1.0 if a == 2 else (-1.0 if a == 3 else 0.0)
-            features[s, a, 3] = 1.0 if a == 1 else (-1.0 if a == 0 else 0.0)
+            features = features.at[s, a, 0].set(-1.0 if ns != s else 0.0)
+            features = features.at[s, a, 1].set((1.0 if nd < d else -1.0) if ns != s else 0.0)
+            features = features.at[s, a, 2].set(1.0 if a == 2 else (-1.0 if a == 3 else 0.0))
+            features = features.at[s, a, 3].set(1.0 if a == 1 else (-1.0 if a == 0 else 0.0))
 
-    true_params = torch.tensor([-0.5, 2.0, 0.1, 0.1])
+    true_params = jnp.array([-0.5, 2.0, 0.1, 0.1])
     return features, names, true_params
 
 
@@ -67,8 +68,8 @@ def _generate_panel(grid_size, features, true_params, transitions, discount,
     operator = SoftBellmanOperator(problem, transitions)
     result = hybrid_iteration(operator, reward_matrix, tol=1e-10)
 
-    initial_dist = torch.zeros(n_states)
-    initial_dist[0] = 1.0
+    initial_dist = jnp.zeros(n_states)
+    initial_dist = initial_dist.at[0].set(1.0)
     return simulate_panel_from_policy(
         problem=problem,
         transitions=transitions,
@@ -156,9 +157,9 @@ class TestMCEIRLOnSmallGrid:
             transitions=env.transition_matrices,
         )
 
-        cos = F.cosine_similarity(
-            result.parameters.unsqueeze(0), true_params.unsqueeze(0)
-        ).item()
+        cos = float(jnp.sum(result.parameters * true_params) / (
+            jnp.linalg.norm(result.parameters) * jnp.linalg.norm(true_params)
+        ))
 
         assert cos > 0.9, (
             f"MCE-IRL cosine similarity {cos:.4f} too low (expected > 0.9). "
@@ -193,9 +194,9 @@ class TestMCEIRLOnSmallGrid:
         assert result.policy is not None
         assert result.policy.shape == (25, 5)
         # Policy should sum to 1 across actions
-        row_sums = result.policy.sum(dim=1)
-        assert torch.allclose(
-            row_sums, torch.ones(25, dtype=row_sums.dtype), atol=1e-5
+        row_sums = result.policy.sum(axis=1)
+        assert jnp.allclose(
+            row_sums, jnp.ones(25, dtype=row_sums.dtype), atol=1e-5
         )
 
 
@@ -208,10 +209,10 @@ class TestMCEIRLNeuralOnSmallGrid:
 
     def _make_encoder(self, grid_size):
         def state_encoder(s, gs=grid_size):
-            s_long = s.long()
-            row = (s_long // gs).float() / max(gs - 1, 1)
-            col = (s_long % gs).float() / max(gs - 1, 1)
-            return torch.stack([row, col], dim=-1)
+            s_int = s.astype(jnp.int32)
+            row = (s_int // gs).astype(jnp.float32) / max(gs - 1, 1)
+            col = (s_int % gs).astype(jnp.float32) / max(gs - 1, 1)
+            return jnp.stack([row, col], axis=-1)
         return state_encoder
 
     def test_neural_fits_on_small_grid(self, env, panel, features_and_params):
@@ -286,7 +287,6 @@ class TestMCEIRLNeuralOnSmallGrid:
         the learned policy should place high probability on the same actions
         as the expert policy.
         """
-        import numpy as np
 
         features, names, true_params = features_and_params
         # More data for better recovery
@@ -331,7 +331,7 @@ class TestMCEIRLNeuralOnSmallGrid:
         expert_result = hybrid_iteration(
             operator, utility.compute(true_params), tol=1e-10
         )
-        expert_policy = expert_result.policy.numpy()
+        expert_policy = np.asarray(expert_result.policy)
 
         # Compare: most-likely action should match for most states
         learned_policy = model.policy_

@@ -43,7 +43,6 @@ from typing import Literal
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import torch
 from scipy.stats import norm as scipy_norm
 
 from econirl.core.reward_spec import RewardSpec

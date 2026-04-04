@@ -10,8 +10,8 @@ These tests verify the complete estimation pipeline:
 """
 
 import pytest
-import torch
 import numpy as np
+import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.core.bellman import SoftBellmanOperator
@@ -33,16 +33,16 @@ class TestBellmanOperator:
         utility = rust_env_small.compute_utility_matrix()
 
         # Start from two different initial values
-        V1 = torch.zeros(problem_spec_small.num_states)
-        V2 = torch.ones(problem_spec_small.num_states) * 10
+        V1 = jnp.zeros(problem_spec_small.num_states)
+        V2 = jnp.ones(problem_spec_small.num_states) * 10
 
         result1 = operator.apply(utility, V1)
         result2 = operator.apply(utility, V2)
 
         # Contraction: ||TV1 - TV2|| <= beta * ||V1 - V2||
         # Adding small tolerance for floating-point precision at the boundary
-        initial_dist = torch.abs(V1 - V2).max()
-        after_dist = torch.abs(result1.V - result2.V).max()
+        initial_dist = jnp.abs(V1 - V2).max()
+        after_dist = jnp.abs(result1.V - result2.V).max()
 
         assert after_dist <= problem_spec_small.discount_factor * initial_dist + 1e-6
 
@@ -51,18 +51,18 @@ class TestBellmanOperator:
         operator = SoftBellmanOperator(problem_spec_small, transitions_small)
         utility = rust_env_small.compute_utility_matrix()
 
-        V = torch.zeros(problem_spec_small.num_states)
+        V = jnp.zeros(problem_spec_small.num_states)
         result = operator.apply(utility, V)
 
-        row_sums = result.policy.sum(dim=1)
-        assert torch.allclose(row_sums, torch.ones_like(row_sums), atol=1e-6)
+        row_sums = result.policy.sum(axis=1)
+        assert jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-6)
 
     def test_policy_non_negative(self, rust_env_small, transitions_small, problem_spec_small):
         """Test that policy probabilities are non-negative."""
         operator = SoftBellmanOperator(problem_spec_small, transitions_small)
         utility = rust_env_small.compute_utility_matrix()
 
-        V = torch.zeros(problem_spec_small.num_states)
+        V = jnp.zeros(problem_spec_small.num_states)
         result = operator.apply(utility, V)
 
         assert (result.policy >= 0).all()
@@ -83,7 +83,7 @@ class TestSolvers:
 
     def test_policy_iteration_convergence(self, rust_env, transitions, problem_spec):
         """Test that policy iteration converges."""
-        # With β=0.9999, convergence is slow so we use a looser tolerance
+        # With beta=0.9999, convergence is slow so we use a looser tolerance
         operator = SoftBellmanOperator(problem_spec, transitions)
         utility = rust_env.compute_utility_matrix()
 
@@ -103,10 +103,10 @@ class TestSolvers:
         assert pi_result.converged, "Policy iteration did not converge"
 
         # Value functions should match (use relative tolerance)
-        assert torch.allclose(vi_result.V, pi_result.V, rtol=1e-3, atol=1e-3)
+        assert jnp.allclose(vi_result.V, pi_result.V, rtol=1e-3, atol=1e-3)
 
         # Policies should match
-        assert torch.allclose(vi_result.policy, pi_result.policy, rtol=1e-3, atol=1e-3)
+        assert jnp.allclose(vi_result.policy, pi_result.policy, rtol=1e-3, atol=1e-3)
 
 
 class TestDataSimulation:
@@ -140,8 +140,8 @@ class TestDataSimulation:
         panel1 = simulate_panel(rust_env_small, n_individuals=10, n_periods=20, seed=42)
         panel2 = simulate_panel(rust_env_small, n_individuals=10, n_periods=20, seed=42)
 
-        assert torch.equal(panel1.get_all_states(), panel2.get_all_states())
-        assert torch.equal(panel1.get_all_actions(), panel2.get_all_actions())
+        assert jnp.array_equal(panel1.get_all_states(), panel2.get_all_states())
+        assert jnp.array_equal(panel1.get_all_actions(), panel2.get_all_actions())
 
 
 class TestNFXPEstimation:
@@ -182,7 +182,7 @@ class TestNFXPEstimation:
         true_params = rust_env.get_true_parameter_vector()
 
         # Check recovery - RMSE should be small
-        rmse = torch.sqrt(torch.mean((result.parameters - true_params) ** 2)).item()
+        rmse = float(jnp.sqrt(jnp.mean((result.parameters - true_params) ** 2)))
         assert rmse < 0.1, (
             f"NFXP RMSE={rmse:.6f} exceeds 0.1. "
             f"Estimates: {result.parameters.tolist()}, True: {true_params.tolist()}"
@@ -200,7 +200,7 @@ class TestNFXPEstimation:
         for i, name in enumerate(result.parameter_names):
             error = abs(result.parameters[i] - true_params[i])
             se = result.standard_errors[i]
-            if torch.isfinite(se) and se > 0 and not (error < 3 * se):
+            if jnp.isfinite(se) and se > 0 and not (error < 3 * se):
                 # Numerical SEs at high gamma can be underestimated
                 rel_error = error / (abs(true_params[i]) + 1e-8)
                 assert rel_error < 0.5, \
@@ -281,8 +281,8 @@ class TestCounterfactual:
         )
 
         # Double replacement cost
-        new_params = result.parameters.clone()
-        new_params[1] *= 2
+        new_params = jnp.array(result.parameters)
+        new_params = new_params.at[1].multiply(2)
 
         cf = counterfactual_policy(
             result, new_params, utility_small, problem_spec_small, transitions_small
@@ -300,8 +300,8 @@ class TestCounterfactual:
         )
 
         # If replacement cost increases, replacement probability should decrease
-        new_params = result.parameters.clone()
-        new_params[1] *= 2  # Double replacement cost
+        new_params = jnp.array(result.parameters)
+        new_params = new_params.at[1].multiply(2)  # Double replacement cost
 
         cf = counterfactual_policy(
             result, new_params, utility_small, problem_spec_small, transitions_small
@@ -346,7 +346,7 @@ class TestEndToEnd:
         # 7. Counterfactual should work
         new_params = result.parameters * 1.1
         cf = counterfactual_policy(result, new_params, utility, problem, transitions)
-        assert cf.welfare_change != 0 or torch.allclose(
+        assert cf.welfare_change != 0 or jnp.allclose(
             cf.baseline_policy, cf.counterfactual_policy, atol=1e-6
         )
 
