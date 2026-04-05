@@ -130,13 +130,16 @@ def part2_discretization():
         discount_factor=0.95,
     )
 
-    # Re-bin states
+    # Re-bin states from 90 to 15 bins
     bin_ratio = 90 / 15
     coarse_trajs = []
     for traj in panel_fine.trajectories:
-        cs = np.array([min(int(s / bin_ratio), 14) for s in np.array(traj.states)])
-        cn = np.array([min(int(s / bin_ratio), 14) for s in np.array(traj.next_states)])
-        ca = np.array(traj.actions)
+        fine_s = np.asarray(traj.states)
+        fine_ns = np.asarray(traj.next_states)
+        fine_a = np.asarray(traj.actions)
+        cs = jnp.array(np.minimum((fine_s / bin_ratio).astype(int), 14), dtype=jnp.int32)
+        cn = jnp.array(np.minimum((fine_ns / bin_ratio).astype(int), 14), dtype=jnp.int32)
+        ca = jnp.array(fine_a, dtype=jnp.int32)
         coarse_trajs.append(Trajectory(
             states=cs, actions=ca, next_states=cn,
             individual_id=traj.individual_id,
