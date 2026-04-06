@@ -193,7 +193,7 @@ No features need to be specified.
 \paragraph{IQ-Learn.}
 The IQ-Learn estimator of \citet{garg2021} collapses the min-max IRL problem to a concave maximization over $Q$ alone, since the optimal policy is deterministically the softmax of $Q$.
 Reward is recovered via the inverse Bellman operator $r(s,a) = Q(s,a) - \beta\sum_{s'} V(s')\,p(s'|s,a)$.
-Section~\ref{sec:iq_learn} shows that in the tabular DDC setting this objective is algebraically equivalent to a penalized conditional log-likelihood.
+Appendix~\ref{sec:iq_learn} shows that in the tabular DDC setting this objective is algebraically equivalent to a penalized conditional log-likelihood.
 
 \paragraph{BC (baseline).}
 Behavioral cloning \citep{pomerleau1991} estimates the policy directly via frequency counting $\hat P(a|s) = N(s,a)/N(s)$.

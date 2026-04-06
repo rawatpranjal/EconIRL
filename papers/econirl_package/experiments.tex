@@ -53,7 +53,7 @@ The neural structural estimators (NNES, TD-CCP, SEES, GLADIUS) all achieve cosin
 SEES stands out for speed, running in 1.5 seconds compared to 16 seconds for NNES and 130 seconds for TD-CCP.
 GLADIUS recovers the replacement cost within 21 percent but underestimates it due to the state-dependent identification constant discussed in Section~\ref{sec:estimators}.
 
-IQ-Learn achieves lower log-likelihood than NFXP ($-4678$ versus $-4263$) because the $\ell^2$ reward penalty trades fit for a smaller implied reward, as predicted by the penalized MLE equivalence in Section~\ref{sec:iq_learn}.
+IQ-Learn achieves lower log-likelihood than NFXP ($-4678$ versus $-4263$) because the $\ell^2$ reward penalty trades fit for a smaller implied reward, as predicted by the penalized MLE equivalence in Appendix~\ref{sec:iq_learn}.
 AIRL is the slowest method at 608 seconds due to its adversarial training loop but recovers the replacement cost within 30 percent.
 BC provides the non-structural floor at log-likelihood $-4238$.
 
