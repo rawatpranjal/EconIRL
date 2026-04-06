@@ -1,49 +1,31 @@
 # GAIL
 
-| Category | Citation | Reward | Transitions | SEs | Scales | Transfer |
-|----------|----------|--------|-------------|-----|--------|----------|
-| Inverse | Ho and Ermon (2016) | Tabular (implicit) | No (adversarial) | Bootstrap only | No | No |
+| Category | Citation | Reward | Transitions | SEs | Scales |
+|----------|----------|--------|-------------|-----|--------|
+| Inverse | Ho and Ermon (2016) | None | No (adversarial) | No | Yes |
 
-## Background
+## What this estimator does
 
-Before GAIL, inverse reinforcement learning was a two-step process. First recover a reward function from demonstrations, then solve the MDP under that reward to get a policy. Ho and Ermon (2016) observed that if the goal is imitation rather than reward recovery, the intermediate reward step is unnecessary. They framed imitation learning as a GAN: a discriminator learns to distinguish expert state-action pairs from agent state-action pairs, and the agent's policy is updated to fool the discriminator. The resulting policy matches the expert's occupancy measure without ever producing an explicit reward function.
+Traditional IRL solves a two-step problem. First recover the reward from expert demonstrations, then find the optimal policy for that reward. Ho and Ermon (2016) observe that if the goal is only to match the expert's behavior and not to understand the reward, the two steps can be collapsed into one. Their key insight is that IRL is dual to occupancy measure matching. Two policies produce the same behavior if and only if they have the same occupancy measure. So matching the expert's behavior reduces to matching its occupancy measure, which can be done directly via a GAN without ever recovering a reward.
 
-## Key Equations
+The tradeoff is clear. GAIL is faster and simpler than IRL but does not produce a reward function. This means GAIL cannot answer counterfactual questions because there is no structural primitive to re-optimize. The discriminator $D(s,a)$ is not a reward function. It is a classifier that distinguishes expert from policy transitions. At the optimum $D = 1/2$ everywhere and carries no structural information. GAIL serves as a strong imitation learning baseline that exploits MDP structure without requiring feature specification.
 
-The discriminator is trained to minimize binary cross-entropy between expert and policy state-action distributions. The reward signal for the policy is derived from the discriminator output.
+## How it works
+
+The estimator solves the minimax problem
 
 $$
-R(s,a) = -\log(1 - D(s,a))
+\min_\pi \max_D \; \mathbb{E}_{\rho_\pi}[\log D(s,a)] + \mathbb{E}_{\rho_E}[\log(1 - D(s,a))] - \lambda \mathcal{H}(\pi),
 $$
 
-The policy is updated by solving the MDP under this induced reward via soft value iteration.
+where the inner maximization over $D$ computes the Jensen-Shannon divergence between learned and expert occupancy measures, and the outer minimization finds the policy whose occupancy is closest to the expert's. The reward signal $\tilde{r} = -\log(1 - D)$ encourages the policy to generate transitions that fool the discriminator. Standard errors are available only via bootstrap because there is no structural likelihood.
 
-## Pseudocode
+## When to use it
 
-```
-GAIL(D_expert, p, beta, sigma, max_rounds):
-  1. Initialize discriminator D(s,a)
-  2. For each round:
-     a. Compute state-action occupancy under current policy
-     b. Update discriminator to classify expert vs policy
-     c. Derive reward: R(s,a) = -log(1 - D(s,a))
-     d. Update policy via soft value iteration under R
-  3. Return policy (no explicit reward)
-```
-
-## Strengths and Limitations
-
-GAIL is the most direct path from demonstrations to a matching policy. It does not require feature specification for the reward, does not require computing feature expectations, and converges when the policy's occupancy measure matches the expert's. For practitioners who need only to replicate expert behavior and do not need reward interpretability, GAIL is the simplest adversarial approach.
-
-The core limitation is that GAIL does not produce a transferable reward function. The discriminator is entangled with the training environment's dynamics, so the learned signal does not transfer to new environments. If counterfactual analysis, welfare computation, or deployment under different dynamics is needed, AIRL or MCE-IRL is the better choice. GAIL also inherits the training instability of GANs, with sensitivity to learning rates and discriminator capacity.
-
-Standard errors are available only through bootstrap, which requires re-running the full adversarial training loop for each replicate.
-
-## In econirl
-
-The implementation is `GAILEstimator` in `econirl.contrib.gail`. It uses `TabularDiscriminator` or `LinearDiscriminator` from the adversarial module, and soft value iteration for the generator. Configuration is via `GAILConfig`, which controls discriminator learning rate, number of discriminator steps per round, and convergence tolerance.
+GAIL is the right choice when the goal is policy matching rather than reward recovery, and when no feature specification is available. It scales to high-dimensional continuous state-action spaces via neural discriminators and PPO. For structural estimation and counterfactual analysis, AIRL or MCE-IRL are needed because they recover a reward function. GAIL's role in the econirl pipeline is as a strong behavioral baseline that exploits MDP structure.
 
 ## References
 
-- Ho, J. & Ermon, S. (2016). Generative Adversarial Imitation Learning. *NeurIPS 2016*.
-- Fu, J., Luo, K., & Levine, S. (2018). Learning Robust Rewards with Adversarial Inverse Reinforcement Learning. *ICLR 2018*.
+- Ho, J. and Ermon, S. (2016). Generative Adversarial Imitation Learning. *NeurIPS 2016*.
+
+The full derivation, algorithm, and simulation results are in the [GAIL primer (PDF)](https://github.com/rawatpranjal/econirl/blob/main/papers/econirl_package/primers/gail.pdf).

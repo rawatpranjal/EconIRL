@@ -38,6 +38,7 @@ estimators/f_irl
 estimators/airl
 estimators/neural_airl
 estimators/airl_het
+estimators/gail
 ```
 
 ```{toctree}
@@ -46,6 +47,8 @@ estimators/airl_het
 
 estimators/gcl
 estimators/max_margin_irl
+estimators/max_margin_planning
+estimators/bayesian_irl
 ```
 
 ```{toctree}
