@@ -1,0 +1,285 @@
+{
+  "baseline": {
+    "spec": "baseline",
+    "config": {
+      "discount_factor": 0.95,
+      "max_sessions": 30000,
+      "offset": 0,
+      "n_actions": 3,
+      "interactions": false
+    },
+    "n_sessions": 25848,
+    "n_obs": 363841,
+    "log_likelihood": -114854.913210833,
+    "elapsed_s": 651.1,
+    "parameters": {
+      "theta_position": 0.23093269765377045,
+      "theta_price": 0.7776054739952087,
+      "theta_quality": 0.46057945489883423,
+      "click_cost": -3.2119765281677246,
+      "book_value": -2.468419075012207
+    },
+    "standard_errors": {
+      "theta_position": 0.003856643894214426,
+      "theta_price": 0.01723773268223748,
+      "theta_quality": 0.014855570301502906,
+      "click_cost": 0.013668862410664485,
+      "book_value": 0.013893298039689786
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "click_cost",
+      "book_value"
+    ]
+  },
+  "beta_090": {
+    "spec": "beta_090",
+    "config": {
+      "discount_factor": 0.9,
+      "max_sessions": 30000,
+      "offset": 0,
+      "n_actions": 3,
+      "interactions": false
+    },
+    "n_sessions": 25848,
+    "n_obs": 363841,
+    "log_likelihood": -114793.71488608801,
+    "elapsed_s": 563.6,
+    "parameters": {
+      "theta_position": 0.33316195011138916,
+      "theta_price": 0.7763323783874512,
+      "theta_quality": 0.4578762650489807,
+      "click_cost": -3.1767852306365967,
+      "book_value": -2.4567203521728516
+    },
+    "standard_errors": {
+      "theta_position": 0.005688488389764151,
+      "theta_price": 0.017238244255295822,
+      "theta_quality": 0.014858635476749508,
+      "click_cost": 0.013786125063099317,
+      "book_value": 0.013982626890150396
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "click_cost",
+      "book_value"
+    ]
+  },
+  "beta_099": {
+    "spec": "beta_099",
+    "config": {
+      "discount_factor": 0.99,
+      "max_sessions": 30000,
+      "offset": 0,
+      "n_actions": 3,
+      "interactions": false
+    },
+    "n_sessions": 25848,
+    "n_obs": 363841,
+    "log_likelihood": -114905.18896065479,
+    "elapsed_s": 720.8,
+    "parameters": {
+      "theta_position": 0.15595746040344238,
+      "theta_price": 0.7788279056549072,
+      "theta_quality": 0.46338269114494324,
+      "click_cost": -3.238569498062134,
+      "book_value": -2.475552797317505
+    },
+    "standard_errors": {
+      "theta_position": 0.0025025137648623428,
+      "theta_price": 0.017237295514493635,
+      "theta_quality": 0.014855433664633747,
+      "click_cost": 0.013598907200652917,
+      "book_value": 0.013846399834605047
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "click_cost",
+      "book_value"
+    ]
+  },
+  "window_10k": {
+    "spec": "window_10k",
+    "config": {
+      "discount_factor": 0.95,
+      "max_sessions": 10000,
+      "offset": 0,
+      "n_actions": 3,
+      "interactions": false
+    },
+    "n_sessions": 8625,
+    "n_obs": 120527,
+    "log_likelihood": -38386.766264431644,
+    "elapsed_s": 184.8,
+    "parameters": {
+      "theta_position": 0.2342040091753006,
+      "theta_price": 0.7560782432556152,
+      "theta_quality": 0.42520639300346375,
+      "click_cost": -3.1881136894226074,
+      "book_value": -2.4401769638061523
+    },
+    "standard_errors": {
+      "theta_position": 0.006683702241416074,
+      "theta_price": 0.02979427043882726,
+      "theta_quality": 0.025600153322700145,
+      "click_cost": 0.023568844792393823,
+      "book_value": 0.0238416209956013
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "click_cost",
+      "book_value"
+    ]
+  },
+  "window_50k": {
+    "spec": "window_50k",
+    "config": {
+      "discount_factor": 0.95,
+      "max_sessions": 50000,
+      "offset": 0,
+      "n_actions": 3,
+      "interactions": false
+    },
+    "n_sessions": 43033,
+    "n_obs": 606468,
+    "log_likelihood": -191372.74785320633,
+    "elapsed_s": 1214.7,
+    "parameters": {
+      "theta_position": 0.2286052405834198,
+      "theta_price": 0.7740548849105835,
+      "theta_quality": 0.4545161724090576,
+      "click_cost": -3.2123122215270996,
+      "book_value": -2.4703152179718018
+    },
+    "standard_errors": {
+      "theta_position": 0.0029804209055585306,
+      "theta_price": 0.013358034861190153,
+      "theta_quality": 0.011497023175630488,
+      "click_cost": 0.010582626514544283,
+      "book_value": 0.010758389943629846
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "click_cost",
+      "book_value"
+    ]
+  },
+  "subsample_b": {
+    "spec": "subsample_b",
+    "config": {
+      "discount_factor": 0.95,
+      "max_sessions": 30000,
+      "offset": 30000,
+      "n_actions": 3,
+      "interactions": false
+    },
+    "n_sessions": 25746,
+    "n_obs": 363395,
+    "log_likelihood": -114322.34901569321,
+    "elapsed_s": 690.5,
+    "parameters": {
+      "theta_position": 0.22593554854393005,
+      "theta_price": 0.7971749901771545,
+      "theta_quality": 0.47988075017929077,
+      "click_cost": -3.227414608001709,
+      "book_value": -2.4827206134796143
+    },
+    "standard_errors": {
+      "theta_position": 0.0038457156705019673,
+      "theta_price": 0.01725529930651521,
+      "theta_quality": 0.014871050460950119,
+      "click_cost": 0.01373093305325211,
+      "book_value": 0.01396295688506758
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "click_cost",
+      "book_value"
+    ]
+  },
+  "action_2": {
+    "spec": "action_2",
+    "config": {
+      "discount_factor": 0.95,
+      "max_sessions": 30000,
+      "offset": 0,
+      "n_actions": 2,
+      "interactions": false
+    },
+    "n_sessions": 24243,
+    "n_obs": 215339,
+    "log_likelihood": -74776.64976712827,
+    "elapsed_s": 462.4,
+    "parameters": {
+      "theta_position": -0.09786377847194672,
+      "theta_price": 0.7834756970405579,
+      "theta_quality": 0.42167168855667114,
+      "engage_value": -2.0841012001037598
+    },
+    "standard_errors": {
+      "theta_position": 0.006366559908490491,
+      "theta_price": 0.019145691703836485,
+      "theta_quality": 0.01655517891139132,
+      "engage_value": 0.013659961453431698
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "engage_value"
+    ]
+  },
+  "interactions": {
+    "spec": "interactions",
+    "config": {
+      "discount_factor": 0.95,
+      "max_sessions": 30000,
+      "offset": 0,
+      "n_actions": 3,
+      "interactions": true
+    },
+    "n_sessions": 25848,
+    "n_obs": 363841,
+    "log_likelihood": -114648.07417592409,
+    "elapsed_s": 1416.1,
+    "parameters": {
+      "theta_position": 0.19710154831409454,
+      "theta_price": 0.583964467048645,
+      "theta_quality": 0.5944284796714783,
+      "click_cost": -3.209965467453003,
+      "book_value": -2.5959558486938477,
+      "pos_x_quality": -0.46765249967575073,
+      "pos_x_price": -0.7074875831604004
+    },
+    "standard_errors": {
+      "theta_position": 0.004229131139184549,
+      "theta_price": 0.027165973457953223,
+      "theta_quality": 0.022675488044940652,
+      "click_cost": 0.013736687189801429,
+      "book_value": 0.015668079095432632,
+      "pos_x_quality": 0.060288011701968174,
+      "pos_x_price": 0.07855314294052321
+    },
+    "param_names": [
+      "theta_position",
+      "theta_price",
+      "theta_quality",
+      "click_cost",
+      "book_value",
+      "pos_x_quality",
+      "pos_x_price"
+    ]
+  }
+}
