@@ -1,0 +1,187 @@
+\documentclass[11pt]{article}
+\usepackage[right=1in,left=1in,top=0.85in,bottom=0.85in]{geometry}
+\input{../common/notation}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{titling}
+\setlength{\droptitle}{-2.5em}
+\posttitle{\par\end{center}\vspace{-1.2em}}
+\setlength{\parskip}{0.3em}
+\bibliographystyle{abbrvnat}
+
+\title{Primer: MPEC for Dynamic Discrete Choice\\[3pt]
+\large Su and Judd (2012)}
+\author{econirl package documentation}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-0.5em}
+
+%% ============================================================
+\section{Context and Problem}
+%% ============================================================
+
+Structural estimation of DDC models requires solving the Bellman equation at every candidate parameter vector during optimization.
+In Rust's NFXP approach \citep{rust1987}, an outer loop searches over $\theta$ while an inner loop solves $V = T(V;\theta)$ by contraction.
+When the discount factor $\beta$ is close to 1, the contraction rate $\beta$ approaches unity and the inner loop requires many iterations.
+\citet{suJudd2012} propose MPEC (Mathematical Programming with Equilibrium Constraints) as an alternative: instead of solving the Bellman equation inside the likelihood evaluation, treat $V$ as a decision variable and enforce the Bellman equation as a constraint.
+This eliminates the inner fixed-point loop entirely and replaces it with a single constrained optimization over $(\theta, V)$ jointly.
+
+The practical advantage is that standard nonlinear programming solvers (KNITRO, SNOPT, or augmented Lagrangian methods) can handle the constraint efficiently, especially when the state space is large and the inner loop is expensive.
+\citet{iskhakovRustSchjerning2016} later showed that if the NFXP inner solver uses Newton-Kantorovich (NK) iteration instead of successive approximation (SA), the speed advantage of MPEC largely disappears at moderate state spaces ($|\calS| < 200$).
+MPEC remains relevant for very large state spaces and as a conceptual alternative that makes the computational structure explicit.
+
+%% ============================================================
+\section{Model and Notation}
+%% ============================================================
+
+The DDC model follows \citet{rust1987}.
+The agent observes state $s_t \in \calS$ with $|\calS| = n$, chooses action $a_t \in \calA$ with $|\calA| = k$, and receives flow utility $u(s_t, a_t; \theta) + \sigma \epsilon_{t,a}$ where $\epsilon$ is Type I extreme value.
+The state transitions according to $P(s'|s,a)$ and future payoffs are discounted at rate $\beta$.
+
+\commonnotation
+
+\noindent MPEC introduces two additional objects: $\lambda \in \R^n$ (Lagrange multipliers for the Bellman constraint) and $\rho > 0$ (augmented Lagrangian penalty weight).
+The Bellman operator is $T_s(V;\theta) = \sigma \log \sum_a \exp[(u(s,a;\theta) + \beta P_a V)/\sigma]$.
+\FloatBarrier
+
+%% ============================================================
+\section{Formulation}
+%% ============================================================
+
+\paragraph{NFXP (nested).}
+\begin{equation}
+\label{eq:nfxp}
+\max_\theta \; \mathcal{L}(\theta) \quad \text{where } V(\theta) \text{ solves } V = T(V;\theta).
+\end{equation}
+The log-likelihood is $\mathcal{L}(\theta) = \sum_{i,t} \log \pi(a_{it} | s_{it}; \theta, V(\theta))$.
+At each $\theta$, the inner loop iterates $V^{k+1} = T(V^k;\theta)$ until convergence.
+
+\paragraph{MPEC (joint).}
+\begin{equation}
+\label{eq:mpec}
+\max_{\theta, V} \; \mathcal{L}(\theta, V) \quad \text{subject to} \quad V = T(V;\theta).
+\end{equation}
+The decision variables are $(\theta, V) \in \mathbb{R}^{p+n}$.
+The Bellman equation is an explicit equality constraint rather than an implicit fixed point.
+
+\paragraph{Augmented Lagrangian.}
+MPEC~\eqref{eq:mpec} is solved via the augmented Lagrangian
+\begin{equation}
+\label{eq:al}
+\mathcal{L}_\rho(\theta, V, \lambda) = -\mathcal{L}(\theta, V) + \lambda^\top [V - T(V;\theta)] + \frac{\rho}{2} \|V - T(V;\theta)\|^2.
+\end{equation}
+The penalty $\rho$ is increased across outer iterations until the constraint $\|V - T(V;\theta)\|_\infty < \epsilon$ is satisfied.
+Each inner subproblem $\min_{\theta,V} \mathcal{L}_\rho$ is solved by L-BFGS-B.
+
+%% ============================================================
+\section{Identification}
+%% ============================================================
+
+MPEC and NFXP solve the same MLE problem.
+At convergence, if $V^* = T(V^*;\theta^*)$, the MPEC log-likelihood equals the NFXP log-likelihood.
+Standard errors are computed by the same formula: the observed information matrix with the implicit derivative $dV/d\theta$ obtained from $(I - \beta P_\pi) \, dV/d\theta = dT/d\theta$ via the implicit function theorem.
+Identification requires the same rank condition on the feature matrix $\phi(s,a)$ as NFXP.
+
+%% ============================================================
+\section{Algorithm}
+%% ============================================================
+
+\begin{algorithm}[h!]
+\caption{MPEC via Augmented Lagrangian (Su \& Judd 2012)}
+\label{alg:mpec}
+\begin{algorithmic}[1]
+\REQUIRE Data panel, transitions $P$, discount $\beta$, initial $\theta_0$
+\ENSURE MLE parameters $\theta^*$, value function $V^*$
+
+\STATE Solve $V_0 = T(V_0; \theta_0)$ by value iteration \hfill \textit{// warm start}
+\STATE Set $\lambda_0 = 0$, $\rho = \rho_{\text{init}}$
+
+\FOR{$k = 0, 1, \ldots$ (outer AL iterations)}
+
+\STATE \textbf{// Inner: minimize augmented Lagrangian}
+\STATE $(\theta^{k+1}, V^{k+1}) \leftarrow \arg\min_{\theta, V} \; \mathcal{L}_\rho(\theta, V, \lambda^k)$ \hfill \textit{// L-BFGS-B}
+
+\STATE \textbf{// Check constraint}
+\STATE $c^{k+1} \leftarrow \|V^{k+1} - T(V^{k+1}; \theta^{k+1})\|_\infty$
+\IF{$c^{k+1} < \epsilon_c$}
+  \STATE \textbf{break} \hfill \textit{// Bellman satisfied}
+\ENDIF
+
+\STATE \textbf{// Update multipliers and penalty}
+\STATE $\lambda^{k+1} \leftarrow \lambda^k + \rho \cdot [V^{k+1} - T(V^{k+1}; \theta^{k+1})]$
+\STATE $\rho \leftarrow \min(\rho \cdot \gamma_\rho, \; \rho_{\max})$ \hfill \textit{// grow penalty}
+
+\ENDFOR
+
+\STATE Compute SEs via implicit function theorem at $(\theta^*, V^*)$
+\RETURN $\theta^*$, $V^*$, SEs
+\end{algorithmic}
+\end{algorithm}
+\FloatBarrier
+
+The warm start (line 1) is critical: initializing $V_0$ from the Bellman solution at $\theta_0$ gives L-BFGS-B a feasible starting point.
+The penalty schedule $\rho_{\text{init}} = 1$, $\gamma_\rho = 10$, $\rho_{\max} = 10^6$ works well across discount factors.
+
+%% ============================================================
+\section{Results from the Paper}
+%% ============================================================
+
+\paragraph{Su \& Judd (2012, Table 2).}
+On the Rust bus engine with $n = 175$ states and $\beta = 0.9999$, MPEC (using KNITRO) solves in 0.5 seconds versus 188 seconds for NFXP-SA.
+The speedup comes from avoiding the slow contraction mapping: at $\beta = 0.9999$ the contraction rate is 0.9999 and SA needs roughly $\log(10^{-10})/\log(0.9999) \approx 230{,}000$ inner iterations per outer step.
+
+\paragraph{Iskhakov, Rust \& Schjerning (2016, Table 1).}
+When the NFXP inner solver switches from SA to Newton-Kantorovich (NK), NFXP-NK solves the same problem in 0.3 seconds, eliminating MPEC's speed advantage.
+NK converges in 5--10 inner iterations regardless of $\beta$ because it achieves quadratic convergence near the fixed point.
+The speed advantage of MPEC only reappears at very large state spaces ($n > 500$) where forming and inverting the $n \times n$ Jacobian for NK becomes expensive.
+
+\paragraph{Takeaway.}
+The Su \& Judd critique of NFXP was correct for NFXP-SA but not for NFXP-NK.
+The econirl library implements the NK inner solver via the hybrid SA$\to$NK polyalgorithm of \citet{iskhakovRustSchjerning2016}, which starts with SA iterations and switches to NK once the contraction residual is small enough for quadratic convergence.
+
+%% ============================================================
+\section{Simulation}
+%% ============================================================
+
+We run MPEC and NFXP-NK on the Rust bus engine ($n = 90$ mileage bins, true $\theta_c = 0.001$, $RC = 3.0$) at three discount factors.
+Expert data: 500 buses observed for 100 periods each (50,000 observations).
+Run \texttt{python mpec\_run.py} to regenerate Table~\ref{tab:results}.
+
+\begin{table}[h!]
+\centering\small
+\begin{tabular}{r|rrr|rrrr}
+\toprule
+$\beta$ & \multicolumn{3}{c|}{NFXP-NK} & \multicolumn{4}{c}{MPEC (Augmented Lagrangian)} \\
+ & $\hat\theta_c$ & $\widehat{RC}$ & Time & $\hat\theta_c$ & $\widehat{RC}$ & Time & CV \\
+\midrule
+\input{mpec_results}
+\bottomrule
+\end{tabular}
+\caption{Parameter recovery on Rust bus (90 states). True: $\theta_c = 0.001$, $RC = 3.0$. CV = Bellman constraint violation $\|V - T(V;\theta)\|_\infty$. Auto-generated by \texttt{mpec\_run.py}.}
+\label{tab:results}
+\end{table}
+\FloatBarrier
+
+NFXP-NK recovers the true parameters within sampling variability at all three discount factors, with OC estimates within 20\% of the true 0.001 and RC estimates within 0.5\% of the true 3.0.
+MPEC performs well at $\beta = 0.95$ (OC within 17\%, RC within 1\%) but shows larger deviations at the extremes.
+At $\beta = 0.90$ the operating cost is overestimated because the low discount factor makes the Bellman constraint less binding and the AL penalty schedule needs more outer iterations.
+At $\beta = 0.99$ the constraint is tighter but the landscape is flatter, making L-BFGS-B convergence slower.
+
+The timing comparison confirms the Iskhakov et al.\ finding: NFXP-NK is substantially faster at this state space size (90 states).
+The NK inner loop exploits the Jacobian structure of the Bellman operator to achieve quadratic convergence in 5--10 iterations, while the MPEC AL solver must optimize over 92 variables ($p + n = 2 + 90$) at each outer step.
+MPEC's advantage would emerge at $n > 500$ states where forming the NK Jacobian becomes expensive.
+
+The Bellman constraint violation (CV) measures how well the final $V^*$ satisfies $V = T(V;\theta)$.
+Values below $10^{-4}$ indicate the augmented Lagrangian successfully enforced the equilibrium constraint.
+When CV is larger, the AL penalty $\rho$ did not grow fast enough to enforce feasibility, and the parameter estimates may be biased.
+
+\paragraph{Code mapping.}
+The econirl implementation at \texttt{src/econirl/estimation/mpec.py} provides \texttt{MPECEstimator} with \texttt{MPECConfig}.
+Key config parameters: \texttt{solver="augmented\_lagrangian"}, \texttt{rho\_initial=1.0}, \texttt{rho\_growth=10.0}, \texttt{rho\_max=1e6}, \texttt{constraint\_tol=1e-8}.
+Standard errors use the same implicit function theorem formula as NFXP because the Bellman constraint is exactly satisfied at convergence.
+
+\bibliography{references}
+
+\end{document}
