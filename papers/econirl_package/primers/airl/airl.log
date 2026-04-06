@@ -539,9 +539,11 @@ deleted material, e.g., by typing `I$}'.
 
 
 
-[3] (./airl.bbl)
+[3] (./airl.bbl
 
-[4] (./airl.aux)
+[4])
+
+[5] (./airl.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -550,8 +552,8 @@ Package rerunfilecheck Info: File `airl.out' has not changed.
 (rerunfilecheck)             Checksum: BC4B12F86FEB50C8C128D5408EA9AA09;890.
  ) 
 Here is how much of TeX's memory you used:
- 10299 strings out of 473190
- 155691 string characters out of 5715801
+ 10300 strings out of 473190
+ 155697 string characters out of 5715801
  572198 words of memory out of 5000000
  33383 multiletter control sequences out of 15000+600000
  569062 words of font info for 76 fonts, out of 8000000 for 9000
@@ -577,10 +579,10 @@ xmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2025/tex
 mf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2025/texm
 f-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2025/
 texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on airl.pdf (4 pages, 249886 bytes).
+Output written on airl.pdf (5 pages, 252593 bytes).
 PDF statistics:
- 233 PDF objects out of 1000 (max. 8388607)
- 185 compressed objects within 2 object streams
- 49 named destinations out of 1000 (max. 500000)
+ 237 PDF objects out of 1000 (max. 8388607)
+ 188 compressed objects within 2 object streams
+ 50 named destinations out of 1000 (max. 500000)
  57 words of extra memory for PDF output out of 10000 (max. 10000000)
 
