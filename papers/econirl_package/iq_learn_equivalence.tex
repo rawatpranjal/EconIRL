@@ -1,0 +1,41 @@
+\section{IQ-Learn as Penalized Conditional Log-Likelihood}
+\label{sec:iq_learn}
+
+The IQ-Learn estimator \citep{garg2021} parameterizes the $Q$-function directly and minimizes a chi-squared divergence objective over it, bypassing the need to specify a reward function. In continuous environments where the transition kernel $p(s'|s,a)$ is unknown, the continuation value $\sum_{s'} V(s')\,p(s'|s,a)$ must be approximated from sampled next states, introducing double-sampling bias and requiring careful target-network stabilization. In the tabular DDC setting where transitions are known from the model or consistently estimated from data, this expectation can be computed exactly from the transition matrix. \citet{rawat2026} shows that the resulting finite-state objective has a clean structural interpretation that connects IQ-Learn to the classical maximum likelihood estimators of structural econometrics.
+
+\paragraph{The chi-squared objective.}
+Let $\{(s_i, a_i)\}_{i=1}^N$ denote the observed state-action pairs. The IQ-Learn chi-squared objective is
+\begin{equation}
+\label{eq:iq_obj}
+\mathcal{L}(Q) \;=\; -\frac{1}{N}\sum_{i=1}^{N}\bigl[Q(s_i,a_i) - V(s_i)\bigr] \;+\; \frac{1}{4\alpha}\,\frac{1}{N}\sum_{i=1}^{N}\bigl[\mathrm{td}(s_i,a_i)\bigr]^2,
+\end{equation}
+where $V(s) = \sigma\log\sum_a \exp\{Q(s,a)/\sigma\}$ is the smoothed value function (the log-sum-exp operator), $\mathrm{td}(s,a) = Q(s,a) - \beta\sum_{s'}V(s')\,p(s'|s,a)$ is the temporal difference between the current $Q$-value and its Bellman backup, and $\alpha > 0$ is a regularization parameter that controls the strength of the Bellman-consistency penalty. The first term rewards $Q$-functions that assign high advantage to observed actions. The second term penalizes $Q$-functions that deviate from the Bellman fixed point.
+
+\paragraph{Two identities.}
+Two algebraic identities, proved in \citet{rawat2026}, enable the reinterpretation.
+
+\textbf{Identity 1} (Proposition~1 of \citealp{rawat2026}). For any function $Q(s,a)$, define $V(s)$ via the log-sum-exp and $\pi(a|s) = \exp\{(Q(s,a) - V(s))/\sigma\}$ via the softmax. Then $Q(s,a) - V(s) = \sigma\log\pi(a|s)$. The advantage function equals the scaled log choice probability under the softmax policy induced by $Q$.
+
+\textbf{Identity 2} (Proposition~2 of \citealp{rawat2026}). If $Q$ satisfies the Bellman fixed point $Q = \Lambda_\sigma(Q)$, where $\Lambda_\sigma$ denotes the smoothed Bellman operator, then $\mathrm{td}(s,a) = r(s,a)$. The temporal difference equals the flow reward implied by $Q$ through the inverse Bellman operator.
+
+\paragraph{The equivalence.}
+Substituting these identities into equation~\eqref{eq:iq_obj} yields the main result of \citet{rawat2026}, stated here without proof.
+
+\begin{equation}
+\label{eq:iq_equiv}
+\fbox{$\displaystyle
+\min_Q\;\mathcal{L}(Q) \;\;\Longleftrightarrow\;\; \max_Q\;\underbrace{\frac{1}{N}\sum_{i=1}^{N}\log\pi(a_i \mid s_i)}_{\text{conditional log-likelihood}} \;-\; \frac{1}{4\alpha\sigma}\,\sum_{i=1}^{N}\hat{r}_i^{\,2}
+$}
+\end{equation}
+
+\noindent
+The term $\mathrm{LL}(Q) = \sum_i \log\pi(a_i|s_i)$ is the conditional log-likelihood of observed actions under the softmax policy induced by $Q$, which is exactly the standard multinomial logit likelihood with $Q$-values playing the role of choice-specific utilities. The term $\hat{r}_i = \mathrm{td}(s_i, a_i)$ is the Bellman-implied reward at the $i$-th observation, so the penalty $\sum_i \hat{r}_i^{\,2}$ is an $\ell^2$ norm on the magnitude of the implied reward at expert-visited state-action pairs. Minimizing the IQ-Learn objective is therefore equivalent to maximizing the fit to observed choices while penalizing the complexity of the reward function that rationalizes them.
+
+\paragraph{Connection to NFXP.}
+In NFXP \citep{rust1987,iskhakov2016}, the Bellman equation $Q = \Lambda_\sigma(Q)$ is imposed as a hard constraint. An inner loop solves the fixed point to machine precision before the outer loop evaluates the conditional log-likelihood and takes a gradient step in the structural parameters $\theta$. In IQ-Learn, the Bellman equation enters as a soft constraint through the $\ell^2$ penalty on temporal differences. The regularization parameter $\alpha$ governs the tradeoff between data fit and structural consistency. As $\alpha \to 0$ the penalty dominates and forces $\mathrm{td}(s,a) \to 0$ at observed state-action pairs, so IQ-Learn converges to the Bellman-constrained MLE that NFXP solves exactly. As $\alpha \to \infty$ the penalty vanishes and the estimator reduces to an unconstrained conditional logit that maximizes the likelihood of observed choices with no structural content from the dynamic model. The IQ-Learn regularization path therefore traces a continuous family of estimators between the unconstrained logit and the fully structural NFXP.
+
+\paragraph{Connection to CCP estimation.}
+Both CCP estimation \citep{hotzMiller1993,aguirregabiriaMira2002} and IQ-Learn avoid the inner fixed-point loop that makes NFXP computationally expensive at high discount factors. CCP methods estimate choice probabilities nonparametrically in a first stage, use the Hotz-Miller inversion to recover continuation values from these probabilities, and then estimate the structural parameters $\theta$ in a second-stage conditional likelihood. IQ-Learn estimates the $Q$-function directly and recovers the implied reward via the inverse Bellman operator $r(s,a) = Q(s,a) - \beta\sum_{s'}V(s')\,p(s'|s,a)$. Both approaches replace the nested computation with a direct estimation step, but they differ in what is estimated in the first stage. CCP methods estimate the policy $\pi(a|s)$ and work backward to value functions, while IQ-Learn estimates $Q(s,a)$ and reads off the policy as a byproduct through the softmax.
+
+\paragraph{Connection to GLADIUS.}
+The ERM-IRL estimator of \citet{kang2025} shares the same high-level structure as the tabular IQ-Learn rewrite in equation~\eqref{eq:iq_equiv}. Both objectives combine a conditional log-likelihood term with a Bellman-consistency penalty, and both avoid the inner fixed-point loop. The key difference lies in how the continuation value $\E[V(s') \mid s, a]$ is handled. \citet{kang2025} work in a model-free setting where $p(s'|s,a)$ is unknown and introduce a dual variable $\zeta(s,a)$ that approximates the conditional expectation, turning the problem into a min-max optimization with provable convergence guarantees under their ERM framework. In the tabular DDC setting with known transitions, this expectation is computed exactly from the transition matrix, which eliminates the need for the dual variable and its associated double-sampling bias. The tabular IQ-Learn equivalence therefore reveals the simplest member of a family of penalized-likelihood estimators that also includes GLADIUS, with each member distinguished by its treatment of the transition kernel.
