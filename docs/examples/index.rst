@@ -1,7 +1,7 @@
 Examples
 ========
 
-These examples span six application domains. The spatial navigation examples use synthetic environments with known ground truth to validate estimators and benchmark parameter recovery. The remaining examples apply the same estimators to real data from maintenance engineering, healthcare, transportation, labor economics, and consumer markets. For estimator comparisons, post-estimation diagnostics, and identification studies, see :doc:`../tutorials/index`.
+These examples span ten application domains. The spatial navigation examples use synthetic environments with known ground truth to validate estimators and benchmark parameter recovery. The remaining examples apply the same estimators to real data from maintenance engineering, healthcare, transportation, labor economics, and consumer markets. For estimator comparisons, post-estimation diagnostics, and identification studies, see :doc:`../tutorials/index`.
 
 Spatial Navigation
 ------------------
@@ -95,6 +95,16 @@ Sequential search, browsing, and purchase decisions in markets.
    instacart
    kkbox_churn
    expedia_search
+
+Digital Content and Platforms
+-----------------------------
+
+Serialized content consumption, subscription dynamics, and platform policy design.
+
+.. toctree::
+   :maxdepth: 1
+
+   serialized_content
 
 Gym Environments
 -----------------
