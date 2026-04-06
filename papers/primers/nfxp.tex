@@ -197,22 +197,26 @@ Default tolerances: $\varepsilon_{\text{switch}} = 10^{-3}$, $\varepsilon_{\text
 The companion script \texttt{papers/primers/nfxp\_demo.py} runs NFXP on the Rust bus engine (90 mileage states, 2 actions, $\beta = 0.95$) with 500 individuals observed for 100 periods.
 The API call is five lines:
 
-\begin{lstlisting}
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily]
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel
 
-env = RustBusEnvironment(operating_cost=0.001, replacement_cost=3.0,
-                         num_mileage_bins=90, discount_factor=0.95)
+env = RustBusEnvironment(operating_cost=0.001,
+    replacement_cost=3.0, num_mileage_bins=90,
+    discount_factor=0.95)
 utility = LinearUtility.from_environment(env)
-panel = simulate_panel(env, n_individuals=500, n_periods=100, seed=42)
+panel = simulate_panel(env, n_individuals=500,
+    n_periods=100, seed=42)
 result = NFXPEstimator(se_method="robust").estimate(
-    panel, utility, env.problem_spec, env.transition_matrices)
+    panel, utility, env.problem_spec,
+    env.transition_matrices)
 \end{lstlisting}
 
-Results are auto-generated from the companion script output.
-Rerun \texttt{python papers/primers/nfxp\_demo.py} followed by \texttt{python papers/primers/generate\_tables.py} to update.
+Results are auto-generated from the companion script.
+To update, rerun \texttt{nfxp\_demo.py} followed by
+\texttt{generate\_tables.py}.
 
 \begin{table}[H]
 \centering
@@ -226,7 +230,23 @@ The operating cost estimate $\hat\theta_c = 0.001044$ is close to the true value
 Policy accuracy is 100 percent: the estimated policy assigns the same argmax action as the true policy at every state.
 Estimation takes under 3 seconds on a single CPU.
 
-For cross-estimator comparison, the benchmark at \texttt{examples/rust-bus-engine/benchmark\_results.csv} shows that NFXP, CCP, and MCE-IRL all recover identical parameters to four decimal places on this problem, confirming the DDC-IRL equivalence.
+\paragraph{Cross-estimator comparison.}
+The Rust bus benchmark runs all twelve estimators on this problem.
+NFXP, CCP, and MCE-IRL recover identical parameters to four decimal places, confirming DDC-IRL equivalence.
+Neural estimators (NNES, TD-CCP, SEES) recover parameters with small approximation error.
+Adversarial estimators (AIRL, GAIL) produce noisier estimates due to optimization variance from the min-max training loop.
+NFXP's advantages are threefold: the inner loop produces an exact fixed point so the likelihood surface is smooth, the analytical score~\eqref{eq:implicit} gives exact gradients at negligible cost, and the BHHH outer product~\eqref{eq:bhhh} produces valid robust standard errors without bootstrap.
+The limitation is computational scaling: the inner loop costs $O(|\mathcal{S}|^2)$ per contraction and the NK step costs $O(|\mathcal{S}|^3)$.
+For state spaces above a few thousand states, NNES, TD-CCP, and SEES become faster because their cost scales with data size rather than state space size.
+
+\paragraph{Counterfactual exercise.}
+The estimated $\hat\theta$ supports policy counterfactuals by re-solving~\eqref{eq:bellman_op} at modified parameters.
+A fuel tax that increases operating costs by 50 percent ($\theta_c' = 1.5\,\hat\theta_c$) shifts the replacement threshold to lower mileage, with welfare effect $\Delta W = \E_{\mu_0}[V(s;\theta') - V(s;\hat\theta)]$.
+This is valid because $u = \theta^\top\phi$ pins down the reward and $P(s'|s,a)$ does not depend on $\theta$.
+Counterfactuals that change $P$ itself, such as a preventive maintenance program that slows mileage accumulation, require re-estimating transition probabilities from new data and re-solving the model.
+The econirl post-estimation module computes $\Delta W$ with bootstrap confidence intervals given any pair of parameter vectors $(\hat\theta, \theta')$.
+Standard errors on the counterfactual policy $\pi'(a|s;\theta')$ propagate from the asymptotic distribution of $\hat\theta$ via the delta method, since the mapping $\theta \mapsto \pi(\cdot|\cdot;\theta)$ is smooth at any interior fixed point.
+The companion script \texttt{nfxp\_demo.py} demonstrates this workflow end to end.
 Full documentation is at \texttt{docs/estimators/nfxp.md}.
 
 \end{document}
