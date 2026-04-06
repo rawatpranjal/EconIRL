@@ -1,0 +1,36 @@
+{
+  "mode": "K=1 single type (Segment A: Pay&Read)",
+  "environment": {
+    "n_episodes": 50,
+    "n_states": 51,
+    "n_actions": 3,
+    "discount": 0.9,
+    "feature_rank": 6,
+    "n_cliffhangers": 22
+  },
+  "true_parameters": {
+    "buy_cost": -0.3,
+    "quality_buy": 2.0,
+    "cliffhanger_buy": 1.5,
+    "wait_cost": -0.8,
+    "quality_wait": 0.5,
+    "progress_buy": 0.8
+  },
+  "nfxp_parameters": {
+    "buy_cost": -0.058143058305631795,
+    "quality_buy": 1.7196397158806869,
+    "cliffhanger_buy": 1.5431685985739003,
+    "wait_cost": -0.7904923912823137,
+    "quality_wait": 0.49059265959027515,
+    "progress_buy": 0.717591667231945
+  },
+  "airl_parameters": {
+    "buy_cost": 4.896529809143184,
+    "quality_buy": 4.901393395671303,
+    "cliffhanger_buy": 4.918610813793211,
+    "wait_cost": 1.7914159310690292,
+    "quality_wait": 2.4146853176887064,
+    "progress_buy": 4.863360871037046
+  },
+  "airl_time": 286.2589292526245
+}

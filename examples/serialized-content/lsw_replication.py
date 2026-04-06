@@ -45,7 +45,7 @@ import numpy as np
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.adversarial.airl_het import AIRLHetEstimator, AIRLHetConfig
+from econirl.estimation.adversarial.airl import AIRLEstimator, AIRLConfig
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.simulation.synthetic import simulate_panel_from_policy
@@ -182,44 +182,31 @@ def build_environment(seed=42):
 # Panel generation with multi-book trajectories
 # ---------------------------------------------------------------------------
 
-def simulate_mixture_panel(env, seed=42):
-    """Generate mixture panel where each user reads multiple books.
+def simulate_single_type_panel(env, seed=42):
+    """Generate panel from Segment A (Pay&Read) only. No mixture.
 
-    Each user is assigned to segment A or B. They read N_SERIES_PER_USER
-    books, each starting at episode 0 of a different book. This gives
-    within-user consistency signal for the EM algorithm.
+    Each user reads N_SERIES_PER_USER books, each starting at episode 0
+    of a different book.
     """
     rng = np.random.default_rng(seed)
     operator = SoftBellmanOperator(env["problem"], env["transitions"])
 
-    # Compute optimal policies
     result_a = value_iteration(operator, env["reward_a"], tol=1e-10, max_iter=5000)
-    result_b = value_iteration(operator, env["reward_b"], tol=1e-10, max_iter=5000)
     policy_a = np.array(result_a.policy)
-    policy_b = np.array(result_b.policy)
-
-    print(f"  Soft VI A converged: {result_a.converged} ({result_a.num_iterations} iters)")
-    print(f"  Soft VI B converged: {result_b.converged} ({result_b.num_iterations} iters)")
+    print(f"  Soft VI converged: {result_a.converged} ({result_a.num_iterations} iters)")
 
     trajectories = []
-    true_segments = []
-
     for i in range(N_INDIVIDUALS):
-        is_a = rng.random() < TRUE_MIX_A
-        true_segments.append(0 if is_a else 1)
-        policy = policy_a if is_a else policy_b
-
-        # Each user reads N_SERIES_PER_USER different books
         book_order = rng.choice(N_BOOKS, size=N_SERIES_PER_USER, replace=False)
         for book_idx in book_order:
             start_ep = book_idx * EPISODES_PER_BOOK
             state = start_ep
             states, actions, next_states = [], [], []
 
-            for _ in range(EPISODES_PER_BOOK * 2):  # max 2x episodes (wait doubles)
+            for _ in range(EPISODES_PER_BOOK * 2):
                 if state == ABSORBING:
                     break
-                probs = np.array(policy[state])
+                probs = np.array(policy_a[state])
                 probs = np.maximum(probs, 0)
                 probs = probs / probs.sum()
                 action = rng.choice(N_ACTIONS, p=probs)
@@ -239,7 +226,31 @@ def simulate_mixture_panel(env, seed=42):
                 ))
 
     panel = Panel(trajectories=trajectories)
-    return panel, np.array(true_segments), policy_a, policy_b
+    return panel, policy_a
+
+
+def project_reward_onto_features(reward_matrix, feature_matrix):
+    """Project tabular R(s,a) onto linear feature basis.
+
+    Solves: theta_hat = argmin ||F @ theta - R||^2
+    where F is (n_states*n_actions, n_features) and R is (n_states*n_actions,).
+
+    Returns the best-fitting linear parameters and R-squared.
+    """
+    R_flat = np.array(reward_matrix).flatten()
+    F_flat = np.array(feature_matrix).reshape(-1, feature_matrix.shape[-1])
+
+    # Only fit on non-zero rows (skip absorbing state)
+    mask = np.any(F_flat != 0, axis=1) | (R_flat != 0)
+    theta_hat, residuals, _, _ = np.linalg.lstsq(F_flat[mask], R_flat[mask], rcond=None)
+
+    # R-squared
+    R_pred = F_flat[mask] @ theta_hat
+    ss_res = np.sum((R_flat[mask] - R_pred) ** 2)
+    ss_tot = np.sum((R_flat[mask] - R_flat[mask].mean()) ** 2)
+    r_squared = 1 - ss_res / max(ss_tot, 1e-10)
+
+    return theta_hat, r_squared
 
 
 # ---------------------------------------------------------------------------
@@ -544,7 +555,7 @@ def field_experiment_validation(env, policy_a_true, policy_b_true):
 def main():
     print()
     print("=" * 72)
-    print("LSW 2026 Semi-Synthetic Replication")
+    print("LSW 2026 Semi-Synthetic Replication (K=1, Single Type)")
     print("Lee, Sudhir, and Wang: Serialized Content Consumption")
     print("=" * 72)
 
@@ -558,23 +569,20 @@ def main():
     print(f"  Condition number: {env['condition_number']:.1f}")
     print(f"  Cliffhanger episodes: {int(env['cliffhanger'].sum())}/{N_EPISODES}")
 
-    # Step 2: Generate panel
-    print(f"\n--- Step 2: Generate {N_INDIVIDUALS} Users x {N_SERIES_PER_USER} Books ---")
-    print(f"  True segments: A (Pay&Read) = {TRUE_MIX_A:.0%}, "
-          f"B (Wait&Read) = {1-TRUE_MIX_A:.0%}")
-    print(f"  True params A: {dict(zip(PARAM_NAMES, TRUE_PARAMS_A))}")
-    print(f"  True params B: {dict(zip(PARAM_NAMES, TRUE_PARAMS_B))}")
+    # Step 2: Generate panel (single type: Segment A only)
+    print(f"\n--- Step 2: Generate {N_INDIVIDUALS} Users x {N_SERIES_PER_USER} Books (Segment A only) ---")
+    print(f"  True params: {dict(zip(PARAM_NAMES, TRUE_PARAMS_A))}")
 
-    panel, true_segments, policy_a, policy_b = simulate_mixture_panel(env, seed=42)
+    panel, policy_a = simulate_single_type_panel(env, seed=42)
     n_obs = sum(len(t.states) for t in panel.trajectories)
     all_actions = np.concatenate([np.array(t.actions) for t in panel.trajectories])
     print(f"  Trajectories: {len(panel.trajectories):,}")
     print(f"  Observations: {n_obs:,}")
-    print(f"  Action shares: buy={( all_actions==0).mean():.3f}, "
+    print(f"  Action shares: buy={(all_actions==0).mean():.3f}, "
           f"wait={(all_actions==1).mean():.3f}, exit={(all_actions==2).mean():.3f}")
 
-    # Step 3: Pooled NFXP (homogeneous baseline)
-    print("\n--- Step 3: Pooled NFXP (assumes single type) ---")
+    # Step 3: NFXP (structural MLE baseline)
+    print("\n--- Step 3: NFXP (structural MLE) ---")
     t0 = time.time()
     try:
         nfxp = NFXPEstimator(se_method="robust")
@@ -583,171 +591,126 @@ def main():
         )
         nfxp_params = np.array(nfxp_result.parameters)
         print(f"  Time: {time.time() - t0:.1f}s")
-        print(f"  Pooled params: {dict(zip(PARAM_NAMES, [f'{p:.4f}' for p in nfxp_params]))}")
     except Exception as e:
         print(f"  NFXP failed: {e}")
         nfxp_params = None
 
-    # Step 4: AIRL-Anchored (K=2 segments)
-    print("\n--- Step 4: AIRL-Anchored (K=2 segments, EM) ---")
+    # Step 4: AIRL-Anchored (K=1, no EM)
+    print("\n--- Step 4: AIRL-Anchored (K=1, single type) ---")
     t0 = time.time()
-    config = AIRLHetConfig(
-        num_segments=2,
-        exit_action=EXIT_ACTION,
-        absorbing_state=ABSORBING,
-        max_em_iterations=20,
-        max_airl_rounds=100,
-        reward_lr=0.05,
-        em_convergence_tol=1e-5,
-        consistency_weight=0.5,
+    airl_config = AIRLConfig(
+        reward_type="linear",
+        max_rounds=500,
+        reward_lr=0.01,
+        reward_weight_decay=0.01,
+        discriminator_steps=1,
+        policy_step_size=0.1,   # conservative policy iteration (key fix)
+        use_shaping=True,
+        convergence_tol=1e-6,
         verbose=True,
     )
-    airl_het = AIRLHetEstimator(config)
-    het_result = airl_het.estimate(
+    airl = AIRLEstimator(airl_config)
+    airl_result = airl.estimate(
         panel, env["utility"], env["problem"], env["transitions"]
     )
-    het_time = time.time() - t0
-    print(f"  Time: {het_time:.1f}s")
+    airl_time = time.time() - t0
+    print(f"  Time: {airl_time:.1f}s")
 
-    seg_rewards = het_result.metadata.get("segment_reward_matrices", [])
-    seg_priors = het_result.metadata.get("segment_priors", [])
-    seg_posteriors = het_result.metadata.get("segment_posteriors", None)
+    # With reward_type="linear", parameters ARE the 6 linear coefficients
+    airl_params = np.array(airl_result.parameters) if airl_result.parameters is not None else None
+    if airl_params is not None:
+        print(f"  AIRL recovered params: {dict(zip(PARAM_NAMES, [f'{p:.4f}' for p in airl_params]))}")
 
-    if seg_priors:
-        print(f"  Recovered priors: {[f'{p:.3f}' for p in seg_priors]}")
+    # Also extract tabular reward for episode-level comparison
+    airl_reward = None
+    if airl_result.metadata and "reward_matrix" in airl_result.metadata:
+        airl_reward = np.array(airl_result.metadata["reward_matrix"])
 
-    # Match segments to ground truth
-    seg_a_idx, seg_b_idx = 0, 1
-    if seg_priors and len(seg_priors) == 2:
-        if abs(seg_priors[0] - TRUE_MIX_A) > abs(seg_priors[1] - TRUE_MIX_A):
-            seg_a_idx, seg_b_idx = 1, 0
-
-    # Classification accuracy
-    accuracy = None
-    if seg_posteriors is not None:
-        posteriors = np.array(seg_posteriors)
-        if posteriors.shape[0] == len(true_segments) and posteriors.shape[1] == 2:
-            # Match by trajectory: group by individual
-            hard = posteriors.argmax(axis=1)
-            # Map trajectories back to individuals
-            traj_to_ind = [int(t.individual_id) for t in panel.trajectories]
-            ind_votes = {}
-            for ti, ind_id in enumerate(traj_to_ind):
-                if ti < len(hard):
-                    ind_votes.setdefault(ind_id, []).append(hard[ti])
-            ind_assignments = {}
-            for ind_id, votes in ind_votes.items():
-                ind_assignments[ind_id] = int(np.round(np.mean(votes)))
-
-            # Compare to true
-            correct = 0
-            total = 0
-            for i in range(N_INDIVIDUALS):
-                if i in ind_assignments:
-                    pred = ind_assignments[i]
-                    true_seg = true_segments[i]
-                    # Try both mappings
-                    if (pred == seg_a_idx and true_seg == 0) or \
-                       (pred == seg_b_idx and true_seg == 1):
-                        correct += 1
-                    total += 1
-            accuracy = correct / max(total, 1)
-            print(f"  Segment classification accuracy: {accuracy:.1%}")
-
-    # Step 5: Results summary
+    # Step 5: Linear projection of recovered rewards
     print("\n" + "=" * 72)
-    print("Segment Recovery Results")
+    print("Parameter Recovery: True vs NFXP vs AIRL-Anchored")
     print("=" * 72)
 
-    print(f"\n  Recovered priors: seg {seg_a_idx} (Pay&Read) = "
-          f"{seg_priors[seg_a_idx]:.3f}, "
-          f"seg {seg_b_idx} (Wait&Read) = {seg_priors[seg_b_idx]:.3f}")
-    print(f"  True priors:      Pay&Read = {TRUE_MIX_A:.3f}, "
-          f"Wait&Read = {1-TRUE_MIX_A:.3f}")
+    true_params = TRUE_PARAMS_A
 
-    if len(seg_rewards) == 2:
-        print(f"\n  Segment reward comparison (first 5 episodes, buy action):")
-        print(f"  {'Episode':>8} {'A rec':>10} {'A true':>10} "
-              f"{'B rec':>10} {'B true':>10}")
-        print("  " + "-" * 52)
-        for s in range(min(5, N_EPISODES)):
-            r_a_rec = float(np.array(seg_rewards[seg_a_idx])[s, 0])
-            r_b_rec = float(np.array(seg_rewards[seg_b_idx])[s, 0])
-            r_a_true = float(env["reward_a"][s, 0])
-            r_b_true = float(env["reward_b"][s, 0])
-            print(f"  {s:>8} {r_a_rec:>10.4f} {r_a_true:>10.4f} "
-                  f"{r_b_rec:>10.4f} {r_b_true:>10.4f}")
+    # Parameter comparison table
+    header = f"  {'Parameter':>20} {'True':>10} {'NFXP':>10} {'AIRL':>10}"
+    print(header)
+    print("  " + "-" * len(header.strip()))
 
-    # Step 6: Counterfactuals
+    for i, name in enumerate(PARAM_NAMES):
+        row = f"  {name:>20} {true_params[i]:>10.4f}"
+        if nfxp_params is not None:
+            row += f" {nfxp_params[i]:>10.4f}"
+        else:
+            row += f" {'--':>10}"
+        if airl_params is not None and i < len(airl_params):
+            row += f" {airl_params[i]:>10.4f}"
+        else:
+            row += f" {'--':>10}"
+        print(row)
+
+    # Show implied tabular reward comparison at selected episodes
+    if airl_params is not None:
+        features_np = np.array(env["feature_matrix"])
+        true_reward = np.array(env["reward_a"])
+        airl_reward_implied = features_np @ airl_params
+        print(f"\n  Implied R(s,a) at selected episodes:")
+        print(f"  {'Ep':>4} {'True buy':>10} {'AIRL buy':>10} "
+              f"{'True wait':>10} {'AIRL wait':>10}")
+        print("  " + "-" * 48)
+        for s in [0, 4, 8, 15, 25, 40, 49]:
+            if s < N_EPISODES:
+                print(f"  {s:>4} {true_reward[s,0]:>10.4f} {airl_reward_implied[s,0]:>10.4f} "
+                      f"{true_reward[s,1]:>10.4f} {airl_reward_implied[s,1]:>10.4f}")
+
+    # Step 6: Counterfactuals (use ground truth rewards)
     print("\n" + "=" * 72)
-    print("Counterfactual Exercises")
+    print("Counterfactual Exercises (ground truth rewards)")
     print("=" * 72)
 
     cf_a = counterfactual_type_a(env)
     cf_b = counterfactual_type_b(env)
     cf_c = counterfactual_type_c(env)
 
-    # Step 7: Field experiment validation
+    # Step 7: Field experiment (Segment A only)
     print("\n" + "=" * 72)
     print("Field Experiment Validation")
     print("=" * 72)
-    field_results = field_experiment_validation(env, policy_a, policy_b)
+
+    print("\n--- Field Experiment (Segment A: Pay&Read) ---")
+    features_np_exp = np.array(env["feature_matrix"]).copy()
+    for s in range(30, N_EPISODES):
+        features_np_exp[s, 1, 3] *= 0.5
+    F_exp_jnp = jnp.array(features_np_exp, dtype=jnp.float32)
+
+    exp_starts = [30, 40]
+    base_stats = simulate_behavior(policy_a, env["transitions"], exp_starts, n_per_start=1000, seed=400)
+    reward_exp = jnp.einsum("sak,k->sa", F_exp_jnp, env["params_a"])
+    pol_exp, _ = compute_policy_from_reward(reward_exp, env["problem"], env["transitions"])
+    exp_stats = simulate_behavior(pol_exp, env["transitions"], exp_starts, n_per_start=1000, seed=400)
+
+    print(f"  Baseline: {base_stats['avg_buys']:.2f} buys, {base_stats['avg_waits']:.2f} waits")
+    print(f"  Experiment (wait cost halved on books 3-4): "
+          f"{exp_stats['avg_buys']:.2f} buys, {exp_stats['avg_waits']:.2f} waits")
+    print(f"  Buy change: {exp_stats['avg_buys'] - base_stats['avg_buys']:+.3f}")
+    print(f"  Wait change: {exp_stats['avg_waits'] - base_stats['avg_waits']:+.3f}")
 
     # Save results
     out = {
+        "mode": "K=1 single type (Segment A: Pay&Read)",
         "environment": {
             "n_episodes": N_EPISODES,
             "n_states": N_STATES,
             "n_actions": N_ACTIONS,
-            "n_books": N_BOOKS,
             "discount": DISCOUNT,
             "feature_rank": int(env["feature_rank"]),
-            "condition_number": float(env["condition_number"]),
             "n_cliffhangers": int(env["cliffhanger"].sum()),
         },
-        "true_parameters": {
-            "params_a": TRUE_PARAMS_A.tolist(),
-            "params_b": TRUE_PARAMS_B.tolist(),
-            "mix_a": TRUE_MIX_A,
-            "param_names": PARAM_NAMES,
-        },
-        "estimation": {
-            "pooled_nfxp": nfxp_params.tolist() if nfxp_params is not None else None,
-            "airl_het": {
-                "priors": [float(p) for p in seg_priors] if seg_priors else None,
-                "classification_accuracy": accuracy,
-                "time": het_time,
-                "seg_a_idx": seg_a_idx,
-                "seg_b_idx": seg_b_idx,
-            },
-        },
-        "counterfactual_a": {
-            seg: {
-                "baseline_episodes": v["baseline"]["avg_episodes"],
-                "wff_episodes": v["wff"]["avg_episodes"],
-                "consumption_change": v["consumption_change"],
-                "purchase_change": v["purchase_change"],
-            } for seg, v in cf_a.items()
-        },
-        "counterfactual_b": {
-            seg: {
-                "wait_multiplier": v["wait_multiplier"],
-                "baseline_buys": v["baseline"]["avg_buys"],
-                "modified_buys": v["modified"]["avg_buys"],
-                "purchase_change": v["purchase_change"],
-            } for seg, v in cf_b.items()
-        },
-        "counterfactual_c": {
-            seg: {
-                "baseline_buys": v["baseline"]["avg_buys"],
-                "content_buys": v["content_pricing"]["avg_buys"],
-                "purchase_change": v["purchase_change"],
-                "consumption_change": v["consumption_change"],
-            } for seg, v in cf_c.items()
-        },
-        "field_experiment": {
-            seg: v for seg, v in field_results.items()
-        },
+        "true_parameters": dict(zip(PARAM_NAMES, TRUE_PARAMS_A.tolist())),
+        "nfxp_parameters": dict(zip(PARAM_NAMES, nfxp_params.tolist())) if nfxp_params is not None else None,
+        "airl_parameters": dict(zip(PARAM_NAMES, airl_params.tolist())) if airl_params is not None else None,
+        "airl_time": airl_time,
     }
 
     out_path = Path("examples/serialized-content/lsw_results.json")

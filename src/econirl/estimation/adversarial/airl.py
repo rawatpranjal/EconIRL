@@ -62,10 +62,15 @@ class AIRLConfig:
 
     reward_type: Literal["tabular", "linear"] = "tabular"
     reward_lr: float = 0.01
+    reward_weight_decay: float = 0.0  # L2 regularization on reward params
     discriminator_steps: int = 5
     generator_solver: Literal["value", "hybrid"] = "hybrid"
     generator_tol: float = 1e-8
     generator_max_iter: int = 5000
+    policy_step_size: float = 1.0  # Conservative policy iteration mixing.
+    # 1.0 = full VI update (original). 0.1 = mix 10% new, 90% old.
+    # Lower values prevent reward divergence in tabular settings by
+    # dampening the policy update, mimicking PPO's small steps.
     max_rounds: int = 200
     use_shaping: bool = True
     shaping_coef: float | None = None  # If None, uses discount_factor
@@ -367,7 +372,13 @@ class AIRLEstimator(AdversarialEstimatorBase):
             else:
                 reward_params = jnp.zeros(n_features)
 
-            optimizer = optax.adam(self.config.reward_lr)
+            if self.config.reward_weight_decay > 0:
+                optimizer = optax.adamw(
+                    self.config.reward_lr,
+                    weight_decay=self.config.reward_weight_decay,
+                )
+            else:
+                optimizer = optax.adam(self.config.reward_lr)
             opt_state = optimizer.init(reward_params)
 
             def get_reward_matrix(params):
@@ -378,7 +389,13 @@ class AIRLEstimator(AdversarialEstimatorBase):
             reward_params = jnp.zeros((n_states, n_actions))
             feature_matrix = None
 
-            optimizer = optax.adam(self.config.reward_lr)
+            if self.config.reward_weight_decay > 0:
+                optimizer = optax.adamw(
+                    self.config.reward_lr,
+                    weight_decay=self.config.reward_weight_decay,
+                )
+            else:
+                optimizer = optax.adam(self.config.reward_lr)
             opt_state = optimizer.init(reward_params)
 
             def get_reward_matrix(params):
@@ -456,7 +473,9 @@ class AIRLEstimator(AdversarialEstimatorBase):
                     expert_states, expert_actions, expert_next_states,
                     policy_states, policy_actions, policy_next_states,
                 )
-                updates, opt_state = optimizer.update(grads, opt_state)
+                updates, opt_state = optimizer.update(
+                    grads, opt_state, params=reward_params
+                )
                 reward_params = optax.apply_updates(reward_params, updates)
                 disc_loss = float(loss)
 
@@ -464,7 +483,16 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
             # Update policy via soft value iteration
             current_reward = get_reward_matrix(reward_params)
-            policy, V = self._compute_policy(current_reward, operator, problem.num_periods)
+            new_policy, V = self._compute_policy(current_reward, operator, problem.num_periods)
+
+            # Conservative policy iteration: mix old and new policy
+            alpha = self.config.policy_step_size
+            if alpha < 1.0:
+                policy = (1 - alpha) * old_policy + alpha * new_policy
+                # Renormalize to valid distribution
+                policy = policy / policy.sum(axis=1, keepdims=True)
+            else:
+                policy = new_policy
 
             # Check convergence
             policy_change = float(jnp.abs(policy - old_policy).max())
