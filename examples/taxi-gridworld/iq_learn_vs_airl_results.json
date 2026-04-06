@@ -1,0 +1,73 @@
+{
+  "grid_size": 5,
+  "n_seeds": 5,
+  "true_params": [
+    -0.10000000149011612,
+    10.0,
+    0.10000000149011612
+  ],
+  "iq_learn": [
+    {
+      "seed": 0,
+      "policy_acc": 0.88,
+      "time": 2.4013938903808594,
+      "converged": false
+    },
+    {
+      "seed": 1,
+      "policy_acc": 0.88,
+      "time": 0.6310329437255859,
+      "converged": false
+    },
+    {
+      "seed": 2,
+      "policy_acc": 0.92,
+      "time": 0.7822401523590088,
+      "converged": false
+    },
+    {
+      "seed": 3,
+      "policy_acc": 0.88,
+      "time": 0.6424257755279541,
+      "converged": false
+    },
+    {
+      "seed": 4,
+      "policy_acc": 0.96,
+      "time": 0.6481790542602539,
+      "converged": false
+    }
+  ],
+  "airl": [
+    {
+      "seed": 0,
+      "policy_acc": 0.48,
+      "time": 25.574206829071045,
+      "converged": false
+    },
+    {
+      "seed": 1,
+      "policy_acc": 0.48,
+      "time": 24.80460214614868,
+      "converged": false
+    },
+    {
+      "seed": 2,
+      "policy_acc": 0.44,
+      "time": 26.862239837646484,
+      "converged": false
+    },
+    {
+      "seed": 3,
+      "policy_acc": 0.56,
+      "time": 26.60083794593811,
+      "converged": false
+    },
+    {
+      "seed": 4,
+      "policy_acc": 0.48,
+      "time": 26.896962881088257,
+      "converged": false
+    }
+  ]
+}

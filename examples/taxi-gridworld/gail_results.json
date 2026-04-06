@@ -1,0 +1,17 @@
+{
+  "bc": {
+    "policy_acc": 0.96,
+    "time": 0.414992094039917,
+    "has_reward": false
+  },
+  "mce_irl": {
+    "policy_acc": 1.0,
+    "time": 90.3832139968872,
+    "has_reward": true
+  },
+  "gail": {
+    "policy_acc": 0.76,
+    "time": 431.67886209487915,
+    "has_reward": false
+  }
+}

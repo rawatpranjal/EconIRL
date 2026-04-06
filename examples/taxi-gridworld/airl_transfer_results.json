@@ -1,0 +1,14 @@
+{
+  "airl": {
+    "time": 59.339818239212036,
+    "original_acc": 0.4,
+    "transfer_acc": 0.96,
+    "has_reward": true
+  },
+  "gail": {
+    "time": 442.95210814476013,
+    "original_acc": 0.76,
+    "transfer_acc": NaN,
+    "has_reward": false
+  }
+}
