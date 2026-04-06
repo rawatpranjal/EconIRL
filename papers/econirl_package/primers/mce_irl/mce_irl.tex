@@ -69,37 +69,106 @@ $\theta$ & Reward weights & Unknown, dimension $K$ \\
 
 
 %% ============================================================
-\section{Core Results}
+\section{Derivations}
 %% ============================================================
 
-\paragraph{Theorem 1 (Ziebart 2010).}
-The policy maximizing causal entropy $H(A_t | S_{1:t})$ subject to feature matching $\E_\pi[\phi] = \E_{\text{data}}[\phi]$ satisfies the soft Bellman recursion
+\subsection{Theorem 1: The MCE Optimal Policy}
+
+We seek the policy that is maximally noncommittal (highest entropy) while reproducing the observed feature statistics. The \emph{causal} entropy conditions each action only on information available at decision time, respecting the agent's sequential information structure.
+
+\paragraph{Primal problem.}
+\begin{equation}
+\label{eq:primal}
+\max_{\pi} \; H_{\text{causal}}(\pi) \quad \text{s.t.} \quad \E_\pi[\phi] = \bar\phi_{\text{data}}, \quad \pi(a|s) \geq 0, \quad \sum_a \pi(a|s) = 1 \;\forall s.
+\end{equation}
+The causal entropy is
+\begin{equation}
+H_{\text{causal}}(\pi) = \sum_{t=0}^{\infty} \gamma^t \sum_{s} d_\pi^t(s) \sum_{a} \pi(a|s) \log \frac{1}{\pi(a|s)},
+\end{equation}
+where $d_\pi^t(s) = P(S_t = s \mid \pi)$ is the probability of being in state $s$ at time $t$ under policy $\pi$.
+
+\paragraph{Lagrangian.}
+Introducing multipliers $\theta \in \R^K$ for the feature constraints and $\lambda(s)$ for the normalization constraints,
+\begin{equation}
+\calL(\pi, \theta, \lambda) = H_{\text{causal}}(\pi) + \theta^\top\!\left(\E_\pi[\phi] - \bar\phi_{\text{data}}\right) + \sum_s \lambda(s)\!\left(\sum_a \pi(a|s) - 1\right).
+\end{equation}
+Substituting the definitions and taking the derivative with respect to $\pi(a|s)$,
+\begin{equation}
+\frac{\partial \calL}{\partial \pi(a|s)} = d_\pi(s)\!\left[-\log \pi(a|s) - 1 + \theta^\top \phi(s,a) + \text{continuation}\right] + \lambda(s) = 0.
+\end{equation}
+The ``continuation'' term accounts for how changing $\pi(a|s)$ affects future state visitation. Solving and absorbing constants into $\lambda(s)$, we obtain
+\begin{equation}
+\pi^*(a|s) = \frac{\exp\!\bigl(Q^*(s,a)/\sigma\bigr)}{\sum_{a'} \exp\!\bigl(Q^*(s,a')/\sigma\bigr)},
+\end{equation}
+where $Q^*$ satisfies the soft Bellman recursion
 \begin{align}
 Q(s,a) &= \theta^\top \phi(s,a) + \beta \sum_{s'} P(s'|s,a)\, V(s'), \label{eq:soft_q} \\
-V(s) &= \sigma \log \sum_{a} \exp\bigl(Q(s,a)/\sigma\bigr), \label{eq:soft_v} \\
-\pi(a|s) &= \exp\bigl((Q(s,a) - V(s))/\sigma\bigr). \label{eq:soft_pi}
+V(s) &= \sigma \log \sum_{a} \exp\bigl(Q(s,a)/\sigma\bigr). \label{eq:soft_v}
 \end{align}
-This is the same system that arises from the structural logit model of \citet{rust1987} with Type I extreme value errors.
+The policy is therefore
+\begin{equation}
+\label{eq:soft_pi}
+\pi(a|s) = \exp\!\bigl((Q(s,a) - V(s))/\sigma\bigr).
+\end{equation}
+This is exactly the structural logit model of \citet{rust1987} with Type I extreme value errors at scale $\sigma$. The Lagrange multipliers $\theta$ play the role of the structural parameters, and the soft Bellman recursion is the standard DDC value function.
 
-\paragraph{Theorem 3 (Ziebart 2010).}
-The MCE policy minimizes worst-case prediction log-loss under distribution shift while matching observed feature expectations. This provides a robustness guarantee that is absent from NFXP, which maximizes the likelihood under the assumption that the data distribution is correctly specified.
 
-\paragraph{Feature matching gradient.}
-The gradient of the log-likelihood with respect to $\theta$ is the feature matching residual
+\subsection{Theorem 2: Feature Matching Gradient}
+
+\paragraph{Dual problem.}
+Define the dual function $G(\theta) = \max_\pi \calL(\pi, \theta)$. Since the inner maximization has the closed-form solution $\pi^*(\theta)$ from Theorem 1, we can write
+\begin{equation}
+G(\theta) = H_{\text{causal}}(\pi^*(\theta)) + \theta^\top\!\left(\E_{\pi^*}[\phi] - \bar\phi_{\text{data}}\right).
+\end{equation}
+The MCE-IRL problem is $\min_\theta G(\theta)$.
+
+\paragraph{Gradient by the envelope theorem.}
+Since $\pi^*$ is the unconstrained maximizer of $\calL$ for fixed $\theta$, the envelope theorem gives
 \begin{equation}
 \label{eq:gradient}
-\nabla_\theta \ell(\theta) = \bar\phi_{\text{data}} - \bar\phi_\pi(\theta), \qquad
+\nabla_\theta G(\theta) = \E_{\pi^*(\theta)}[\phi] - \bar\phi_{\text{data}} = \bar\phi_\pi(\theta) - \bar\phi_{\text{data}}.
+\end{equation}
+The expected features under the current policy are computed via the occupancy measure
+\begin{equation}
 \bar\phi_\pi(\theta) = \sum_{s} D_\pi(s) \sum_{a} \pi(a|s)\, \phi(s,a),
 \end{equation}
-where $\bar\phi_{\text{data}} = \frac{1}{N}\sum_i \phi(s_i, a_i)$ are the empirical feature expectations and $D_\pi(s)$ is the state visitation frequency under the current policy, computed via the forward pass
+where $D_\pi(s)$ is the expected discounted state visitation frequency under $\pi$. This satisfies the fixed-point equation
 \begin{equation}
 \label{eq:occupancy}
-D_\pi = (I - \beta\, F_\pi^\top)^{-1}\, \rho_0.
+D_\pi = \rho_0 + \beta\, F_\pi^\top\, D_\pi \quad \Longrightarrow \quad D_\pi = (I - \beta\, F_\pi^\top)^{-1}\, \rho_0,
 \end{equation}
-At convergence, $\bar\phi_{\text{data}} = \bar\phi_\pi$ and the gradient vanishes.
+with $F_\pi[s,s'] = \sum_a \pi(a|s)\, P(s'|s,a)$ and $\rho_0$ the initial state distribution.
 
-\paragraph{Identification.}
-Rewards are identified only up to potential-based shaping \citep{ng1999, magnacThesmar2002}. The parametric restriction $r = \theta^\top \phi$ with $K < |\calS|(|\calA|-1)$ resolves this. MCE-IRL additionally constrains $\|\theta\|$ via the feature matching dual, which selects the maximum-entropy-compatible reward from the equivalence class \citep{kim2021}. The MCE-IRL and NFXP estimators solve the same maximum likelihood problem and recover the same $\theta$.
+At the optimum, $\nabla_\theta G = 0$, so $\bar\phi_\pi = \bar\phi_{\text{data}}$. The gradient vanishes when the policy's feature expectations match the data.
+
+\paragraph{Equivalence to NFXP.}
+The conditional log-likelihood of the DDC logit model is $\ell(\theta) = \sum_i \log \pi_\theta(a_i|s_i)$. Its gradient is
+\begin{equation}
+\nabla_\theta \ell(\theta) = \frac{1}{\sigma}\!\left(\bar\phi_{\text{data}} - \bar\phi_\pi(\theta)\right),
+\end{equation}
+which differs from Equation~\eqref{eq:gradient} only by the factor $1/\sigma$. MCE-IRL and NFXP optimize the same objective and converge to the same $\hat\theta$.
+
+
+\subsection{Theorem 3: Robustness Guarantee}
+
+The MCE distribution $P_{\text{MCE}}$ solves a minimax problem over the set $\calC$ of distributions matching the feature constraints.
+
+\paragraph{Statement.}
+Among all distributions in $\calC$, the MCE distribution minimizes the worst-case KL divergence to the true (unknown) distribution $P'$:
+\begin{equation}
+P_{\text{MCE}} = \argmin_{P \in \calC} \; \max_{P' \in \calC} \; D_{\text{KL}}(P' \| P).
+\end{equation}
+
+\paragraph{Proof sketch.}
+The KL divergence $D_{\text{KL}}(P' \| P) = \E_{P'}[\log P'/P]$ is minimized (in $P$) when $P$ places as much probability mass as possible on all outcomes consistent with the constraints. The maximum entropy distribution does exactly this: it is the ``flattest'' distribution in $\calC$, making it the centroid of the constraint set in the KL geometry. Any other distribution $P \in \calC$ concentrates mass away from some region, creating a worst-case $P'$ that concentrates mass precisely in that region, yielding higher KL divergence. For a formal proof, see Chapter 3 of \citet{ziebart2010}.
+
+\paragraph{Practical consequence.}
+This means the MCE policy hedges against adversarial changes in the state distribution. NFXP, which solves the same optimization, inherits this guarantee. However, the guarantee applies only within the constraint set defined by the chosen features $\phi$. Misspecified features can still produce poor out-of-sample predictions.
+
+
+\subsection{Identification}
+
+Rewards are identified only up to potential-based shaping \citep{ng1999}. For any $h: \calS \to \R$, the shaped reward $r'(s,a) = r(s,a) + h(s) - \beta \sum_{s'} P(s'|s,a) h(s')$ produces the same optimal policy \citep{magnacThesmar2002}. The parametric restriction $r = \theta^\top \phi$ with $K < |\calS|(|\calA|-1)$ resolves this by constraining the reward to a low-dimensional subspace. MCE-IRL additionally constrains $\|\theta\|$ via the feature matching dual, selecting the maximum-entropy-compatible reward from the equivalence class \citep{kim2021}.
 
 
 %% ============================================================

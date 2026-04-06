@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  6 APR 2026 17:03
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  6 APR 2026 17:18
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -334,24 +334,24 @@ File: l3backend-pdftex.def 2024-05-08 L3 backend support: PDF output (pdfTeX)
 (./airl.aux)
 \openout1 = `airl.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 27.
-LaTeX Font Info:    ... okay on input line 27.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 28.
+LaTeX Font Info:    ... okay on input line 28.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -362,14 +362,14 @@ LaTeX Font Info:    ... okay on input line 27.
 * layoutoffset:(h,v)=(0.0pt,0.0pt)
 * modes: 
 * h-part:(L,W,R)=(72.26999pt, 469.75502pt, 72.26999pt)
-* v-part:(T,H,B)=(65.04256pt, 664.88487pt, 65.04256pt)
+* v-part:(T,H,B)=(61.42993pt, 672.11012pt, 61.42993pt)
 * \paperwidth=614.295pt
 * \paperheight=794.96999pt
 * \textwidth=469.75502pt
-* \textheight=664.88487pt
+* \textheight=672.11012pt
 * \oddsidemargin=0.0pt
 * \evensidemargin=0.0pt
-* \topmargin=-44.22743pt
+* \topmargin=-47.84006pt
 * \headheight=12.0pt
 * \headsep=25.0pt
 * \topskip=11.0pt
@@ -387,18 +387,18 @@ LaTeX Font Info:    ... okay on input line 27.
 * \@reversemarginfalse
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
-Package hyperref Info: Link coloring OFF on input line 27.
+Package hyperref Info: Link coloring OFF on input line 28.
 (./airl.out) (./airl.out)
 \@outlinefile=\write3
 \openout3 = `airl.out'.
 
-LaTeX Font Info:    Trying to load font information for U+msa on input line 28.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 29.
 
 
 (/usr/local/texlive/2025/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 28.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 29.
 
 
 (/usr/local/texlive/2025/texmf-dist/tex/latex/amsfonts/umsb.fd
@@ -409,12 +409,25 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 
 {/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
 Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
-put line 135.
+put line 116.
+
+
+! LaTeX Error: Something's wrong--perhaps a missing \item.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.129   \STATE
+               $f_n \leftarrow g_\theta(s_n) + \gamma\, h_\phi(s'_n) - h_\ph...
+
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
 
 ! Undefined control sequence.
 <recently read> \calL 
                       
-l.154   \STATE $\calL
+l.131   \STATE $\calL
                       \leftarrow -\E_{\calD_E}[\log D] - \E_{\calD_\pi}[\log...
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -423,7 +436,7 @@ spelling (e.g., `I\hbox'). Otherwise just continue,
 and I'll forget about whatever was undefined.
 
 ! Undefined control sequence.
-l.155 ...phi - \alpha_D \nabla_{\theta,\phi} \calL
+l.132 ...phi - \alpha_D \nabla_{\theta,\phi} \calL
                                                   $
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -433,13 +446,11 @@ and I'll forget about whatever was undefined.
 
 
 
-[2]
-
-[3] (./airl_results.tex)
+[2] (./airl_results.tex)
 ! Misplaced \noalign.
 \bottomrule ->\noalign 
                        {\ifnum 0=`}\fi \@aboverulesep =\aboverulesep \global...
-l.219 \bottomrule
+l.190 \bottomrule
                  
 I expect to see \noalign only after the \cr of
 an alignment. Proceed, and I'll ignore this case.
@@ -447,7 +458,7 @@ an alignment. Proceed, and I'll ignore this case.
 ! Missing } inserted.
 <inserted text> 
                 }
-l.220 \end
+l.191 \end
           {tabular}
 I've inserted something that you may have forgotten.
 (See the <inserted text> above.)
@@ -458,7 +469,7 @@ my insertion and my current dilemma will both disappear.
 ! Missing } inserted.
 <inserted text> 
                 }
-l.220 \end
+l.191 \end
           {tabular}
 I've inserted something that you may have forgotten.
 (See the <inserted text> above.)
@@ -469,7 +480,7 @@ my insertion and my current dilemma will both disappear.
 ! Missing } inserted.
 <inserted text> 
                 }
-l.220 \end
+l.191 \end
           {tabular}
 I've inserted something that you may have forgotten.
 (See the <inserted text> above.)
@@ -480,14 +491,14 @@ my insertion and my current dilemma will both disappear.
 ! Missing \cr inserted.
 <inserted text> 
                 \cr 
-l.220 \end
+l.191 \end
           {tabular}
 I'm guessing that you meant to end an alignment here.
 
 ! Missing { inserted.
 <inserted text> 
                 {
-l.220 \end
+l.191 \end
           {tabular}
 I've put in what seems to be necessary to fix
 the current column of the current alignment.
@@ -496,7 +507,7 @@ Try to go on, since this might almost work.
 ! Undefined control sequence.
 \@BTrule ...\doublerulesep \fi \fi \fi \@BTswitch 
                                                   
-l.220 \end
+l.191 \end
           {tabular}
 The control sequence at the end of the top line
 of your error message was never \def'ed. If you have
@@ -507,7 +518,7 @@ and I'll forget about whatever was undefined.
 ! Misplaced \crcr.
 <recently read> \crcr 
                       
-l.220 \end{tabular}
+l.191 \end{tabular}
                    
 I can't figure out why you would want to use a tab mark
 or \cr or \span just now. If something like a right brace
@@ -518,7 +529,7 @@ might try typing `S' now just to see what is salvageable.
 ! Extra }, or forgotten $.
 \endtabular ->\crcr \egroup \egroup 
                                     $\egroup 
-l.220 \end{tabular}
+l.191 \end{tabular}
                    
 I've deleted a group-closing symbol because it seems to be
 spurious, as in `$x}$'. But perhaps the } is legitimate and
@@ -528,24 +539,24 @@ deleted material, e.g., by typing `I$}'.
 
 
 
-[4] (./airl.bbl)
+[3] (./airl.bbl)
 
-[5] (./airl.aux)
+[4] (./airl.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `airl.out' has not changed.
-(rerunfilecheck)             Checksum: 2016198750E6BF6B75B6D61835164540;1389.
+(rerunfilecheck)             Checksum: BC4B12F86FEB50C8C128D5408EA9AA09;890.
  ) 
 Here is how much of TeX's memory you used:
- 10316 strings out of 473190
- 155908 string characters out of 5715801
- 571266 words of memory out of 5000000
- 33387 multiletter control sequences out of 15000+600000
- 569061 words of font info for 76 fonts, out of 8000000 for 9000
+ 10299 strings out of 473190
+ 155691 string characters out of 5715801
+ 572198 words of memory out of 5000000
+ 33383 multiletter control sequences out of 15000+600000
+ 569062 words of font info for 76 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 75i,10n,79p,270b,623s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,10n,79p,260b,609s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
 ></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb>
 </usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb><
@@ -556,20 +567,20 @@ local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/lo
 cal/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/loca
 l/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/
 texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/local/te
-xlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texli
-ve/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/
-2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/202
-5/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025
-/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2025/t
-exmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025/tex
-mf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2025/texmf
--dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2025/texmf-
-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2025/texmf-d
-ist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on airl.pdf (5 pages, 249720 bytes).
+xlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texli
+ve/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/
+2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2
+025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/202
+5/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025/
+texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2025/te
+xmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2025/tex
+mf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2025/texm
+f-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2025/
+texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on airl.pdf (4 pages, 249886 bytes).
 PDF statistics:
- 265 PDF objects out of 1000 (max. 8388607)
- 215 compressed objects within 3 object streams
- 62 named destinations out of 1000 (max. 500000)
- 81 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 233 PDF objects out of 1000 (max. 8388607)
+ 185 compressed objects within 2 object streams
+ 49 named destinations out of 1000 (max. 500000)
+ 57 words of extra memory for PDF output out of 10000 (max. 10000000)
 
