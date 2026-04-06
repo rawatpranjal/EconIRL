@@ -1,5 +1,5 @@
-\documentclass[11pt]{article}
-\usepackage[left=1in,right=1in,top=0.9in,bottom=0.9in]{geometry}
+\documentclass[10pt]{article}
+\usepackage[left=0.8in,right=0.8in,top=0.8in,bottom=0.8in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage[round]{natbib}
@@ -12,6 +12,8 @@
 \usepackage{titling}
 \setlength{\droptitle}{-2em}
 \posttitle{\par\end{center}\vspace{-1em}}
+\setlength{\parskip}{0.3em}
+\setlength{\parindent}{0em}
 
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\R}{\mathbb{R}}
@@ -188,10 +190,6 @@ $\text{optimizer} \leftarrow \text{Adam}(\alpha, \text{gradient\_clip}=1.0)$\;
 \KwOut{$R_\psi$ (neural reward), $V^*$, $\pi^*$, optional $\hat\theta$ and $R^2$}
 \end{algorithm}
 
-\paragraph{Implementation notes.}
-The backward pass (Step 3b) uses the same hybrid solver as linear MCE-IRL, starting with successive approximation and switching to Newton-Kantorovich near the fixed point for quadratic convergence. The forward pass (Step 3c) computes the occupancy measure via matrix inversion. Neither the backward nor the forward pass is differentiated through. Gradients flow only through the neural reward network in Step 3e. The Adam optimizer with gradient clipping provides stable training even when the reward surface is poorly conditioned. Early stopping with patience prevents overfitting by restoring the model checkpoint that achieved the lowest feature matching residual.
-
-
 %% ============================================================
 \section{Results}
 %% ============================================================
@@ -202,11 +200,7 @@ We run Deep MCE-IRL (\texttt{MCEIRLNeural}), linear MCE-IRL, and behavioral clon
 
 Linear MCE-IRL achieves \deepMcePolicyAcc\% policy accuracy despite the fact that the Objectworld reward is nonlinear in the continuous distance features. Behavioral cloning reaches \deepBcPolicyAcc\%. The deep variant achieves only \deepDeepPolicyAcc\% after \deepDeepEpochs\ epochs, substantially underperforming both baselines.
 
-This result is not surprising for several reasons. The Objectworld has only 64 states, so the reward function has 320 free parameters in the state-action case. The neural network has far more parameters than needed for this small state space, and the MCE-IRL training signal (the occupancy mismatch) provides only a 320-dimensional gradient signal per iteration. With noisy demonstrations (30\% random actions), the empirical occupancy is itself noisy, and the neural network overfits to noise in the occupancy rather than learning the true reward structure. The projection $R^2$ of \deepDeepProjectionR\ confirms that the learned neural reward bears no meaningful relationship to the linear features.
-
-Linear MCE-IRL outperforms the deep variant here because the continuous distance features, while not perfectly representing the nonlinear reward, provide a strong enough inductive bias to recover a good policy. The linear model has only 2 parameters and cannot overfit. The deep model has thousands of parameters and insufficient training signal to constrain them.
-
-Deep MCE-IRL is expected to outperform linear MCE-IRL on larger state spaces (32x32 or larger) where the nonlinear reward structure matters more and the training signal is richer. On small grids, the simplicity of the linear model is an advantage, not a limitation.
+The Objectworld has only 64 states, so the neural network has far more parameters than needed, and the occupancy mismatch provides only a 320-dimensional gradient signal per iteration. The neural network overfits to noise in the occupancy rather than learning the true reward structure. The projection $R^2$ of \deepDeepProjectionR\ confirms this. Linear MCE-IRL outperforms the deep variant here because 2 linear parameters cannot overfit, while the deep model has thousands of parameters and insufficient training signal. Deep MCE-IRL is expected to outperform linear MCE-IRL on larger state spaces (32x32 or larger) where nonlinear reward structure matters more.
 
 
 %% ============================================================

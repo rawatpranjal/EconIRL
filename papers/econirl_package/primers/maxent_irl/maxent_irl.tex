@@ -1,5 +1,5 @@
-\documentclass[11pt]{article}
-\usepackage[left=1in,right=1in,top=0.9in,bottom=0.9in]{geometry}
+\documentclass[10pt]{article}
+\usepackage[left=0.8in,right=0.8in,top=0.8in,bottom=0.8in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage[round]{natbib}
@@ -12,6 +12,8 @@
 \usepackage{titling}
 \setlength{\droptitle}{-2em}
 \posttitle{\par\end{center}\vspace{-1em}}
+\setlength{\parskip}{0.3em}
+\setlength{\parindent}{0em}
 
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\R}{\mathbb{R}}
@@ -148,22 +150,14 @@ D_0(s) &= \rho_0(s), \label{eq:forward_init} \\
 D_{t+1}(s') &= \sum_s D_t(s) \sum_a \pi(a|s)\, P(s'|s,a), \label{eq:forward_step} \\
 D(s) &= \sum_{t=0}^{T} \gamma^t D_t(s). \label{eq:forward_total}
 \end{align}
-The total discounted visitation $D(s)$ weights each state by how often the agent visits it, discounted by time. This forward pass is identical in form to the MCE-IRL forward pass. The difference lies in the policy $\pi(a|s)$ that drives the propagation. In MaxEnt IRL, the policy comes from the non-causal backward messages in Equation~\eqref{eq:maxent_policy}, which incorporate information about future states and actions. In MCE-IRL, the policy comes from the causal softmax Bellman equation, which conditions only on information available at decision time.
-
-This distinction is critical. The non-causal backward messages $Z(s')$ incorporate information about which actions will be available at state $s'$ and what rewards those actions will yield in the future. The policy in Equation~\eqref{eq:maxent_policy} therefore gives the agent effective foresight, assigning probability to actions based on the entire future trajectory rather than the current state alone. When features depend only on states, this foresight is harmless because the future reward does not depend on which actions the agent takes. When features depend on actions, the foresight produces systematically biased reward estimates because the agent can ``see'' which action-specific rewards are coming and adjust its current behavior accordingly.
+This forward pass is identical in form to MCE-IRL. The difference lies in the policy $\pi(a|s)$ that drives the propagation. In MaxEnt IRL, the policy comes from the non-causal backward messages in Equation~\eqref{eq:maxent_policy}, which incorporate future information. In MCE-IRL, the policy comes from the causal softmax Bellman equation, conditioning only on information available at decision time. When features depend on actions, the non-causal foresight produces systematically biased reward estimates.
 
 
 %% ============================================================
 \section{When MaxEnt Fails}
 %% ============================================================
 
-The non-causal trajectory distribution means $P(\tau)$ does not factor correctly into per-step decisions $\pi(a_t|s_t)$ when features depend on actions. The backward message $Z(s')$ incorporates information about which actions will be available at $s'$, effectively giving the agent foresight that a real decision-maker does not have.
-
-Consider the concrete case from the EconIRL gridworld benchmarks. On a $5 \times 5$ gridworld with direction-dependent step costs (different penalties for moving left, right, up, or down), MaxEnt IRL recovers a reward vector with cosine similarity of approximately $-0.72$ to the true reward, meaning the recovered reward points in roughly the opposite direction from the ground truth. MCE-IRL on the same data achieves cosine similarity of $0.9999$, recovering the true reward almost exactly. With state-only features (where the step penalty is the same regardless of direction), both estimators achieve cosine similarity above $0.99$ because the information asymmetry between causal and non-causal entropy does not matter when rewards do not vary across actions.
-
-The failure mechanism is precise. The backward messages propagate action-specific reward information from future states into the current policy. When action A leads to a state where action B yields high reward, the non-causal policy at the current state inflates the probability of action A because it ``knows'' about the future reward from B. The causal policy does not have this information and assigns probability to A based only on the immediate reward and the discounted expected value of the next state, which is the correct decision rule under rational expectations.
-
-This failure mode is not a matter of tuning or insufficient data. It is a structural bias in the MaxEnt IRL objective. Increasing the number of trajectories does not help because the bias comes from the functional form of the backward messages, not from estimation noise. The only fix is to use the causal entropy objective of \citet{ziebart2010}, which produces the softmax Bellman equation and correctly conditions on the agent's information set.
+The non-causal trajectory distribution does not factor correctly into per-step decisions $\pi(a_t|s_t)$ when features depend on actions. The backward messages propagate action-specific reward information from future states into the current policy, giving the agent effective foresight. On a $5 \times 5$ gridworld with direction-dependent step costs, MaxEnt IRL recovers a reward with cosine similarity of approximately $-0.72$ to the truth, while MCE-IRL achieves $0.9999$. This is a structural bias, not a tuning problem. Increasing the number of trajectories does not help because the bias comes from the functional form of the backward messages. The only fix is the causal entropy objective of \citet{ziebart2010}.
 
 
 %% ============================================================
@@ -221,10 +215,6 @@ $\theta_0 \leftarrow \mathbf{0}$\;
 \KwOut{$\hat\theta$ (reward weights), $\pi^*$, log-likelihood}
 \end{algorithm}
 
-\paragraph{Implementation notes.}
-The backward pass (Step 3a) computes the partition function messages using value iteration on the soft Bellman equation, substituting the backward messages for soft Q-values. In the EconIRL implementation, this uses the same policy iteration solver as MCE-IRL, with the non-causal structure captured by the state visitation computation rather than the backward pass itself. The forward pass (Step 3c) propagates the initial distribution through the policy-weighted transitions for a fixed horizon $T$, then normalizes the accumulated visitation frequencies. The gradient (Step 3e) has the same form as MCE-IRL but produces different updates because the policy and visitation frequencies differ. L-BFGS-B is the default optimizer because it handles the implicit curvature of the feature matching objective well, though projected gradient descent is also available when the parameter space has box constraints.
-
-
 %% ============================================================
 \section{Results}
 %% ============================================================
@@ -248,8 +238,7 @@ python papers/econirl_package/primers/maxent_irl/maxent_irl_results.py
 \section{Code}
 %% ============================================================
 
-The MaxEnt IRL estimator is implemented in \texttt{src/econirl/contrib/maxent\_irl.py}. The key class is \texttt{MaxEntIRLEstimator}, which accepts either a \texttt{LinearReward} (state-only features) or an \texttt{ActionDependentReward} (state-action features).
-
+{\small
 \begin{verbatim}
 from econirl.contrib.maxent_irl import MaxEntIRLEstimator
 from econirl.preferences.action_reward import ActionDependentReward
@@ -258,27 +247,17 @@ reward_fn = ActionDependentReward(
     feature_matrix=env.feature_matrix,
     parameter_names=env.parameter_names,
 )
-
 estimator = MaxEntIRLEstimator(
-    optimizer="L-BFGS-B",
-    inner_solver="policy",
-    inner_tol=1e-10,
-    inner_max_iter=1000,
-    outer_tol=1e-6,
-    outer_max_iter=500,
+    optimizer="L-BFGS-B", inner_solver="policy",
+    inner_tol=1e-10, inner_max_iter=1000,
+    outer_tol=1e-6, outer_max_iter=500,
 )
-
 result = estimator.estimate(
-    panel=panel,
-    utility=reward_fn,
-    problem=env.problem_spec,
-    transitions=env.transition_matrices,
+    panel=panel, utility=reward_fn,
+    problem=env.problem_spec, transitions=env.transition_matrices,
 )
 \end{verbatim}
-
-The \texttt{inner\_solver} parameter controls how the soft Bellman equation is solved in the backward pass. The ``policy'' solver uses policy iteration with matrix evaluation, which converges in fewer iterations than value iteration for small state spaces. The \texttt{outer\_tol} parameter sets the gradient norm threshold for the feature matching convergence criterion.
-
-The main difference from MCE-IRL in the code is the state visitation computation. The method \texttt{\_compute\_state\_visitation\_frequency} uses iterative forward propagation rather than the matrix inversion $(I - \gamma F_\pi^\top)^{-1} \rho_0$ used by MCE-IRL. Both compute the same quantity when the policy is causal, but they diverge when the backward messages are non-causal. For a detailed comparison of the two estimators, see the MCE-IRL primer in \texttt{papers/econirl\_package/primers/mce\_irl/}.
+}
 
 
 \bibliographystyle{plainnat}
