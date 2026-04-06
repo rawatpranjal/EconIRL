@@ -5,22 +5,22 @@
     "se_theta_c": 0.00071461,
     "se_RC": 0.081024,
     "ll": -3823.91,
-    "time_s": 4.64
+    "time_s": 4.43
   },
   "sees": {
-    "theta_c": 0.00537724,
-    "RC": 3.723299,
-    "se_theta_c": 0.00149392,
-    "se_RC": 0.118851,
-    "ll": -3822.95,
-    "time_s": 2.96,
-    "bellman_violation": 0.073867,
+    "theta_c": 0.00379624,
+    "RC": 3.843942,
+    "se_theta_c": NaN,
+    "se_RC": NaN,
+    "ll": -3821.45,
+    "time_s": 2.72,
+    "bellman_violation": 0.142199,
     "basis_type": "fourier",
     "basis_dim": 12
   },
   "relative_error_pct": {
-    "theta_c": 46.23,
-    "RC": 6.92
+    "theta_c": 62.04,
+    "RC": 3.9
   },
   "dgp": {
     "true_theta_c": 0.01,

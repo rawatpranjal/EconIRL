@@ -1,0 +1,187 @@
+\documentclass[11pt]{article}
+\usepackage[left=1in,right=1in,top=0.9in,bottom=0.9in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[round]{natbib}
+\usepackage{hyperref}
+\hypersetup{colorlinks,citecolor=blue,filecolor=blue,linkcolor=blue,urlcolor=blue}
+\usepackage{float}
+\usepackage[ruled,lined]{algorithm2e}
+\usepackage{microtype}
+\usepackage{placeins}
+\usepackage{titling}
+\setlength{\droptitle}{-2em}
+\posttitle{\par\end{center}\vspace{-1em}}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calS}{\mathcal{S}}
+\newcommand{\calH}{\mathcal{H}}
+
+\title{Primer: Maximum Causal Entropy IRL (MCE-IRL)}
+\author{econirl package documentation}
+\date{}
+
+\begin{document}
+\maketitle
+
+
+%% ============================================================
+\section{Problem and Motivation}
+%% ============================================================
+
+Standard maximum entropy IRL \citep{ziebart2008} recovers a reward function from demonstrations by matching feature expectations under the maximum entropy principle. However, it uses non-causal state visitation frequencies that propagate future information backward, violating the agent's information structure. When features vary by action, this produces incorrect policies.
+
+\citet{ziebart2010} introduced Maximum Causal Entropy IRL (MCE-IRL), which conditions each action only on information available at decision time. The causal entropy $H(A_t | S_{1:t}, A_{1:t-1})$ replaces the Shannon entropy $H(A^T)$, ensuring that the recovered policy respects the sequential timing of decisions. This is exactly what economists call ``rational expectations'' in dynamic programming.
+
+The resulting softmax Bellman equation is simultaneously the MCE optimal policy (Theorem 1 of \citealt{ziebart2010}) and the structural logit choice model of \citet{rust1987}. An economist sees structural estimation with feature matching. A machine learning researcher sees maximum entropy IRL. They solve the same optimization problem. This makes MCE-IRL the bridge estimator between the two traditions.
+
+
+%% ============================================================
+\section{Model and Notation}
+%% ============================================================
+
+The agent solves the maximum causal entropy problem
+\begin{equation}
+\label{eq:mce_objective}
+\max_\pi \; \E_\pi\!\left[\sum_{t=0}^{\infty} \gamma^t \bigl(r(s_t, a_t;\theta) + \sigma \calH(\pi(\cdot | s_t))\bigr)\right]
+\end{equation}
+subject to the feature matching constraint $\E_\pi[\phi] = \E_{\text{data}}[\phi]$, where $r(s,a;\theta) = \theta^\top \phi(s,a)$ is linear in known features $\phi$ with unknown weights $\theta$.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l l}
+\toprule
+Symbol & Name & Definition \\
+\midrule
+$Q(s,a)$ & Soft Q-value & $r(s,a;\theta) + \beta \sum_{s'} P(s'|s,a)\, V(s')$ \\
+$V(s)$ & Soft value & $\sigma \log \sum_a \exp(Q(s,a)/\sigma)$ \\
+$\pi(a|s)$ & Policy (CCP) & $\exp\bigl((Q(s,a) - V(s))/\sigma\bigr)$ \\
+$D_\pi(s)$ & State visitation & Expected discounted visits to $s$ under $\pi$ \\
+$\rho_0$ & Initial distribution & Empirical start-state frequencies \\
+$F_\pi$ & Policy transitions & $F_\pi[s,s'] = \sum_a \pi(a|s)\, P(s'|s,a)$ \\
+$\phi(s,a)$ & Features & Known, shape $(|\calS|, |\calA|, K)$ \\
+$\theta$ & Reward weights & Unknown, dimension $K$ \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+
+%% ============================================================
+\section{Core Results}
+%% ============================================================
+
+\paragraph{Theorem 1 (Ziebart 2010).}
+The policy maximizing causal entropy $H(A_t | S_{1:t})$ subject to feature matching $\E_\pi[\phi] = \E_{\text{data}}[\phi]$ satisfies the soft Bellman recursion
+\begin{align}
+Q(s,a) &= \theta^\top \phi(s,a) + \beta \sum_{s'} P(s'|s,a)\, V(s'), \label{eq:soft_q} \\
+V(s) &= \sigma \log \sum_{a} \exp\bigl(Q(s,a)/\sigma\bigr), \label{eq:soft_v} \\
+\pi(a|s) &= \exp\bigl((Q(s,a) - V(s))/\sigma\bigr). \label{eq:soft_pi}
+\end{align}
+This is the same system that arises from the structural logit model of \citet{rust1987} with Type I extreme value errors.
+
+\paragraph{Theorem 3 (Ziebart 2010).}
+The MCE policy minimizes worst-case prediction log-loss under distribution shift while matching observed feature expectations. This provides a robustness guarantee that is absent from NFXP, which maximizes the likelihood under the assumption that the data distribution is correctly specified.
+
+\paragraph{Feature matching gradient.}
+The gradient of the log-likelihood with respect to $\theta$ is the feature matching residual
+\begin{equation}
+\label{eq:gradient}
+\nabla_\theta \ell(\theta) = \bar\phi_{\text{data}} - \bar\phi_\pi(\theta), \qquad
+\bar\phi_\pi(\theta) = \sum_{s} D_\pi(s) \sum_{a} \pi(a|s)\, \phi(s,a),
+\end{equation}
+where $\bar\phi_{\text{data}} = \frac{1}{N}\sum_i \phi(s_i, a_i)$ are the empirical feature expectations and $D_\pi(s)$ is the state visitation frequency under the current policy, computed via the forward pass
+\begin{equation}
+\label{eq:occupancy}
+D_\pi = (I - \beta\, F_\pi^\top)^{-1}\, \rho_0.
+\end{equation}
+At convergence, $\bar\phi_{\text{data}} = \bar\phi_\pi$ and the gradient vanishes.
+
+\paragraph{Identification.}
+Rewards are identified only up to potential-based shaping \citep{ng1999, magnacThesmar2002}. The parametric restriction $r = \theta^\top \phi$ with $K < |\calS|(|\calA|-1)$ resolves this. MCE-IRL additionally constrains $\|\theta\|$ via the feature matching dual, which selects the maximum-entropy-compatible reward from the equivalence class \citep{kim2021}. The MCE-IRL and NFXP estimators solve the same maximum likelihood problem and recover the same $\theta$.
+
+
+%% ============================================================
+\section{Estimation Algorithm}
+%% ============================================================
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\caption{MCE-IRL \citep{ziebart2010}}
+\label{alg:mce_irl}
+\KwIn{Panel $\{(s_i, a_i)\}_{i=1}^N$, features $\phi(s,a)$, transitions $P(s'|s,a)$, discount $\beta$, scale $\sigma$}
+\BlankLine
+
+\tcp{Step 1: Compute empirical feature expectations}
+$\bar\phi_{\text{data}} = \frac{1}{N} \sum_{i=1}^N \phi(s_i, a_i)$\;
+Compute empirical state occupancy $D_{\text{data}}(s) = \frac{1}{N}\sum_i \mathbf{1}[s_i = s]$\;
+Compute initial state distribution $\rho_0$ from first observations\;
+\BlankLine
+
+\tcp{Step 2: Initialize reward weights}
+$\theta_0 \leftarrow \mathbf{0}$\;
+\BlankLine
+
+\tcp{Step 3: Iterate until convergence}
+\For{$k = 0, 1, \ldots$}{
+    \BlankLine
+    \tcp{3a. Backward pass: soft value iteration (Eqs.~\ref{eq:soft_q}--\ref{eq:soft_pi})}
+    $R \leftarrow \theta_k^\top \phi$ \tcp*{reward matrix $(|\calS|, |\calA|)$}
+    Solve $V = T_\sigma(V; R)$ via hybrid iteration to get $V$, $Q$, $\pi$\;
+    \BlankLine
+    \tcp{3b. Forward pass: occupancy measure (Eq.~\ref{eq:occupancy})}
+    $F_\pi[s,s'] = \sum_a \pi(a|s)\, P(s'|s,a)$\;
+    $D_\pi = (I - \beta\, F_\pi^\top)^{-1}\, \rho_0$\;
+    \BlankLine
+    \tcp{3c. Expected features under current policy}
+    $\bar\phi_\pi = \sum_s D_\pi(s) \sum_a \pi(a|s)\, \phi(s,a)$\;
+    \BlankLine
+    \tcp{3d. Feature matching gradient (Eq.~\ref{eq:gradient})}
+    $g = \bar\phi_{\text{data}} - \bar\phi_\pi$\;
+    \BlankLine
+    \tcp{3e. Update $\theta$ via L-BFGS-B or Adam}
+    $\theta_{k+1} \leftarrow \theta_k + \alpha\, g$ \tcp*{or L-BFGS-B step}
+    \BlankLine
+    \tcp{3f. Dual stopping criteria (Gleave \& Toyer 2022)}
+    \lIf{$\|g\| < \varepsilon_1$ \textbf{or} $\|D_{\text{data}} - D_\pi\|_\infty < \varepsilon_2$}{\textbf{break}}
+}
+\BlankLine
+
+\tcp{Step 4: Inference}
+$\ell(\hat\theta) = \sum_i \log \pi_{\hat\theta}(a_i | s_i)$\;
+Bootstrap SEs by resampling individuals and re-estimating\;
+\BlankLine
+
+\KwOut{$\hat\theta$ (reward weights), $V^*$, $\pi^*$, log-likelihood, bootstrap SEs}
+\end{algorithm}
+
+\paragraph{Implementation notes.}
+The backward pass (Step 3a) uses the hybrid solver from EconIRL, which starts with successive approximation and switches to Newton-Kantorovich near the fixed point for quadratic convergence. The forward pass (Step 3b) solves the occupancy measure via matrix inversion rather than iterative power method. The dual stopping criterion (Step 3f) follows \citet{gleave2022}, checking both gradient convergence and occupancy distance. L-BFGS-B is the default optimizer because it handles the implicit curvature well, but Adam is available for gradient-based optimization when the Hessian is ill-conditioned.
+
+The deep variant replaces $\theta^\top \phi(s,a)$ with a neural network $r_\psi(s,a)$ following \citet{wulfmeier2016}. The gradient becomes $\nabla_\psi r$ weighted by the occupancy mismatch. This gains flexibility at the cost of interpretability and valid standard errors.
+
+
+%% ============================================================
+\section{Results}
+%% ============================================================
+
+We run MCE-IRL, NFXP, and behavioral cloning on a \mceGridSize$\times$\mceGridSize\ gridworld with \mceNstates\ states, 5 actions, and three action-dependent features (step penalty, terminal reward, distance weight). Data consists of \mceNobs\ observations from \mceGridSize00 simulated trajectories at $\beta = \mceBeta$.
+
+\input{mce_irl_results}
+
+MCE-IRL and NFXP achieve identical policy accuracy (\mcePolicyAcc\% and \mceNfxpPolicyAcc\%), confirming that they solve the same MLE. Both substantially outperform behavioral cloning (\mceBcPolicyAcc\%), which does not learn from MDP structure. The cosine similarities differ because rewards are identified only up to an additive constant and scale, so the raw parameter vectors may point in different directions while producing the same policy. Policy accuracy is the correct evaluation metric for IRL.
+
+The feature matching gradient (Equation~\ref{eq:gradient}) is the key difference from NFXP. NFXP computes the likelihood gradient via implicit differentiation through the Bellman fixed point, which requires solving a linear system at each step. MCE-IRL computes the gradient as a difference between empirical and expected features, which requires the forward occupancy pass but avoids the implicit differentiation. Both approaches have the same computational cost per iteration (one backward pass and one forward solve), but MCE-IRL's gradient has a cleaner interpretation as feature matching.
+
+\paragraph{Code.}
+The companion script \texttt{mce\_irl\_results.py} in this folder generates Table~\ref{tab:mce_results}. The MCE-IRL estimator is implemented in \texttt{src/econirl/estimation/mce\_irl.py}. To regenerate:
+\begin{verbatim}
+python papers/econirl_package/primers/mce_irl/mce_irl_results.py
+\end{verbatim}
+
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

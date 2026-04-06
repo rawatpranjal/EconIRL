@@ -22,18 +22,18 @@ from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel
 
 # ---------- DGP settings (Rust 1987) ----------
-TRUE_OC = 0.001          # operating cost per mileage bin
-TRUE_RC = 3.0            # replacement cost
-N_STATES = 200           # mileage bins
-DISCOUNT = 0.9999        # beta (high to amplify operating cost signal)
+TRUE_OC = 0.01           # operating cost per mileage bin
+TRUE_RC = 4.0            # replacement cost
+N_STATES = 90            # mileage bins
+DISCOUNT = 0.99          # beta
 N_BUSES = 200            # number of individuals
 N_PERIODS = 100          # periods per bus
 SEED = 42
 
 # ---------- SEES settings (Luo & Sang 2024) ----------
 BASIS_TYPE = "fourier"
-BASIS_DIM = 8
-PENALTY_WEIGHT = 10.0
+BASIS_DIM = 12
+PENALTY_WEIGHT = 100.0
 
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
 
