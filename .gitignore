@@ -63,3 +63,13 @@ notes/
 
 # Loose PDFs in root
 /*.pdf
+
+# LaTeX compilation artifacts
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.log
+*.out
+texput.log

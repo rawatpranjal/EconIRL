@@ -1,9 +1,13 @@
-\documentclass[11pt]{article}
-\usepackage{preamble}
-\usepackage{placeins}
+\documentclass[10pt]{article}
+\usepackage[left=0.8in,right=0.8in,top=0.8in,bottom=0.8in]{geometry}
+\usepackage{float}
+\input{../notation}
+\usepackage[ruled,lined]{algorithm2e}
 \usepackage{titling}
 \setlength{\droptitle}{-2em}
 \posttitle{\par\end{center}\vspace{-1em}}
+\setlength{\parskip}{0.3em}
+\setlength{\parindent}{0em}
 
 \title{Primer: Temporal-Difference CCP (TD-CCP)\\[4pt]
 \large Adusumilli and Eckardt (2025)}
@@ -172,56 +176,44 @@ For neural AVI, replace Step~3 with iterative regression networks (\texttt{\_neu
 \section{Simulation}
 %% ============================================================
 
-The companion script \texttt{tdccp\_demo.py} runs TD-CCP (semi-gradient, $K_\Psi = 8$, robust SEs) alongside NFXP on the Rust bus engine (90 states, $\beta = 0.95$, 50{,}000 observations).
+\input{tdccp_results}
+
+The experiment simulates a firm value model where productivity $z \in [0,1]$ follows an AR(1) process with persistence $\rho = 0.8$.
+Firms choose to operate ($a=1$) or exit ($a=0$) each period.
+Flow utility is $u(1, z;\theta) = \theta_v z + \theta_{FC}$ and $u(0, z;\theta) = 0$, where $\theta_v = 5.0$ is the productivity value and $\theta_{FC} = -1.0$ is the fixed operating cost (negative sign).
+The state space is represented by \tdNstates\ discrete bins covering $[0,1]$, which approximates the continuous process.
+The dataset has \tdNobs\ observations from 3{,}000 individuals over 5 periods, with $\beta = \tdBeta$.
+
+CCP must estimate the structural parameters by discretizing the state space into $K$ coarse bins and estimating the transition matrix $\hat P(z' \mid z, a)$ from data.
+With $K = 5$ bins (width $0.2$), each bin averages over a wide range of true productivity values, introducing feature misspecification.
+With $K = 20$ bins (width $0.05$), the features are more accurate but the transition matrix has 800 cells to estimate from the same data, producing noisy $\hat P$.
+Neither discretization level escapes both sources of error simultaneously.
+TD-CCP uses degree-8 polynomial basis functions over the normalized state $z_{\mathrm{norm}} \in [0,1]$ and never estimates the transition density.
+
+Table~\ref{tab:tdccp_results} shows the results.
+TD-CCP recovers $\theta_v$ within 1 percent and $\theta_{FC}$ within 7 percent of the true values, with valid robust standard errors reported in parentheses.
+CCP with $K = 5$ bins achieves parameter RMSE of \ccpFiveRMSE, roughly 4 times worse than TD-CCP's \tdRMSE.
+CCP with $K = 20$ bins achieves RMSE of \ccpTwentyRMSE, roughly 8 times worse, because the finer grid creates noisier transition estimates that compound the discretization error.
+Behavioral cloning reaches \bcAcc\ policy accuracy but cannot recover structural parameters or produce standard errors.
+
+The comparison illustrates the paper's central claim: there is no safe choice of bin width for CCP when the state is continuous.
+Coarser bins introduce feature bias; finer bins introduce transition estimation variance.
+TD-CCP sidesteps the dilemma by forming $h_k$ and $g$ directly from the observed next-state transitions $(z_t, a_t, z_{t+1})$, never forming $P(z' \mid z, a)$ at all.
+The locally robust standard errors are valid at the parametric $\sqrt{n}$ rate despite the nonparametric polynomial first stage.
 
 \begin{lstlisting}[basicstyle=\footnotesize\ttfamily]
 from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
 
 config = TDCCPConfig(method="semigradient", basis_dim=8,
-    robust_se=True)
+    ccp_method="logit", robust_se=True)
 result = TDCCPEstimator(config=config).estimate(
     panel, utility, problem, transitions)
 \end{lstlisting}
 
-\begin{table}[H]
-\centering
-\caption{TD-CCP vs NFXP on the Rust bus engine (90 states, $\beta = 0.95$, 50{,}000 obs).}
-\label{tab:tdccp_results}
-\input{tables/tdccp_results}
-\end{table}
-
-TD-CCP recovers both parameters near the true values with valid robust standard errors.
-The replacement cost is estimated at 3.00 with a standard error of 0.015, and the operating cost at 0.0017 with a standard error of 0.0002.
-NFXP is slightly more precise because it solves the Bellman equation exactly, but NFXP requires the full transition matrix $P(s' \mid s,a)$ while TD-CCP uses only the observed transitions $(x_t, a_t, x_{t+1})$ in the data.
-On this 90-state tabular problem both methods run in under 3 seconds.
-TD-CCP's advantage appears on continuous-state problems where estimating $P$ is infeasible.
-
-\paragraph{Cross-estimator comparison.}
-The Rust bus benchmark confirms that NFXP, CCP, and MCE-IRL recover identical parameters when transitions are known.
-TD-CCP trades a small amount of parameter accuracy for independence from the transition density.
-The locally robust standard errors are valid despite the nonparametric first stage, which is TD-CCP's unique theoretical contribution.
-No other estimator in econirl achieves $\sqrt{n}$ inference without requiring transition probabilities.
-
-The per-feature decomposition $h_1(a,x), \ldots, h_K(a,x)$ provides a diagnostic that other estimators lack.
-Each $h_k$ measures how much feature $k$ contributes to the expected discounted value under each action.
-Plotting $h_k$ against the state reveals whether a feature's dynamic contribution is well-approximated by the chosen basis.
-If the semi-gradient residual $\delta_{h,k}$ is large for a particular feature, the basis dimension for that feature should be increased.
-
-\paragraph{Basis selection.}
-The semi-gradient method requires choosing the basis dimension $K_\Psi$.
-Too few basis functions produce approximation bias in $h$ and $g$ that propagates to $\hat\theta$.
-Too many basis functions overfit and inflate variance.
-The paper recommends polynomial bases of degree 2 to 4 for continuous states, with cross-validation to select the degree.
-In the tabular setting (finite states), the basis can be the full state indicator, which recovers the exact CCP estimator as a special case.
-
-\paragraph{Counterfactual exercise.}
-Because TD-CCP estimates structural parameters $\hat\theta$ in the same linear utility $u = \theta^\top\phi$, it supports the same counterfactual exercises as NFXP.
-Changing $\theta$ and re-solving the Bellman equation produces a counterfactual policy, with welfare effect $\Delta W = \E_{\mu_0}[V(s;\theta') - V(s;\hat\theta)]$.
-The transition density is needed for the counterfactual solve, but it can be estimated separately from the data or specified by the researcher as a modeling assumption.
-The locally robust SEs on $\hat\theta$ propagate to counterfactual welfare via the delta method.
-The companion script \texttt{tdccp\_demo.py} demonstrates this workflow end to end.
-For continuous-state applications where TD-CCP is most valuable, the neural AVI variant (\texttt{method="neural"}) replaces the polynomial basis with a two-layer MLP, trading the closed-form solution for flexibility in high-dimensional state spaces at the cost of iterative training.
-Early stopping monitors the relative change in $\hat h$ between AVI iterations and halts when improvement falls below 1 percent, preventing overfitting.
-Full documentation is at \texttt{docs/estimators/tdccp.md}.
+\paragraph{Code.}
+\texttt{tdccp\_run.py} generates Table~\ref{tab:tdccp_results}. Estimator: \texttt{src/econirl/estimation/td\_ccp.py}.
+\begin{verbatim}
+.venv/bin/python papers/econirl_package/primers/tdccp/tdccp_run.py
+\end{verbatim}
 
 \end{document}
