@@ -1,0 +1,44 @@
+\section{Pre-Estimation}
+\label{sec:pre_estimation}
+
+This section describes the data pipeline from raw observations to estimation-ready objects.
+The pipeline handles data loading, validation, state discretization, feature normalization, transition estimation, and utility specification.
+
+\paragraph{Data types.}
+Three core types encode the estimation problem.
+\texttt{DDCProblem} is a frozen dataclass that stores the MDP structure, including the number of states $|\mathcal{S}|$, the number of actions $|\mathcal{A}|$, the discount factor $\beta$, and the scale parameter $\sigma$ of the extreme value shocks.
+\texttt{Trajectory} stores a single individual's sequence of state-action-next-state tuples $(s_t, a_t, s_{t+1})$ as JAX arrays with matching lengths.
+\texttt{Panel} collects a list of trajectories and provides cached sufficient statistics via \texttt{.sufficient\_stats()}, which computes state-action counts, empirical CCPs, transition frequencies, and the initial state distribution in a single pass over the data.
+Panels can be constructed from pandas DataFrames via \texttt{Panel.from\_dataframe(df, state, action, id, next\_state)} or saved and loaded as compressed NumPy archives via \texttt{.save\_npz()} and \texttt{.load\_npz()} for reproducibility.
+
+\paragraph{Data loading.}
+The \texttt{econirl.datasets} module provides loaders for real-world datasets spanning DDC applications and IRL trajectory data.
+DDC datasets include the Rust (1987) bus engine replacement data, Scania heavy truck component reliability, Keane-Wolpin career choices, and ICU sepsis treatment protocols.
+IRL trajectory datasets include Beijing taxi GPS traces via the T-Drive corpus, NYC Citibike station-to-station route choices, NGSIM highway lane-change trajectories, and Foursquare check-in sequences.
+Each loader returns a Panel object with metadata documenting the source, sample period, and variable definitions.
+For synthetic data, \texttt{simulate\_panel(env, n\_individuals, n\_periods, seed)} generates panels from any \texttt{DDCEnvironment} with known ground truth parameters, enabling controlled parameter recovery experiments.
+
+\paragraph{Data validation.}
+Before estimation, \texttt{check\_panel\_structure()} validates the panel for missing values, unbalanced periods, and period gaps, returning a \texttt{PanelValidationResult} with error and warning lists.
+Four pre-estimation diagnostics are printed automatically before any \texttt{.estimate()} call.
+Feature matrix rank is computed on the flattened feature matrix of dimension $(|\mathcal{S}| \times |\mathcal{A}|) \times K$, and if the rank falls below $K$, estimation halts with an error.
+The condition number flags near-collinearity that inflates standard errors even when the matrix is technically full rank, with values above $10^6$ triggering a warning.
+State coverage reports how many states have at least one observation.
+Single-action state counts identify states where only one action is ever observed, which produce degenerate CCP estimates.
+
+\paragraph{State discretization and normalization.}
+Continuous state variables are discretized via \texttt{discretize\_state(values, method, n\_bins)} using either equal-width or equal-count binning.
+The Rust (1987) convention of 5{,}000-mile bins is available via \texttt{discretize\_mileage()}.
+Feature normalization during training uses \texttt{RunningNorm}, which implements the numerically stable online mean-variance algorithm of Chan, Golub, and LeVeque (1979) for features that span different scales.
+This is important when feature columns differ by orders of magnitude, as in the Rust bus model where operating cost is $O(10^{-3})$ and replacement cost is $O(1)$.
+
+\paragraph{Transition estimation.}
+When transition probabilities are not known from the model, they are estimated from data via \texttt{estimate\_transition\_probs()}, which counts state transitions from non-replacement observations and returns a probability vector that is expanded into the full $(|\mathcal{A}|, |\mathcal{S}|, |\mathcal{S}|)$ transition tensor.
+Group-stratified estimation is available via \texttt{estimate\_transition\_probs\_by\_group()} for heterogeneous transition dynamics across subpopulations such as bus groups or geographic regions.
+All estimators expect transitions in the shape $(|\mathcal{A}|, |\mathcal{S}|, |\mathcal{S}|)$, meaning \texttt{transitions[a, s, s']} gives $P(s'|s,a)$.
+
+\paragraph{Utility specification.}
+The \texttt{LinearUtility} class specifies $u(s,a;\theta) = \theta^\top \phi(s,a)$ from a feature matrix of shape $(|\mathcal{S}|, |\mathcal{A}|, K)$.
+The \texttt{anchor\_action} parameter normalizes utility differences by subtracting the anchor action's features from all other actions, resolving the level non-identification discussed in Section~\ref{sec:framework}.
+The class method \texttt{LinearUtility.from\_environment(env)} extracts features and parameter names automatically from any \texttt{DDCEnvironment}.
+For deep IRL estimators that learn nonlinear reward functions, \texttt{NeuralCost} provides a neural network parameterization of the reward.
