@@ -1,40 +1,95 @@
 {
   "dataset": "ahs-housing",
-  "estimator": "NPL (K=10)",
-  "n_observations": 100000,
-  "n_individuals": 10000,
-  "log_likelihood": -44223.279662722416,
-  "parameters": {
-    "theta_burden": {
-      "coef": 0.7269901633262634,
-      "std_err": 0.037222318702542626
-    },
-    "theta_duration": {
-      "coef": 0.19420690834522247,
-      "std_err": 0.01559636214109778
-    },
-    "theta_renter": {
-      "coef": -0.5741291642189026,
-      "std_err": 0.013157781815742982
-    },
-    "theta_age": {
-      "coef": 3.6833345890045166,
-      "std_err": 0.08067303132458542
-    },
-    "move_cost": {
-      "coef": 1.9415278434753418,
-      "std_err": 0.05893819328974794
-    }
+  "methodology": "semi-synthetic parameter recovery",
+  "true_parameters": {
+    "theta_burden": -0.5,
+    "theta_duration": 0.3,
+    "theta_renter": -0.4,
+    "theta_age": 0.6,
+    "move_cost": -1.5
   },
+  "n_observations": 100000,
+  "n_individuals": 5000,
+  "discount_factor": 0.95,
   "diagnostics": {
     "feature_rank": 5,
     "state_coverage": 54,
-    "n_states": 54,
-    "single_action_states": 0
+    "n_states": 54
   },
   "cross_section_moments": {
     "renter_share": 0.40738376423023726,
-    "move_rate_overall": 0.23700393658899882,
-    "median_burden_renters": 0.2857142857142857
+    "n_valid_households": 46995
+  },
+  "NFXP": {
+    "parameters": {
+      "theta_burden": -0.4598003784840038,
+      "theta_duration": 0.2912596252306474,
+      "theta_renter": -0.41651590645906883,
+      "theta_age": 0.5969404649525747,
+      "move_cost": -1.5350653252732949
+    },
+    "standard_errors": {
+      "theta_burden": 0.04494112357497215,
+      "theta_duration": 0.01279742643237114,
+      "theta_renter": 0.014434130862355232,
+      "theta_age": 0.061444707214832306,
+      "move_cost": 0.0528065524995327
+    },
+    "log_likelihood": -24350.995915809766,
+    "converged": true
+  },
+  "CCP": {
+    "parameters": {
+      "theta_burden": -0.4598039388656616,
+      "theta_duration": 0.29125797748565674,
+      "theta_renter": -0.41651904582977295,
+      "theta_age": 0.5968229174613953,
+      "move_cost": -1.5351600646972656
+    },
+    "standard_errors": {
+      "theta_burden": 0.04495291298204396,
+      "theta_duration": 0.012799669717254093,
+      "theta_renter": 0.014440864772568283,
+      "theta_age": 0.061429700737352204,
+      "move_cost": 0.052897497990819733
+    },
+    "log_likelihood": -24350.995917877084,
+    "converged": false
+  },
+  "NNES": {
+    "parameters": {
+      "theta_burden": 0.08532343059778214,
+      "theta_duration": 0.5953002572059631,
+      "theta_renter": -3.0990724563598633,
+      "theta_age": 0.5276831984519958,
+      "move_cost": -3.053173065185547
+    },
+    "standard_errors": {
+      "theta_burden": 0.11996771056674015,
+      "theta_duration": 0.03118871013460052,
+      "theta_renter": 0.046349814590019724,
+      "theta_age": 0.058054099417206,
+      "move_cost": 0.05518233140902989
+    },
+    "log_likelihood": -24374.55703835338,
+    "converged": false
+  },
+  "TD-CCP": {
+    "parameters": {
+      "theta_burden": -1.217588979009193,
+      "theta_duration": 0.4911851089277695,
+      "theta_renter": -0.5437323015789359,
+      "theta_age": 0.18090842269909765,
+      "move_cost": -2.229136591273028
+    },
+    "standard_errors": {
+      "theta_burden": 0.0570066425637235,
+      "theta_duration": 0.027857701114770286,
+      "theta_renter": 0.01213316854923373,
+      "theta_age": 0.029949662964039885,
+      "move_cost": 0.03268228693677095
+    },
+    "log_likelihood": -25455.608088071094,
+    "converged": true
   }
 }

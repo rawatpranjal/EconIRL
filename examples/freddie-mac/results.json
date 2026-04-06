@@ -1,0 +1,109 @@
+{
+  "dataset": "freddie-mac",
+  "methodology": "semi-synthetic parameter recovery",
+  "true_parameters": {
+    "theta_delinquency": -0.8,
+    "theta_credit": 0.5,
+    "theta_ltv": -0.4,
+    "theta_equity": 0.6,
+    "prepay_cost": -1.0,
+    "default_cost": -2.0
+  },
+  "n_observations": 600000,
+  "n_individuals": 10000,
+  "discount_factor": 0.99,
+  "diagnostics": {
+    "feature_rank": 6,
+    "state_coverage": 24,
+    "n_states": 24
+  },
+  "calibration_moments": {
+    "ever_delinq_rate": 0.2812311163034283,
+    "credit_high_share": 0.6600867475056735,
+    "ltv_dist": [
+      0.15725335374451113,
+      0.5220763002054546,
+      0.32067034605003425
+    ]
+  },
+  "NFXP": {
+    "parameters": {
+      "theta_delinquency": -0.8104256067473169,
+      "theta_credit": 0.4846375098148963,
+      "theta_ltv": -0.38215470018433284,
+      "theta_equity": 0.6653868474641488,
+      "prepay_cost": -1.0657204125181494,
+      "default_cost": -2.0030740544282883
+    },
+    "standard_errors": {
+      "theta_delinquency": 0.02142636850476265,
+      "theta_credit": 0.005166478455066681,
+      "theta_ltv": 0.010646261274814606,
+      "theta_equity": 0.03495039790868759,
+      "prepay_cost": 0.03490341827273369,
+      "default_cost": 0.005166495218873024
+    },
+    "log_likelihood": -530889.6910985876,
+    "converged": true
+  },
+  "CCP": {
+    "parameters": {
+      "theta_delinquency": -0.8103097677230835,
+      "theta_credit": 0.48464757204055786,
+      "theta_ltv": -0.3821325898170471,
+      "theta_equity": 0.6635650992393494,
+      "prepay_cost": -1.0638965368270874,
+      "default_cost": -2.0030007362365723
+    },
+    "standard_errors": {
+      "theta_delinquency": 0.021506416544364387,
+      "theta_credit": 0.005162557419606459,
+      "theta_ltv": 0.010651031718905662,
+      "theta_equity": 0.034911939878013366,
+      "prepay_cost": 0.03486610944621871,
+      "default_cost": 0.005165368800064797
+    },
+    "log_likelihood": -530889.6924918127,
+    "converged": false
+  },
+  "NNES": {
+    "parameters": {
+      "theta_delinquency": -5.535319805145264,
+      "theta_credit": 0.7465226054191589,
+      "theta_ltv": -1.8848955631256104,
+      "theta_equity": 0.6480005383491516,
+      "prepay_cost": -0.978300154209137,
+      "default_cost": -1.9325785636901855
+    },
+    "standard_errors": {
+      "theta_delinquency": 0.03278978996619771,
+      "theta_credit": 0.020974078239548152,
+      "theta_ltv": 0.039094796942330784,
+      "theta_equity": 0.03493039986694817,
+      "prepay_cost": 0.03487622931548858,
+      "default_cost": 0.005127759240860071
+    },
+    "log_likelihood": -531002.1642839261,
+    "converged": false
+  },
+  "TD-CCP": {
+    "parameters": {
+      "theta_delinquency": -1.0082518466718922,
+      "theta_credit": 1.1875718422131614,
+      "theta_ltv": -1.6132408540749572,
+      "theta_equity": 0.7299177839766884,
+      "prepay_cost": -1.1248183276871773,
+      "default_cost": -1.9975261046608521
+    },
+    "standard_errors": {
+      "theta_delinquency": 0.01093744892582547,
+      "theta_credit": 0.01600427644153343,
+      "theta_ltv": 0.03225871209570815,
+      "theta_equity": 0.022416528085501552,
+      "prepay_cost": 0.022477560425457035,
+      "default_cost": 0.0026202247755182286
+    },
+    "log_likelihood": -530944.50906771,
+    "converged": true
+  }
+}

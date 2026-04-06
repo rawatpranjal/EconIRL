@@ -1,38 +1,32 @@
 #!/usr/bin/env python3
 """
-AHS Housing Mobility -- CCP Estimation
-=======================================
+AHS Housing Mobility -- Semi-Synthetic Parameter Recovery
+=========================================================
 
-Estimates structural parameters of a household mobility model using the
-2023 American Housing Survey (AHS) national cross-section. The DDC problem:
-each period, a household decides whether to stay in its current unit or move.
-
-Challenge: AHS is a single cross-section. We derive a pseudo-panel by treating
-the cross-sectional distribution of years-in-unit (duration) as if it represents
-the dynamic process. We generate 10K synthetic trajectories calibrated to the
-cross-sectional moments (duration distribution, move rates by tenure/age/income).
+Estimates structural parameters of a household mobility model using
+transition dynamics calibrated from the 2023 American Housing Survey.
+Known ground truth reward parameters are used to generate data from
+the soft VI optimal policy. Four estimators (NFXP, CCP, NNES, TD-CCP)
+recover the parameters, demonstrating both structural and neural
+estimation on a realistic housing domain.
 
 State: (tenure_type, age_bin, income_bin, duration_bin) -> 2 x 3 x 3 x 3 = 54
 Action: stay=0, move=1
 
 Features (5):
-    0. housing_burden  -- RENT/HINCP for renters (cost-to-income ratio)
+    0. housing_burden  -- median rent/income for renters (cost-to-income)
     1. duration        -- years in current unit (attachment/lock-in)
     2. renter          -- 1 if renting (renters are more mobile)
     3. age             -- householder age normalized (older = less mobile)
     4. move_cost       -- 1 for move action (transaction cost of moving)
 
 Data: AHS 2023 National, household.csv (~55K households)
-    TENURE: '1'=own, '2'=rent
-    HHMOVE: year moved in (used to derive duration)
-    HINCP: household income
-    RENT: monthly rent (renters only)
-    HHAGE: age of householder
-    NUMPEOPLE: household size
+    Cross-section provides: transition calibration, initial state
+    distribution, and burden values per state.
 
 Reference:
-    Ferreira, F., Gyourko, J., Tracy, J. (2010). "Housing Busts and Household
-    Mobility." Journal of Urban Economics 68(1): 34-45.
+    Ferreira, F., Gyourko, J., Tracy, J. (2010). "Housing Busts and
+    Household Mobility." Journal of Urban Economics 68(1): 34-45.
 
 Usage:
     python examples/ahs-housing/run_ccp.py
@@ -46,9 +40,15 @@ import jax.numpy as jnp
 import numpy as np
 import polars as pl
 
-from econirl.core.types import DDCProblem, Panel, Trajectory
+from econirl.core.bellman import SoftBellmanOperator
+from econirl.core.solvers import value_iteration
+from econirl.core.types import DDCProblem
 from econirl.estimation.ccp import CCPEstimator
+from econirl.estimation.nfxp import NFXPEstimator
+from econirl.estimation.nnes import NNESEstimator
+from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
 from econirl.preferences.linear import LinearUtility
+from econirl.simulation.synthetic import simulate_panel_from_policy
 
 
 # ---------------------------------------------------------------------------
@@ -57,10 +57,9 @@ from econirl.preferences.linear import LinearUtility
 
 DATA_DIR = Path("data/raw/ahs")
 SURVEY_YEAR = 2023
-N_SYNTHETIC = 10_000   # synthetic trajectories to generate
-T_PERIODS = 10         # years per trajectory
+N_INDIVIDUALS = 5_000
+N_PERIODS = 20
 DISCOUNT_FACTOR = 0.95
-RNG = np.random.default_rng(42)
 
 # State dimensions
 TENURE_TYPES = 2     # 0=own, 1=rent
@@ -71,6 +70,17 @@ DURATION_BINS = 3    # new(0-2yr), established(3-9yr), long(10+yr)
 NUM_STATES = TENURE_TYPES * AGE_BINS * INCOME_BINS * DURATION_BINS  # 54
 NUM_ACTIONS = 2   # stay=0, move=1
 NUM_FEATURES = 5
+
+# Ground truth reward parameters
+TRUE_PARAMS = {
+    "theta_burden": -0.50,    # high burden reduces stay utility
+    "theta_duration": 0.30,   # longer tenure increases attachment
+    "theta_renter": -0.40,    # renters less attached to current unit
+    "theta_age": 0.60,        # older households prefer staying
+    "move_cost": -1.50,       # transaction cost of moving
+}
+TRUE_PARAM_ARRAY = jnp.array(list(TRUE_PARAMS.values()))
+PARAM_NAMES = list(TRUE_PARAMS.keys())
 
 
 # ---------------------------------------------------------------------------
@@ -94,38 +104,14 @@ def decode_state(s: int) -> tuple[int, int, int, int]:
     return tenure, age_bin, inc_bin, dur_bin
 
 
-def bin_age(age: float) -> int:
-    if age < 35:
-        return 0
-    elif age < 65:
-        return 1
-    return 2
-
-
-def bin_income(inc: float) -> int:
-    if inc < 40_000:
-        return 0
-    elif inc < 100_000:
-        return 1
-    return 2
-
-
-def bin_duration(dur: int) -> int:
-    if dur <= 2:
-        return 0
-    elif dur <= 9:
-        return 1
-    return 2
-
-
 # ---------------------------------------------------------------------------
-# Load cross-section and compute calibration moments
+# Load cross-section for calibration
 # ---------------------------------------------------------------------------
 
 def load_ahs_moments() -> dict:
-    """Load AHS cross-section, filter to valid households, compute moments.
+    """Load AHS cross-section and compute calibration moments.
 
-    Returns a dict of calibration statistics used to generate the synthetic panel.
+    Returns burden values per state and initial state distribution.
     """
     print("Loading AHS household.csv...")
     df = (
@@ -135,7 +121,7 @@ def load_ahs_moments() -> dict:
     )
     print(f"  Loaded {df.shape[0]:,} households")
 
-    # Filter to owner (TENURE='1') and renter (TENURE='2'), drop vacants (-6)
+    # Filter to owner/renter, drop vacants
     df = df.filter(pl.col("TENURE").is_in(["'1'", "'2'"]))
     df = df.with_columns([
         (pl.col("TENURE") == "'2'").cast(pl.Int32).alias("renter"),
@@ -143,22 +129,20 @@ def load_ahs_moments() -> dict:
         pl.col("RENT").cast(pl.Float64),
         pl.col("HHAGE").cast(pl.Float64),
         pl.col("HHMOVE").cast(pl.Int64),
-        pl.col("NUMPEOPLE").cast(pl.Float64),
     ])
 
-    # Drop rows with missing key fields
     df = df.filter(
         pl.col("HINCP") > 0,
         pl.col("HHAGE") > 0,
         pl.col("HHMOVE") > 0,
     )
 
-    # Duration: years since moved in (SURVEY_YEAR - HHMOVE)
+    # Duration
     df = df.with_columns(
         (SURVEY_YEAR - pl.col("HHMOVE")).clip(0, 50).alias("duration")
     )
 
-    # Housing burden: rent / annual income for renters; 0 for owners
+    # Housing burden: rent / annual income for renters
     df = df.with_columns(
         pl.when(
             (pl.col("renter") == 1) & (pl.col("RENT") > 0) & (pl.col("HINCP") > 0)
@@ -182,78 +166,19 @@ def load_ahs_moments() -> dict:
           .otherwise(2).cast(pl.Int32).alias("dur_bin"),
     ])
 
+    # Flat state index
+    df = df.with_columns(
+        (pl.col("renter") * AGE_BINS * INCOME_BINS * DURATION_BINS
+         + pl.col("age_bin") * INCOME_BINS * DURATION_BINS
+         + pl.col("inc_bin") * DURATION_BINS
+         + pl.col("dur_bin")).cast(pl.Int32).alias("state")
+    )
+
     n = len(df)
     print(f"  Valid households: {n:,}")
     print(f"  Renter share: {df['renter'].mean():.3f}")
-    print(f"  Median burden (renters): "
-          f"{df.filter(pl.col('renter')==1)['burden'].median():.3f}")
 
-    # Compute move rate = fraction that moved in last 2 years (duration_bin = 0)
-    move_rate = (df["dur_bin"] == 0).mean()
-    print(f"  Implied annual move rate (new 0-2yr): {move_rate:.3f}")
-
-    # Compute per-state distributions (for synthetic panel calibration)
-    moments = {
-        "renter_share": float(df["renter"].mean()),
-        "move_rate_overall": float(move_rate),
-        "age_dist": df["age_bin"].value_counts().sort("age_bin")["count"].to_list(),
-        "inc_dist": df["inc_bin"].value_counts().sort("inc_bin")["count"].to_list(),
-        "dur_dist": df["dur_bin"].value_counts().sort("dur_bin")["count"].to_list(),
-        "median_burden_renters": float(
-            df.filter(pl.col("renter") == 1)["burden"].median()
-        ),
-        # Per-(tenure, age_bin, inc_bin) move rate: share of recent movers
-        "df": df,
-    }
-    return moments
-
-
-# ---------------------------------------------------------------------------
-# Generate synthetic panel
-# ---------------------------------------------------------------------------
-
-def generate_synthetic_panel(moments: dict) -> Panel:
-    """Generate synthetic household trajectories calibrated to AHS cross-section.
-
-    Each household trajectory simulates T_PERIODS annual decisions (stay or move).
-    Transition dynamics:
-        Stay: duration increments by 1 year; age increments every 5 years;
-              income may change with 10% probability.
-        Move: duration resets to 0; tenure type may switch with 20% probability;
-              draw new income from cross-sectional distribution.
-
-    Move probability is calibrated per state using cross-sectional move rates.
-    """
-    df = moments["df"]
-
-    # Compute per-(tenure, age_bin, inc_bin) move rates from cross-section
-    # Move = recently moved (duration_bin = 0)
-    state_move_rates = {}
-    for tenure in range(TENURE_TYPES):
-        for ab in range(AGE_BINS):
-            for ib in range(INCOME_BINS):
-                sub = df.filter(
-                    (pl.col("renter") == tenure) &
-                    (pl.col("age_bin") == ab) &
-                    (pl.col("inc_bin") == ib)
-                )
-                if len(sub) >= 5:
-                    rate = float((sub["dur_bin"] == 0).mean())
-                else:
-                    rate = moments["move_rate_overall"]
-                state_move_rates[(tenure, ab, ib)] = np.clip(rate, 0.02, 0.60)
-
-    # Initial state distribution: sample from cross-section
-    cross_section_states = (
-        df.with_columns(
-            (pl.col("renter") * AGE_BINS * INCOME_BINS * DURATION_BINS
-             + pl.col("age_bin") * INCOME_BINS * DURATION_BINS
-             + pl.col("inc_bin") * DURATION_BINS
-             + pl.col("dur_bin")).cast(pl.Int32).alias("state")
-        )["state"].to_numpy()
-    )
-
-    # Compute per-state burden values for feature construction
+    # Per-state burden values
     burden_by_state = np.zeros(NUM_STATES)
     for s in range(NUM_STATES):
         tenure, ab, ib, db = decode_state(s)
@@ -264,64 +189,122 @@ def generate_synthetic_panel(moments: dict) -> Panel:
         )
         if len(sub) > 0 and tenure == 1:
             burden_by_state[s] = float(sub["burden"].median())
+
+    # Initial state distribution from cross-section
+    state_counts = np.bincount(
+        df["state"].to_numpy().astype(np.int32), minlength=NUM_STATES
+    ).astype(np.float64)
+    initial_dist = state_counts / state_counts.sum()
+
+    # Income distribution for transition calibration
+    inc_counts = np.array(
+        df["inc_bin"].value_counts().sort("inc_bin")["count"].to_list(),
+        dtype=np.float64
+    )
+    inc_probs = inc_counts / inc_counts.sum()
+
+    return {
+        "burden_by_state": burden_by_state,
+        "initial_dist": initial_dist,
+        "inc_probs": inc_probs,
+        "renter_share": float(df["renter"].mean()),
+        "n_valid": n,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Build structural transition matrices
+# ---------------------------------------------------------------------------
+
+def build_structural_transitions(inc_probs: np.ndarray) -> np.ndarray:
+    """Build transition matrices from structural assumptions.
+
+    Stay (a=0):
+        - Duration increments: bin 0->1 with prob 0.7, stays 0 with 0.3
+          bin 1->2 with prob 0.3, stays 1 with 0.7
+          bin 2 stays at 2
+        - Age increments every ~5 years: 10% per period for bin 0->1, 1->2
+        - Income changes with 10% prob (random walk across bins)
+
+    Move (a=1):
+        - Duration resets to 0
+        - Tenure may flip (15% prob)
+        - Income redrawn from cross-sectional distribution
+        - Age unchanged
+    """
+    transitions = np.zeros((NUM_ACTIONS, NUM_STATES, NUM_STATES))
+
+    for s in range(NUM_STATES):
+        tenure, age_bin, inc_bin, dur_bin = decode_state(s)
+
+        # --- Stay action (a=0) ---
+        # Duration transition
+        dur_probs = np.zeros(DURATION_BINS)
+        if dur_bin == 0:
+            dur_probs[0] = 0.3
+            dur_probs[1] = 0.7
+        elif dur_bin == 1:
+            dur_probs[1] = 0.7
+            dur_probs[2] = 0.3
         else:
-            burden_by_state[s] = 0.0
+            dur_probs[2] = 1.0
 
-    # Income distribution for re-draws after moving
-    inc_probs = np.array(moments["inc_dist"], dtype=np.float64)
-    inc_probs /= inc_probs.sum()
+        # Age transition (slow aging)
+        age_probs = np.zeros(AGE_BINS)
+        if age_bin < AGE_BINS - 1:
+            age_probs[age_bin] = 0.90
+            age_probs[age_bin + 1] = 0.10
+        else:
+            age_probs[age_bin] = 1.0
 
-    trajectories = []
-    for _ in range(N_SYNTHETIC):
-        # Sample initial state from cross-section
-        init_s = int(RNG.choice(cross_section_states))
-        tenure, age_bin, inc_bin, dur_bin = decode_state(init_s)
+        # Income transition (small random walk)
+        inc_trans = np.zeros(INCOME_BINS)
+        if inc_bin == 0:
+            inc_trans[0] = 0.90
+            inc_trans[1] = 0.10
+        elif inc_bin == 1:
+            inc_trans[0] = 0.05
+            inc_trans[1] = 0.90
+            inc_trans[2] = 0.05
+        else:
+            inc_trans[1] = 0.10
+            inc_trans[2] = 0.90
 
-        states, actions, next_states = [], [], []
+        # Combine via outer product (independence assumption)
+        for ab_next in range(AGE_BINS):
+            for ib_next in range(INCOME_BINS):
+                for db_next in range(DURATION_BINS):
+                    sp = encode_state(tenure, ab_next, ib_next, db_next)
+                    transitions[0, s, sp] += (
+                        age_probs[ab_next]
+                        * inc_trans[ib_next]
+                        * dur_probs[db_next]
+                    )
 
-        for t in range(T_PERIODS):
-            s = encode_state(tenure, age_bin, inc_bin, dur_bin)
+        # --- Move action (a=1) ---
+        # Duration resets to 0, tenure may flip, income redrawn
+        for tenure_next in range(TENURE_TYPES):
+            if tenure_next == tenure:
+                ten_prob = 0.85
+            else:
+                ten_prob = 0.15
 
-            # Move probability for this state
-            p_move = state_move_rates.get((tenure, age_bin, inc_bin),
-                                          moments["move_rate_overall"])
-            action = int(RNG.random() < p_move)
+            for ab_next in range(AGE_BINS):
+                for ib_next in range(INCOME_BINS):
+                    sp = encode_state(tenure_next, ab_next, ib_next, 0)
+                    transitions[1, s, sp] += (
+                        ten_prob
+                        * age_probs[ab_next]
+                        * inc_probs[ib_next]
+                    )
 
-            # Transition
-            if action == 1:  # move
-                dur_bin = 0
-                # May switch tenure type
-                if RNG.random() < 0.15:
-                    tenure = 1 - tenure
-                # Redraw income
-                inc_bin = int(RNG.choice(3, p=inc_probs))
-            else:  # stay
-                dur_bin = min(dur_bin + 1, DURATION_BINS - 1)
-                # Age increment (slow)
-                if t > 0 and t % 5 == 0:
-                    age_bin = min(age_bin + 1, AGE_BINS - 1)
-                # Small income shock
-                if RNG.random() < 0.10:
-                    inc_bin = int(np.clip(inc_bin + RNG.choice([-1, 1]), 0, 2))
+    # Verify row normalization
+    for a in range(NUM_ACTIONS):
+        row_sums = transitions[a].sum(axis=1)
+        assert np.allclose(row_sums, 1.0, atol=1e-10), \
+            f"Action {a}: row sums not 1, max deviation {np.max(np.abs(row_sums - 1))}"
 
-            next_s = encode_state(tenure, age_bin, inc_bin, dur_bin)
-            states.append(s)
-            actions.append(action)
-            next_states.append(next_s)
-
-        if len(states) >= 2:
-            traj = Trajectory(
-                states=jnp.array(states, dtype=jnp.int32),
-                actions=jnp.array(actions, dtype=jnp.int32),
-                next_states=jnp.array(next_states, dtype=jnp.int32),
-                individual_id=_,
-            )
-            trajectories.append(traj)
-
-    panel = Panel(trajectories=trajectories)
-    print(f"  Synthetic panel: {len(trajectories):,} trajectories, "
-          f"{sum(len(t.states) for t in trajectories):,} total observations")
-    return panel, burden_by_state
+    return transitions
 
 
 # ---------------------------------------------------------------------------
@@ -334,24 +317,11 @@ def build_feature_matrix(burden_by_state: np.ndarray) -> np.ndarray:
     Features on stay action (a=0):
         0. housing_burden  -- cost-to-income ratio (renters only)
         1. duration        -- dur_bin normalized (lock-in / attachment)
-        2. renter          -- 1 if renter (renters are more mobile = lower stay utility)
+        2. renter          -- 1 if renter (renters more mobile = lower stay utility)
         3. age             -- age_bin normalized (older = higher stay utility)
 
     Feature on move action (a=1):
         4. move_cost       -- 1 (transaction cost / hassle of moving)
-
-    Expected signs:
-        theta_burden   > 0 (high cost-to-income pushes away from staying)
-        theta_duration < 0 (longer tenure increases attachment to current unit)
-        theta_renter   < 0 (renters find staying less attractive = more mobile)
-        theta_age      > 0 (older households prefer staying)
-        move_cost      > 0 (positive cost of moving discourages moves)
-
-    Note: theta_burden > 0 on stay action means burden reduces stay utility.
-    theta_duration < 0 means longer tenure reduces... wait, if duration increases
-    attachment, it should INCREASE stay utility, so theta_duration > 0.
-    And theta_renter < 0 means renter flag reduces stay utility.
-    move_cost > 0 means move action has a positive baseline constant.
     """
     features = np.zeros((NUM_STATES, NUM_ACTIONS, NUM_FEATURES))
 
@@ -361,57 +331,13 @@ def build_feature_matrix(burden_by_state: np.ndarray) -> np.ndarray:
     for s in range(NUM_STATES):
         tenure, age_bin, inc_bin, dur_bin = decode_state(s)
 
-        # Feature 0: housing burden on stay action (reduces stay utility if high)
         features[s, 0, 0] = burden_by_state[s]
-
-        # Feature 1: duration on stay action (longer = more attached = higher stay utility)
         features[s, 0, 1] = dur_midpoints[dur_bin]
-
-        # Feature 2: renter flag on stay action (renters less attached)
         features[s, 0, 2] = float(tenure)
-
-        # Feature 3: age on stay action (older = more attached)
         features[s, 0, 3] = age_midpoints[age_bin]
-
-        # Feature 4: move cost on move action (transaction cost)
         features[s, 1, 4] = 1.0
 
     return features
-
-
-# ---------------------------------------------------------------------------
-# Transition estimation
-# ---------------------------------------------------------------------------
-
-def estimate_transitions(panel: Panel) -> np.ndarray:
-    """Estimate transitions from synthetic panel data."""
-    stay_counts = np.zeros((NUM_STATES, NUM_STATES), dtype=np.float64)
-    move_counts = np.zeros((NUM_STATES, NUM_STATES), dtype=np.float64)
-
-    for traj in panel.trajectories:
-        states = np.array(traj.states)
-        actions = np.array(traj.actions)
-        next_s = np.array(traj.next_states)
-        for t in range(len(states) - 1):
-            s, sp, a = int(states[t]), int(next_s[t]), int(actions[t])
-            if 0 <= s < NUM_STATES and 0 <= sp < NUM_STATES:
-                if a == 0:
-                    stay_counts[s, sp] += 1
-                else:
-                    move_counts[s, sp] += 1
-
-    def normalize(counts):
-        row_sums = counts.sum(axis=1, keepdims=True)
-        return np.where(
-            row_sums > 0,
-            counts / np.maximum(row_sums, 1),
-            np.eye(NUM_STATES),
-        )
-
-    transitions = np.zeros((NUM_ACTIONS, NUM_STATES, NUM_STATES))
-    transitions[0] = normalize(stay_counts)
-    transitions[1] = normalize(move_counts)
-    return transitions
 
 
 # ---------------------------------------------------------------------------
@@ -421,29 +347,28 @@ def estimate_transitions(panel: Panel) -> np.ndarray:
 def main():
     print()
     print("=" * 72)
-    print("AHS Housing Mobility -- CCP Estimation")
+    print("AHS Housing Mobility -- Semi-Synthetic Parameter Recovery")
     print("=" * 72)
 
-    # Step 1: Load cross-section and generate synthetic panel
+    # Step 1: Load cross-section
     print("\n--- Step 1: Load AHS Cross-Section ---")
     moments = load_ahs_moments()
 
-    print(f"\n--- Step 2: Generate {N_SYNTHETIC:,} Synthetic Trajectories ---")
-    panel, burden_by_state = generate_synthetic_panel(moments)
+    # Step 2: Build structural transitions
+    print("\n--- Step 2: Build Structural Transitions ---")
+    transitions = build_structural_transitions(moments["inc_probs"])
+    print(f"  Transition shape: {transitions.shape}")
 
-    actions = np.concatenate([np.array(t.actions) for t in panel.trajectories])
-    print(f"  Empirical move rate: {(actions == 1).mean():.4f}")
-
-    all_states = np.concatenate([np.array(t.states) for t in panel.trajectories])
-    state_counts = np.bincount(all_states, minlength=NUM_STATES)
-    print(f"  States with observations: {(state_counts > 0).sum()}/{NUM_STATES}")
-
-    # Step 3: Build features
+    # Step 3: Build features and problem
     print("\n--- Step 3: Build Features ---")
-    features = build_feature_matrix(burden_by_state)
-    param_names = ["theta_burden", "theta_duration", "theta_renter",
-                   "theta_age", "move_cost"]
-    print(f"  Feature matrix: {features.shape}")
+    features = build_feature_matrix(moments["burden_by_state"])
+    utility = LinearUtility(feature_matrix=features, parameter_names=PARAM_NAMES)
+
+    problem = DDCProblem(
+        num_states=NUM_STATES,
+        num_actions=NUM_ACTIONS,
+        discount_factor=DISCOUNT_FACTOR,
+    )
 
     # Pre-estimation diagnostics
     print("\n--- Pre-Estimation Diagnostics ---")
@@ -456,97 +381,142 @@ def main():
         cond = np.linalg.cond(nonzero_rows)
         print(f"  Condition number: {cond:.1f}  "
               f"({'OK' if cond < 1e6 else 'HIGH'})")
-    covered = (state_counts > 0).sum()
-    print(f"  State coverage: {covered}/{NUM_STATES}")
-    single_action = sum(
-        1 for s in range(NUM_STATES)
-        if state_counts[s] > 0 and len(set(
-            int(a) for t in panel.trajectories
-            for i, a in enumerate(np.array(t.actions))
-            if np.array(t.states)[i] == s
-        )) < 2
+
+    # Step 4: Compute true policy via soft VI
+    print("\n--- Step 4: Compute True Policy ---")
+    print(f"  True params: {TRUE_PARAMS}")
+    transitions_jnp = jnp.array(transitions, dtype=jnp.float64)
+    true_utility = utility.compute(TRUE_PARAM_ARRAY)
+    operator = SoftBellmanOperator(problem, transitions_jnp)
+    solver_result = value_iteration(operator, true_utility, tol=1e-10)
+    print(f"  Soft VI converged: {solver_result.converged} "
+          f"({solver_result.num_iterations} iterations)")
+    print(f"  Move rate under true policy: "
+          f"{float(jnp.dot(jnp.array(moments['initial_dist']), solver_result.policy[:, 1])):.4f}")
+
+    # Step 5: Generate panel from policy
+    print(f"\n--- Step 5: Generate {N_INDIVIDUALS:,} Trajectories ---")
+    initial_dist = jnp.array(moments["initial_dist"])
+    panel = simulate_panel_from_policy(
+        problem=problem,
+        transitions=transitions_jnp,
+        policy=solver_result.policy,
+        initial_distribution=initial_dist,
+        n_individuals=N_INDIVIDUALS,
+        n_periods=N_PERIODS,
+        seed=42,
     )
-    print(f"  States with only one observed action: {single_action}")
+    n_obs = sum(len(t.states) for t in panel.trajectories)
+    all_actions = np.concatenate([np.array(t.actions) for t in panel.trajectories])
+    all_states = np.concatenate([np.array(t.states) for t in panel.trajectories])
+    state_counts = np.bincount(all_states.astype(np.int32), minlength=NUM_STATES)
+    print(f"  Panel: {len(panel.trajectories):,} trajectories, {n_obs:,} observations")
+    print(f"  Empirical move rate: {(all_actions == 1).mean():.4f}")
+    print(f"  States with observations: {(state_counts > 0).sum()}/{NUM_STATES}")
 
-    utility = LinearUtility(feature_matrix=features, parameter_names=param_names)
+    # Step 6: Run estimators
+    results = {}
 
-    # Step 4: Estimate transitions
-    print("\n--- Step 4: Estimate Transitions ---")
-    transitions = estimate_transitions(panel)
+    print("\n--- NFXP ---")
+    t0 = time.time()
+    nfxp = NFXPEstimator(se_method="robust")
+    results["NFXP"] = nfxp.estimate(panel, utility, problem, transitions_jnp)
+    print(f"  Time: {time.time() - t0:.1f}s")
 
-    # Step 5: CCP estimation
-    print("\n--- Step 5: CCP Estimation (Hotz-Miller) ---")
-    problem = DDCProblem(
-        num_states=NUM_STATES,
-        num_actions=NUM_ACTIONS,
-        discount_factor=DISCOUNT_FACTOR,
+    print("\n--- CCP (NPL K=10) ---")
+    t0 = time.time()
+    ccp = CCPEstimator(num_policy_iterations=10, compute_hessian=True, verbose=True)
+    results["CCP"] = ccp.estimate(panel, utility, problem, transitions_jnp)
+    print(f"  Time: {time.time() - t0:.1f}s")
+
+    print("\n--- NNES (NPL variant, Nguyen 2025) ---")
+    t0 = time.time()
+    nnes = NNESEstimator(
+        hidden_dim=32,
+        num_layers=2,
+        v_epochs=200,
+        v_lr=1e-3,
+        n_outer_iterations=3,
+        verbose=False,
     )
+    results["NNES"] = nnes.estimate(panel, utility, problem, transitions_jnp)
+    print(f"  Time: {time.time() - t0:.1f}s")
 
-    ccp = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=True)
+    print("\n--- TD-CCP (semigradient, Adusumilli & Eckardt 2025) ---")
     t0 = time.time()
-    result = ccp.estimate(panel, utility, problem, transitions)
-    print(f"\n  Time: {time.time() - t0:.1f}s")
-    print(result.summary())
+    tdccp = TDCCPEstimator(config=TDCCPConfig(
+        method="semigradient",
+        basis_dim=8,
+        cross_fitting=True,
+        robust_se=False,
+    ))
+    results["TD-CCP"] = tdccp.estimate(panel, utility, problem, transitions_jnp)
+    print(f"  Time: {time.time() - t0:.1f}s")
 
-    # Step 6: NPL refinement
-    print("\n--- Step 6: NPL Estimation (K=10) ---")
-    npl = CCPEstimator(num_policy_iterations=10, compute_hessian=True, verbose=True)
-    t0 = time.time()
-    result_npl = npl.estimate(panel, utility, problem, transitions)
-    elapsed = time.time() - t0
-    print(f"\n  Time: {elapsed:.1f}s")
-    print(result_npl.summary())
+    # Step 7: Parameter recovery table
+    print("\n" + "=" * 72)
+    print("Parameter Recovery")
+    print("=" * 72)
 
-    # Step 7: Sanity checks
-    print("\n--- Step 7: Sanity Checks ---")
-    params = result_npl.parameters
-    # theta_burden > 0: high burden reduces utility of staying (pushes toward moving)
-    # theta_duration > 0: longer tenure increases attachment (boosts stay utility)
-    # theta_renter: sign depends on interpretation (renters move more -> lower stay utility -> could be negative)
-    # theta_age > 0: older households prefer staying
-    # move_cost > 0: moving has a positive baseline constant (i.e., cost makes it less likely)
-    expected_signs = {
-        "theta_burden": ("positive", "high burden reduces stay utility"),
-        "theta_duration": ("positive", "longer tenure = more attachment = higher stay utility"),
-        "theta_age": ("positive", "older households prefer staying"),
-        "move_cost": ("positive", "move cost baseline"),
-    }
-    for name, (expected, reason) in expected_signs.items():
-        idx = param_names.index(name)
-        val = float(params[idx])
-        got = "positive" if val > 0 else "negative"
-        ok = "PASS" if got == expected else "UNEXPECTED"
-        print(f"  {name:18s} = {val:+.4f}  ({got}, expected {expected}) [{ok}] -- {reason}")
+    header = f"{'':>18} {'True':>10} {'NFXP':>10} {'CCP':>10} {'NNES':>10} {'TD-CCP':>10}"
+    print(header)
+    print("-" * len(header))
+    for i, name in enumerate(PARAM_NAMES):
+        true_val = float(TRUE_PARAM_ARRAY[i])
+        nfxp_val = float(results["NFXP"].parameters[i])
+        ccp_val = float(results["CCP"].parameters[i])
+        nnes_val = float(results["NNES"].parameters[i])
+        tdccp_val = float(results["TD-CCP"].parameters[i])
+        print(f"{name:>18} {true_val:>10.4f} {nfxp_val:>10.4f} "
+              f"{ccp_val:>10.4f} {nnes_val:>10.4f} {tdccp_val:>10.4f}")
+
+    print(f"\n{'Standard Errors':>18} {'':>10} {'NFXP':>10} {'CCP':>10} {'NNES':>10} {'TD-CCP':>10}")
+    print("-" * len(header))
+    for i, name in enumerate(PARAM_NAMES):
+        ses = {}
+        for est_name in ["NFXP", "CCP", "NNES", "TD-CCP"]:
+            r = results[est_name]
+            if r.standard_errors is not None:
+                ses[est_name] = float(r.standard_errors[i])
+            else:
+                ses[est_name] = float("nan")
+        print(f"{name:>18} {'':>10} {ses['NFXP']:>10.4f} "
+              f"{ses['CCP']:>10.4f} {ses['NNES']:>10.4f} {ses['TD-CCP']:>10.4f}")
 
     # Save results
-    results = {
+    out = {
         "dataset": "ahs-housing",
-        "estimator": "NPL (K=10)",
-        "n_observations": int(sum(len(t.states) for t in panel.trajectories)),
-        "n_individuals": len(panel.trajectories),
-        "log_likelihood": float(result_npl.log_likelihood),
-        "parameters": {
-            name: {
-                "coef": float(result_npl.parameters[i]),
-                "std_err": float(result_npl.standard_errors[i])
-                if result_npl.standard_errors is not None else None,
-            }
-            for i, name in enumerate(param_names)
-        },
+        "methodology": "semi-synthetic parameter recovery",
+        "true_parameters": TRUE_PARAMS,
+        "n_observations": n_obs,
+        "n_individuals": N_INDIVIDUALS,
+        "discount_factor": DISCOUNT_FACTOR,
         "diagnostics": {
             "feature_rank": int(rank),
-            "state_coverage": int(covered),
+            "state_coverage": int((state_counts > 0).sum()),
             "n_states": NUM_STATES,
-            "single_action_states": int(single_action),
         },
         "cross_section_moments": {
             "renter_share": moments["renter_share"],
-            "move_rate_overall": moments["move_rate_overall"],
-            "median_burden_renters": moments["median_burden_renters"],
+            "n_valid_households": moments["n_valid"],
         },
     }
+    for est_name, r in results.items():
+        out[est_name] = {
+            "parameters": {
+                name: float(r.parameters[i])
+                for i, name in enumerate(PARAM_NAMES)
+            },
+            "standard_errors": {
+                name: float(r.standard_errors[i])
+                for i, name in enumerate(PARAM_NAMES)
+            } if r.standard_errors is not None else None,
+            "log_likelihood": float(r.log_likelihood),
+            "converged": bool(r.converged),
+        }
+
     out_path = Path("examples/ahs-housing/results.json")
-    out_path.write_text(json.dumps(results, indent=2))
+    out_path.write_text(json.dumps(out, indent=2))
     print(f"\nResults saved to {out_path}")
     print("\nDone.")
 

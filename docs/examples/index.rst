@@ -72,6 +72,17 @@ Life-cycle models of schooling, occupation, and employment transitions.
 
    keane_wolpin
 
+Housing and Finance
+-------------------
+
+Household mobility and mortgage termination models with semi-synthetic parameter recovery.
+
+.. toctree::
+   :maxdepth: 1
+
+   ahs_housing
+   freddie_mac
+
 Consumer and Search Behavior
 -----------------------------
 
@@ -82,6 +93,8 @@ Sequential search, browsing, and purchase decisions in markets.
 
    trivago_search
    instacart
+   kkbox_churn
+   expedia_search
 
 Gym Environments
 -----------------
