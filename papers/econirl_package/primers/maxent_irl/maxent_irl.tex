@@ -1,0 +1,287 @@
+\documentclass[11pt]{article}
+\usepackage[left=1in,right=1in,top=0.9in,bottom=0.9in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[round]{natbib}
+\usepackage{hyperref}
+\hypersetup{colorlinks,citecolor=blue,filecolor=blue,linkcolor=blue,urlcolor=blue}
+\usepackage{float}
+\usepackage[ruled,lined]{algorithm2e}
+\usepackage{microtype}
+\usepackage{placeins}
+\usepackage{titling}
+\setlength{\droptitle}{-2em}
+\posttitle{\par\end{center}\vspace{-1em}}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calS}{\mathcal{S}}
+\newcommand{\calH}{\mathcal{H}}
+
+\title{Primer: Maximum Entropy IRL (MaxEnt IRL)}
+\author{econirl package documentation}
+\date{}
+
+\begin{document}
+\maketitle
+
+
+%% ============================================================
+\section{Problem and Motivation}
+%% ============================================================
+
+Maximum Entropy Inverse Reinforcement Learning \citep{ziebart2008} recovers a reward function from demonstrations by applying the maximum entropy principle of \citet{jaynes1957} to the space of trajectories. Among all policies that reproduce the observed feature statistics, the algorithm selects the one with maximum entropy over trajectory distributions. This yields the ``least committed'' explanation consistent with the data.
+
+The maximum entropy principle produces a Boltzmann distribution over entire trajectories, weighted by cumulative reward. The partition function factors via backward recursion through the MDP, making the gradient of the log-likelihood a simple difference between empirical and expected features. This feature matching interpretation connects IRL to moment-based estimation in econometrics, where the structural parameters are chosen so that model-implied moments match their empirical counterparts.
+
+The key limitation of MaxEnt IRL, which motivates Maximum Causal Entropy IRL \citep{ziebart2010}, is that it uses non-causal Shannon entropy over entire trajectories rather than conditioning each action on the agent's available information at decision time. The backward messages propagate future information into current decisions, giving the agent effective foresight. With action-dependent features, this foresight produces systematically incorrect reward estimates, because the trajectory distribution does not factor into per-step decisions that respect the sequential timing of information arrival. The causal variant of \citet{ziebart2010} fixes this by replacing the Shannon entropy with causal entropy, producing the softmax Bellman equation that is equivalent to the structural logit model of \citet{rust1987}.
+
+
+%% ============================================================
+\section{Model and Notation}
+%% ============================================================
+
+The agent operates in a Markov decision process $(\calS, \calA, P, R, \gamma)$ with finite state space $\calS$, finite action space $\calA$, transition probabilities $P(s'|s,a)$, reward function $R(s;\theta) = \theta^\top \phi(s)$, and discount factor $\gamma \in [0,1)$. A trajectory is a sequence of state-action pairs $\tau = (s_0, a_0, s_1, a_1, \ldots)$. The initial state $s_0$ is drawn from $\rho_0$.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}} l l l}
+\toprule
+Symbol & Name & Definition \\
+\midrule
+$\tau$ & Trajectory & $(s_0, a_0, s_1, a_1, \ldots)$ \\
+$P(\tau|\theta)$ & Trajectory probability & $\propto \exp\!\left(\sum_t \gamma^t R(s_t;\theta)\right)$ \\
+$Z(\theta)$ & Partition function & $\sum_\tau \exp\!\left(\sum_t \gamma^t R(s_t;\theta)\right)$ \\
+$D_t(s)$ & State visitation at $t$ & Forward message passing from $\rho_0$ \\
+$Z_a(s)$ & Backward message & $\sum_{s'} P(s'|s,a)\, Z(s')$ \\
+$\phi(s)$ & State features & Known, shape $(|\calS|, K)$ \\
+$\theta$ & Reward weights & Unknown, dimension $K$ \\
+$\rho_0$ & Initial distribution & Empirical start-state frequencies \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+
+%% ============================================================
+\section{Derivation}
+%% ============================================================
+
+\subsection{Theorem: MaxEnt Optimal Trajectory Distribution}
+
+We seek the distribution over trajectories that is maximally noncommittal while reproducing the observed feature statistics.
+
+\paragraph{Primal problem.}
+\begin{equation}
+\label{eq:maxent_primal}
+\max_{P(\tau)} \; H(P) = -\sum_\tau P(\tau) \log P(\tau) \quad \text{s.t.} \quad \E_P[\phi] = \tilde\phi, \quad \sum_\tau P(\tau) = 1,
+\end{equation}
+where $\tilde\phi = \frac{1}{N}\sum_{i=1}^N \sum_t \gamma^t \phi(s_t^{(i)})$ is the empirical discounted feature expectation from the demonstrations and the entropy $H(P)$ is the Shannon entropy over the entire trajectory space. The constraint requires the model's expected features to match those observed in the data.
+
+\paragraph{Lagrangian.}
+Introducing a multiplier $\theta \in \R^K$ for the feature constraint and $\lambda$ for the normalization constraint,
+\begin{equation}
+\label{eq:maxent_lagrangian}
+\mathcal{L}(P, \theta, \lambda) = -\sum_\tau P(\tau) \log P(\tau) + \theta^\top\!\left(\E_P[\phi] - \tilde\phi\right) + \lambda\!\left(\sum_\tau P(\tau) - 1\right).
+\end{equation}
+Expanding the expected features, the Lagrangian becomes
+\begin{equation}
+\mathcal{L} = -\sum_\tau P(\tau) \log P(\tau) + \theta^\top\!\left(\sum_\tau P(\tau) \sum_t \gamma^t \phi(s_t) - \tilde\phi\right) + \lambda\!\left(\sum_\tau P(\tau) - 1\right).
+\end{equation}
+
+\paragraph{First-order condition.}
+Taking the derivative with respect to $P(\tau)$ and setting it to zero,
+\begin{equation}
+\frac{\partial \mathcal{L}}{\partial P(\tau)} = -\log P(\tau) - 1 + \theta^\top \sum_t \gamma^t \phi(s_t) + \lambda = 0.
+\end{equation}
+Solving for $P(\tau)$ gives
+\begin{equation}
+P^*(\tau) = \exp\!\left(\theta^\top \sum_t \gamma^t \phi(s_t) + \lambda - 1\right).
+\end{equation}
+Absorbing the constant $\exp(\lambda - 1)$ into the normalization,
+\begin{equation}
+\label{eq:boltzmann_traj}
+P^*(\tau|\theta) = \frac{1}{Z(\theta)} \exp\!\left(\sum_t \gamma^t \theta^\top \phi(s_t)\right),
+\end{equation}
+where $Z(\theta) = \sum_\tau \exp\!\left(\sum_t \gamma^t \theta^\top \phi(s_t)\right)$ is the partition function. This is a Boltzmann distribution over trajectories, with energy equal to the negative cumulative reward.
+
+\paragraph{Partition function via backward recursion.}
+Direct computation of $Z(\theta)$ requires summing over all trajectories, which is intractable. However, the partition function factors through the MDP structure. Define backward messages
+\begin{align}
+Z(s) &= \sum_a \exp\!\bigl(R(s;\theta)\bigr) \sum_{s'} P(s'|s,a)\, Z(s'), \label{eq:backward_z} \\
+Z_a(s) &= \sum_{s'} P(s'|s,a)\, Z(s'). \label{eq:backward_za}
+\end{align}
+Starting from $Z(s_{\text{terminal}}) = \exp(R(s_{\text{terminal}};\theta))$ for absorbing states and working backward, these messages compute the local contribution of each state to the global partition function. In the discounted infinite-horizon setting, the backward recursion becomes
+\begin{equation}
+\label{eq:backward_discount}
+Z(s) = \exp\!\bigl(R(s;\theta)\bigr) \sum_a \left[\sum_{s'} P(s'|s,a)\, Z(s')^{\gamma}\right].
+\end{equation}
+The policy implied by the MaxEnt distribution is
+\begin{equation}
+\label{eq:maxent_policy}
+\pi(a|s) = \frac{Z_a(s)}{\sum_{a'} Z_{a'}(s)},
+\end{equation}
+which assigns probability to each action proportional to the total future reward mass accessible through that action.
+
+\paragraph{Gradient.}
+The log-likelihood of the demonstrations under the MaxEnt model is
+\begin{equation}
+\log L(\theta) = \sum_{i=1}^N \log P(\tau^{(i)}|\theta) = \sum_{i=1}^N \sum_t \gamma^t \theta^\top \phi(s_t^{(i)}) - N \log Z(\theta).
+\end{equation}
+Taking the gradient,
+\begin{equation}
+\label{eq:maxent_gradient}
+\nabla_\theta \log L = N\!\left(\tilde\phi - \E_\pi[\phi]\right),
+\end{equation}
+where the expected features under the current policy are
+\begin{equation}
+\E_\pi[\phi] = \sum_s D(s)\, \phi(s), \qquad D(s) = \sum_t \gamma^t D_t(s),
+\end{equation}
+and $D_t(s)$ is the probability of being in state $s$ at time $t$ under the current policy. The gradient has the same form as in MCE-IRL, but the state visitation frequencies $D(s)$ are computed differently because the backward messages are non-causal.
+
+
+\subsection{State Visitation via Forward Pass}
+
+The state visitation frequencies are computed by propagating the initial distribution forward through the policy-weighted transitions.
+\begin{align}
+D_0(s) &= \rho_0(s), \label{eq:forward_init} \\
+D_{t+1}(s') &= \sum_s D_t(s) \sum_a \pi(a|s)\, P(s'|s,a), \label{eq:forward_step} \\
+D(s) &= \sum_{t=0}^{T} \gamma^t D_t(s). \label{eq:forward_total}
+\end{align}
+The total discounted visitation $D(s)$ weights each state by how often the agent visits it, discounted by time. This forward pass is identical in form to the MCE-IRL forward pass. The difference lies in the policy $\pi(a|s)$ that drives the propagation. In MaxEnt IRL, the policy comes from the non-causal backward messages in Equation~\eqref{eq:maxent_policy}, which incorporate information about future states and actions. In MCE-IRL, the policy comes from the causal softmax Bellman equation, which conditions only on information available at decision time.
+
+This distinction is critical. The non-causal backward messages $Z(s')$ incorporate information about which actions will be available at state $s'$ and what rewards those actions will yield in the future. The policy in Equation~\eqref{eq:maxent_policy} therefore gives the agent effective foresight, assigning probability to actions based on the entire future trajectory rather than the current state alone. When features depend only on states, this foresight is harmless because the future reward does not depend on which actions the agent takes. When features depend on actions, the foresight produces systematically biased reward estimates because the agent can ``see'' which action-specific rewards are coming and adjust its current behavior accordingly.
+
+
+%% ============================================================
+\section{When MaxEnt Fails}
+%% ============================================================
+
+The non-causal trajectory distribution means $P(\tau)$ does not factor correctly into per-step decisions $\pi(a_t|s_t)$ when features depend on actions. The backward message $Z(s')$ incorporates information about which actions will be available at $s'$, effectively giving the agent foresight that a real decision-maker does not have.
+
+Consider the concrete case from the EconIRL gridworld benchmarks. On a $5 \times 5$ gridworld with direction-dependent step costs (different penalties for moving left, right, up, or down), MaxEnt IRL recovers a reward vector with cosine similarity of approximately $-0.72$ to the true reward, meaning the recovered reward points in roughly the opposite direction from the ground truth. MCE-IRL on the same data achieves cosine similarity of $0.9999$, recovering the true reward almost exactly. With state-only features (where the step penalty is the same regardless of direction), both estimators achieve cosine similarity above $0.99$ because the information asymmetry between causal and non-causal entropy does not matter when rewards do not vary across actions.
+
+The failure mechanism is precise. The backward messages propagate action-specific reward information from future states into the current policy. When action A leads to a state where action B yields high reward, the non-causal policy at the current state inflates the probability of action A because it ``knows'' about the future reward from B. The causal policy does not have this information and assigns probability to A based only on the immediate reward and the discounted expected value of the next state, which is the correct decision rule under rational expectations.
+
+This failure mode is not a matter of tuning or insufficient data. It is a structural bias in the MaxEnt IRL objective. Increasing the number of trajectories does not help because the bias comes from the functional form of the backward messages, not from estimation noise. The only fix is to use the causal entropy objective of \citet{ziebart2010}, which produces the softmax Bellman equation and correctly conditions on the agent's information set.
+
+
+%% ============================================================
+\section{Algorithm}
+%% ============================================================
+
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\caption{MaxEnt IRL \citep{ziebart2008}}
+\label{alg:maxent_irl}
+\KwIn{Panel $\{(s_i, a_i)\}_{i=1}^N$, features $\phi(s)$, transitions $P(s'|s,a)$, discount $\gamma$}
+\BlankLine
+
+\tcp{Step 1: Compute empirical feature expectations}
+$\tilde\phi = \frac{1}{N} \sum_{i=1}^N \phi(s_i)$\;
+Compute initial state distribution $\rho_0$ from first observations\;
+\BlankLine
+
+\tcp{Step 2: Initialize reward weights}
+$\theta_0 \leftarrow \mathbf{0}$\;
+\BlankLine
+
+\tcp{Step 3: Iterate until convergence}
+\For{$k = 0, 1, \ldots$}{
+    \BlankLine
+    \tcp{3a. Backward pass: compute partition function messages (Eqs.~\ref{eq:backward_z}--\ref{eq:backward_za})}
+    $R \leftarrow \theta_k^\top \phi$ \tcp*{reward vector $(|\calS|)$}
+    Compute $Z(s)$ for all states via backward recursion\;
+    Compute $Z_a(s) = \sum_{s'} P(s'|s,a)\, Z(s')$ for all state-action pairs\;
+    \BlankLine
+    \tcp{3b. Policy from backward messages (Eq.~\ref{eq:maxent_policy})}
+    $\pi(a|s) = Z_a(s) / \sum_{a'} Z_{a'}(s)$\;
+    \BlankLine
+    \tcp{3c. Forward pass: state visitation (Eqs.~\ref{eq:forward_init}--\ref{eq:forward_total})}
+    $D_0(s) = \rho_0(s)$\;
+    \For{$t = 0, \ldots, T-1$}{
+        $D_{t+1}(s') = \sum_s D_t(s) \sum_a \pi(a|s)\, P(s'|s,a)$\;
+    }
+    $D(s) = \sum_t \gamma^t D_t(s)$\;
+    \BlankLine
+    \tcp{3d. Expected features under current policy}
+    $\bar\phi_\pi = \sum_s D(s)\, \phi(s)$\;
+    \BlankLine
+    \tcp{3e. Feature matching gradient (Eq.~\ref{eq:maxent_gradient})}
+    $g = \tilde\phi - \bar\phi_\pi$\;
+    \BlankLine
+    \tcp{3f. Update $\theta$ via L-BFGS-B or gradient descent}
+    $\theta_{k+1} \leftarrow \theta_k + \alpha\, g$ \tcp*{or L-BFGS-B step}
+    \BlankLine
+    \tcp{3g. Stopping criterion}
+    \lIf{$\|g\| < \varepsilon$}{\textbf{break}}
+}
+\BlankLine
+
+\KwOut{$\hat\theta$ (reward weights), $\pi^*$, log-likelihood}
+\end{algorithm}
+
+\paragraph{Implementation notes.}
+The backward pass (Step 3a) computes the partition function messages using value iteration on the soft Bellman equation, substituting the backward messages for soft Q-values. In the EconIRL implementation, this uses the same policy iteration solver as MCE-IRL, with the non-causal structure captured by the state visitation computation rather than the backward pass itself. The forward pass (Step 3c) propagates the initial distribution through the policy-weighted transitions for a fixed horizon $T$, then normalizes the accumulated visitation frequencies. The gradient (Step 3e) has the same form as MCE-IRL but produces different updates because the policy and visitation frequencies differ. L-BFGS-B is the default optimizer because it handles the implicit curvature of the feature matching objective well, though projected gradient descent is also available when the parameter space has box constraints.
+
+
+%% ============================================================
+\section{Results}
+%% ============================================================
+
+\input{maxent_irl_results}
+
+We run MaxEnt IRL, MCE-IRL, and behavioral cloning on a \maxentGridSize$\times$\maxentGridSize\ gridworld with \maxentNstates\ states, 5 actions, and three action-dependent features (step penalty, terminal reward, distance weight). Data consists of \maxentNobs\ observations at $\beta = \maxentBeta$.
+
+MCE-IRL achieves cosine similarity of \maxentMceCosine\ to the true reward parameters, recovering the reward structure almost exactly. MaxEnt IRL achieves cosine similarity of \maxentCosine, demonstrating the bias introduced by non-causal state visitation when features are action-dependent. Both structural estimators outperform behavioral cloning (\maxentBcPolicyAcc\% policy accuracy), which does not learn from MDP structure.
+
+The log-likelihood comparison is also informative. MCE-IRL achieves log-likelihood $\maxentMceLL$ while MaxEnt IRL achieves $\maxentLL$. Because MCE-IRL correctly models the agent's information structure, it produces a policy that better explains the observed choices in likelihood terms.
+
+\paragraph{Code.}
+The companion script \texttt{maxent\_irl\_results.py} in this folder generates Table~\ref{tab:maxent_results}. To regenerate:
+\begin{verbatim}
+python papers/econirl_package/primers/maxent_irl/maxent_irl_results.py
+\end{verbatim}
+
+
+%% ============================================================
+\section{Code}
+%% ============================================================
+
+The MaxEnt IRL estimator is implemented in \texttt{src/econirl/contrib/maxent\_irl.py}. The key class is \texttt{MaxEntIRLEstimator}, which accepts either a \texttt{LinearReward} (state-only features) or an \texttt{ActionDependentReward} (state-action features).
+
+\begin{verbatim}
+from econirl.contrib.maxent_irl import MaxEntIRLEstimator
+from econirl.preferences.action_reward import ActionDependentReward
+
+reward_fn = ActionDependentReward(
+    feature_matrix=env.feature_matrix,
+    parameter_names=env.parameter_names,
+)
+
+estimator = MaxEntIRLEstimator(
+    optimizer="L-BFGS-B",
+    inner_solver="policy",
+    inner_tol=1e-10,
+    inner_max_iter=1000,
+    outer_tol=1e-6,
+    outer_max_iter=500,
+)
+
+result = estimator.estimate(
+    panel=panel,
+    utility=reward_fn,
+    problem=env.problem_spec,
+    transitions=env.transition_matrices,
+)
+\end{verbatim}
+
+The \texttt{inner\_solver} parameter controls how the soft Bellman equation is solved in the backward pass. The ``policy'' solver uses policy iteration with matrix evaluation, which converges in fewer iterations than value iteration for small state spaces. The \texttt{outer\_tol} parameter sets the gradient norm threshold for the feature matching convergence criterion.
+
+The main difference from MCE-IRL in the code is the state visitation computation. The method \texttt{\_compute\_state\_visitation\_frequency} uses iterative forward propagation rather than the matrix inversion $(I - \gamma F_\pi^\top)^{-1} \rho_0$ used by MCE-IRL. Both compute the same quantity when the policy is causal, but they diverge when the backward messages are non-causal. For a detailed comparison of the two estimators, see the MCE-IRL primer in \texttt{papers/econirl\_package/primers/mce\_irl/}.
+
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

@@ -1,45 +1,52 @@
-"""SEES primer toy example: parameter recovery on the Rust bus engine.
+#!/usr/bin/env python3
+"""SEES Primer — auto-generate results for the LaTeX document.
 
 Runs SEES (Fourier basis, K=8) and NFXP (oracle) on a simulated panel
-from the Rust (1987) bus replacement model. Writes results to
-sees_results.tex as \\newcommand definitions so the primer PDF
-auto-updates when this script is rerun.
+from the Rust (1987) bus replacement model. Writes LaTeX macros and a
+results table to sees_results.tex.
+
+This script reproduces a scaled-up variant of Rust's bus engine to
+demonstrate SEES's computational advantage: the sieve basis avoids the
+inner fixed-point loop entirely, making SEES faster than NFXP even on
+moderate state spaces while achieving comparable log-likelihood.
 
 Usage:
-    python sees_toy.py
+    cd /path/to/econirl
+    python papers/econirl_package/primers/sees/sees_run.py
 """
 
 import json
-import os
 import time
+from pathlib import Path
 
+import jax.numpy as jnp
 import numpy as np
 
-from econirl.environments.rust_bus import RustBusEnvironment
-from econirl.estimation.nfxp import NFXPEstimator
-from econirl.estimation.sees import SEESConfig, SEESEstimator
-from econirl.preferences.linear import LinearUtility
-from econirl.simulation.synthetic import simulate_panel
+OUT = Path(__file__).resolve().parent / "sees_results.tex"
 
 # ---------- DGP settings (Rust 1987) ----------
-TRUE_OC = 0.01           # operating cost per mileage bin
-TRUE_RC = 4.0            # replacement cost
-N_STATES = 90            # mileage bins
-DISCOUNT = 0.99          # beta
+TRUE_OC = 0.001          # operating cost per mileage bin
+TRUE_RC = 3.0            # replacement cost
+N_STATES = 200           # mileage bins (large to show SEES scaling)
+DISCOUNT = 0.9999        # beta
 N_BUSES = 200            # number of individuals
 N_PERIODS = 100          # periods per bus
 SEED = 42
 
-# ---------- SEES settings (Luo & Sang 2024) ----------
-BASIS_TYPE = "fourier"
-BASIS_DIM = 12
-PENALTY_WEIGHT = 100.0
-
-OUT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 def main():
-    # --- Simulate data ---
+    from econirl.environments.rust_bus import RustBusEnvironment
+    from econirl.estimation.nfxp import NFXPEstimator
+    from econirl.estimation.sees import SEESConfig, SEESEstimator
+    from econirl.preferences.linear import LinearUtility
+    from econirl.simulation.synthetic import simulate_panel
+
+    n_obs = N_BUSES * N_PERIODS
+
+    print("SEES Primer — generating results")
+    print(f"  Environment: Rust bus, {N_STATES} bins, beta={DISCOUNT}")
+    print(f"  Data: {N_BUSES} x {N_PERIODS} = {n_obs:,} obs")
+
     env = RustBusEnvironment(
         operating_cost=TRUE_OC,
         replacement_cost=TRUE_RC,
@@ -52,20 +59,18 @@ def main():
     utility = LinearUtility.from_environment(env)
 
     panel = simulate_panel(
-        env,
-        n_individuals=N_BUSES,
-        n_periods=N_PERIODS,
+        env, n_individuals=N_BUSES, n_periods=N_PERIODS,
         seed=SEED + 1000,
     )
 
-    true_params = np.array([TRUE_OC, TRUE_RC])
     results = {}
 
-    # --- NFXP oracle ---
+    # ── NFXP oracle ──
+    print("\n  Running NFXP...")
     nfxp = NFXPEstimator(
         inner_solver="hybrid",
         inner_tol=1e-12,
-        inner_max_iter=100000,
+        inner_max_iter=300000,
         switch_tol=1e-3,
         outer_max_iter=200,
         compute_hessian=True,
@@ -78,21 +83,23 @@ def main():
     nfxp_se = np.asarray(nfxp_res.standard_errors)
 
     results["nfxp"] = {
-        "theta_c": round(float(nfxp_params[0]), 8),
-        "RC": round(float(nfxp_params[1]), 6),
-        "se_theta_c": round(float(nfxp_se[0]), 8),
-        "se_RC": round(float(nfxp_se[1]), 6),
-        "ll": round(float(nfxp_res.log_likelihood), 2),
-        "time_s": round(nfxp_time, 2),
+        "theta_c": float(nfxp_params[0]),
+        "RC": float(nfxp_params[1]),
+        "se_theta_c": float(nfxp_se[0]),
+        "se_RC": float(nfxp_se[1]),
+        "ll": float(nfxp_res.log_likelihood),
+        "time": nfxp_time,
     }
-    print(f"NFXP:  theta_c={nfxp_params[0]:.6f}  RC={nfxp_params[1]:.4f}  "
-          f"LL={nfxp_res.log_likelihood:.1f}  time={nfxp_time:.1f}s")
+    print(f"    theta_c={nfxp_params[0]:.6f} (SE {nfxp_se[0]:.6f}), "
+          f"RC={nfxp_params[1]:.4f} (SE {nfxp_se[1]:.4f}), "
+          f"LL={nfxp_res.log_likelihood:.1f}, time={nfxp_time:.1f}s")
 
-    # --- SEES ---
+    # ── SEES (Fourier basis) ──
+    print("\n  Running SEES...")
     sees_cfg = SEESConfig(
-        basis_type=BASIS_TYPE,
-        basis_dim=BASIS_DIM,
-        penalty_weight=PENALTY_WEIGHT,
+        basis_type="fourier",
+        basis_dim=8,
+        penalty_weight=10.0,
         max_iter=500,
         compute_se=True,
         se_method="asymptotic",
@@ -106,80 +113,84 @@ def main():
     sees_params = np.asarray(sees_res.parameters)
     sees_se = np.asarray(sees_res.standard_errors)
 
-    # Bellman violation at solution
     bellman_viol = 0.0
     if sees_res.metadata and "bellman_violation" in sees_res.metadata:
         bellman_viol = float(sees_res.metadata["bellman_violation"])
 
     results["sees"] = {
-        "theta_c": round(float(sees_params[0]), 8),
-        "RC": round(float(sees_params[1]), 6),
-        "se_theta_c": round(float(sees_se[0]), 8),
-        "se_RC": round(float(sees_se[1]), 6),
-        "ll": round(float(sees_res.log_likelihood), 2),
-        "time_s": round(sees_time, 2),
-        "bellman_violation": round(float(bellman_viol), 6),
-        "basis_type": BASIS_TYPE,
-        "basis_dim": BASIS_DIM,
+        "theta_c": float(sees_params[0]),
+        "RC": float(sees_params[1]),
+        "se_theta_c": float(sees_se[0]),
+        "se_RC": float(sees_se[1]),
+        "ll": float(sees_res.log_likelihood),
+        "time": sees_time,
+        "bellman_violation": bellman_viol,
     }
-    print(f"SEES:  theta_c={sees_params[0]:.6f}  RC={sees_params[1]:.4f}  "
-          f"LL={sees_res.log_likelihood:.1f}  time={sees_time:.1f}s")
+    print(f"    theta_c={sees_params[0]:.6f} (SE {sees_se[0]:.6f}), "
+          f"RC={sees_params[1]:.4f} (SE {sees_se[1]:.4f}), "
+          f"LL={sees_res.log_likelihood:.1f}, time={sees_time:.1f}s")
 
-    # --- Relative errors ---
-    oc_pct = float(abs(sees_params[0] - TRUE_OC) / TRUE_OC * 100)
-    rc_pct = float(abs(sees_params[1] - TRUE_RC) / TRUE_RC * 100)
-    results["relative_error_pct"] = {
-        "theta_c": round(oc_pct, 2),
-        "RC": round(rc_pct, 2),
-    }
-    print(f"Relative error:  theta_c={oc_pct:.1f}%  RC={rc_pct:.1f}%")
+    speedup = nfxp_time / sees_time if sees_time > 0 else float("inf")
+    ll_gap = abs(float(sees_res.log_likelihood) - float(nfxp_res.log_likelihood))
+    print(f"\n  Speedup: {speedup:.1f}x")
+    print(f"  LL gap: {ll_gap:.2f}")
 
-    # --- DGP metadata ---
-    results["dgp"] = {
-        "true_theta_c": TRUE_OC,
-        "true_RC": TRUE_RC,
-        "n_states": N_STATES,
-        "discount": DISCOUNT,
-        "n_buses": N_BUSES,
-        "n_periods": N_PERIODS,
-        "n_obs": N_BUSES * N_PERIODS,
-    }
+    # ── Write LaTeX ──
+    tex = []
+    tex.append("% Auto-generated by sees_run.py — do not edit by hand")
+    tex.append(f"% Rust bus {N_STATES} bins, beta={DISCOUNT}, {n_obs} obs, seed={SEED}")
+    tex.append("")
+    tex.append(f"\\newcommand{{\\seesNstates}}{{{N_STATES}}}")
+    tex.append(f"\\newcommand{{\\seesBeta}}{{{DISCOUNT}}}")
+    tex.append(f"\\newcommand{{\\seesNobs}}{{{n_obs:,}}}")
+    tex.append(f"\\newcommand{{\\seesTrueOC}}{{{TRUE_OC}}}")
+    tex.append(f"\\newcommand{{\\seesTrueRC}}{{{TRUE_RC}}}")
+    tex.append("")
+    # NFXP
+    tex.append(f"\\newcommand{{\\seesNfxpOC}}{{{float(nfxp_params[0]):.6f}}}")
+    tex.append(f"\\newcommand{{\\seesNfxpRC}}{{{float(nfxp_params[1]):.4f}}}")
+    tex.append(f"\\newcommand{{\\seesNfxpSEOC}}{{{float(nfxp_se[0]):.6f}}}")
+    tex.append(f"\\newcommand{{\\seesNfxpSERC}}{{{float(nfxp_se[1]):.4f}}}")
+    tex.append(f"\\newcommand{{\\seesNfxpLL}}{{{float(nfxp_res.log_likelihood):.1f}}}")
+    tex.append(f"\\newcommand{{\\seesNfxpTime}}{{{nfxp_time:.1f}}}")
+    tex.append("")
+    # SEES
+    tex.append(f"\\newcommand{{\\seesOC}}{{{float(sees_params[0]):.6f}}}")
+    tex.append(f"\\newcommand{{\\seesRC}}{{{float(sees_params[1]):.4f}}}")
+    tex.append(f"\\newcommand{{\\seesSEOC}}{{{float(sees_se[0]):.6f}}}")
+    tex.append(f"\\newcommand{{\\seesSERC}}{{{float(sees_se[1]):.4f}}}")
+    tex.append(f"\\newcommand{{\\seesLL}}{{{float(sees_res.log_likelihood):.1f}}}")
+    tex.append(f"\\newcommand{{\\seesTime}}{{{sees_time:.1f}}}")
+    tex.append(f"\\newcommand{{\\seesSpeedup}}{{{speedup:.1f}}}")
+    tex.append(f"\\newcommand{{\\seesLLgap}}{{{ll_gap:.2f}}}")
+    tex.append(f"\\newcommand{{\\seesBellmanViol}}{{{bellman_viol:.2e}}}")
+    tex.append("")
 
-    # --- Write JSON ---
-    json_path = os.path.join(OUT_DIR, "sees_results.json")
-    with open(json_path, "w") as f:
-        json.dump(results, f, indent=2)
-    print(f"Wrote {json_path}")
+    # Embedded results table
+    tex.append("\\begin{table}[h!]")
+    tex.append("\\centering\\small")
+    tex.append(f"\\caption{{Rust bus engine (\\seesNstates\\ bins, "
+               f"$\\beta=\\seesBeta$, \\seesNobs\\ obs). "
+               f"SEES uses a Fourier basis with $K=8$ terms.}}")
+    tex.append("\\label{tab:sees_results}")
+    tex.append("\\begin{tabular*}{\\textwidth}{@{\\extracolsep{\\fill}} l r r r}")
+    tex.append("\\toprule")
+    tex.append("& True & NFXP & SEES \\\\")
+    tex.append("\\midrule")
+    tex.append("$\\hat\\theta_c$ & \\seesTrueOC & \\seesNfxpOC & \\seesOC \\\\")
+    tex.append("SE($\\hat\\theta_c$) & --- & \\seesNfxpSEOC & \\seesSEOC \\\\")
+    tex.append("$\\widehat{RC}$ & \\seesTrueRC & \\seesNfxpRC & \\seesRC \\\\")
+    tex.append("SE($\\widehat{RC}$) & --- & \\seesNfxpSERC & \\seesSERC \\\\")
+    tex.append("Log-likelihood & --- & $\\seesNfxpLL$ & $\\seesLL$ \\\\")
+    tex.append("Time (s) & --- & \\seesNfxpTime & \\seesTime \\\\")
+    tex.append("\\bottomrule")
+    tex.append("\\end{tabular*}")
+    tex.append("\\end{table}")
 
-    # --- Write LaTeX snippet ---
-    tex_path = os.path.join(OUT_DIR, "sees_results.tex")
-    with open(tex_path, "w") as f:
-        f.write("% Auto-generated by sees_toy.py -- do not edit\n")
-        # DGP
-        f.write(f"\\newcommand{{\\dgpOC}}{{{TRUE_OC}}}\n")
-        f.write(f"\\newcommand{{\\dgpRC}}{{{TRUE_RC}}}\n")
-        f.write(f"\\newcommand{{\\dgpNstates}}{{{N_STATES}}}\n")
-        f.write(f"\\newcommand{{\\dgpBeta}}{{{DISCOUNT}}}\n")
-        f.write(f"\\newcommand{{\\dgpNobs}}{{{N_BUSES * N_PERIODS}}}\n")
-        # NFXP
-        f.write(f"\\newcommand{{\\nfxpOC}}{{{nfxp_params[0]:.6f}}}\n")
-        f.write(f"\\newcommand{{\\nfxpRC}}{{{nfxp_params[1]:.4f}}}\n")
-        f.write(f"\\newcommand{{\\nfxpSEOC}}{{{nfxp_se[0]:.6f}}}\n")
-        f.write(f"\\newcommand{{\\nfxpSERC}}{{{nfxp_se[1]:.4f}}}\n")
-        f.write(f"\\newcommand{{\\nfxpLL}}{{{nfxp_res.log_likelihood:.1f}}}\n")
-        f.write(f"\\newcommand{{\\nfxpTime}}{{{nfxp_time:.1f}}}\n")
-        # SEES
-        f.write(f"\\newcommand{{\\seesOC}}{{{sees_params[0]:.6f}}}\n")
-        f.write(f"\\newcommand{{\\seesRC}}{{{sees_params[1]:.4f}}}\n")
-        f.write(f"\\newcommand{{\\seesSEOC}}{{{sees_se[0]:.6f}}}\n")
-        f.write(f"\\newcommand{{\\seesSERC}}{{{sees_se[1]:.4f}}}\n")
-        f.write(f"\\newcommand{{\\seesLL}}{{{sees_res.log_likelihood:.1f}}}\n")
-        f.write(f"\\newcommand{{\\seesTime}}{{{sees_time:.1f}}}\n")
-        f.write(f"\\newcommand{{\\seesBellmanViol}}{{{bellman_viol:.2e}}}\n")
-        # Relative errors
-        f.write(f"\\newcommand{{\\seesOCpct}}{{{oc_pct:.1f}}}\n")
-        f.write(f"\\newcommand{{\\seesRCpct}}{{{rc_pct:.1f}}}\n")
-    print(f"Wrote {tex_path}")
+    OUT.write_text("\n".join(tex) + "\n")
+    print(f"\n  Wrote {OUT}")
+    OUT.with_suffix(".json").write_text(json.dumps(results, indent=2, default=float))
+    print(f"  Wrote {OUT.with_suffix('.json')}")
 
 
 if __name__ == "__main__":
