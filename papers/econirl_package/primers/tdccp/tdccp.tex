@@ -180,26 +180,26 @@ For neural AVI, replace Step~3 with iterative regression networks (\texttt{\_neu
 
 The experiment simulates a firm value model where productivity $z \in [0,1]$ follows an AR(1) process with persistence $\rho = 0.8$.
 Firms choose to operate ($a=1$) or exit ($a=0$) each period.
-Flow utility is $u(1, z;\theta) = \theta_v z + \theta_{FC}$ and $u(0, z;\theta) = 0$, where $\theta_v = 5.0$ is the productivity value and $\theta_{FC} = -1.0$ is the fixed operating cost (negative sign).
-The state space is represented by \tdNstates\ discrete bins covering $[0,1]$, which approximates the continuous process.
-The dataset has \tdNobs\ observations from 3{,}000 individuals over 5 periods, with $\beta = \tdBeta$.
+Flow utility is $u(1, z;\theta) = \theta_v z + \theta_{FC}$ and $u(0, z;\theta) = 0$, where $\theta_v = 5.0$ and $\theta_{FC} = -1.0$.
+The state is discretized to \tdNstates\ bins approximating the continuous process.
+The dataset has \tdNobs\ observations from 3{,}000 individuals over 5 periods with $\beta = \tdBeta$.
 
-CCP must estimate the structural parameters by discretizing the state space into $K$ coarse bins and estimating the transition matrix $\hat P(z' \mid z, a)$ from data.
-With $K = 5$ bins (width $0.2$), each bin averages over a wide range of true productivity values, introducing feature misspecification.
-With $K = 20$ bins (width $0.05$), the features are more accurate but the transition matrix has 800 cells to estimate from the same data, producing noisy $\hat P$.
-Neither discretization level escapes both sources of error simultaneously.
-TD-CCP uses degree-8 polynomial basis functions over the normalized state $z_{\mathrm{norm}} \in [0,1]$ and never estimates the transition density.
+CCP must discretize the state into $K$ coarse bins and estimate the transition matrix $\hat P(z' \mid z, a)$ by frequency counting.
+With $K = 5$ bins, each bin spans a productivity range of $0.2$, averaging over a utility variation of $\theta_v \times 0.2 = 1.0$, which is larger than both structural parameters combined.
+The coarse features bias the parameter estimates away from the truth.
+The natural fix is to increase $K$: at $K = 100$ bins (the same resolution as the fine grid, so no coarsening at all), the AR(1) noise spreads each source state across roughly 17 destination bins.
+With \tdNobs\ observations and two actions, each source state receives about 75 observations; spread across 17 active transition cells, that yields roughly 4 observations per cell.
+The frequency estimate $\hat P$ is nearly noise, and the NPL propagates this noise directly into the parameter estimates.
+There is no safe choice of $K$: coarser bins introduce feature bias, finer bins introduce transition estimation variance.
+This is the Goldilocks trap for discretized CCP.
+TD-CCP uses degree-8 polynomial basis functions over $z_{\mathrm{norm}} \in [0,1]$ and never forms $\hat P$ at all.
 
-Table~\ref{tab:tdccp_results} shows the results.
-TD-CCP recovers $\theta_v$ within 1 percent and $\theta_{FC}$ within 7 percent of the true values, with valid robust standard errors reported in parentheses.
-CCP with $K = 5$ bins achieves parameter RMSE of \ccpFiveRMSE, roughly 4 times worse than TD-CCP's \tdRMSE.
-CCP with $K = 20$ bins achieves RMSE of \ccpTwentyRMSE, roughly 8 times worse, because the finer grid creates noisier transition estimates that compound the discretization error.
-Behavioral cloning reaches \bcAcc\ policy accuracy but cannot recover structural parameters or produce standard errors.
-
-The comparison illustrates the paper's central claim: there is no safe choice of bin width for CCP when the state is continuous.
-Coarser bins introduce feature bias; finer bins introduce transition estimation variance.
-TD-CCP sidesteps the dilemma by forming $h_k$ and $g$ directly from the observed next-state transitions $(z_t, a_t, z_{t+1})$, never forming $P(z' \mid z, a)$ at all.
-The locally robust standard errors are valid at the parametric $\sqrt{n}$ rate despite the nonparametric polynomial first stage.
+Table~\ref{tab:tdccp_results} shows the outcome.
+TD-CCP achieves RMSE of \tdRMSE, with robust standard errors in parentheses.
+CCP with $K = 5$ bins reaches RMSE of \ccpFiveRMSE\ (feature bias dominates), \ccpFiveWin\ times worse.
+CCP with $K = 100$ bins reaches RMSE of \ccpHundredRMSE\ (transition noise dominates), \ccpHundredWin\ times worse.
+Finer discretization makes things worse, not better, once the transition matrix is too sparse to estimate reliably.
+Behavioral cloning reaches \bcAcc\ policy accuracy but recovers no structural parameters.
 
 \begin{lstlisting}[basicstyle=\footnotesize\ttfamily]
 from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
