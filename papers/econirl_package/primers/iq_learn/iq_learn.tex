@@ -102,9 +102,9 @@ where $\hat{r}_i = Q(s_i,a_i) - \beta\sum_{s'} V(s')\,p(s'|s_i,a_i)$ and $V(s) =
 
 Expression~\eqref{eq:penMLE} is a penalized conditional log-likelihood. The first term is the multinomial logit log-likelihood with $Q$-values as utilities. The second term is an $\ell^2$ penalty on the Bellman-implied reward, weighted by the expert occupancy. The penalty is quadratic in $\hat{r}$ but not in $Q$ (because $V$ depends on $Q$ through the logsumexp). No inner Bellman solve appears because $V$ is an explicit function of $Q$.
 
-\paragraph{Identification.} Multiple reward functions rationalize the same policy. For any potential $h: \mathcal{S} \to \R$, the shaped reward $r'(s,a) = r(s,a) + h(s) - \beta\sum_{s'} h(s')\,p(s'|s,a)$ yields the same optimal policy (Ng et al., 1999). IQ-Learn does not resolve this non-identification. The chi-squared regularizer selects the element with smallest implied reward at expert-visited states. This has no economic interpretation, unlike the anchor normalizations of AAIRL (Lee et al., 2026) which set the exit payoff to zero. As $\alpha \to \infty$ the penalty vanishes and the objective reduces to standard conditional log-likelihood maximization, recovering BC as a special case with no Bellman structure.
+\paragraph{Identification.} Multiple reward functions rationalize the same policy. For any potential $h: \mathcal{S} \to \R$, the shaped reward $r'(s,a) = r(s,a) + h(s) - \beta\sum_{s'} h(s')\,p(s'|s,a)$ yields the same optimal policy (Ng et al., 1999). IQ-Learn does not resolve this non-identification. The chi-squared regularizer selects the element with smallest implied reward at expert-visited states. This has no economic interpretation, unlike the anchor normalizations of AAIRL (Lee et al., 2026) which set the exit payoff to zero.
 
-\paragraph{Comparison to GLADIUS.} Both IQ-Learn and GLADIUS combine a log-likelihood term with a Bellman-consistency penalty. The key difference is how the continuation value $\E[V(s')|s,a]$ is handled. IQ-Learn with known transitions computes it exactly. GLADIUS works model-free and introduces a dual variable $\zeta(s,a) \approx \E[V(s')|s,a]$ to correct the double-sampling bias. GLADIUS also explicitly enforces Bellman consistency and has global convergence guarantees via the PL condition, while IQ-Learn does not enforce or guarantee Bellman satisfaction.
+\paragraph{Context among estimators.} Both IQ-Learn and GLADIUS combine a log-likelihood term with a Bellman-consistency penalty. IQ-Learn with known transitions computes continuation values exactly; GLADIUS works model-free and introduces a dual variable $\zeta(s,a) \approx \E[V(s')|s,a]$ to correct double-sampling bias, with global convergence guarantees via the PL condition. More broadly, IQ-Learn traces a regularization path among classical estimators: $\alpha\!\to\!\infty$ recovers BC (pure conditional logit); $\alpha\!\to\!0$ forces $\mathrm{td}(s,a)\!\to\!0$ at expert states, converging to the Bellman-constrained MLE of NFXP and MPEC (Su \& Judd 2012)---both impose Bellman globally as a hard equality constraint, while IQ-Learn relaxes it to a soft $\ell^2$ penalty at expert states only. The CCP connection (Hotz \& Miller 1993) is algorithmic: both avoid the inner loop via the inverse Bellman operator, but CCP does so in two steps (estimate $\hat\pi$ empirically, then Hotz-Miller inversion) while IQ-Learn jointly optimizes $Q$ in one step.
 
 
 %% ============================================================
@@ -142,7 +142,7 @@ $\hat{\pi}(a|s) \leftarrow \text{softmax}(Q(s,\cdot)/\sigma)$\;
 \KwOut{$\hat{Q}$, $\hat{r}$, $\hat{\pi}$}
 \end{algorithm}
 
-\paragraph{Implementation notes.} In the tabular setting with known transitions, the gradient $\nabla_Q \mathcal{J}$ is computed by automatic differentiation through the logsumexp. No inner Bellman loop is needed. The EconIRL implementation uses L-BFGS-B for the outer optimization. In continuous spaces where $p$ is unknown, the original IQ-Learn paper replaces the exact continuation value with sampled next states and adds a separate policy network, but these are implementation details for the continuous case. The regularization parameter $\alpha$ controls how tightly the Bellman equation is enforced: $\alpha \to 0$ forces $\hat{r} \to 0$ at expert states, $\alpha \to \infty$ removes the penalty and reduces to unconstrained logit with no structural content.
+\paragraph{Implementation notes.} In the tabular setting with known transitions, the gradient $\nabla_Q \mathcal{J}$ is computed by automatic differentiation through the logsumexp. No inner Bellman loop is needed. The EconIRL implementation uses L-BFGS-B for the outer optimization.
 
 
 %% ============================================================
@@ -228,6 +228,10 @@ Identification & parametric & parametric & regularizer & anchor & anchor \\
 
 \smallskip\noindent Ng, A., Harada, D., and Russell, S.\ (1999). Policy invariance under reward transformations. \textit{ICML}.
 
+\smallskip\noindent Hotz, V.J.\ and Miller, R.A.\ (1993). Conditional choice probabilities. \textit{Review of Economic Studies} 60(3):497--529.
+
 \smallskip\noindent Rust, J.\ (1987). Optimal replacement of GMC bus engines. \textit{Econometrica} 55(5):999--1033.
+
+\smallskip\noindent Su, C.-L.\ and Judd, K.L.\ (2012). Constrained optimization approaches to structural models. \textit{Econometrica} 80(5):2213--2230.
 
 \end{document}
