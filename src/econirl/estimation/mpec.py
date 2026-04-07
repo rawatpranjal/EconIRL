@@ -172,29 +172,34 @@ class MPECEstimator(BaseEstimator):
         transitions: jnp.ndarray,
         initial_params: jnp.ndarray | None = None,
     ) -> EstimationResult:
-        """MPEC via Sequential Quadratic Programming (JAX-native).
+        """MPEC via Sequential Quadratic Programming (scipy SLSQP + JAX gradients).
 
-        At each outer iteration:
-          1. Compute objective gradient g and Bellman constraint c, Jacobian J.
-          2. Solve KKT system [H J^T; J 0] [d; mu] = [-g; -c] for search
-             direction d and updated multipliers mu.
-          3. Backtracking line search on an L1 merit function.
-          4. Damped BFGS update of the Lagrangian Hessian approximation H.
+        Reformulates DDC estimation as:
+            min_{theta, V}  -L(theta, V)
+            s.t.            V = T(V; theta)
 
-        Convergence when max(|c|) < constraint_tol AND max(|g + J^T mu|) < tol.
+        The Bellman equality constraint is passed to scipy's SLSQP solver.
+        JAX JIT-compiled functions supply the objective gradient and constraint
+        Jacobian. The inner Bellman fixed-point loop is eliminated entirely.
+
+        This is the JAX-ecosystem alternative to Su & Judd (2012)'s KNITRO-based
+        MPEC. SLSQP is an SQP method — at each outer step it solves a quadratic
+        approximation to the constrained problem — so it converges quickly from
+        a feasible starting point (V0 = Bellman FP at initial theta).
         """
+        import numpy as np
+        from scipy.optimize import minimize as scipy_minimize
+
         start_time = time.time()
         cfg = self._config
         (beta, sigma, transitions_f64, features, obs_states, obs_actions,
          n_params, n_states, theta, V, operator, _) = self._setup_common(
             panel, utility, problem, transitions, initial_params)
 
-        n_vars = n_params + n_states
-
-        # --- JAX-native functions (JIT-compiled once) ---
+        # --- JIT-compiled objective and constraint functions ---
 
         @jax.jit
-        def bellman_residual(x):
+        def _bellman_residual(x):
             th, v = x[:n_params], x[n_params:]
             u = jnp.einsum("sak,k->sa", features, th)
             EV = jnp.einsum("ast,t->as", transitions_f64, v)
@@ -203,7 +208,7 @@ class MPECEstimator(BaseEstimator):
             return v - TV  # shape (n_states,)
 
         @jax.jit
-        def neg_log_likelihood(x):
+        def _neg_log_likelihood(x):
             th, v = x[:n_params], x[n_params:]
             u = jnp.einsum("sak,k->sa", features, th)
             EV = jnp.einsum("ast,t->as", transitions_f64, v)
@@ -211,157 +216,84 @@ class MPECEstimator(BaseEstimator):
             lp = jax.nn.log_softmax(Q / sigma, axis=1)
             return -lp[obs_states, obs_actions].sum()
 
-        grad_fn = jax.jit(jax.value_and_grad(neg_log_likelihood))
-        jac_fn = jax.jit(jax.jacobian(bellman_residual))  # (n_states, n_vars)
+        _grad_nll = jax.jit(jax.grad(_neg_log_likelihood))
+        _jac_bellman = jax.jit(jax.jacobian(_bellman_residual))
 
-        # L1 merit function for line search
-        @jax.jit
-        def merit(x, penalty):
-            return neg_log_likelihood(x) + penalty * jnp.abs(bellman_residual(x)).sum()
+        # Warm scipy call to trigger JAX compilation before the timed run
+        _x0 = np.array(jnp.concatenate([theta, V]), dtype=np.float64)
+        _ = _neg_log_likelihood(jnp.array(_x0))
+        _ = _bellman_residual(jnp.array(_x0))
 
-        # Damped BFGS update (maintains positive definiteness)
-        def _bfgs_update(H, s, y):
-            Hs = H @ s
-            sHs = jnp.dot(s, Hs)
-            sy = jnp.dot(s, y)
-            # Damping: ensure sy >= 0.2 * s'Hs
-            theta_damp = jnp.where(sy >= 0.2 * sHs, 1.0, 0.8 * sHs / (sHs - sy))
-            y_damp = theta_damp * y + (1.0 - theta_damp) * Hs
-            sy_damp = jnp.dot(s, y_damp)
-            rho = 1.0 / jnp.where(jnp.abs(sy_damp) < 1e-12, 1e-12, sy_damp)
-            I = jnp.eye(n_vars)
-            A = I - rho * jnp.outer(s, y_damp)
-            return A @ H @ A.T + rho * jnp.outer(s, s)
+        # Numpy wrappers for scipy (scipy requires np arrays, not JAX)
+        def obj_np(x):
+            return float(_neg_log_likelihood(jnp.array(x, dtype=jnp.float64)))
 
-        # --- Warm-up: JAXopt LBFGS on LL(theta | V fixed) ---
-        # Optimising theta with V held fixed at the initial Bellman FP
-        # moves theta close to the MLE before the constrained SQP begins.
-        # This avoids the spurious local optima that arise when SQP starts
-        # far from the truth with V pinned at the wrong equilibrium.
-        self._log("Warm-up: LBFGS on theta with V fixed (JAXopt)")
-        try:
-            from jaxopt import LBFGS as JAXoptLBFGS
-
-            _warmup = JAXoptLBFGS(fun=_mpec_warmup_nll_jit, maxiter=50, tol=1e-6)
-            _ws = _warmup.run(
-                theta, V, features, transitions_f64,
-                obs_states, obs_actions, beta, sigma,
+        def grad_np(x):
+            return np.array(
+                _grad_nll(jnp.array(x, dtype=jnp.float64)), dtype=np.float64
             )
-            theta = jnp.array(_ws.params, dtype=jnp.float64)
-            # Re-solve V at warmed-up theta so the starting (theta, V) is feasible
-            _warm_u = jnp.einsum("sak,k->sa", features, theta)
-            _warm_vi = value_iteration(operator, _warm_u, tol=1e-8, max_iter=10000)
-            V = jnp.array(_warm_vi.V, dtype=jnp.float64)
-            self._log("Warm-up complete")
-        except Exception as e:
-            self._log(f"Warm-up skipped ({e})")
 
-        # --- Initialise SQP ---
-        x = jnp.concatenate([theta, V])
-        H = jnp.eye(n_vars, dtype=jnp.float64)  # BFGS Hessian approximation
-        mu = jnp.zeros(n_states, dtype=jnp.float64)  # Lagrange multipliers
+        def con_np(x):
+            return np.array(
+                _bellman_residual(jnp.array(x, dtype=jnp.float64)), dtype=np.float64
+            )
 
-        converged = False
-        n_evals = 0
-        violation = float("inf")
-        kkt_err = float("inf")
-        ll = float(-neg_log_likelihood(x))
+        def jac_con_np(x):
+            return np.array(
+                _jac_bellman(jnp.array(x, dtype=jnp.float64)), dtype=np.float64
+            )
 
-        self._log("Starting MPEC SQP optimisation")
+        # Progress tracking via callback (called after each major iterate)
+        _iter_count = [0]
+        _last_ll = [float(-_neg_log_likelihood(jnp.array(_x0)))]
+        _last_cv = [float(np.max(np.abs(con_np(_x0))))]
 
         from tqdm import tqdm
         pbar = tqdm(
-            range(cfg.outer_max_iter),
-            desc="MPEC SQP",
+            total=cfg.outer_max_iter,
+            desc="MPEC SLSQP",
             disable=not self._verbose,
             leave=True,
         )
 
-        for outer_iter in pbar:
-            nll, g = grad_fn(x)
-            c = bellman_residual(x)
-            J = jac_fn(x)  # (n_states, n_vars)
-            n_evals += 1
-
-            violation = float(jnp.abs(c).max())
-            # Lagrangian stationarity: g + J^T mu
-            kkt_err = float(jnp.abs(g + J.T @ mu).max())
-            ll = float(-nll)
-
+        def _callback(x):
+            _iter_count[0] += 1
+            _last_ll[0] = float(-_neg_log_likelihood(jnp.array(x, dtype=jnp.float64)))
+            _last_cv[0] = float(np.max(np.abs(con_np(x))))
+            pbar.update(1)
             pbar.set_postfix({
-                "LL": f"{ll:.2f}",
-                "|c|": f"{violation:.1e}",
-                "|KKT|": f"{kkt_err:.1e}",
+                "LL": f"{_last_ll[0]:.2f}",
+                "|c|_inf": f"{_last_cv[0]:.1e}",
             })
             self._log(
-                f"SQP iter {outer_iter+1}: LL={ll:.4f} |c|={violation:.2e} |KKT|={kkt_err:.2e}"
+                f"SLSQP iter {_iter_count[0]}: LL={_last_ll[0]:.4f} |c|={_last_cv[0]:.2e}"
             )
 
-            if violation < cfg.constraint_tol and kkt_err < cfg.tol:
-                converged = True
-                self._log(f"MPEC SQP converged at iter {outer_iter+1}")
-                pbar.close()
-                break
+        constraints = [{"type": "eq", "fun": con_np, "jac": jac_con_np}]
 
-            # --- KKT system solve ---
-            # [H  J^T] [d ] = [-g]
-            # [J  0  ] [mu]   [-c]
-            # Regularise H for numerical stability
-            H_reg = H + 1e-6 * jnp.eye(n_vars)
-            KKT = jnp.block([
-                [H_reg,                        J.T],
-                [J,    jnp.zeros((n_states, n_states))],
-            ])
-            rhs = jnp.concatenate([-g, -c])
-            try:
-                sol = jnp.linalg.solve(KKT, rhs)
-                d = sol[:n_vars]
-                mu_new = sol[n_vars:]
-            except Exception:
-                # Fallback: gradient descent step
-                d = -g
-                mu_new = mu
+        res = scipy_minimize(
+            obj_np,
+            _x0,
+            method="SLSQP",
+            jac=grad_np,
+            constraints=constraints,
+            callback=_callback,
+            options={
+                "maxiter": cfg.outer_max_iter,
+                "ftol": cfg.tol,
+                "disp": False,
+            },
+        )
+        pbar.close()
 
-            # --- L1 merit line search ---
-            penalty = float(jnp.max(jnp.abs(mu_new))) + 1.0
-            merit_0 = float(merit(x, penalty))
-            # Directional derivative of merit at x
-            dd_merit = float(g @ d) - penalty * float(jnp.abs(c).sum())
-
-            alpha = 1.0
-            x_new = x + alpha * d
-            for _ in range(25):
-                m_new = float(merit(x_new, penalty))
-                if m_new <= merit_0 + 1e-4 * alpha * dd_merit:
-                    break
-                alpha *= 0.5
-                x_new = x + alpha * d
-            n_evals += _  # approximate
-
-            # --- BFGS Hessian update ---
-            nll_new, g_new = grad_fn(x_new)
-            c_new = bellman_residual(x_new)
-            J_new = jac_fn(x_new)
-            n_evals += 1
-
-            s_step = x_new - x
-            lag_grad_old = g + J.T @ mu
-            lag_grad_new = g_new + J_new.T @ mu_new
-            y_step = lag_grad_new - lag_grad_old
-
-            if float(jnp.abs(s_step).max()) > 1e-14:
-                H = _bfgs_update(H, s_step, y_step)
-
-            x = x_new
-            mu = mu_new
-
-        # Final values
-        theta_final = x[:n_params].astype(jnp.float32)
-        V_final = x[n_params:]
-        c_final = bellman_residual(x)
+        x_opt = jnp.array(res.x, dtype=jnp.float64)
+        theta_final = x_opt[:n_params].astype(jnp.float32)
+        V_final = x_opt[n_params:]
+        c_final = _bellman_residual(x_opt)
         violation_final = float(jnp.abs(c_final).max())
+        converged = bool(res.success) and violation_final < cfg.constraint_tol
 
-        u_final = jnp.einsum("sak,k->sa", features, x[:n_params])
+        u_final = jnp.einsum("sak,k->sa", features, x_opt[:n_params])
         EV_final = jnp.einsum("ast,t->as", transitions_f64, V_final)
         Q_final = u_final + beta * EV_final.T
         final_policy = jax.nn.softmax(Q_final / sigma, axis=1)
@@ -388,15 +320,16 @@ class MPECEstimator(BaseEstimator):
             hessian=hessian,
             gradient_contributions=gradient_contributions,
             converged=converged,
-            num_iterations=outer_iter + 1,
-            num_function_evals=n_evals,
+            num_iterations=res.nit,
+            num_function_evals=res.nfev,
             num_inner_iterations=0,  # no inner Bellman loop
-            message="converged" if converged else "max iterations reached",
+            message=res.message,
             optimization_time=elapsed,
             metadata={
-                "method": "sqp",
+                "method": "slsqp",
                 "final_constraint_violation": violation_final,
-                "final_kkt_error": kkt_err,
+                "scipy_success": bool(res.success),
+                "scipy_message": res.message,
             },
         )
 
