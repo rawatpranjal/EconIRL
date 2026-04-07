@@ -378,6 +378,21 @@ class TDCCPEstimator(BaseEstimator):
     # ==================================================================
 
     @staticmethod
+    def _extract_individual_ids(panel: Panel) -> np.ndarray:
+        """Return individual index for each transition tuple from _extract_transitions.
+
+        Produces an array of length equal to the number of transitions, where
+        entry i is the index of the individual whose trajectory produced transition i.
+        Used for clustering the sandwich estimator by individual.
+        """
+        ids = []
+        for ind_idx, traj in enumerate(panel.trajectories):
+            n_trans = max(0, len(traj.actions) - 1)
+            if n_trans > 0:
+                ids.append(np.full(n_trans, ind_idx, dtype=np.int32))
+        return np.concatenate(ids) if ids else np.array([], dtype=np.int32)
+
+    @staticmethod
     def _extract_transitions(panel: Panel) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Extract (a_t, x_t, a_{t+1}, x_{t+1}) tuples from panel data.
 
@@ -1113,6 +1128,7 @@ class TDCCPEstimator(BaseEstimator):
         ccps: np.ndarray,
         problem: DDCProblem,
         gamma: float,
+        individual_ids: np.ndarray | None = None,
     ) -> np.ndarray:
         """Compute locally robust standard errors (Section 4.2.1).
 
@@ -1196,11 +1212,21 @@ class TDCCPEstimator(BaseEstimator):
 
         # -----------------------------------------------------------------
         # Sandwich formula: V = (G^T Omega^{-1} G)^{-1}
-        # For the locally robust moment, under regularity conditions,
-        # G = -Omega (it is a just-identified GMM), so V = Omega^{-1}.
-        # In practice, we compute both for robustness.
+        # We cluster Omega by individual when individual_ids is provided.
+        # Without clustering, panel data with T > 1 periods per individual
+        # inflates n_samples by (T-1), understating variance by sqrt(T-1).
         # -----------------------------------------------------------------
-        Omega = (zeta.T @ zeta) / n_samples  # (K, K)
+        if individual_ids is not None and len(individual_ids) == n_samples:
+            # Cluster: sum zeta within individual, then outer product
+            n_ind = int(individual_ids.max()) + 1
+            zeta_clustered = np.zeros((n_ind, num_params), dtype=np.float64)
+            for i in range(n_samples):
+                zeta_clustered[individual_ids[i]] += zeta[i]
+            Omega = (zeta_clustered.T @ zeta_clustered) / n_ind  # (K, K)
+            n_eff = n_ind  # effective sample size for SE scaling
+        else:
+            Omega = (zeta.T @ zeta) / n_samples  # (K, K)
+            n_eff = n_samples
 
         # Numerical Jacobian G = d/d_theta E_n[zeta]
         eps = 1e-5
@@ -1242,20 +1268,106 @@ class TDCCPEstimator(BaseEstimator):
             G[:, j] = (score_plus - score_minus) / (2 * eps * n_samples)
 
         # V = (G^T Omega^{-1} G)^{-1}
-        # For n_samples scaling, the variance of theta_hat is V / n_samples
+        # SE = sqrt(diag(V / n_eff)).  Base class computes sqrt(diag(inv(-H))),
+        # so we need -H = n_eff * GtOiG, i.e. H = -n_eff * GtOiG.
         try:
             Omega_inv = np.linalg.solve(Omega + 1e-10 * np.eye(num_params), np.eye(num_params))
             GtOiG = G.T @ Omega_inv @ G
-            V = np.linalg.solve(GtOiG + 1e-10 * np.eye(num_params), np.eye(num_params))
-            # The Hessian-equivalent for SE computation is -n * G (since SE = sqrt(diag(V/n)))
-            # We return the negative of the information matrix so that the base class
-            # SE computation (which expects a Hessian) works correctly.
-            hessian_equiv = -n_samples * (G + G.T) / 2  # symmetrize
+            hessian_equiv = -n_eff * GtOiG  # base class inverts (-H) to get V/n_eff
         except np.linalg.LinAlgError:
             self._log("Warning: robust SE computation failed, falling back to naive Hessian")
             hessian_equiv = None
 
         return hessian_equiv
+
+    # ==================================================================
+    # Clustered SE computation
+    # ==================================================================
+
+    def _compute_clustered_se(
+        self,
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        feature_matrix: np.ndarray,
+        all_states: np.ndarray,
+        all_actions: np.ndarray,
+        panel: "Panel",
+        sigma: float,
+        H: np.ndarray,
+    ) -> jnp.ndarray | None:
+        """Clustered MLE sandwich SE.
+
+        Var(theta_hat) = H^{-1} B_cluster H^{-1}
+
+        where H is the Hessian of the total pseudo-log-likelihood and
+        B_cluster = Σ_g (Σ_{i in g} g_i)(Σ_{i in g} g_i)^T with g_i the
+        per-observation pseudo-LL score.  Summing scores within individual g
+        before taking the outer product clusters standard errors at the
+        individual level, which is correct when the panel has T > 1 periods
+        per person.
+
+        all_states / all_actions should be consistent with H (same N=T×n_ind).
+        We build per-obs individual IDs directly from panel.trajectories.
+
+        Returns the effective hessian H_eff = -inv(V) so the base class
+        formula SE = sqrt(diag(inv(-H_eff))) recovers SE = sqrt(diag(V)).
+        """
+        n_samples = len(all_states)
+        n_params = len(params)
+
+        # Build per-obs individual IDs (length = T × n_ind = n_samples)
+        obs_ind_ids = []
+        for ind_idx, traj in enumerate(panel.trajectories):
+            n_obs = len(traj.states)
+            if n_obs > 0:
+                obs_ind_ids.append(np.full(n_obs, ind_idx, dtype=np.int32))
+        if not obs_ind_ids:
+            return None
+        obs_ind_ids = np.concatenate(obs_ind_ids)  # length = n_samples
+
+        if len(obs_ind_ids) != n_samples:
+            # Mismatch — fall back gracefully
+            return None
+
+        # Per-observation scores: d/dtheta log pi(a_i | s_i; theta, h, g)
+        z_h = feature_matrix + h_table  # (S, A, K)
+        v = np.einsum("sak,k->sa", z_h, params) + g_table  # (S, A)
+        v_max = v.max(axis=1, keepdims=True)
+        exp_v = np.exp(v - v_max)
+        pi = exp_v / exp_v.sum(axis=1, keepdims=True)
+
+        score_i = np.zeros((n_samples, n_params), dtype=np.float64)
+        for i in range(n_samples):
+            s, a = int(all_states[i]), int(all_actions[i])
+            z_obs = z_h[s, a]                                    # (K,)
+            z_exp = np.einsum("a,ak->k", pi[s], z_h[s])         # (K,)
+            score_i[i] = (z_obs - z_exp) / sigma
+
+        # Cluster: sum scores within individual
+        n_ind = int(obs_ind_ids.max()) + 1
+        cluster_scores = np.zeros((n_ind, n_params), dtype=np.float64)
+        for i in range(n_samples):
+            cluster_scores[obs_ind_ids[i]] += score_i[i]
+
+        # Meat: B_cluster = Σ_g g_g g_g^T
+        B_cluster = cluster_scores.T @ cluster_scores
+
+        # Small-sample correction (Stata-style)
+        G = n_ind
+        N = n_samples
+        K = n_params
+        correction = (G / (G - 1)) * (N - 1) / (N - K) if G > 1 and N > K else 1.0
+
+        # Sandwich: V = H_inv @ B_cluster @ H_inv
+        try:
+            H_inv = np.linalg.inv(-H)   # -H is positive semi-definite at optimum
+            V = correction * (H_inv @ B_cluster @ H_inv)
+            H_eff = -np.linalg.inv(V)   # base class computes inv(-H_eff) = V → SE = sqrt(diag(V))
+            return jnp.array(H_eff)
+        except np.linalg.LinAlgError:
+            self._log("Warning: clustered SE computation failed, falling back to naive Hessian")
+            return None
 
     # ==================================================================
     # Main estimation routine
@@ -1304,6 +1416,7 @@ class TDCCPEstimator(BaseEstimator):
         # -----------------------------------------------------------------
         self._log("Step 2: Extracting transition tuples")
         actions, states, next_actions, next_states = self._extract_transitions(panel)
+        individual_ids = self._extract_individual_ids(panel)
         n_transitions = len(states)
         self._log(f"  {n_transitions} transition tuples extracted")
 
@@ -1375,34 +1488,34 @@ class TDCCPEstimator(BaseEstimator):
         # -----------------------------------------------------------------
         hessian = None
         if cfg.compute_se:
-            if cfg.robust_se and cfg.cross_fitting:
-                # Locally robust SEs (Section 4 of the paper)
-                self._log("Computing locally robust standard errors")
-                lambda_table = self._compute_backward_value(
+            self._last_h_table = h_table
+            self._last_g_table = g_table
+            all_states_np = np.array(panel.get_all_states())
+            all_actions_np = np.array(panel.get_all_actions())
+
+            def ll_fn(p):
+                return jnp.array(self._pseudo_log_likelihood_jax(
+                    np.array(p), h_table, g_table, feature_matrix,
+                    all_states_np, all_actions_np, problem.scale_parameter,
+                ))
+
+            H = compute_numerical_hessian(jnp.array(params_opt), ll_fn)
+
+            if cfg.robust_se:
+                # Clustered MLE sandwich: Var = H^{-1} B_cluster H^{-1}
+                # Bread: numerical Hessian of total pseudo-LL (H is negative semi-definite)
+                # Meat: per-obs pseudo-LL scores, summed within individual before outer product
+                # This correctly handles panel dependence (T transitions per individual).
+                self._log("Computing clustered sandwich standard errors")
+                hessian = self._compute_clustered_se(
                     params_opt, h_table, g_table, feature_matrix,
-                    actions, states, next_actions, next_states,
-                    problem, gamma,
+                    all_states_np, all_actions_np, panel,
+                    problem.scale_parameter, np.array(H),
                 )
-                hessian = self._compute_robust_se(
-                    params_opt, h_table, g_table, lambda_table,
-                    feature_matrix, actions, states, next_actions,
-                    next_states, np.array(ccps), problem, gamma,
-                )
+
             if hessian is None:
-                # Fallback: naive numerical Hessian (understates uncertainty)
-                self._log("Computing numerical Hessian (naive, no first-stage correction)")
-                self._last_h_table = h_table
-                self._last_g_table = g_table
-
-                def ll_fn(p):
-                    return jnp.array(self._pseudo_log_likelihood_jax(
-                        np.array(p), h_table, g_table, feature_matrix,
-                        np.array(panel.get_all_states()),
-                        np.array(panel.get_all_actions()),
-                        problem.scale_parameter,
-                    ))
-
-                hessian = compute_numerical_hessian(jnp.array(params_opt), ll_fn)
+                self._log("Using naive numerical Hessian (no clustering)")
+                hessian = H
 
         optimization_time = time.time() - start_time
 

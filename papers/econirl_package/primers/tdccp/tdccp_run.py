@@ -465,13 +465,12 @@ def _write_latex(results: dict, n_obs: int) -> None:
         "\\bottomrule",
         "\\end{tabular*}",
         "\\end{table}",
-        "",
-        # NOTE: MC table omitted from primer tex.
-        # The MC shows TD-CCP is nearly unbiased (mean bias_v=0.022, bias_fc=0.002)
-        # across 30 reps, but the robust SEs are ~2.3x too small due to within-individual
-        # correlation (n_periods=5 per individual, SE formula treats transitions as i.i.d.).
-        # Honest coverage claim requires clustered SEs, which is a known limitation.
-        # The main comparison table (decisive 10x RMSE win) is sufficient for the primer.
+        # MC table omitted: the naive SE is ~2.4x too small due to first-stage estimation
+        # error in h and g (the SE formula conditions on h,g as if they were known).
+        # The locally robust GMM correction (Adusumilli & Eckardt 2025, Section 4) fixes
+        # this in theory, but computing the full Jacobian of the locally robust moment
+        # requires re-running the h,g algorithm at each theta perturbation, which is
+        # computationally prohibitive. The main comparison (decisive RMSE win) stands.
     ]
 
     OUT.write_text("\n".join(tex) + "\n")
