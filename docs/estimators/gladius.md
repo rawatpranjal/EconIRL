@@ -20,6 +20,24 @@ $$
 
 where $\Delta$ denotes action differences that cancel the unidentified constant. The projection $R^2$ measures how well the neural reward surface is explained by linear features. Standard errors are not available analytically because the neural training loop does not produce a well-defined likelihood.
 
+## Quick start
+
+```python
+from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
+
+config = GLADIUSConfig(
+    q_hidden_dim=128,
+    q_num_layers=3,
+    max_epochs=500,
+    batch_size=512,
+)
+result = GLADIUSEstimator(config=config).estimate(
+    panel, utility, problem, transitions
+)
+print(result.parameters)        # projected structural parameters
+print(result.policy)            # softmax policy from trained Q-network
+```
+
 ## When to use it
 
 GLADIUS is the appropriate choice when the state space is too large for tabular methods and the analyst wants to check whether linear features are sufficient via the $R^2$ diagnostic. When transitions are known and the state space is manageable, NFXP recovers both parameters within 5 percent and is strictly preferable. The structural identification bias in the IRL setting means GLADIUS should be used for continuous-state environments or when rewards are observed in the data, which is the paper's intended use case where the bi-conjugate Bellman error anchors Q-values.
@@ -28,4 +46,4 @@ GLADIUS is the appropriate choice when the state space is too large for tabular 
 
 - Kang, J., Yoganarasimhan, H., and Jain, V. (2025). GLADIUS: ERM for Offline IRL. Working paper.
 
-The full derivation, algorithm, and simulation results are in the [GLADIUS primer (PDF)](https://github.com/rawatpranjal/econirl/blob/main/papers/econirl_package/primers/gladius.pdf).
+The full derivation, algorithm, and simulation results are in the [GLADIUS primer (PDF)](https://github.com/rawatpranjal/econirl/blob/main/papers/econirl_package/primers/gladius/gladius.pdf).

@@ -707,6 +707,8 @@ class GLADIUSEstimator(BaseEstimator):
             rng_key, perm_key = jax.random.split(rng_key)
             perm = jax.random.permutation(perm_key, n_obs)
             epoch_loss = 0.0
+            epoch_nll = float("nan")
+            epoch_bell = float("nan")
             n_batches = 0
 
             # Tikhonov annealing: decay CE weight over epochs so training
@@ -737,12 +739,14 @@ class GLADIUSEstimator(BaseEstimator):
                             zeta_net, q_net, zeta_opt_state,
                             s_feat, a_batch, sp_feat,
                         )
+                        epoch_bell = float(loss)
                     else:
                         # Odd batch: update Q only
                         q_net, q_opt_state, loss, _aux = q_step(
                             q_net, zeta_net, q_opt_state,
                             s_feat, a_batch, sp_feat, ce_weight,
                         )
+                        epoch_nll = float(_aux[0])
                 else:
                     q_net, zeta_net, q_opt_state, zeta_opt_state, loss, _aux = (
                         joint_step(
@@ -750,6 +754,8 @@ class GLADIUSEstimator(BaseEstimator):
                             s_feat, a_batch, sp_feat, ce_weight,
                         )
                     )
+                    epoch_nll = float(_aux[0])
+                    epoch_bell = float(_aux[1])
 
                 epoch_loss += float(loss)
                 n_batches += 1
@@ -758,11 +764,19 @@ class GLADIUSEstimator(BaseEstimator):
             avg_loss = epoch_loss / max(n_batches, 1)
             loss_history.append(avg_loss)
 
+            # Q-value range: sample a small batch of states for monitoring
+            sample_feat = self._build_state_features(
+                all_states[:min(256, n_obs)], problem
+            )
+            q_sample = q_net.forward_all_actions(sample_feat)
+            q_min = float(q_sample.min())
+            q_max = float(q_sample.max())
+
             pbar.set_postfix({
-                "loss": f"{avg_loss:.4f}",
-                "best": f"{best_loss:.4f}",
-                "ce_w": f"{float(ce_weight):.2f}",
-                "no_imp": epochs_no_improve,
+                "nll": f"{epoch_nll:.3f}" if not jnp.isnan(epoch_nll) else "n/a",
+                "bell": f"{epoch_bell:.3f}" if not jnp.isnan(epoch_bell) else "n/a",
+                "q": f"[{q_min:.1f},{q_max:.1f}]",
+                "pat": f"{epochs_no_improve}/{self.config.patience}",
             })
 
             # Early stopping

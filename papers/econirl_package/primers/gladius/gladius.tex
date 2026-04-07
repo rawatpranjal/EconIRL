@@ -136,12 +136,23 @@ $\hat\theta = (\Delta\Phi^\top\Delta\Phi)^{-1}\,\Delta\Phi^\top\,\Delta \hat r$ 
 
 
 %% ============================================================
-\section{Results}
+\section{Simulation}
 %% ============================================================
 
 \input{gladius_results}
 
-GLADIUS recovers the replacement cost within \gladRCerr\% of the true value via the action-difference projection. The operating cost is overestimated due to the state-dependent identification constant discussed in Section 3.4. The projection $R^2$ indicates how well the neural reward surface is explained by linear features. NFXP recovers both parameters within 5\% but requires the full transition matrix and is limited to tabular state spaces. GLADIUS is the appropriate choice when the state space is too large for tabular methods or when the analyst wants to check whether linear features are sufficient via the $R^2$ diagnostic.
+The experiment uses a three-component bus with \gladNstates\ discrete states ($K=\gladK$, $M=\gladM$, $\beta = \gladBeta$). NFXP requires storing a $(2 \times \gladNstates \times \gladNstates)$ transition tensor---roughly 512\,MB---and solving the Bellman equations at that scale. It does not finish within 120 seconds. GLADIUS parameterizes $Q$ with a neural network that takes normalized mileage features as input, never materialises $P$, and trains in \gladTime\,s from raw $(s,a,s')$ tuples.
+
+With only \gladObsPerState\ observations per state on average, behavioral cloning produces sparse empirical CCPs that generalize poorly to rarely-visited states. GLADIUS achieves test log-likelihood \gladTestLL\ against BC at \gladBCTestLL, a gain of \gladLLgain\ log-units per action, and within 0.0007 of the oracle. The neural $Q$ function approximates the value surface globally from normalized mileage inputs, recovering generalization that empirical frequency counts cannot provide.
+
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily]
+from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
+
+config = GLADIUSConfig(q_hidden_dim=128, q_num_layers=3,
+    max_epochs=500, batch_size=512)
+result = GLADIUSEstimator(config=config).estimate(
+    panel, utility, problem, transitions)
+\end{lstlisting}
 
 \paragraph{Code.}
 \texttt{gladius\_results.py} generates Table~\ref{tab:gladius_results}. Estimator: \texttt{src/econirl/estimation/gladius.py}.

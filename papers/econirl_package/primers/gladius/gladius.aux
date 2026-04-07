@@ -20,16 +20,16 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Action-Difference Projection}{2}{subsection.3.3}\protected@file@percent }
 \newlabel{eq:projection}{{4}{2}{Action-Difference Projection}{equation.4}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Identification and the IRL Bias}{2}{subsection.3.4}\protected@file@percent }
-\bibstyle{plainnat}
-\bibdata{references}
-\bibcite{kang2025}{{1}{2025}{{Kang et~al.}}{{Kang, Yoganarasimhan, and Jain}}}
 \@writefile{toc}{\contentsline {section}{\numberline {4}Estimation Algorithm}{3}{section.4}\protected@file@percent }
 \@writefile{loa}{\contentsline {algocf}{\numberline {1}{\ignorespaces GLADIUS (ERM-IRL) \citep  {kang2025}}}{3}{algocf.1}\protected@file@percent }
 \newlabel{alg:gladius}{{1}{3}{Estimation Algorithm}{algocf.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Results}{3}{section.5}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Multi-component bus (2\ components, 20\ bins, 400\ states, $\beta = 0.99$). NFXP needs the full $(2, 400, 400)$ transition tensor. GLADIUS learns from raw transitions without storing $P$.}}{3}{table.2}\protected@file@percent }
-\newlabel{tab:gladius_results}{{2}{3}{Multi-component bus (\gladKcomp \ components, \gladMbins \ bins, \gladNstates \ states, $\beta = \gladBeta $). NFXP needs the full $(2, 400, 400)$ transition tensor. GLADIUS learns from raw transitions without storing $P$}{table.2}{}}
-\@writefile{toc}{\contentsline {paragraph}{Code.}{3}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Simulation}{3}{section.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Large-scale bus ($K=3$, $M=20$, 8,000\ states, $\beta =0.95$). Training panel: 40,000\ observations (5.0\ per state on average). NFXP requires storing a $(2 \times 8,000\times 8,000)$ transition tensor and solving the Bellman equations at that scale. GLADIUS trains from raw $(s,a,s')$ tuples without materialising $P$.}}{3}{table.2}\protected@file@percent }
+\newlabel{tab:gladius_results}{{2}{3}{Large-scale bus ($K=\gladK $, $M=\gladM $, \gladNstates \ states, $\beta =\gladBeta $). Training panel: \gladNobs \ observations (\gladObsPerState \ per state on average). NFXP requires storing a $(2 \times \gladNstates \times \gladNstates )$ transition tensor and solving the Bellman equations at that scale. GLADIUS trains from raw $(s,a,s')$ tuples without materialising $P$}{table.2}{}}
+\bibstyle{plainnat}
+\bibdata{references}
+\bibcite{kang2025}{{1}{2025}{{Kang et~al.}}{{Kang, Yoganarasimhan, and Jain}}}
 \bibcite{magnacThesmar2002}{{2}{2002}{{Magnac and Thesmar}}{{}}}
 \bibcite{ng1999}{{3}{1999}{{Ng et~al.}}{{Ng, Harada, and Russell}}}
+\@writefile{toc}{\contentsline {paragraph}{Code.}{4}{section*.1}\protected@file@percent }
 \gdef \@abspage@last{4}
