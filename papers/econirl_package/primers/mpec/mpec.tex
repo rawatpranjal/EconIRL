@@ -1,8 +1,7 @@
 \documentclass[10pt]{article}
 \usepackage[left=0.8in,right=0.8in,top=0.75in,bottom=0.75in]{geometry}
 \input{../notation}
-\usepackage{algorithm}
-\usepackage{algorithmic}
+\usepackage[ruled,lined]{algorithm2e}
 \usepackage{titling}
 \setlength{\droptitle}{-2em}
 \posttitle{\par\end{center}\vspace{-1em}}
@@ -24,16 +23,16 @@
 
 Rust's NFXP algorithm \citep{rust1987} estimates DDC parameters by nesting the Bellman solve inside the likelihood maximization.
 At each candidate $\theta$, the inner loop iterates the contraction mapping $V^{k+1} = T(V^k;\theta)$ until $\|V^{k+1} - V^k\|_\infty < \epsilon$.
-When the discount factor $\beta$ is close to 1, the contraction rate $\beta$ approaches unity and convergence slows catastrophically.
-At $\beta = 0.9999$, successive approximation (SA) requires
+When the discount factor $\beta$ is close to 1, the contraction rate approaches unity and convergence slows.
+At $\beta = 0.9999$, successive approximation (SA) theoretically requires
 $\lceil \log(\epsilon)/\log(\beta) \rceil = \lceil \log(10^{-10})/\log(0.9999) \rceil = 230{,}258$
-inner iterations \emph{per outer likelihood evaluation}.
-With a fixed budget far below this threshold, the inner loop terminates early and the gradient passed to the outer optimizer is inaccurate, causing the parameter estimates to be biased or divergent.
+inner iterations per outer likelihood evaluation.
+In the logit model, the softmax policy depends on value \emph{differences} which converge faster than absolute levels, so truncated SA can still produce correct MLE estimates.
+But each outer step still pays the cost of hundreds of SA iterations, and the SA-then-NK polyalgorithm of \citet{iskhakovRustSchjerning2016} replaces each SA call with a handful of Newton steps that cost $O(|\calS|^3)$ each.
 
-\citet{suJudd2012} reframe estimation as a single constrained optimization problem.
+\citet{suJudd2012} eliminate the inner loop entirely by reframing estimation as a single constrained optimization problem.
 The value function $V$ becomes an explicit decision variable and the Bellman equation $V = T(V;\theta)$ is imposed as a constraint.
-This eliminates the inner fixed-point loop entirely.
-The constraint is enforced by an augmented Lagrangian penalty, which grows across outer iterations until the Bellman residual falls below the feasibility tolerance.
+The constraint is enforced via SQP or an augmented Lagrangian penalty, producing the same MLE in a fraction of the time because zero inner Bellman iterations are needed regardless of $\beta$.
 
 %% ============================================================
 \section{Model and Notation}
@@ -83,35 +82,28 @@ The penalty $\rho$ grows by factor $\gamma_\rho$ each outer iteration until the 
 %% ============================================================
 
 \begin{algorithm}[h!]
+\DontPrintSemicolon
 \caption{MPEC via SQP \citep{suJudd2012}}
 \label{alg:mpec}
-\begin{algorithmic}[1]
-\REQUIRE Data $\mathcal{D}$, transitions $P$, discount $\beta$, initial $\theta_0$
-\ENSURE MLE parameters $\theta^*$, value function $V^*$
-
-\STATE \textbf{Warm start:} solve $V_0 = T(V_0;\theta_0)$ by value iteration to get feasible $({\theta_0, V_0})$
-
-\FOR{$k = 0, 1, \ldots, K_{\text{outer}}$}
-
-  \STATE \textit{// Quadratic subproblem: linearize constraint around current iterate}
-  \STATE Compute $\nabla_{(\theta,V)} \mathcal{L}$ and Jacobian $J = \nabla_{(\theta,V)} [V - T(V;\theta)]$
-  \STATE Solve KKT system for SQP step $d^k$ and multipliers $\mu^k$:
-         $\begin{bmatrix} B^k & J^\top \\ J & 0 \end{bmatrix}
-          \begin{bmatrix} d^k \\ \mu^k \end{bmatrix} =
-          \begin{bmatrix} -\nabla \mathcal{L} \\ -(V - T(V;\theta)) \end{bmatrix}$
-
-  \STATE Line search on $\mathcal{L}(\theta + \alpha d^k_\theta,\, V + \alpha d^k_V)$; set $(\theta^{k+1}, V^{k+1}) \leftarrow (\theta^k, V^k) + \alpha d^k$
-
-  \IF{$\|V^{k+1} - T(V^{k+1};\theta^{k+1})\|_\infty < \epsilon_c$}
-    \STATE \textbf{break}
-  \ENDIF
-
-\ENDFOR
-
-\STATE Compute standard errors via implicit function theorem at $(\theta^*, V^*)$
-\RETURN $\theta^*$, $V^*$, standard errors
-
-\end{algorithmic}
+\KwIn{Data $\mathcal{D}$, transitions $P$, discount $\beta$, initial $\theta_0$}
+\BlankLine
+\textbf{Warm start:} solve $V_0 = T(V_0;\theta_0)$ by value iteration to get feasible $(\theta_0, V_0)$\;
+\BlankLine
+\For{$k = 0, 1, \ldots, K_{\text{outer}}$}{
+  \tcp{Quadratic subproblem: linearize constraint around current iterate}
+  Compute $\nabla_{(\theta,V)} \mathcal{L}$ and Jacobian $J = \nabla_{(\theta,V)} [V - T(V;\theta)]$\;
+  Solve KKT system for SQP step $d^k$ and multipliers $\mu^k$:\;
+  \Indp
+  $\begin{bmatrix} B^k & J^\top \\ J & 0 \end{bmatrix}
+   \begin{bmatrix} d^k \\ \mu^k \end{bmatrix} =
+   \begin{bmatrix} -\nabla \mathcal{L} \\ -(V - T(V;\theta)) \end{bmatrix}$\;
+  \Indm
+  Line search on $\mathcal{L}(\theta + \alpha d^k_\theta,\, V + \alpha d^k_V)$; \quad $(\theta^{k+1}, V^{k+1}) \leftarrow (\theta^k, V^k) + \alpha d^k$\;
+  \lIf{$\|V^{k+1} - T(V^{k+1};\theta^{k+1})\|_\infty < \epsilon_c$}{\textbf{break}}
+}
+\BlankLine
+Compute standard errors via implicit function theorem at $(\theta^*, V^*)$\;
+\KwOut{$\theta^*$, $V^*$, standard errors}
 \end{algorithm}
 \FloatBarrier
 
@@ -144,11 +136,12 @@ At $\beta = \mpecBetaVal$, successive approximation theoretically requires \mpec
 
 \textbf{Results.}
 All three estimators recover the same MLE: OC $= \mpecOC$ and RC $= \mpecRC$ (Bellman residual \mpecCV{}).
+The logit gradient's level-invariance in $V$ means truncated SA still finds the correct optimum, so all methods converge.
 The difference is speed.
 MPEC-SQP enforces the Bellman equation as an equality constraint in a single outer optimisation over $(\theta, V) \in \mathbb{R}^{p+n}$, running no inner iterations, and converges in \mpecMPECTime{}.
-NFXP-SA, which solves the Bellman fixed point via contraction at each outer step, takes \mpecNFXPTime{} (\mpecSpeedup{} slower).
-NFXP-NK, which replaces SA with Newton-Kantorovich inner iterations \citep{iskhakovRustSchjerning2016}, takes \mpecNKTime{} (\mpecNKSpeedup{} slower).
-Eliminating the inner loop is the source of the speedup; MPEC does \emph{zero} inner Bellman iterations regardless of $\beta$.
+NFXP-SA takes \mpecNFXPTime{} (\mpecSpeedup{} slower).
+NFXP-NK \citep{iskhakovRustSchjerning2016} takes \mpecNKTime{} (\mpecNKSpeedup{} slower).
+MPEC does zero inner Bellman iterations regardless of $\beta$, which is the source of the speedup.
 
 Behavioral cloning achieves \mpecBCacc{} policy accuracy (LL $= \mpecBCLL$), confirming the data are informative but that BC cannot recover replacement costs without exploiting the MDP structure.
 

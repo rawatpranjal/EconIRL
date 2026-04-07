@@ -21,12 +21,12 @@
 \section{Context and Problem}
 %% ============================================================
 
-CCP estimation (Hotz and Miller 1993) avoids the inner Bellman loop of NFXP by inverting observed choice probabilities into value differences.
+CCP estimation \citep{hotzMiller1993} avoids the inner Bellman loop of NFXP by inverting observed choice probabilities into value differences.
 The inversion requires computing the expected future value $\E[V(s') \mid s,a]$, which in turn requires the transition density $p(s' \mid s,a)$.
 When the state space is continuous or high-dimensional, estimating this density is the binding constraint.
 Kernel methods suffer from the curse of dimensionality, and discretization introduces approximation bias that grows with the number of state variables.
 
-Adusumilli and Eckardt (2025) eliminate the transition density entirely.
+\citet{adusumilliEckardt2025} eliminate the transition density entirely.
 Their key insight is that the CCP value function components $h(a,x)$ and $g(a,x)$ satisfy temporal-difference fixed-point equations that depend only on sample expectations over observed transitions $(x_t, a_t, x_{t+1})$, not on the density $p(x' \mid x,a)$.
 This is the same idea that makes TD learning in reinforcement learning model-free: replace $\E_{p}[V(s')]$ with the sample next state $V(s'_{t+1})$.
 
@@ -36,14 +36,14 @@ The neural approximate value iteration (AVI) method uses neural networks for $h$
 Both produce locally robust standard errors at the parametric $\sqrt{n}$ rate, even though the first-stage $h$ and $g$ estimates converge at slower nonparametric rates.
 
 TD-CCP is the only estimator in econirl that requires neither transition densities nor an inner Bellman loop.
-NFXP and CCP require known transitions.
-NNES and SEES require transitions for the Bellman target.
+NFXP \citep{rust1987} and CCP require known transitions.
+NNES \citep{nguyen2025} and SEES \citep{luoSang2024} require transitions for the Bellman target.
 AIRL avoids transitions but does not produce valid standard errors.
 TD-CCP provides all three: no transitions, scalability, and valid inference.
 
 The name ``temporal-difference CCP'' reflects the connection to TD learning in reinforcement learning.
 Just as TD($0$) updates value estimates using the observed next state rather than the full expectation over the transition kernel, TD-CCP updates value function components $h_k$ and $g$ using observed next transitions $(x_{t+1}, a_{t+1})$ rather than the density $p(x' \mid x,a)$.
-The semi-gradient fixed-point equation~\eqref{eq:semigradient} is the structural econometrics analog of the Tsitsiklis and Van Roy (1997) linear TD method with function approximation.
+The semi-gradient fixed-point equation~\eqref{eq:semigradient} is the structural econometrics analog of the \citet{tsitsiklisVanRoy1997} linear TD method with function approximation.
 
 %% ============================================================
 \section{Model and Notation}
@@ -75,7 +75,7 @@ $\lambda_k(a,x)$ & Backward value function (for robust SEs) \\
 \end{table}
 \FloatBarrier
 
-The CCP decomposition of Hotz and Miller (1993) writes the choice-specific value as
+The CCP decomposition of \citet{hotzMiller1993} writes the choice-specific value as
 \begin{equation}
 \label{eq:ccp_decomp}
 Q(a,x;\theta) \;=\; \sum_{k=1}^K \theta_k\,h_k(a,x) \;+\; \sigma\,g(a,x),
@@ -120,7 +120,7 @@ The key property is Neyman orthogonality: the moment condition $\zeta_i$ has zer
 This means first-order errors in $\hat h$ and $\hat g$ drop out of the influence function for $\hat\theta$, so the structural parameters inherit the parametric $\sqrt{n}$ rate even when the nonparametric first stage converges at a slower rate such as $n^{-1/3}$ or $n^{-2/5}$.
 Without the correction terms in~\eqref{eq:robust_moment}, naive standard errors would understate uncertainty by ignoring the estimation error in $h$ and $g$.
 
-Cross-fitting (splitting data into two folds, estimating $h,g$ on one fold and $\theta$ on the other) eliminates the Donsker condition that would otherwise restrict the complexity of the first-stage estimator.
+Cross-fitting \citep{chernozhukov2018} splits the data into two folds, estimating $h,g$ on one fold and $\theta$ on the other. This eliminates the Donsker condition that would otherwise restrict the complexity of the first-stage estimator.
 On tabular problems where the state space is finite, the standard approach without cross-fitting also produces valid SEs because the CCP estimates converge at the parametric rate.
 The paper recommends cross-fitting for continuous-state applications where nonparametric rates apply.
 
@@ -134,7 +134,7 @@ What it changes is the computational requirements: the transition density is no 
 
 \begin{algorithm}[H]
 \DontPrintSemicolon
-\caption{TD-CCP with Semi-Gradient (Adusumilli and Eckardt 2025)}
+\caption{TD-CCP with Semi-Gradient \citep{adusumilliEckardt2025}}
 \label{alg:tdccp}
 \KwIn{Panel $\{(x_i, a_i, x_i', a_i')\}_{i=1}^n$, features $\phi$, basis $\Psi$, discount $\beta$}
 \textbf{Cross-fitting:} split data into folds $\mathcal{I}_1, \mathcal{I}_2$\tcp*{\texttt{\_estimate\_with\_cross\_fitting()}}
@@ -201,6 +201,8 @@ CCP with $K = 100$ bins reaches RMSE of \ccpHundredRMSE\ (transition noise domin
 Finer discretization makes things worse, not better, once the transition matrix is too sparse to estimate reliably.
 Behavioral cloning reaches \bcAcc\ policy accuracy but recovers no structural parameters.
 
+A mini Monte Carlo (\mcNreps\ replications, \mcNobs\ observations each) reveals that the robust standard errors understate uncertainty: 95\% confidence interval coverage is \mcCovV\ for $\theta_v$ and \mcCovFC\ for $\theta_{FC}$, against a nominal 95\% target. The SE formula conditions on $\hat h$ and $\hat g$ as if they were known, but they are estimated from the same data. The locally robust correction in Equation~\eqref{eq:robust_moment} accounts for this asymptotically, but computing the full Jacobian requires re-estimating $h,g$ at each $\theta$ perturbation. The decisive RMSE win stands; the coverage issue affects inference, not point estimation. Cross-fitting is disabled here because the states are discretized to \tdNstates\ bins, so CCP estimates converge at the parametric rate. For genuinely continuous states, cross-fitting should be enabled per the paper's recommendation.
+
 \begin{lstlisting}[basicstyle=\footnotesize\ttfamily]
 from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
 
@@ -215,5 +217,8 @@ result = TDCCPEstimator(config=config).estimate(
 \begin{verbatim}
 .venv/bin/python papers/econirl_package/primers/tdccp/tdccp_run.py
 \end{verbatim}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
 
 \end{document}

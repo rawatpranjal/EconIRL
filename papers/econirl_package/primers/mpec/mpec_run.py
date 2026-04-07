@@ -2,10 +2,10 @@
 """
 MPEC Primer -- Companion simulation (Su & Judd 2012).
 
-Core finding: at beta=0.9999, successive approximation (NFXP-SA) requires
-~230,258 inner Bellman iterations per likelihood evaluation and cannot converge
-within a fixed budget. MPEC eliminates the inner loop entirely by treating V
-as a decision variable and enforcing Bellman as a constraint.
+Core finding: at beta=0.9999, MPEC eliminates the inner Bellman loop entirely
+by treating V as a decision variable and enforcing Bellman as a constraint.
+All three estimators (NFXP-SA, MPEC-SQP, NFXP-NK) recover the same MLE, but
+MPEC is 7-12x faster because it does zero inner iterations regardless of beta.
 
 Usage:
     cd papers/econirl_package/primers/mpec

@@ -1,10 +1,12 @@
-\documentclass[11pt]{article}
-\usepackage[left=1in,right=1in,top=0.9in,bottom=0.9in]{geometry}
+\documentclass[10pt]{article}
+\usepackage[left=0.8in,right=0.8in,top=0.8in,bottom=0.8in]{geometry}
 \input{../notation}
 \usepackage[ruled,lined]{algorithm2e}
 \usepackage{titling}
 \setlength{\droptitle}{-2em}
 \posttitle{\par\end{center}\vspace{-1em}}
+\setlength{\parskip}{0.3em}
+\setlength{\parindent}{0em}
 
 \newcommand{\calC}{\mathcal{C}}
 
@@ -156,14 +158,14 @@ The NPL variant (Algorithm~\ref{alg:nnes}) uses the Hotz-Miller emax correction 
 
 \input{nnes_results}
 
-We run NNES and NFXP on a Rust bus engine with \nnesNstates\ mileage bins, discount $\beta = \nnesBeta$, and \nnesNobs\ observations (true $\theta_c = \nnesTrueOC$, $RC = \nnesTrueRC$). NNES uses a 2-layer ReLU V-network with 32 hidden units, 500 V-network epochs per outer iteration, and 10 outer iterations.
+We run NNES and NFXP on a \nnesKcomp-component bus engine with \nnesNstates\ total states (\nnesMbins\ mileage bins per component), discount $\beta = \nnesBeta$, and \nnesNobs\ observations. NNES uses a 2-layer ReLU V-network with 64 hidden units that takes a \nnesKcomp-dimensional normalized mileage vector as input, 500 V-network epochs per outer iteration, and 20 outer iterations. This environment tests the scalability argument from \citet{nguyen2025}: with $|\calS| = \nnesNstates$, NFXP must solve a $\nnesNstates \times \nnesNstates$ Bellman fixed point at each parameter guess, while NNES trains a small network that generalizes across the \nnesKcomp-dimensional state space.
 
-The log-likelihoods are nearly identical (gap of \nnesLLgap\ nats), confirming that NNES finds the same optimum as NFXP. The replacement cost is well-recovered by both estimators. The operating cost coefficient $\theta_c = 0.001$ is notoriously hard to identify in the Rust bus model because the flow utility gradient is small relative to the replacement cost. Neural structural estimators face an additional challenge: the V-network can partially absorb the linear operating cost term into the value function approximation, creating a tradeoff between $\theta_c$ and $V_\gamma$ that the outer iterations gradually resolve.
+NNES achieves a log-likelihood within \nnesLLgap\ nats of NFXP while running \nnesSpeedup$\times$ faster (\nnesTime s vs \nnesNfxpTime s). The speedup comes from replacing the $O(|\calS|^2)$ inner Bellman contraction with neural regression on the state features. Behavioral cloning achieves \nnesBCacc\ policy accuracy (LL $= \nnesBCll$) but recovers no structural parameters.
 
 \paragraph{Code.}
-The companion script \texttt{nnes\_run.py} in this folder generates Table~\ref{tab:nnes_results}. The NNES estimator is implemented in \texttt{src/econirl/estimation/nnes.py}. To regenerate:
+The companion script \texttt{nnes\_run.py} in this folder generates Table~\ref{tab:nnes_results}. Estimator: \texttt{src/econirl/estimation/nnes.py}. To regenerate:
 \begin{verbatim}
-python papers/econirl_package/primers/nnes/nnes_run.py
+.venv/bin/python papers/econirl_package/primers/nnes/nnes_run.py
 \end{verbatim}
 
 

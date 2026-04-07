@@ -18,6 +18,7 @@ import json
 import time
 from pathlib import Path
 
+import jax.numpy as jnp
 import numpy as np
 
 OUT = Path(__file__).resolve().parent / "sees_results.tex"
@@ -59,6 +60,35 @@ def main():
     )
 
     results = {}
+
+    # ── BC baseline ──
+    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator
+    from econirl.core.bellman import SoftBellmanOperator
+    from econirl.core.solvers import policy_iteration
+
+    print("\n  Running BC baseline...")
+    transitions_f64 = jnp.asarray(transitions, dtype=jnp.float64)
+    operator = SoftBellmanOperator(problem, transitions_f64)
+    true_reward = jnp.asarray(
+        utility.compute(jnp.asarray(true_params, dtype=jnp.float32)),
+        dtype=jnp.float64,
+    )
+    true_result = policy_iteration(
+        operator, true_reward, tol=1e-10, max_iter=200, eval_method="matrix"
+    )
+    true_actions = np.argmax(np.array(true_result.policy), axis=1)
+
+    t0 = time.time()
+    bc = BehavioralCloningEstimator(smoothing=1.0, verbose=False)
+    bc_res = bc.estimate(panel, utility, problem, jnp.asarray(transitions))
+    bc_time = time.time() - t0
+    bc_acc = float(np.mean(np.argmax(np.array(bc_res.policy), axis=1) == true_actions))
+    results["bc"] = {
+        "ll": float(bc_res.log_likelihood),
+        "policy_acc": bc_acc,
+        "time": bc_time,
+    }
+    print(f"    LL={results['bc']['ll']:.2f}, policy_acc={bc_acc:.2%}, time={bc_time:.2f}s")
 
     # ── NFXP oracle ──
     print("\n  Running NFXP...")
@@ -122,6 +152,8 @@ def main():
     tex.append(f"\\newcommand{{\\seesLLgap}}{{{ll_gap:.2f}}}")
     tex.append(f"\\newcommand{{\\seesNfxpTime}}{{{nfxp_time:.1f}}}")
     tex.append(f"\\newcommand{{\\seesTime}}{{{sees_time:.1f}}}")
+    tex.append(f"\\newcommand{{\\seesBCacc}}{{{results['bc']['policy_acc']*100:.1f}\\%}}")
+    tex.append(f"\\newcommand{{\\seesBCll}}{{{results['bc']['ll']:.1f}}}")
     tex.append("")
 
     # Results table

@@ -180,9 +180,9 @@ CCP K=5 is invariant to $\theta_0$ by construction. Step 1 reads CCPs directly f
 
 
 \paragraph{Code.}
-\texttt{ccp\_results.py} generates Tables~\ref{tab:ccp_vs_nfxp}~and~\ref{tab:init_robustness}. Estimator: \texttt{src/econirl/estimation/ccp.py}. Behavioral cloning achieves \bcAcc\ policy accuracy (log-likelihood \bcLL), confirming that CCP learns from MDP structure beyond empirical action frequencies.
+\texttt{ccp\_run.py} generates Tables~\ref{tab:ccp_vs_nfxp}~and~\ref{tab:init_robustness}. Estimator: \texttt{src/econirl/estimation/ccp.py}. Behavioral cloning achieves \bcAcc\ policy accuracy (log-likelihood \bcLL), confirming that CCP learns from MDP structure beyond empirical action frequencies.
 \begin{verbatim}
-.venv/bin/python papers/econirl_package/primers/ccp/ccp_results.py
+.venv/bin/python papers/econirl_package/primers/ccp/ccp_run.py
 \end{verbatim}
 
 

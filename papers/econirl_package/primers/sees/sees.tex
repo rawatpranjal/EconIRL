@@ -1,10 +1,12 @@
-\documentclass[11pt]{article}
-\usepackage[left=1in,right=1in,top=0.9in,bottom=0.9in]{geometry}
+\documentclass[10pt]{article}
+\usepackage[left=0.8in,right=0.8in,top=0.8in,bottom=0.8in]{geometry}
 \input{../notation}
 \usepackage[ruled,lined]{algorithm2e}
 \usepackage{titling}
 \setlength{\droptitle}{-2em}
 \posttitle{\par\end{center}\vspace{-1em}}
+\setlength{\parskip}{0.3em}
+\setlength{\parindent}{0em}
 
 \title{Primer: Sieve Estimation of Structural Models (SEES)}
 \author{econirl package documentation}
@@ -146,12 +148,14 @@ SEES achieves a log-likelihood within \seesLLgap\ nats of NFXP while running \se
 
 Both estimators agree closely on the replacement cost parameter. The operating and quadratic cost parameters show larger discrepancies because their effects on the likelihood surface are small relative to replacement cost, making them harder to identify precisely. The key observation is that the log-likelihoods are nearly identical: SEES finds the same statistical optimum as NFXP despite optimizing over only 11 unknowns ($d_\theta + K = 3 + 8$) instead of solving a $\seesNstates \times \seesNstates$ fixed point.
 
+Behavioral cloning achieves \seesBCacc\ policy accuracy (LL $= \seesBCll$), confirming that the data are informative but that BC cannot recover structural parameters or produce standard errors.
+
 SEES occupies a middle ground between MPEC and NNES. The basis functions are deterministic and require no training, making the optimization smooth and well-conditioned. The trade-off is projection bias when $V$ is not well-represented by the basis. NNES \citep{nguyen2025} avoids this with a universal approximator and achieves valid SEs via Neyman orthogonality, at the cost of alternating optimization and sensitivity to initialization.
 
 \paragraph{Code.}
 The SEES estimator is implemented in \texttt{src/econirl/estimation/sees.py}. The companion script \texttt{sees\_run.py} generates Table~\ref{tab:sees_results}. The key implementation details map directly to Algorithm~\ref{alg:sees}: \texttt{\_build\_basis()} constructs $\Psi$ (Step 1), the \texttt{penalized\_ll()} closure implements Equation~\ref{eq:criterion} (Step 3), and the Schur complement in Equation~\ref{eq:schur} is computed from the numerical Hessian (Step 5). To regenerate:
 \begin{verbatim}
-python papers/econirl_package/primers/sees_run.py
+python papers/econirl_package/primers/sees/sees_run.py
 \end{verbatim}
 
 

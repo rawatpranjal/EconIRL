@@ -12,7 +12,7 @@ solving the Bellman equation for the outer loop gradient. K=1 already
 identifies theta consistently; NPL iterations add efficiency.
 
 Usage:
-    .venv/bin/python papers/econirl_package/primers/ccp/ccp_results.py
+    .venv/bin/python papers/econirl_package/primers/ccp/ccp_run.py
 
 Output:
     papers/econirl_package/primers/ccp/ccp_results.tex
