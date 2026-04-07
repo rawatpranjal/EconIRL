@@ -1197,15 +1197,13 @@ class TDCCPEstimator(BaseEstimator):
                     + gamma * h_table[s_next, a_next, j]
                     - h_table[s, a, j]
                 )
-                # Correction: lambda_j(a',x') * delta_h_j * theta_j
-                m_i[j] += lambda_table[s_next, a_next, j] * delta_h_j
+                # Correction: lambda_j at CURRENT state (a,x) per paper eq (4.4)
+                m_i[j] += lambda_table[s, a, j] * delta_h_j
 
             # TD error for g
             e_obs = EULER_MASCHERONI - np.log(safe_ccps[s, a])
             delta_g = e_obs + gamma * g_table[s_next, a_next] - g_table[s, a]
-            # g correction affects all parameters through the entropy channel
-            # The lambda for g is approximated by the mean of lambda across params
-            lambda_g = np.mean(lambda_table[s_next, a_next])
+            lambda_g = np.mean(lambda_table[s, a])
             m_i += lambda_g * delta_g * np.ones(num_params) / sigma
 
             zeta[i] = m_i
@@ -1502,21 +1500,11 @@ class TDCCPEstimator(BaseEstimator):
             H = compute_numerical_hessian(jnp.array(params_opt), ll_fn)
 
             if cfg.robust_se and cfg.cross_fitting:
-                # With cross-fitting, h/g are estimated from independent data so the
-                # first-stage correction terms in zeta_i are small (Neyman orthogonality).
-                # Use the locally robust GMM sandwich: V = (G^T Omega^{-1} G)^{-1} / n_eff
-                self._log("Computing locally robust standard errors (cross-fitting)")
-                lambda_table = self._compute_backward_value(
-                    params_opt, h_table, g_table, feature_matrix,
-                    actions, states, next_actions, next_states,
-                    problem, gamma,
-                )
-                hessian = self._compute_robust_se(
-                    params_opt, h_table, g_table, lambda_table,
-                    feature_matrix, actions, states, next_actions,
-                    next_states, np.array(ccps), problem, gamma,
-                    individual_ids=individual_ids,
-                )
+                # With correct cross-fitting (individual-level fold split), each
+                # theta_k's pseudo-LL scores are independent of the h,g used in that
+                # fold (Neyman orthogonality, Theorem 5). Standard MLE Hessian is valid.
+                self._log("Using numerical Hessian for cross-fitted SE (Neyman orthogonality)")
+                hessian = H
             elif cfg.robust_se:
                 # Without cross-fitting, use clustered MLE sandwich: Var = H^{-1} B H^{-1}
                 # This captures panel clustering but not first-stage h/g error.
@@ -1603,59 +1591,68 @@ class TDCCPEstimator(BaseEstimator):
     ):
         """2-fold cross-fitting (Algorithm 2 of the paper).
 
-        Split data into two folds. For each fold k:
-        1. Estimate h, g on fold k.
-        2. Estimate theta on fold -k (the other fold) using h, g from fold k.
+        Split INDIVIDUALS into two folds. For each fold k:
+        1. Estimate h, g using fold k's transitions.
+        2. Estimate theta on fold -k's panel using h, g from fold k.
         3. Average the two theta estimates.
 
-        This ensures that h,g are estimated on independent data from the
-        data used for parameter estimation, which is required for the
-        locally robust moment to achieve sqrt(n) rates.
+        Splitting by individual (not by transition) ensures that all T
+        transitions from individual i land in the same fold, so h,g
+        estimated on fold k are strictly independent of fold -k's data.
+        This is the condition required for Neyman orthogonality (Theorem 5).
         """
+        from econirl.core.types import Panel as EconPanel
+
         self._log("Using 2-fold cross-fitting (Algorithm 2)")
-        n = len(states)
-        half = n // 2
+        n_ind = len(panel.trajectories)
+        half_ind = n_ind // 2
 
-        # Random permutation for fold assignment
+        # Random permutation for individual-level fold assignment
         key, perm_key = jax.random.split(key)
-        perm = np.array(jax.random.permutation(perm_key, n))
+        ind_perm = np.array(jax.random.permutation(perm_key, n_ind))
+        fold1_inds = ind_perm[:half_ind]
+        fold2_inds = ind_perm[half_ind:]
 
-        fold1_idx = perm[:half]
-        fold2_idx = perm[half:]
+        # Build fold-specific sub-panels (for theta MLE)
+        fold1_panel = EconPanel([panel.trajectories[i] for i in fold1_inds])
+        fold2_panel = EconPanel([panel.trajectories[i] for i in fold2_inds])
+
+        # Build fold-specific transition masks using individual_ids.
+        # individual_ids[t] is the trajectory index in panel.trajectories for transition t.
+        individual_ids = self._extract_individual_ids(panel)
+        fold1_trans_mask = np.isin(individual_ids, fold1_inds)
+        fold2_trans_mask = ~fold1_trans_mask
 
         # -----------------------------------------------------------------
-        # Fold 1: estimate h,g on fold 1 data
+        # Fold 1: estimate h,g from fold 1 transitions
         # -----------------------------------------------------------------
         key, k1 = jax.random.split(key)
         h1, g1, losses1 = self._estimate_h_g(
-            actions[fold1_idx], states[fold1_idx],
-            next_actions[fold1_idx], next_states[fold1_idx],
+            actions[fold1_trans_mask], states[fold1_trans_mask],
+            next_actions[fold1_trans_mask], next_states[fold1_trans_mask],
             feature_matrix, np.array(ccps), problem, gamma, k1,
         )
 
         # -----------------------------------------------------------------
-        # Fold 2: estimate h,g on fold 2 data
+        # Fold 2: estimate h,g from fold 2 transitions
         # -----------------------------------------------------------------
         key, k2 = jax.random.split(key)
         h2, g2, losses2 = self._estimate_h_g(
-            actions[fold2_idx], states[fold2_idx],
-            next_actions[fold2_idx], next_states[fold2_idx],
+            actions[fold2_trans_mask], states[fold2_trans_mask],
+            next_actions[fold2_trans_mask], next_states[fold2_trans_mask],
             feature_matrix, np.array(ccps), problem, gamma, k2,
         )
 
         # -----------------------------------------------------------------
-        # Cross-estimation: theta_1 uses h2,g2; theta_2 uses h1,g1
-        # This is the cross-fitting: each fold's first-stage estimates
-        # are used on the OTHER fold's data for parameter estimation.
+        # Cross-estimation: theta_k on fold k panel using h,g from fold -k.
+        # Each theta_k's pseudo-LL scores are independent of the h,g used,
+        # because h,g were estimated on the complementary fold's data.
         # -----------------------------------------------------------------
-        # Build sub-panels for each fold
-        # For simplicity, use full panel but fold-specific h,g tables
-        # (the MLE uses all observations but with cross-fitted h,g)
         params1, ll1, nit1, nfev1, msg1 = self._partial_mle(
-            panel, utility, problem, h2, g2, initial_params,
+            fold1_panel, utility, problem, h2, g2, initial_params,
         )
         params2, ll2, nit2, nfev2, msg2 = self._partial_mle(
-            panel, utility, problem, h1, g1,
+            fold2_panel, utility, problem, h1, g1,
             np.array(params1) if initial_params is None else initial_params,
         )
 
@@ -1663,7 +1660,7 @@ class TDCCPEstimator(BaseEstimator):
         params_avg = (np.array(params1) + np.array(params2)) / 2.0
         ll_avg = (ll1 + ll2) / 2.0
 
-        # Use average of h,g tables for final policy computation
+        # Use average of h,g tables for final policy computation and numerical Hessian
         h_avg = (h1 + h2) / 2.0
         g_avg = (g1 + g2) / 2.0
 
