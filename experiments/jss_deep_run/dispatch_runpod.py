@@ -121,10 +121,15 @@ _RUNPOD_USD_PER_HOUR = {"cpu": 0.40, "gpu": 1.20}
 def _runpod_pod_payload(cell: Cell, image: str, volume_id: str) -> dict[str, Any]:
     """Build the GraphQL `podRentInterruptable` mutation payload.
 
-    The pod runs the container with the cell id as the only argument,
-    mounts the persistent volume at /workspace/results, and shuts
-    itself down when the worker exits.
+    The image entrypoint is `bash -lc`, so dockerArgs is the full
+    command string. Mounts the persistent volume at /workspace/results.
+    The pod shuts itself down when the worker exits.
     """
+    command = (
+        f"python -m experiments.jss_deep_run.run_cell "
+        f"--cell-id {cell.cell_id} "
+        f"--output-dir /workspace/results"
+    )
     return {
         "cloudType": "COMMUNITY",
         "gpuCount": 1 if cell.hardware == "gpu" else 0,
@@ -140,10 +145,7 @@ def _runpod_pod_payload(cell: Cell, image: str, volume_id: str) -> dict[str, Any
             {"key": "CELL_ID", "value": cell.cell_id},
             {"key": "JAX_PLATFORMS", "value": "cuda" if cell.hardware == "gpu" else "cpu"},
         ],
-        "dockerArgs": (
-            f"--cell-id {cell.cell_id} "
-            f"--output-dir /workspace/results"
-        ),
+        "dockerArgs": command,
     }
 
 
