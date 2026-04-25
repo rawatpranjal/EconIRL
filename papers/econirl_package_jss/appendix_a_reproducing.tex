@@ -1,6 +1,6 @@
 \section{Reproducing every figure and table} \label{app:reproducing}
 
-Every numbered figure and table in this paper is produced by exactly one script. To regenerate the paper end to end, run each script below from the repository root. All scripts use a fixed random seed of 42 and write their output to the location named in the third column.
+Every numbered figure and table in this paper is produced by exactly one script. To regenerate the paper end to end, run \code{bash papers/econirl\_package\_jss/run\_all.sh} from the repository root. All scripts use a fixed random seed of 42 and write their output to the location named in the third column. The orchestrator writes a manifest of every produced output to \code{manifest.csv} so the LaTeX build can verify that nothing was skipped.
 
 \begin{table}[h]
 \centering
@@ -10,20 +10,37 @@ Every numbered figure and table in this paper is produced by exactly one script.
 Element & Script & Output \\
 \midrule
 Listing 1     & \code{code\_snippets/teaser\_nfxp\_rust.py}        & console \\
+Listing 2     & \code{code\_snippets/listing2\_nfxp\_example.py}    & console \\
+Listing 2b    & \code{code\_snippets/listing2b\_bootstrap.py}       & console \\
+Listing 3     & \code{code\_snippets/listing3\_mce\_irl\_example.py}& console \\
+Listing 4     & \code{code\_snippets/listing4\_nnes\_example.py}    & console \\
+Listing 4b    & \code{code\_snippets/listing4b\_nnes\_gpu.py}       & console \\
+Figure 1      & \code{code\_snippets/fig1\_rust\_bus\_ccp.py}       & \code{figures/fig1\_rust\_bus\_ccp.pdf} \\
+Figure 2      & \code{code\_snippets/fig2\_rust\_bus\_value.py}     & \code{figures/fig2\_rust\_bus\_value.pdf} \\
+Figure 3      & \code{code\_snippets/fig3\_mce\_irl\_reward.py}     & \code{figures/fig3\_mce\_irl\_reward.pdf} \\
+Figure 4      & \code{code\_snippets/fig4\_keane\_wolpin\_policy.py}& \code{figures/fig4\_keane\_wolpin\_policy.pdf} \\
+Figure 5      & \code{code\_snippets/fig5\_time\_accuracy.py}       & \code{figures/fig5\_time\_accuracy.pdf} \\
 Table 1       & \code{code\_snippets/table1\_estimator\_taxonomy.py}& \code{figures/table1.tex} \\
 Table 2       & \code{code\_snippets/table2\_library\_comparison.py}& \code{figures/table2.tex} \\
-Listing 2     & \code{code\_snippets/listing2\_nfxp\_example.py}    & console \\
-Figure 1      & \code{code\_snippets/fig1\_rust\_bus\_ccp.py}       & \code{figures/fig1.pdf} \\
-Figure 2      & \code{code\_snippets/fig2\_rust\_bus\_value.py}     & \code{figures/fig2.pdf} \\
-Listing 3     & \code{code\_snippets/listing3\_mce\_irl\_example.py}& console \\
-Figure 3      & \code{code\_snippets/fig3\_mce\_irl\_reward.py}     & \code{figures/fig3.pdf} \\
-Listing 4     & \code{code\_snippets/listing4\_nnes\_example.py}    & console \\
-Figure 4      & \code{code\_snippets/fig4\_keane\_wolpin\_policy.py}& \code{figures/fig4.pdf} \\
-Table 3       & \code{examples/rust-bus-engine/benchmark\_all\_estimators.py} & \code{benchmark\_results.csv} \\
+Table 3 (\code{tab:bench}) & \code{examples/rust-bus-engine/benchmark\_all\_estimators.py} & \code{benchmark\_results.csv} \\
+\addlinespace[2pt]
+Diagnostics D1 & \code{code\_snippets/diagnostics\_rust\_bus.py}     & \code{diagnostics.csv} \\
+Diagnostics D2 & \code{code\_snippets/diagnostics\_keane\_wolpin.py} & \code{diagnostics.csv} \\
+Transfer TT1   & \code{code\_snippets/transfer\_mce\_irl.py}         & \code{transfer\_results.csv} \\
+Transfer TT2   & \code{code\_snippets/transfer\_gladius.py}          & \code{transfer\_results.csv} \\
+Transfer TT3   & \code{code\_snippets/transfer\_airl.py}             & \code{transfer\_results.csv} \\
+Transfer TT4   & \code{code\_snippets/transfer\_iq\_learn.py}        & \code{transfer\_results.csv} \\
+Transfer TT5   & \code{code\_snippets/transfer\_f\_irl.py}           & \code{transfer\_results.csv} \\
 \bottomrule
 \end{tabular}
-\caption{Mapping from each numbered element of the paper to a single reproducing script.}
+\caption{Mapping from each numbered element of the paper to a single reproducing script. The first block produces the listings, figures, and tables that appear in the body of the paper. The second block produces the pre-estimation diagnostics and transfer tests required by the benchmark protocol.}
 \label{tab:reproduce}
 \end{table}
 
-The combined runtime of all eleven scripts is approximately one hour on the central processing unit configuration documented in Section~\ref{sec:computational}, dominated by the adversarial inverse reinforcement learning estimator in Table~\ref{tab:bench}. The Keane-Wolpin script accelerates by roughly a factor of five on a graphics processing unit.
+\subsection{Pre-estimation diagnostics}
+
+The benchmark protocol requires four pre-estimation diagnostics on every dataset before any estimator runs. The diagnostics are the rank of the flattened feature matrix, its condition number on the nonzero rows, the fraction of states observed at least once in the panel, and the count of states in which only one action is ever observed. The diagnostics are computed once per dataset and stored alongside the benchmark CSV. The Rust bus panel and the Keane-Wolpin panel each have their own row in \code{diagnostics.csv}, produced by the scripts named D1 and D2 in Table~\ref{tab:reproduce}. Diagnostic failures abort the corresponding benchmark before any estimator is fit.
+
+\subsection{Transfer test for inverse reinforcement learning}
+
+Inverse reinforcement learning estimators are tested on transfer because the recovered reward is the deliverable. The transfer test holds out a perturbed transition structure that the estimator did not see during fitting and measures the percent optimal value of the estimated reward under the held-out transitions. The Rust bus transfer test perturbs each transition probability by a Beta(2, 2) noise variable and renormalizes. The five scripts named TT1 through TT5 in Table~\ref{tab:reproduce} produce one row each in \code{transfer\_results.csv} for MCE-IRL, GLADIUS, AIRL, IQ-Learn, and $f$-IRL.
