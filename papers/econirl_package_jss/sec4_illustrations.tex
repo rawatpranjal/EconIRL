@@ -79,7 +79,7 @@ The downstream tools work the same way for the inverse reinforcement learning re
 
 \subsection{Keane-Wolpin occupational choice with NNES} \label{sec:illustrations:kw}
 
-The bus engine panel has only ninety states and two actions, so all twelve estimators run in seconds. The Keane-Wolpin occupational choice panel is more demanding. Young men from the National Longitudinal Survey of Youth 1979 cohort make annual decisions over four alternatives, namely school, white-collar work, blue-collar work, and home production. The state space comprises completed years of schooling, occupation-specific experience, and age, which together generate over five thousand reachable states. We use the neural network value approximation estimator \code{NNES} of \citet{nguyen2025nnes} to fit the model on five thousand observations from five hundred individuals.
+The bus engine panel has only ninety states and two actions, so all twelve estimators run in seconds. The Keane-Wolpin occupational choice panel of \citet{keane1997} is more demanding. Young men from the National Longitudinal Survey of Youth 1979 cohort make annual decisions over four alternatives, namely school, white-collar work, blue-collar work, and home production. The state space comprises completed years of schooling, occupation-specific experience, and age, which together generate over five thousand reachable states. We use the neural network value approximation estimator \code{NNES} of \citet{nguyen2025nnes} to fit the model on five thousand observations from five hundred individuals.
 
 \begin{lstlisting}[caption={Fitting NNES on the Keane-Wolpin occupational choice panel.},label={lst:nnes},language=Python,frame=single]
 from econirl.datasets import load_keane_wolpin
