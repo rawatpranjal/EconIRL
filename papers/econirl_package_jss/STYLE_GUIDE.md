@@ -1,100 +1,96 @@
 # Style guide for the econirl JSS paper
 
-This guide distills the conventions of four canonical software papers in the same tradition. Use it as the prose checklist when drafting or revising any section of the paper.
+A loose collection of conventions we are following. Treat it as taste, not law. The four exemplar papers do not agree on everything, and neither do we.
 
-## Primary exemplar
+## What we are imitating
 
-**Conlon and Gortmaker (2020), "Best Practices for Differentiated Products Demand Estimation with PyBLP."** This is the paper closest in shape to what we are writing. It is a long-form software paper that bridges a methodological literature with a Python package, includes original methodological contributions alongside the implementation, and targets a journal with conventions close to JSS. Mimic its rhythm and register.
+The reference is Conlon and Gortmaker (2020) on PyBLP. It is the closest paper in shape to ours. A long-form software paper, a Python package, methodological contributions on the side, a journal with conventions close to JSS. When in doubt, read a section of PyBLP and write something with the same rhythm.
 
-## Secondary exemplars
+Secondary references when PyBLP does not cover the case. Rosseel (2012) on lavaan for inline-session listings. Gleave et al. (2022) on imitation for the related-software comparison. Raffin et al. (2021) on Stable-Baselines3 for the hero teaser.
 
-- **Rosseel (2012), "lavaan: An R Package for Structural Equation Modeling"** in JSS. The template for code-listing format and the "Why do we need X" framing.
-- **Gleave et al. (2022), "imitation: Clean Imitation Learning Implementations."** The template for the related-software comparison table.
-- **Raffin et al. (2021), "Stable-Baselines3."** The template for the hero teaser code block.
+## The principles, in order
 
-## Ten rules to write by
+**Problem first, package second.** Open with the substantive question and the audience that cares. The package shows up after the reader knows why they should keep reading. PyBLP does not name itself until the third sentence of the abstract, and we follow suit.
 
-1. **Open the abstract with the substantive problem, not the package name.** PyBLP starts "Differentiated products demand systems are a workhorse for understanding the price effects of mergers, the value of new goods, and the contribution of products to seller networks." The package is named only in the third sentence. Do the same. Open with why decoding behavior into preferences and beliefs matters for industrial organization, labor economics, urban economics, and AI alignment.
+**Understate.** Do not call your contribution novel, principled, or state-of-the-art. Show the workflow, point at the comparison table, and let the reader draw the conclusion. The exemplars routinely admit that their results coincide with the existing literature on most things and differ on a few specific things. That is the register we want.
 
-2. **End the abstract with one install line and one URL.** Both PyBLP and imitation close their abstracts with `pip install <pkg>` and the documentation URL. Match this.
+**One register per section.** Some sections are notation-heavy and look like applied math: the unified notation block, the per-estimator objectives, the algorithm pseudocode. Some sections are prose-heavy and look like a software README: the introduction, the related-software comparison, the worked illustrations. Do not force prose flavor into the math sections, and do not force equations into the prose sections. PyBLP does this without comment.
 
-3. **Put models before software.** PyBLP devotes six pages to the BLP model and notation before introducing the package architecture. lavaan devotes Section 3 to model syntax before any code. The reader needs to know what is being abstracted before they can appreciate the abstraction. Move the API discussion after the methods.
+**Conversational where possible.** "We find," "By contrast," "A first example," "The main disadvantage" are good. Long passive constructions and stacked nominalizations are bad. Read your paragraph aloud. If it is unreadable, rewrite it in shorter sentences with the verbs in the right place.
 
-4. **Have a "Why do we need econirl?" section.** lavaan dedicates Section 2 to this question with a numbered list of three target audiences. State plainly that no existing package covers both NFXP and AIRL with shared inference. Three target audiences for econirl are structural econometricians who want a path to neural rewards, IRL researchers who want standard errors and identification diagnostics, and applied empiricists who want to fit both families on the same panel without reimplementing either.
+**Punctuation is not a moral test.** Em dashes, semicolons, and colons are fine when they help the sentence. Do not stack them three to a sentence. Do not use them in place of a period when a period would do. The earlier rule that banned them outright produced stiff prose and we are relaxing it.
 
-5. **Use a comparison table for related software.** imitation and SB3 both pair a prose paragraph with a feature table. Rows are estimators and infrastructure features. Columns are competing libraries. Put this in its own section after the methods, not buried in the introduction.
+**Bullet lists belong outside the body.** PyBLP and lavaan use them for target-audience enumerations and for the section roadmap. Everywhere else they convert to prose. We do the same. A short comma list inside one sentence is not a bullet list and is fine.
 
-6. **Worked examples follow the lavaan inline-session template.** Show the prompt, the input, the printed output, then prose that interprets the output. Example:
+**Show the workflow, not the script.** Worked examples use the lavaan inline-session format. Prompt, call, printed output, one paragraph of interpretation. Full scripts live in `code_snippets/` and are referenced by the caption.
 
-   ```
-   >>> from econirl.datasets import load_rust_bus
-   >>> panel = load_rust_bus()
-   >>> result = NFXP(discount_factor=0.9999).estimate(panel)
-   >>> print(result.summary())
-                     coef    std err         z      P>|z|
-   theta_1       0.001231   0.000087     14.16     0.000
-   RC            3.011476   0.245312     12.27     0.000
-   ```
+```
+>>> from econirl.datasets import load_rust_bus
+>>> from econirl.environments.rust_bus import RustBusEnvironment
+>>> from econirl.preferences.linear import LinearUtility
+>>> from econirl.estimation import NFXP
+>>> env = RustBusEnvironment(num_mileage_bins=90, discount_factor=0.9999)
+>>> result = NFXP().estimate(panel=load_rust_bus(as_panel=True),
+...     utility=LinearUtility.from_environment(env),
+...     problem=env.problem_spec, transitions=env.transition_matrices)
+>>> print(result.summary())
+                          coef    std err        t    P>|t|
+operating_cost          0.0010     0.0004     2.54    0.011
+replacement_cost        3.0722     0.0747    41.11    0.000
+```
 
-   Then interpret. Do not paste full scripts as captioned figures.
+**Bold package names. Code-font class and function names. Italicize terms of art on the first use.** "We provide **econirl**, a Python package for ..." "The `Estimator.estimate()` method." "We project the neural reward onto a *sieve basis*." Reset the italic for terms when the section changes register.
 
-7. **Use first person plural.** "We introduce econirl." "Our package implements." "We benchmark." All four exemplars use this register freely. Avoid the passive third person ("the package is presented").
+**First person plural in prose.** "We introduce econirl." "Our package implements." Reserve the impersonal third person for the math sections, where the agent does not matter and the equation does the talking.
 
-8. **Bold package names. Code-font class and function names. Italicize terms of art on first use.** "We provide **econirl**, a Python package for the estimation of dynamic discrete choice models." "The `Estimator.estimate()` method." "We project the neural reward onto a *sieve basis*."
+**Interpret, do not summarize.** A table caption tells the reader what the table is. The paragraph that follows says what is interesting about the numbers in it. If the prose just restates the column headers, cut it.
 
-9. **Three registers: humble on shared methodology, declarative on novel contribution, comparative on prior software.** Borrow PyBLP's "our results generally coincide with and build on the existing literature" alongside its "we struggle to replicate some of the difficulties found in the previous literature." Borrow imitation's "By contrast, prior libraries typically support only a handful of algorithms, are no longer actively maintained, and are built on top of deprecated frameworks."
+## Section register, by section
 
-10. **Write long expository paragraphs, not bullet lists.** PyBLP and lavaan never use bullets in body prose. Five to eight sentences per paragraph is the right rhythm. If you find yourself writing a bullet list outside of an enumerated list of target audiences, convert it to prose.
+| Section | Register | Notes |
+|--|--|--|
+| Abstract | Prose, problem first, install line at the end. | Three to four sentences. |
+| Introduction | Prose. | One teaser code block at the end. No related work. |
+| Models and methods | Math heavy. | Unified notation up front. Per-estimator objectives are the spine. Pseudocode only where the outer structure is non-trivial. |
+| Related software | Prose plus comparison table. | Pulled out of the introduction so the reader can judge the comparison after reading the methods. |
+| Software design | Prose, code-font heavy. | API contract, inference layer, JAX backbone. Listings are short. |
+| Illustrations | Inline-session listings interleaved with interpretive prose. | Three worked examples on real datasets, then a benchmark table. |
+| Computational details | Terse, factual. | Versions, hardware, OS. |
+| Summary | Prose. | Roadmap and the two or three things we did not get to. |
+| Appendix | Tables and pointers. | Reproducibility map. |
 
-## Section ordering for econirl
+## Section ordering
 
-The recommended ordering, restructured from the original plan:
+Introduction, Models and methods, Related software, Software design, Illustrations, Computational details, Summary, Appendix. The earlier draft included a standalone "Why econirl" section. We dropped it because the motivation it carried lives naturally in the introduction.
 
-1. **Introduction.** Substantive problem, narrative of the convergence between structural econometrics and inverse reinforcement learning, statement of the fragmentation problem, one announcement paragraph for econirl, one five-line teaser code block. No related work yet. No contribution list yet.
-2. **Why econirl.** Three target audiences in one paragraph each. Closes with three differentiators in prose.
-3. **Models and methods.** Unified notation table at the top. Each estimator family gets a subsection with display equations. Taxonomy table at the end.
-4. **Related software.** Standalone section with comparison table.
-5. **Software design.** `Estimator` protocol, `EstimationSummary`, inference layer.
-6. **Illustrations.** Three worked examples in inline-session format, real named datasets, benchmark table at the end.
-7. **Computational details.**
-8. **Summary and roadmap.**
+## Useful phrases
 
-The three swaps from the original outline are pulling related work out of the introduction into its own section, inserting "Why econirl" before the methods, and putting related work after the methods so the reader can evaluate the comparison fairly.
-
-## Phrases to memorize
-
-These templates appear repeatedly in the exemplars and should be reused without apology.
+Reuse these without apology.
 
 - "The rest of this paper is organized as follows."
-- "Why do we need X."
-- "A first example: Y."
+- "A first example."
 - "The main disadvantage of X is."
-- "Despite its popularity, this literature lacks."
 - "A key advantage of X is."
 - "By contrast."
 - "We find that."
-- "Our objective is."
 
-## Things to avoid
+## What to keep an eye on
 
-- Em dashes, semicolons, colons, plus signs, equals signs, or brackets in prose. These belong in code and math.
-- Hedging phrases like "we believe," "it should be noted," "arguably." Make the claim or drop it.
-- "Cutting-edge," "state-of-the-art," "novel" as self-applied adjectives. Let the comparison table make the claim.
-- Bullet lists in body prose. Convert to enumerated lists only for the three target audiences.
-- Restating what a table or figure already shows. Prose interprets, not summarizes.
-- Sentences that overload multiple ideas with semicolons. Say one thing per sentence.
+These are common mistakes, not absolute prohibitions.
 
-## Reference checklist before submission
+- Self-applied superlatives like "novel," "state-of-the-art," "principled." The comparison table exists for a reason.
+- Hedging like "we believe," "arguably," "it should be noted." Either claim it or drop it.
+- Two ideas in one sentence joined by a semicolon when a period would do.
+- Long lists in body prose. Short ones inside a sentence are fine. Bulleted lists in body prose are not.
+- Captions that summarize the figure twice. The caption is a one-line label, the prose interprets.
 
-Before sending the manuscript, verify each of the following.
+## What to verify before submission
 
-1. The abstract opens with the substantive problem and closes with the install line and URL.
-2. Section 2 names three target audiences in three paragraphs.
-3. Section 3 has a unified notation block before any estimator subsection.
-4. Section 4 has a comparison table with at least four competing libraries.
-5. Section 6 examples use the inline-session prompt-and-output format, not script blocks as captioned figures.
-6. No prose paragraph contains an em dash, a semicolon, or a colon outside of math or code.
-7. No paragraph in the body uses a bullet list.
-8. Every numbered table and figure is followed by interpretive prose, not a restatement.
-9. Every estimator named in the paper appears in both the taxonomy table and the benchmark table.
-10. Every numerical claim in the paper traces to a script in `replication.md`.
+A short pass, not an audit.
+
+- The abstract opens with the substantive problem and closes with `pip install econirl` plus the docs URL.
+- Every estimator named in the paper appears in both the taxonomy table and the benchmark table.
+- Every numbered figure and table caption names the script that produces it.
+- Every numerical claim traces to a script in the appendix table.
+- The paper compiles with no undefined references.
+- The PDF fits the page limit.
