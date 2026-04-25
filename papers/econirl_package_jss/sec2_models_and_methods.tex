@@ -333,26 +333,31 @@ Table~\ref{tab:taxonomy} summarizes the twelve production estimators along the s
 \begin{table}[t]
 \centering
 \small
-\begin{tabular}{lllcccc}
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.10}
+\begin{tabular}{l l l c c c c}
 \toprule
-Estimator & Family & Reward & Trans.\ & Inner & Cont.\ & Recovers \\
-          &        & form   & known   & solve & states & params  \\
+\textbf{Estimator} & \textbf{Family} & \textbf{Reward} & \textbf{Trans.} & \textbf{Inner} & \textbf{Cont.} & \textbf{Recovers} \\
+                   &                 & \textbf{form}   & \textbf{known}  & \textbf{solve} & \textbf{states} & \textbf{params} \\
 \midrule
-NFXP    & Structural likelihood    & linear  & yes & yes & no  & yes \\
-MPEC    & Structural likelihood    & linear  & yes & no  & no  & yes \\
-CCP     & Structural likelihood    & linear  & yes & no  & no  & yes \\
-SEES    & Sieve approximation      & linear  & yes & no  & yes & yes \\
-NNES    & Neural approximation     & linear  & yes & no  & yes & yes \\
-TD-CCP  & Neural CCP               & linear  & yes & no  & yes & yes \\
-MCE IRL & Max causal entropy       & linear  & yes & yes & no  & yes \\
-GLADIUS & Q-network IRL            & neural  & no  & no  & yes & yes \\
-IQ-Learn& Q-function IRL           & tabular & yes & no  & no  & no  \\
-AIRL    & Adversarial IRL          & linear  & yes & yes & no  & no  \\
-$f$-IRL & Distribution IRL         & tabular & yes & yes & no  & no  \\
-BC      & Imitation                & none    & no  & no  & no  & no  \\
+NFXP        & Structural likelihood & linear  & \cmark & \cmark & \xmark & \cmark \\
+MPEC        & Structural likelihood & linear  & \cmark & \xmark & \xmark & \cmark \\
+CCP         & Structural likelihood & linear  & \cmark & \xmark & \xmark & \cmark \\
+\addlinespace[2pt]
+SEES        & Sieve approximation   & linear  & \cmark & \xmark & \cmark & \cmark \\
+NNES        & Neural approximation  & linear  & \cmark & \xmark & \cmark & \cmark \\
+TD-CCP      & Neural CCP            & linear  & \cmark & \xmark & \cmark & \cmark \\
+\addlinespace[2pt]
+MCE-IRL     & Max causal entropy    & linear  & \cmark & \cmark & \xmark & \cmark \\
+GLADIUS     & Q-network IRL         & neural  & \xmark & \xmark & \cmark & \cmark \\
+IQ-Learn    & Q-function IRL        & tabular & \cmark & \xmark & \xmark & \xmark \\
+AIRL        & Adversarial IRL       & linear  & \cmark & \cmark & \xmark & \xmark \\
+$f$-IRL     & Distribution IRL      & tabular & \cmark & \cmark & \xmark & \xmark \\
+\addlinespace[2pt]
+BC          & Imitation             & none    & \xmark & \xmark & \xmark & \xmark \\
 \bottomrule
 \end{tabular}
-\caption{Twelve production estimators along their structural assumptions. The columns are derived from the \code{ProblemCapabilities} dataclass in \code{econirl.estimation.categories}.}
+\caption{Twelve production estimators along their structural assumptions. Columns are derived from the \code{ProblemCapabilities} dataclass in \code{econirl.estimation.categories}, which serves as the canonical taxonomy and is regenerated whenever a new estimator is added to the library.}
 \label{tab:taxonomy}
 \end{table}
 

@@ -1,0 +1,39 @@
+\section{Related software} \label{sec:related}
+
+The \pkg{imitation} library \citep{gleave2022imitation} from the Center for Human-Compatible Artificial Intelligence is the most mature open-source package for inverse reinforcement learning. It implements behavioral cloning, generative adversarial imitation learning, adversarial inverse reinforcement learning, and a tabular variant of maximum causal entropy inverse reinforcement learning. The library is excellent within its scope. It does not implement structural likelihood estimators. It does not compute standard errors. It does not run identification diagnostics. It does not include a counterfactual analysis pipeline. Its design assumes the \pkg{Stable Baselines 3} ecosystem and the \pkg{Gymnasium} environment interface. \pkg{econirl} borrows the direct linear solve for occupancy measures from \pkg{imitation} and the tabular maximum causal entropy framework, but extends both to the infinite-horizon action-dependent feature setting that structural econometrics requires.
+
+The \pkg{pyblp} package \citep{conlon2020pyblp} is the leading open-source tool for random coefficients logit demand estimation. It is mature and battle-tested but addresses a static demand setting rather than a dynamic decision problem. The R packages \pkg{mlogit} and \pkg{Rchoice} fit static discrete choice models with no inter-temporal substitution. None of these libraries cover dynamic decision making with reward learning.
+
+The closest existing tool to \pkg{econirl} in the structural econometrics tradition is \pkg{respy} \citep{respy2020}, a \proglang{Python} library for structural estimation of Eckstein-Keane-Wolpin models. \pkg{respy} is specialized for finite-horizon labor supply problems and does not implement inverse reinforcement learning estimators. \pkg{econirl} aims to complement rather than replace these specialized tools by providing a single home for the broader family of dynamic discrete choice estimators and the inverse reinforcement learning estimators that share the underlying Markov decision process structure.
+
+Table~\ref{tab:libcompare} summarizes the coverage gap that \pkg{econirl} fills. The columns are estimators and infrastructure features. The rows are competing libraries. \pkg{econirl} is the only package that covers both the structural likelihood and the inverse reinforcement learning families and ships a shared inference and counterfactual pipeline.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{l ccccc}
+\toprule
+\textbf{Estimators / features} & \pkg{econirl} & \pkg{imitation} & \pkg{respy} & \pkg{pyblp} & \pkg{SB3} \\
+\midrule
+\multicolumn{6}{l}{\emph{Structural likelihood family}} \\
+NFXP, MPEC, CCP                    & \cmark & \xmark & \cmark & \xmark & \xmark \\
+SEES, NNES, TD-CCP                 & \cmark & \xmark & \xmark & \xmark & \xmark \\
+\addlinespace[2pt]
+\multicolumn{6}{l}{\emph{Inverse reinforcement learning family}} \\
+MCE-IRL                            & \cmark & \cmark & \xmark & \xmark & \xmark \\
+GAIL, AIRL                         & \cmark & \cmark & \xmark & \xmark & \xmark \\
+IQ-Learn, $f$-IRL                  & \cmark & \xmark & \xmark & \xmark & \xmark \\
+BC                                 & \cmark & \cmark & \xmark & \xmark & \cmark \\
+\addlinespace[2pt]
+\multicolumn{6}{l}{\emph{Post-estimation infrastructure}} \\
+Asymptotic standard errors         & \cmark & \xmark & \cmark & \cmark & \xmark \\
+Identification diagnostics         & \cmark & \xmark & \xmark & \cmark & \xmark \\
+Counterfactual simulation          & \cmark & \xmark & \xmark & \cmark & \xmark \\
+\pkg{JAX} backend, GPU support     & \cmark & \xmark & \xmark & \xmark & \xmark \\
+\bottomrule
+\end{tabular}
+\caption{Coverage of \pkg{econirl} relative to the four nearest open-source packages. Rows are estimator families and infrastructure features. Columns are libraries.}
+\label{tab:libcompare}
+\end{table}

@@ -2,12 +2,101 @@
 
 %% -- LaTeX packages and custom commands ---------------------------------------
 
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
 \usepackage{thumbpdf,lmodern}
+\usepackage{textcomp}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{microtype}
+\usepackage{siunitx}
+\sisetup{
+  detect-all,
+  group-digits=false,
+  table-number-alignment=center,
+  table-format=-1.4,
+  output-decimal-marker={.},
+  retain-explicit-plus=true
+}
 \usepackage{listings}
+\usepackage{xcolor}
 \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage[font=small,labelfont=bf,labelsep=period]{caption}
+\captionsetup[table]{skip=6pt}
+\captionsetup[figure]{skip=6pt}
+
+%% -- Algorithm formatting tweaks ----------------------------------------------
+\SetAlCapFnt{\small\bfseries}
+\SetAlCapNameFnt{\small}
+\SetAlCapHSkip{0pt}
+
+%% -- Code listing palette and Python style ------------------------------------
+\definecolor{econirlBlue}{HTML}{1F4E79}
+\definecolor{econirlSlate}{HTML}{4A4A4A}
+\definecolor{econirlKeyword}{HTML}{0B5394}
+\definecolor{econirlString}{HTML}{8B0000}
+\definecolor{econirlComment}{HTML}{2E6F2E}
+\definecolor{econirlFrame}{HTML}{C9D1D9}
+\definecolor{econirlBg}{HTML}{F8F9FB}
+
+\lstdefinestyle{econirlpython}{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize\color{econirlSlate},
+  keywordstyle=\color{econirlKeyword}\bfseries,
+  commentstyle=\color{econirlComment}\itshape,
+  stringstyle=\color{econirlString},
+  identifierstyle=\color{econirlSlate},
+  numbers=left,
+  numberstyle=\tiny\color{gray!70},
+  numbersep=8pt,
+  stepnumber=1,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=flexible,
+  keepspaces=true,
+  upquote=true,
+  tabsize=4,
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{econirlFrame},
+  backgroundcolor=\color{econirlBg},
+  xleftmargin=14pt,
+  xrightmargin=4pt,
+  belowcaptionskip=4pt,
+  abovecaptionskip=6pt,
+  captionpos=b,
+  literate={->}{{$\rightarrow$}}1
+}
+\lstset{style=econirlpython}
+
+%% Inline-session prompt-and-output style for lavaan-style examples.
+\lstdefinestyle{econirlsession}{
+  style=econirlpython,
+  basicstyle=\ttfamily\footnotesize\color{econirlSlate},
+  numbers=none,
+  frame=none,
+  backgroundcolor=\color{white},
+  xleftmargin=4pt,
+  literate={>>>}{{\textcolor{econirlKeyword}{>>>}}}3
+           {...}{{\textcolor{econirlKeyword}{...}}}3
+}
+
+%% -- Hyperref color tweaks ----------------------------------------------------
+\hypersetup{
+  citecolor=econirlBlue,
+  linkcolor=econirlBlue,
+  urlcolor=econirlBlue,
+  filecolor=econirlBlue,
+  bookmarksnumbered=true,
+  pdftitle={econirl: Unified Estimation and Inverse Reinforcement Learning for Dynamic Discrete Choice in Python},
+  pdfauthor={Pranjal Rawat, John Rust, Hoang Nguyen, Enoch H. Kang, Maximilian Blesch},
+  pdfsubject={Journal of Statistical Software submission},
+  pdfkeywords={dynamic discrete choice, inverse reinforcement learning, structural estimation, JAX, Python}
+}
 
 \graphicspath{{figures/}}
 
@@ -16,14 +105,22 @@
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\PR}{\mathbb{P}}
+\newcommand{\cmark}{\textcolor{econirlBlue}{$\checkmark$}}
+\newcommand{\xmark}{\textcolor{gray!60}{\textendash}}
+\newcommand{\reproduced}[1]{{\footnotesize\itshape\hfill Reproduced by \code{#1}.\par}}
 
 %% -- Article metadata --------------------------------------------------------
 
-\author{Pranjal Rawat\\Georgetown University \And
-        John Rust\\Georgetown University \AND
-        Hoang Nguyen\\Georgetown University \And
-        Enoch H.\ Kang\\University of Washington \And
-        Maximilian Blesch\\Humboldt University of Berlin}
+\author{%
+\begin{tabular}{c@{\hspace{2.2em}}c@{\hspace{2.2em}}c}
+\large Pranjal Rawat & \large John Rust & \large Hoang Nguyen \\
+{\small\itshape Georgetown University} & {\small\itshape Georgetown University} & {\small\itshape Georgetown University}
+\end{tabular}\\[10pt]
+\begin{tabular}{c@{\hspace{2.2em}}c}
+\large Enoch H.\ Kang & \large Maximilian Blesch \\
+{\small\itshape University of Washington} & {\small\itshape Humboldt University of Berlin}
+\end{tabular}%
+}
 
 \Plainauthor{Pranjal Rawat, John Rust, Hoang Nguyen, Enoch H. Kang, Maximilian Blesch}
 
@@ -34,7 +131,7 @@
 \Shorttitle{\pkg{econirl}: Estimation and IRL for DDC}
 
 \Abstract{
-Dynamic discrete choice models and inverse reinforcement learning ask the same question from opposite directions. The structural econometrics literature solves a forward maximum likelihood problem with a parametric reward, while the imitation learning literature recovers an unknown reward from expert behavior. The two communities have developed largely incompatible toolchains. We present \pkg{econirl}, an open-source \proglang{Python} library that implements twelve estimators spanning both traditions under one common interface and a shared post-estimation pipeline. The pipeline provides four standard error methods, identification diagnostics, profile likelihood, hypothesis tests, counterfactual simulation, and visualization, each reusable across every estimator. The library is built on \pkg{JAX} for automatic differentiation and graphics processing unit acceleration. Three worked illustrations on real data demonstrate the unified workflow. The library is available under the MIT license at \url{https://github.com/rawatpranjal/econirl}.
+Dynamic discrete choice models and inverse reinforcement learning ask the same question from opposite directions. The structural econometrics literature solves a forward maximum likelihood problem with a parametric reward, while the imitation learning literature recovers an unknown reward from expert behavior. The two communities have developed largely incompatible toolchains. We present \pkg{econirl}, an open-source \proglang{Python} library that implements twelve estimators spanning both traditions under one common interface and a shared post-estimation pipeline. The pipeline provides four standard error methods, identification diagnostics, profile likelihood, hypothesis tests, counterfactual simulation, and visualization, each reusable across every estimator. The library is built on \pkg{JAX} for automatic differentiation and graphics processing unit acceleration. Three worked illustrations on real data demonstrate the unified workflow. The library is available under the MIT license. Documentation, installation instructions, and worked examples are at \url{https://econirl.readthedocs.io/en/latest/index.html}.
 }
 
 \Plainabstract{
@@ -50,13 +147,15 @@ Dynamic discrete choice models and inverse reinforcement learning solve the same
   Georgetown University\\
   Washington, DC, United States of America\\
   E-mail: \email{pp712@georgetown.edu}\\
-  URL: \url{https://github.com/rawatpranjal/econirl}
+  URL: \url{https://econirl.readthedocs.io/en/latest/index.html}
 }
 
 \begin{document}
 
 \input{sec1_introduction}
+\input{sec1b_why_econirl}
 \input{sec2_models_and_methods}
+\input{sec2b_related_software}
 \input{sec3_software_design}
 \input{sec4_illustrations}
 \input{sec5_computational_details}

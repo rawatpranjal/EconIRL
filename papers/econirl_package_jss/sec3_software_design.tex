@@ -36,28 +36,3 @@ The library is built on \pkg{JAX} \citep{jax2018github} for three reasons. Autom
 
 The configuration module \code{econirl.\_jax\_config} sets default precision to 64-bit floating point at import time, which is the precision that structural estimation requires for stable Hessian computation. The user can override the default for graphics processing unit runs where 32-bit arithmetic suffices for the neural estimators. Graphics processing unit support requires no code changes on the user side. \pkg{JAX} dispatches to the available accelerator automatically.
 
-\subsection{Comparison to existing software}
-
-Table~\ref{tab:libraries} compares \pkg{econirl} to the four most directly related open-source libraries along the dimensions that matter for applied work. The \pkg{imitation} library covers inverse reinforcement learning but lacks structural estimators, standard errors, identification diagnostics, and counterfactual analysis. The \pkg{pyblp} library is mature and well-tested but addresses static demand estimation rather than dynamic decision making. The \proglang{R} packages \pkg{mlogit} and \pkg{Rchoice} fit static discrete choice models with no inter-temporal substitution. \pkg{respy} fits a specific class of finite-horizon labor supply models but does not implement inverse reinforcement learning or the broader estimator family. \pkg{econirl} is the only library that spans dynamic discrete choice and inverse reinforcement learning under a unified inference pipeline.
-
-\begin{table}[t]
-\centering
-\small
-\begin{tabular}{lccccc}
-\toprule
-                            & \pkg{econirl} & \pkg{imitation} & \pkg{pyblp} & \pkg{respy} & \pkg{mlogit} \\
-\midrule
-Dynamic discrete choice     & yes & no  & no  & yes & no  \\
-Inverse reinforcement learning & yes & yes & no  & no  & no  \\
-Standard errors             & yes & no  & yes & yes & yes \\
-Identification diagnostics  & yes & no  & yes & no  & no  \\
-Counterfactual simulation   & yes & no  & yes & yes & no  \\
-GPU acceleration            & yes & yes & no  & no  & no  \\
-Number of estimators        & 12  & 4   & 1   & 1   & 1   \\
-License                     & MIT & MIT & MIT & MIT & GPL \\
-Language                    & Python & Python & Python & Python & R \\
-\bottomrule
-\end{tabular}
-\caption{Comparison of \pkg{econirl} to the most directly related open-source libraries along the dimensions that matter for applied work.}
-\label{tab:libraries}
-\end{table}
