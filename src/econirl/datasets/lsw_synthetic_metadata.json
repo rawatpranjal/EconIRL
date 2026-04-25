@@ -1,0 +1,35 @@
+{
+  "n_users": 5000,
+  "n_books": 50,
+  "n_chapters_per_book": 30,
+  "pi_pay_segment": 0.4,
+  "pi_wait_segment": 0.6,
+  "n_states": 600,
+  "n_actions": 3,
+  "action_labels": {
+    "0": "pay",
+    "1": "wait",
+    "2": "exit"
+  },
+  "anchor_action": 2,
+  "type_theta": {
+    "0": {
+      "alpha_pay": -1.7,
+      "alpha_wait": -3.0
+    },
+    "1": {
+      "alpha_pay": -5.0,
+      "alpha_wait": -2.0
+    }
+  },
+  "beta_price": 0.5,
+  "beta_wait": 0.3,
+  "n_wait_bins": 5,
+  "n_pricing": 2,
+  "n_prev_paid": 2,
+  "simulated_purchase_rate": 0.05435255208593199,
+  "purchase_rate_target": 0.06,
+  "purchase_rate_tol": 0.03,
+  "seed": 42,
+  "discount_factor": 0.95
+}

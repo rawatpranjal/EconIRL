@@ -1,0 +1,1 @@
+rust-big built with n_dummies=30 dummy_cardinality=20 seed=42 observations=9410 trajectories=90

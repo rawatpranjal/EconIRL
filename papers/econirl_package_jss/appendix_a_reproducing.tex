@@ -37,10 +37,4 @@ Transfer TT5   & \code{code\_snippets/transfer\_f\_irl.py}           & \code{tra
 \label{tab:reproduce}
 \end{table}
 
-\subsection{Pre-estimation diagnostics}
-
-The benchmark protocol requires four pre-estimation diagnostics on every dataset before any estimator runs. The diagnostics are the rank of the flattened feature matrix, its condition number on the nonzero rows, the fraction of states observed at least once in the panel, and the count of states in which only one action is ever observed. The diagnostics are computed once per dataset and stored alongside the benchmark CSV. The Rust bus panel and the Keane-Wolpin panel each have their own row in \code{diagnostics.csv}, produced by the scripts named D1 and D2 in Table~\ref{tab:reproduce}. Diagnostic failures abort the corresponding benchmark before any estimator is fit.
-
-\subsection{Transfer test for inverse reinforcement learning}
-
-Inverse reinforcement learning estimators are tested on transfer because the recovered reward is the deliverable. The transfer test holds out a perturbed transition structure that the estimator did not see during fitting and measures the percent optimal value of the estimated reward under the held-out transitions. The Rust bus transfer test perturbs each transition probability by a Beta(2, 2) noise variable and renormalizes. The five scripts named TT1 through TT5 in Table~\ref{tab:reproduce} produce one row each in \code{transfer\_results.csv} for MCE-IRL, GLADIUS, AIRL, IQ-Learn, and $f$-IRL.
+The diagnostic scripts D1 and D2 emit feature-matrix rank, condition number, state coverage, and single-action state count to \code{diagnostics.csv}. Diagnostic failures abort the corresponding benchmark. The transfer scripts TT1 through TT5 perturb each Rust bus transition probability by a Beta(2, 2) noise variable, refit on the original panel, and report the percent optimal value of the recovered reward under the held-out transitions in \code{transfer\_results.csv}.
