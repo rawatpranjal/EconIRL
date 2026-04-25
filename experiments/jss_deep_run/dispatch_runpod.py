@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from experiments.jss_deep_run.matrix import MATRIX, Cell, cells_for_tiers
+from experiments.jss_deep_run.matrix import MATRIX, Cell, cells_for_tiers, get_cell
 
 
 # ---------------------------------------------------------------------------
@@ -264,8 +264,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--tier",
-        default="1",
-        help="Comma-separated tier ids to run, e.g. '1,2,3a'. Default '1'.",
+        default=None,
+        help="Comma-separated tier ids to run, e.g. '1,2,3a,4'. Mutually exclusive with --cell-id.",
+    )
+    parser.add_argument(
+        "--cell-id",
+        default=None,
+        help="Single cell id to dispatch. Useful for smoke tests.",
     )
     parser.add_argument("--local", action="store_true", help="Run sequentially in-process.")
     parser.add_argument(
@@ -289,11 +294,42 @@ def main() -> None:
         type=Path,
         default=Path("experiments/jss_deep_run/results"),
     )
+    parser.add_argument(
+        "--max-spend-usd",
+        type=float,
+        default=None,
+        help="Override the dispatcher cost ceiling. Default uses CostCeiling defaults.",
+    )
+    parser.add_argument(
+        "--max-wallclock-hours",
+        type=float,
+        default=None,
+        help="Override the dispatcher wall-clock ceiling.",
+    )
     args = parser.parse_args()
 
-    tiers = [t.strip() for t in args.tier.split(",") if t.strip()]
-    cells = cells_for_tiers(tiers)
-    print(f"Selected {len(cells)} cells across tiers {tiers}")
+    if args.tier is None and args.cell_id is None:
+        args.tier = "1"
+    if args.tier is not None and args.cell_id is not None:
+        parser.error("Pass --tier or --cell-id, not both.")
+
+    if args.cell_id is not None:
+        cells = [get_cell(args.cell_id)]
+        tiers = [args.cell_id]
+        print(f"Dispatching single cell {args.cell_id}")
+    else:
+        tiers = [t.strip() for t in args.tier.split(",") if t.strip()]
+        cells = cells_for_tiers(tiers)
+        print(f"Selected {len(cells)} cells across tiers {tiers}")
+
+    # The CostCeiling has its own defaults; the CLI flags override them.
+    # The local and runpod runners both construct their own CostCeiling
+    # internally, so the override is applied via class attribute mutation
+    # before they fire.
+    if args.max_spend_usd is not None:
+        CostCeiling.max_total_spend_usd = args.max_spend_usd
+    if args.max_wallclock_hours is not None:
+        CostCeiling.max_wall_clock_s = args.max_wallclock_hours * 3600.0
 
     if args.local:
         outcomes = run_local(cells, args.output_dir)
