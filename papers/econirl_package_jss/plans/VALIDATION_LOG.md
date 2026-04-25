@@ -55,7 +55,7 @@ spend compute.
 - Source paper: Hotz-Miller 1993 with NPL of Aguirregabiria-Mira 2002.
 - Target: recover the same parameters; match NFXP within 5 percent.
 - Acceptance: relative error below 5 percent on both parameters.
-- Status: **Fail (sign bug on theta_c).**
+- Status: **Pass with caveat (requires NPL >= 10).** First-pass run with default `num_policy_iterations=1` gave a wrong-sign theta_c due to a known multi-local-mode property of the 1-step Hotz-Miller pseudo-likelihood; setting `num_policy_iterations=10` recovers NFXP exactly to 4 decimals.
   - Wall-clock: 7.8 seconds on CPU.
   - Converged: True.
   - Log-likelihood: -1907.05.
@@ -64,11 +64,14 @@ spend compute.
   - Asymptotic SE 0.0002329 on theta_c, but the sign is wrong so the SE is meaningless.
   - The feature matrix in `nfxp._create_utility` (which CCP inherits) encodes `U(s, a=0) = -theta_c * s`, so a positive theta_c means keeping becomes less attractive at higher mileage. NFXP recovers theta_c = +0.001 with this convention. CCP recovers it with the opposite sign even though it inherits the same `_create_utility`.
   - The bug is in the low-level `CCPEstimator._optimize` in `src/econirl/estimation/ccp.py`, not the sklearn wrapper. NPL pseudo-likelihood gradient sign or feature transposition is the most likely cause.
-  - **Cross-check.** The existing `examples/rust-bus-engine/benchmark_results.csv` reports CCP recovering `operating_cost = +0.001230` (correct sign) on the *same* underlying CCPEstimator. So CCP *can* recover the right sign through some code path. The bug is therefore most likely in the sklearn-wrapper layer (`econirl.estimators.ccp.CCP.fit`), not in the low-level NPL optimizer itself. Most plausible causes:
-    - Wrapper passes a transition tensor with axes swapped relative to what the low-level CCP expects (the package docs warn about `(A,S,S)` vs `(S,A,S)` convention).
-    - Wrapper builds the feature matrix with the wrong sign on the keep-action mileage column.
-    - Wrapper sets initial parameters with the wrong sign and the inner pseudo-likelihood is bimodal so it converges to a sign-flipped local mode.
-  - **Action**: cannot use CCP in any plan until this is reproduced and fixed. Filed as a blocking issue. The fix should make a single fresh CCP call through `econirl.estimators.CCP` recover the same `+0.001` operating cost the benchmark CSV reports.
+  - **Diagnosis: not a bug, default knob is wrong.** Re-ran CCP on the same panel sweeping `num_policy_iterations` (NPL):
+    - NPL = 1 (default, classic Hotz-Miller): theta_c = -0.001289 (wrong sign), RC = 2.944, log-lik -1907.05.
+    - NPL = 5: theta_c = +0.001003, RC = 3.072, log-lik -1900.33. Matches NFXP. Convergence flag still False.
+    - NPL = 10: theta_c = +0.001003, RC = 3.072209, log-lik -1900.33. Matches NFXP to 4 decimals. Converged.
+    - NPL = 20: identical to NPL = 10.
+  - The 1-step Hotz-Miller pseudo-likelihood has multiple local modes on this panel; the optimizer picks a wrong-sign local mode. NPL refines the CCP estimate iteratively and pulls the optimizer back to the correct mode. This is well documented in Aguirregabiria-Mira 2002 and is the entire reason NPL was invented.
+  - **Action**: not a bug, but the package default `num_policy_iterations=1` is misleading because it points users at the known-fragile classical estimator. Change the default to NPL = 10 (or document the trap). Until then every plan that uses CCP must explicitly set `num_policy_iterations=10`.
+  - Updated CCP status: **Pass with caveat (requires NPL >= 10 for reliable convergence).**
 
 ### Cross-cutting finding: log-likelihood inconsistency in the existing materials
 
