@@ -50,12 +50,14 @@ where $T_\theta$ is the soft Bellman operator implied by equations~\eqref{eq:v} 
 
 \begin{algorithm}[H]
 \SetAlgoLined
-\Repeat{$\theta$ converges}{
-  inner solve $V \leftarrow T_{\theta_k} V$ by SA, switching to Newton-Kantorovich \citep{iskhakov2016}\;
-  evaluate $\ell(\theta_k)$ and per-observation scores via JAX\;
-  update $\theta_{k+1}$ by BHHH or L-BFGS-B\;
+initialize $\theta_0$\;
+\Repeat{$\|\theta_{k+1} - \theta_k\| < \varepsilon$}{
+  $V_k \leftarrow$ fixed point of $V = T_{\theta_k} V$ by SA-to-NK polyalgorithm \citep{iskhakov2016}\;
+  $g_{it} \leftarrow \nabla_\theta \log \pi(a_{it} \mid s_{it}; \theta_k)$ via JAX implicit differentiation through $V_k$\;
+  $\theta_{k+1} \leftarrow \theta_k + (\sum_{i,t} g_{it} g_{it}^\top)^{-1} \sum_{i,t} g_{it}$ \quad (BHHH step)\;
 }
-\caption{NFXP polyalgorithm}
+\Return $\hat\theta = \theta_{k+1}$, $\hat H = \sum_{i,t} g_{it} g_{it}^\top$\;
+\caption{NFXP outer loop}
 \end{algorithm}
 
 \paragraph{Versions.} The \code{NFXP} class exposes three inner-solve modes, namely successive approximation, Newton-Kantorovich, and the SA-to-NK polyalgorithm of \citet{iskhakov2016}. The outer optimizer defaults to BHHH with analytical per-observation scores and switches to L-BFGS-B when the user disables score caching. Standard errors come from the BHHH outer-product or from the Hessian.
@@ -70,9 +72,11 @@ where $T_\theta$ is the soft Bellman operator implied by equations~\eqref{eq:v} 
 
 \begin{algorithm}[H]
 \SetAlgoLined
-form augmented Lagrangian on $V - T_\theta V = 0$ with multipliers $\lambda(s)$\;
-solve with SciPy SLSQP using JAX-computed Jacobians for both $\ell$ and the constraint\;
-recover the structural Hessian by reduced-space projection on active constraints\;
+assemble Lagrangian $\mathcal{L}(\theta, V, \lambda) = \ell(\theta, V) - \lambda^\top (V - T_\theta V)$\;
+$(\hat\theta, \hat V, \hat\lambda) \leftarrow$ stationary point of $\nabla \mathcal{L} = 0$ via SciPy SLSQP\;
+\quad with sparse Jacobians of $\ell$ and the constraint computed by JAX\;
+$\hat H \leftarrow$ reduced-space projection of $\nabla^2_{\theta\theta} \mathcal{L}$ onto active constraints\;
+\Return $\hat\theta$, $\hat H$\;
 \caption{MPEC sequential quadratic programming}
 \end{algorithm}
 
@@ -89,11 +93,11 @@ so the structural likelihood can be evaluated from any consistent estimate of $\
 
 \begin{algorithm}[H]
 \SetAlgoLined
-initialize $\hat\pi^{(0)}$ from frequency counts on the panel\;
-\Repeat{$\theta$ converges}{
-  build $\Psi^{(k)}(s, a) = \sigma \log \hat\pi^{(k)}(a \mid s) + \sigma \gamma$, back out $V$\;
-  maximize $\ell$ in $\theta$ with $V$ fixed at the inversion\;
-  update $\hat\pi^{(k+1)}$ from $\theta_{k+1}$ via equation~\eqref{eq:pi}\;
+$\hat\pi^{(0)}(a \mid s) \leftarrow N^{-1}_s \sum_{i,t} \mathbb{1}\{s_{it} = s, a_{it} = a\}$ \quad (empirical CCP)\;
+\Repeat{$\|\theta^{(k+1)} - \theta^{(k)}\| < \varepsilon$}{
+  $V^{(k)}(s) \leftarrow \sigma \log \hat\pi^{(k)}(a \mid s) + \sigma \gamma + \beta \sum_{s'} P(s' \mid s, a) V^{(k)}(s')$ \quad (Hotz-Miller inversion)\;
+  $\theta^{(k+1)} \leftarrow \argmax_\theta \sum_{i,t} \log \pi_\theta(a_{it} \mid s_{it} ; V^{(k)})$ \quad (one Newton step)\;
+  $\hat\pi^{(k+1)} \leftarrow \pi_{\theta^{(k+1)}}$ via equation~\eqref{eq:pi}\;
 }
 \caption{Nested pseudo-likelihood for CCP}
 \end{algorithm}
@@ -111,8 +115,9 @@ where $\kappa$ is a Bellman residual penalty tuned by cross-validation.
 
 \begin{algorithm}[H]
 \SetAlgoLined
-warm-start $\xi$ from a least-squares fit of equation~\eqref{eq:V} on a coarse grid\;
-jointly maximize the penalized log-likelihood in $(\theta, \xi)$ with L-BFGS-B\;
+$\xi_0 \leftarrow \argmin_\xi \sum_{s \in \text{grid}} (V_\xi(s) - T_{\theta_0} V_\xi(s))^2$ \quad (OLS warm-start)\;
+$(\hat\theta, \hat\xi) \leftarrow \argmax_{\theta, \xi} \ell(\theta, \xi) - \kappa \sum_s (V_\xi(s) - T_\theta V_\xi(s))^2$ via L-BFGS-B\;
+$\hat H \leftarrow \nabla^2_{\theta\theta} \ell(\theta, \hat\xi(\theta))$ at $\theta = \hat\theta$\;
 \caption{Sieve joint maximum likelihood}
 \end{algorithm}
 
@@ -127,9 +132,11 @@ The estimator is root-$n$ consistent and semiparametrically efficient, with a bl
 
 \begin{algorithm}[H]
 \SetAlgoLined
-warm-start $V_\eta$ on a sub-grid of states by value iteration\;
-step $(\theta, \eta)$ jointly with Adam on the penalized log-likelihood\;
-profile the Hessian in $\theta$ via JAX automatic differentiation\;
+warm-start $V_\eta$ on a sub-grid by least-squares regression on $V^\ast_{\theta_0}$\;
+\For{epoch $k$ until validation loss plateaus}{
+  sample minibatch $\mathcal{B}$; $(\theta, \eta) \leftarrow \mathrm{Adam}$ on equation~\eqref{eq:nnes} restricted to $\mathcal{B}$\;
+}
+profile $\hat H \leftarrow \nabla^2_{\theta\theta} \ell(\theta, \hat\eta(\theta))$ at $\hat\theta$ via JAX\;
 \caption{Neural value approximation}
 \end{algorithm}
 
@@ -144,10 +151,12 @@ Cross-fitting renders the influence function of $\hat\theta$ orthogonal to the f
 
 \begin{algorithm}[H]
 \SetAlgoLined
-split individuals into $K$ folds at random with seed 42\;
-\For{$k = 1, \dots, K$}{fit $\hat\pi^{(-k)}$ on the complement of fold $k$\;}
-solve $\sum_{i} \psi(s_{it}, a_{it}; \theta, \hat\pi^{(-k(i))}) = 0$ across folds\;
-estimate $\hat H$ from within-fold score outer products\;
+partition individuals $\{1, \dots, N\}$ into $K$ disjoint folds $\mathcal{I}_1, \dots, \mathcal{I}_K$ at random\;
+\For{$k = 1, \dots, K$}{
+  $\hat\pi^{(-k)} \leftarrow \argmin_\pi \sum_{i \notin \mathcal{I}_k, t} \mathrm{CE}(\pi(s_{it}), a_{it})$ \quad (softmax network on complement)\;
+}
+$\hat\theta \leftarrow$ root of $\sum_{k=1}^K \sum_{i \in \mathcal{I}_k, t} \psi(s_{it}, a_{it}; \theta, \hat\pi^{(-k)}) = 0$ via Newton\;
+$\hat H \leftarrow K^{-1} \sum_k \big( \sum_{i \in \mathcal{I}_k, t} \psi \psi^\top \big)$\;
 \caption{Cross-fit TD-CCP}
 \end{algorithm}
 
@@ -168,10 +177,13 @@ where $\pi_\theta$ on the left is the soft-Bellman policy at $\theta$.
 
 \begin{algorithm}[H]
 \SetAlgoLined
-compute $\hat \E[\phi]$ once from the panel\;
-\Repeat{$\|\nabla\| < \epsilon$ and $\|\mu_{\pi_{\theta_k}} - \hat\mu\|_\infty < \delta$}{
-  soft value iteration at $\theta_k$ to obtain $\pi_{\theta_k}$, occupancy by direct solve \citep{gleave2022imitation}\;
-  step $\theta_{k+1}$ by L-BFGS-B on $\hat \E[\phi] - \E_{\pi_{\theta_k}}[\phi]$\;
+$\hat \E[\phi] \leftarrow n^{-1} \sum_{i,t} \phi(s_{it}, a_{it})$\;
+initialize $\theta_0$\;
+\Repeat{$\|g_k\| < \varepsilon$ \textbf{and} $\|\mu_{\pi_{\theta_k}} - \hat\mu\|_\infty < \delta$}{
+  $\pi_{\theta_k} \leftarrow$ soft value iteration at reward $r_{\theta_k}$\;
+  $\mu_{\pi_{\theta_k}} \leftarrow (I - \beta P_{\pi_{\theta_k}})^{-1} \rho_0$ \quad (direct linear solve, \citealp{gleave2022imitation})\;
+  $g_k \leftarrow \hat \E[\phi] - \sum_{s,a} \mu_{\pi_{\theta_k}}(s, a) \phi(s, a)$\;
+  $\theta_{k+1} \leftarrow$ L-BFGS-B step in direction $g_k$\;
 }
 \caption{Maximum causal entropy gradient path}
 \end{algorithm}
@@ -193,10 +205,9 @@ with $\pi_Q$ the soft policy at $Q$ and $r_Q$ the implied reward through the inv
 
 \begin{algorithm}[H]
 \SetAlgoLined
-build $\hat\mu$ from frequency counts on the panel\;
-parametrize $Q$ tabularly or with a neural head\;
-minimize equation~\eqref{eq:iql} jointly in $Q$ with Adam\;
-recover $\hat r(s, a) = \hat Q(s, a) - \beta \E_{s'} \hat V(s')$\;
+$\hat\mu(s, a) \leftarrow n^{-1} \sum_{i,t} \mathbb{1}\{s_{it} = s, a_{it} = a\}$\;
+initialize $Q$ tabularly or with a neural head; $Q \leftarrow \mathrm{Adam}$ on equation~\eqref{eq:iql} until plateau\;
+$\hat r(s, a) \leftarrow \hat Q(s, a) - \beta \sum_{s'} P(s' \mid s, a) \hat V(s')$ \quad (inverse Bellman)\;
 \caption{Inverse soft Q-learning}
 \end{algorithm}
 
@@ -213,9 +224,11 @@ The first term is the imitation log-likelihood through the soft policy implied b
 
 \begin{algorithm}[H]
 \SetAlgoLined
-sample minibatches of $(s_{it}, a_{it}, s_{it+1})$ from the panel\;
-step $(\eta, \zeta)$ with Adam on equation~\eqref{eq:gladius}\;
-recover $\hat r(s, a) = Q_\eta(s, a) - \beta V_\zeta(s')$ averaged over observed $s'$\;
+initialize $Q_\eta$, $V_\zeta$\;
+\For{epoch $k$ until validation loss plateaus}{
+  sample minibatch $\mathcal{B}$ of transitions $(s, a, s')$; $(\eta, \zeta) \leftarrow \mathrm{Adam}$ on equation~\eqref{eq:gladius}\;
+}
+$\hat r(s, a) \leftarrow$ average of $Q_\eta(s, a) - \beta V_\zeta(s')$ over observed $s'$\;
 \caption{GLADIUS dual-network training}
 \end{algorithm}
 
@@ -235,11 +248,13 @@ so the recovered $r_\theta$ is disentangled from the dynamics and transfers acro
 
 \begin{algorithm}[H]
 \SetAlgoLined
-\Repeat{convergence}{
-  sample expert batch from the panel and policy batch from rollouts of $\pi_\omega$\;
-  step $\theta$ on the discriminator log-likelihood in equation~\eqref{eq:airl}\;
-  step $\omega$ on $\log D_\theta - \log(1 - D_\theta)$ via PPO\;
+initialize reward $r_\theta$, shaping $h_\theta$, generator policy $\pi_\omega$\;
+\Repeat{discriminator and generator stabilize}{
+  $\mathcal{B}_E \leftarrow$ batch from panel; $\mathcal{B}_\pi \leftarrow$ rollouts of $\pi_\omega$ in the simulator\;
+  $\theta \leftarrow \mathrm{Adam}\!\left( \nabla_\theta \big[ \sum_{\mathcal{B}_E} \log D_\theta + \sum_{\mathcal{B}_\pi} \log(1 - D_\theta) \big] \right)$\;
+  $\omega \leftarrow \mathrm{PPO}$ step on rollouts $\mathcal{B}_\pi$ with reward $\tilde r = \log D_\theta - \log(1 - D_\theta)$\;
 }
+\Return $\hat r_\theta$ \quad (disentangled by the parameterization in equation~\eqref{eq:airl})\;
 \caption{Adversarial IRL}
 \end{algorithm}
 
@@ -256,9 +271,12 @@ with $D_f$ chosen from the Kullback-Leibler, reverse-KL, Jensen-Shannon, or chi-
 
 \begin{algorithm}[H]
 \SetAlgoLined
-\Repeat{$\theta$ converges}{
-  rollout $\pi_\theta$ in the simulator and estimate $\mu_{\pi_\theta}$ from frequency counts\;
-  step $\theta$ on the Fenchel dual of $D_f(\mu_{\pi_\theta} \,\|\, \hat\mu)$\;
+initialize reward $r_\theta$; choose $f$ from $\{\mathrm{KL}, \mathrm{revKL}, \mathrm{JS}, \chi^2\}$\;
+$\hat\mu \leftarrow$ empirical state-action occupancy from the panel\;
+\Repeat{$\|\nabla_\theta\| < \varepsilon$}{
+  $\pi_\theta \leftarrow$ soft-RL policy under reward $r_\theta$; rollout in simulator\;
+  $\mu_{\pi_\theta} \leftarrow$ frequency counts on rollouts\;
+  $\theta \leftarrow \theta - \alpha \nabla_\theta D_f^\ast(\mu_{\pi_\theta} \,\|\, \hat\mu)$ \quad (Fenchel dual gradient)\;
 }
 \caption{$f$-divergence IRL}
 \end{algorithm}
@@ -278,8 +296,9 @@ where $\pi_{\mathrm{BC}}$ is a logit on the same features $\phi$ but with the re
 
 \begin{algorithm}[H]
 \SetAlgoLined
-form the design matrix from $\phi(s_{it}, a_{it})$ across all $(i, t)$\;
-fit a multinomial logit by L-BFGS-B on the cross-entropy\;
+$X \leftarrow [\phi(s_{it}, \cdot)]_{(i,t)}$, $y \leftarrow [a_{it}]_{(i,t)}$\;
+$\hat\theta \leftarrow \argmin_\theta -\sum_{i,t} \log \mathrm{softmax}(X_{it} \theta)_{y_{it}}$ via L-BFGS-B\;
+$\hat H \leftarrow \nabla^2_\theta$ of the cross-entropy at $\hat\theta$\;
 \caption{Behavioral cloning}
 \end{algorithm}
 

@@ -10,7 +10,7 @@ Every estimator in the library implements the \code{Estimator} protocol defined 
 \end{quote}
 The four arguments specify the data, the utility function, the structural primitives, and the transition tensor. The return value is a single object that carries the parameter point estimates, the parameter names, the standard errors, the variance-covariance matrix, the Hessian at the optimum, the converged value function, the choice probabilities, the goodness-of-fit measures, and the identification diagnostics. The same object exposes formatted output through a \code{summary} method and offers \code{wald\_test}, \code{confidence\_interval}, \code{t\_statistics}, \code{p\_values}, \code{to\_latex}, and \code{to\_dataframe} as convenience methods.
 
-The base class \code{BaseEstimator} reduces the burden on new estimator authors. A subclass implements only the optimization core through the abstract method \code{\_optimize}, which returns an \code{EstimationResult} carrying the raw fit. The base class then handles the standard error computation, the identification check, the goodness-of-fit calculation, and the assembly of the final \code{EstimationSummary}. This template method pattern means that adding a new estimator to the library requires writing the optimization loop and nothing else. The user-facing inference layer comes for free.
+A subclass of \code{BaseEstimator} implements only the optimization core via the abstract \code{\_optimize} method, which returns an \code{EstimationResult} with the raw fit. The base class then computes standard errors, identification diagnostics, and goodness-of-fit, and assembles the final \code{EstimationSummary}. Adding a new estimator requires writing the optimization loop and nothing else.
 
 \subsection{The shared inference layer}
 
@@ -26,13 +26,9 @@ Counterfactual analysis consumes the fitted result rather than the estimator. Th
 
 The synthetic data layer in \code{econirl.simulation.synthetic} provides \code{simulate\_panel} for forward simulation under a given policy and \code{run\_monte\_carlo} for parameter recovery experiments under a known data generating process. The Monte Carlo function returns the bias, the root mean squared error, and the empirical coverage rate of the standard errors across replications, which is the standard validation we run for every new estimator before release.
 
-\subsection{Visualization}
-
-The visualization layer in \code{econirl.visualization} accepts an \code{EstimationSummary} and produces publication-ready figures. The functions \code{plot\_choice\_probabilities} and \code{plot\_value\_function} render the policy and the value function over the state space. The function \code{plot\_policy\_comparison} overlays a baseline and a counterfactual policy on the same axes for direct visual comparison. All figures use \pkg{Matplotlib} and are styled to match academic publication conventions.
+A small visualization layer in \code{econirl.visualization} renders policies, value functions, and counterfactual overlays from any \code{EstimationSummary} via \pkg{Matplotlib}.
 
 \subsection{The JAX backbone}
 
-The library is built on \pkg{JAX} \citep{jax2018github} for three reasons. Automatic differentiation produces analytical gradients and Hessians without hand-coded derivatives, which removes the most common source of bugs in structural estimation code. Just-in-time compilation accelerates the inner loops of the structural estimators by an order of magnitude relative to interpreted \proglang{NumPy}. Vectorized mapping over individual trajectories enables bootstrap resampling and Monte Carlo replications to run in parallel on a single machine without manual thread management.
-
-The configuration module \code{econirl.\_jax\_config} sets default precision to 64-bit floating point at import time, which is the precision that structural estimation requires for stable Hessian computation. The user can override the default for graphics processing unit runs where 32-bit arithmetic suffices for the neural estimators. Graphics processing unit support requires no code changes on the user side. \pkg{JAX} dispatches to the available accelerator automatically.
+The library is built on \pkg{JAX} \citep{jax2018github}. Automatic differentiation produces gradients and Hessians without hand-coded derivatives, which removes the most common source of bugs in structural code. Just-in-time compilation accelerates inner loops by an order of magnitude relative to \proglang{NumPy}, and vectorized mapping enables bootstrap resampling and Monte Carlo replications without manual thread management. Default precision is 64-bit for stable Hessian computation; the user can drop to 32-bit on a graphics processing unit, with the dispatch handled automatically.
 
