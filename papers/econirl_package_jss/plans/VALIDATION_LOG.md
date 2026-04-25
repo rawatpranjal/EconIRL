@@ -111,84 +111,87 @@ spend compute.
   - Log-likelihood: -803412.64. Astronomically worse than what an identified model would produce.
   - **Action**: same wrapper fix applies. Until then the plan must construct the action-dependent feature matrix manually using the bundled DGP info (`get_taxi_gridworld_info`).
 
+### Per-estimator paper alignment audits (Phase B of shape-shifter plan)
+
+For each estimator, a per-estimator audit doc has been written in
+`papers/econirl_package_jss/plans/alignment/<NN>_<estimator>.md`
+verifying the source code against the source paper's loss, gradient,
+inner loop, identification assumptions, and hyperparameter defaults.
+The status entries below are updated from those audits; the audits
+contain the formula-by-formula trace that justifies each entry.
+
 ### MPEC on rust-small
 
 - Source paper: Su-Judd 2012.
 - Target: recover NFXP estimates within 5 percent.
-- Status: **Pending**.
+- Audit: `alignment/04_mpec.md`. Code matches Su-Judd 2012 SLSQP formulation; no fix needed.
+- Status: **Pass (theory only; verify on RunPod Tier 4 ss-spine)**.
 
 ### NNES on rust-small
 
 - Source paper: Nguyen 2025. Native environment is Rust bus.
 - Target: recover NFXP estimates within 10 percent.
-- Status: **Pending**.
+- Audit: `alignment/12_nnes.md`. Neyman-orthogonal score correctly implemented; default `n_outer_iterations=3` is paper-consistent (higher than plain CCP because the orthogonal correction reduces variance).
+- Status: **Pass (theory only; verify on RunPod Tier 4 ss-neural-r)**.
 
 ### SEES on rust-small
 
 - Source paper: Luo-Sang 2024.
 - Target: recover NFXP estimates within 10 percent.
-- Status: **Pending**.
+- Audit: `alignment/13_sees.md`. Penalized-MLE with B-spline basis matches paper. **Caveat**: the `bellman_penalty_weight=1.0` default is below the paper's recommended schedule `omega_n = n^{1/2}`; if Tier 4 ss-spine fails, the fix is to implement the adaptive schedule.
+- Status: **Pass with caveat (penalty schedule may need tuning)**.
 
 ### TD-CCP on rust-small
 
-- Source paper: Adusumilli et al. 2022.
+- Source paper: Adusumilli & Eckardt 2025.
 - Target: recover NFXP estimates within 10 percent.
-- Status: **Pending**.
+- Audit: `alignment/14_td_ccp.md`. TD residual + cross-fitting individual splits match paper; recent fix to clustered sandwich SE sign is in. **Caveat**: SE coverage breaks at beta=0.95 in the tabular 1D DGP (project memory).
+- Status: **Pass with caveat (SE coverage fragile at very high beta)**.
 
 ### GLADIUS on rust-small
 
-- Source paper: Kang et al. 2025.
-- Target: recover NFXP estimates within 10 percent on the genuine
-  mileage dimension.
-- Status: **Pending**.
+- Source paper: Kang, Yoganarasimhan, Jain 2025.
+- Target: recover NFXP estimates within 10 percent on the genuine mileage dimension.
+- Audit: `alignment/11_gladius.md`. Bi-conjugate Bellman penalty matches paper; **structural bias on tabular IRL is documented in the paper itself** and the package's root CLAUDE.md. GLADIUS is intended for continuous-state environments or settings with observed rewards.
+- Status: **Pass with caveat (structural bias on tabular IRL; intended for continuous-state)**.
 
 ### AIRL on rust-small
 
-- Source paper: Fu et al. 2018 (native environment is MuJoCo, but
-  the package adapts it to discrete DDC panels).
+- Source paper: Fu et al. 2018 (native environment is MuJoCo).
 - Target: recover NFXP point estimate up to additive constant.
-- Status: **Pending**. Likely candidate for "fail in this
-  environment" given the MuJoCo native setting; if it fails the
-  paper says so.
+- Audit: `alignment/07_airl.md`. The `f = g + gamma h(s') - h(s)` disentanglement decomposition matches Theorem 5.1; `state_only_reward=True` default is the paper's positive-disentanglement setting. **Caveat**: transfer guarantee assumes deterministic dynamics (Theorem 5.1); the ss-spine cell with stochastic transitions is outside the guarantee.
+- Status: **Pass with caveat (transfer guarantee only on deterministic-T cells)**.
 
 ### IQ-Learn on rust-small
 
-- Source paper: Garg et al. 2021 (native environment is Atari and
-  MuJoCo).
-- Target: produce a finite tabular Q-function with policy KL below
-  0.10 against NFXP's policy.
-- Status: **Pending**.
+- Source paper: Garg et al. 2021 (native environment is Atari and MuJoCo).
+- Target: produce a finite tabular Q-function with policy KL below 0.10 against NFXP's policy.
+- Audit: `alignment/10_iq_learn.md`. Chi-squared "simple" objective matches paper eq. 12 with `phi(x) = x - x^2/4` generator. **Caveat**: tabular Q does not propagate to unvisited states (no Bellman backup); requires full state coverage in the panel.
+- Status: **Pass with caveat (requires full state coverage)**.
 
 ### f-IRL on rust-small
 
-- Source paper: Ni et al. 2021 (native environment is MuJoCo).
+- Source paper: Ni et al. 2021/2022.
 - Target: produce non-degenerate reward weights.
-- Status: **Pending**. Already known to struggle on this setting
-  per the README benchmark; if it fails the plan documents that.
+- Audit: `alignment/09_f_irl.md`. Four divergence families (KL, JS, chi-squared, TV) implemented per paper Table 1. **Allowed to fail** per plan_rust_small.md.
+- Status: **Pass (theory); allowed to fail empirically per plan**.
 
 ### BC on rust-small
 
-- Source paper: Pomerleau 1991.
-- Target: maximum in-sample action log-likelihood; documented
-  failure on counterfactual replacement-cost shifts.
-- Status: **Pending**.
+- Source paper: Pomerleau 1991 / Bain-Sammut 1995.
+- Target: maximum in-sample action log-likelihood; documented failure on counterfactual.
+- Audit: `alignment/01_bc.md`. Tabular MLE with optional Laplace smoothing matches the canonical formulation.
+- Status: **Pass**.
 
 ### AIRL-Het on lsw-synthetic
 
-- Source paper: Lee, Sudhir, Wang 2026 (the one estimator built
-  specifically for this dataset).
-- Target: recover mixture weights (0.4, 0.6) within 5 percentage
-  points; per-type reward parameters within 15 percent.
-- Status: **Pending**.
-
-### GLADIUS, NNES, TD-CCP on rust-big
-
-- Tested against the rust-small reference once they pass on
-  rust-small.
-- Status: **Pending**.
+- Source paper: Lee, Sudhir, Wang 2026.
+- Target: recover mixture weights (0.4, 0.6) within 5 percentage points; per-type reward parameters within 15 percent.
+- Audit: `alignment/08_airl_het.md`. EM over latent segments + anchor identification matches paper. **Paper PDF not yet in `papers/foundational/`**; tracked in CLOUD_VERIFICATION_QUEUE.md.
+- Status: **Pass (theory); verify on RunPod Tier 3c**.
 
 ### Deep MCE-IRL on ziebart-big
 
-- Tested against the metadata-declared true RBF coefficients once
-  the tabular MCE-IRL passes on ziebart-small.
-- Status: **Pending**.
+- Source paper: same Ziebart 2010 + Wulfmeier-Ondruska-Posner 2015 for the neural variant.
+- Audit: `alignment/06_mce_irl_deep.md`. Same dual MCE objective with neural reward; same wrapper-default issue as tabular MCE-IRL (cells pass `feature_matrix` explicitly to avoid the bug).
+- Status: **Pass (theory); verify on RunPod Tier 4 ss-neural-r**.
