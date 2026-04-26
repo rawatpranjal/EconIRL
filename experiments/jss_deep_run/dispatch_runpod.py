@@ -118,40 +118,78 @@ def run_local(cells: list[Cell], output_dir: Path) -> list[dict[str, Any]]:
 _RUNPOD_USD_PER_HOUR = {"cpu": 0.40, "gpu": 1.20}
 
 
-def _runpod_pod_payload(cell: Cell, image: str, volume_id: str) -> dict[str, Any]:
-    """Build the GraphQL `podRentInterruptable` mutation payload.
+def _bootstrap_command(cell: Cell, repo_ref: str) -> str:
+    """Construct the in-pod setup-and-run command.
 
-    The image entrypoint is `bash -lc`, so dockerArgs is the full
-    command string. Mounts the persistent volume at /workspace/results.
-    The pod shuts itself down when the worker exits.
+    The pod uses the public ``runpod/pytorch`` template (no custom
+    image build required). At launch the pod clones the econirl repo
+    at the pinned ref, installs it with the dev extras, and runs the
+    cell. Output is written to ``/workspace/results`` which is mounted
+    from the persistent network volume so results survive pod
+    termination.
+
+    JAX is installed against CUDA 12 wheels for GPU cells; CPU cells
+    install the wheel-only JAX so the inner solver runs on the box's
+    CPU.
     """
-    command = (
-        f"python -m experiments.jss_deep_run.run_cell "
-        f"--cell-id {cell.cell_id} "
-        f"--output-dir /workspace/results"
+    jax_install = (
+        "pip install -q 'jax[cuda12_pip]==0.4.30' "
+        "-f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
+        if cell.hardware == "gpu"
+        else "pip install -q 'jax==0.4.30'"
     )
-    return {
-        "cloudType": "COMMUNITY",
-        "gpuCount": 1 if cell.hardware == "gpu" else 0,
-        "gpuTypeId": "NVIDIA A100 80GB" if cell.hardware == "gpu" else None,
+    return (
+        "set -euo pipefail; "
+        "cd /workspace && "
+        f"git clone --depth 1 --branch main https://github.com/rawatpranjal/EconIRL.git econirl && "
+        f"cd /workspace/econirl && git checkout {repo_ref} && "
+        f"{jax_install} && "
+        "pip install -q -e .[dev] && "
+        "mkdir -p /workspace/results/shapeshifter && "
+        f"python -m experiments.jss_deep_run.run_cell --cell-id {cell.cell_id} "
+        f"--output-dir /workspace/results/shapeshifter"
+    )
+
+
+def _runpod_pod_payload(
+    cell: Cell, image: str, volume_id: str, repo_ref: str = "main",
+) -> dict[str, Any]:
+    """Build the GraphQL ``podRentInterruptable`` mutation payload.
+
+    Uses the public ``runpod/pytorch`` template by default; the
+    bootstrap dockerArgs clones the econirl repo at ``repo_ref`` and
+    installs it before running the cell. Results land in
+    ``/workspace/results/shapeshifter`` on the persistent volume.
+    """
+    payload: dict[str, Any] = {
         "name": cell.cell_id,
-        "imageName": image,
-        "containerDiskInGb": 20,
-        "volumeInGb": 0,
-        "volumeMountPath": "/workspace/results",
-        "networkVolumeId": volume_id,
+        "image_name": image,
+        "cloud_type": "COMMUNITY",
+        "container_disk_in_gb": 20,
+        "volume_in_gb": 0,
+        "volume_mount_path": "/workspace",
+        "network_volume_id": volume_id,
+        "data_center_id": "EU-RO-1",  # matches the network volume's region
         "ports": "",
-        "env": [
-            {"key": "CELL_ID", "value": cell.cell_id},
-            {"key": "JAX_PLATFORMS", "value": "cuda" if cell.hardware == "gpu" else "cpu"},
-        ],
-        "dockerArgs": command,
+        "env": {
+            "CELL_ID": cell.cell_id,
+            "JAX_PLATFORMS": "cuda" if cell.hardware == "gpu" else "cpu",
+        },
+        "docker_args": _bootstrap_command(cell, repo_ref),
     }
+    if cell.hardware == "gpu":
+        payload["gpu_count"] = 1
+        payload["gpu_type_id"] = "NVIDIA A100 80GB PCIe"
+    else:
+        payload["gpu_count"] = 0
+        payload["min_vcpu_count"] = 2
+        payload["min_memory_in_gb"] = 4
+    return payload
 
 
 def run_runpod(
     cells: list[Cell], image: str, output_dir: Path, max_parallel: int,
-    volume_id: str | None,
+    volume_id: str | None, repo_ref: str = "main",
 ) -> list[dict[str, Any]]:
     """Submit cells as RunPod pods and download results.
 
@@ -195,7 +233,7 @@ def run_runpod(
         # Launch up to max_parallel pods.
         while pending and len(in_flight) < max_parallel:
             cell = pending.pop(0)
-            payload = _runpod_pod_payload(cell, image, volume_id or "<volume_id>")
+            payload = _runpod_pod_payload(cell, image, volume_id or "<volume_id>", repo_ref)
             try:
                 pod = runpod.create_pod(**payload)
                 in_flight.append((cell, pod["id"], time.time()))
@@ -275,8 +313,13 @@ def main() -> None:
     parser.add_argument("--local", action="store_true", help="Run sequentially in-process.")
     parser.add_argument(
         "--image",
-        default="econirl-deep-run:v1",
-        help="Container image to use for RunPod jobs.",
+        default="runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04",
+        help="Container image. Defaults to the public RunPod pytorch+CUDA template; the bootstrap dockerArgs install econirl in-pod, so no custom image build is required.",
+    )
+    parser.add_argument(
+        "--repo-ref",
+        default="main",
+        help="Git ref (branch, tag, or SHA) of econirl to install in each pod.",
     )
     parser.add_argument(
         "--max-parallel",
@@ -340,6 +383,7 @@ def main() -> None:
             output_dir=args.output_dir,
             max_parallel=args.max_parallel,
             volume_id=args.volume_id,
+            repo_ref=args.repo_ref,
         )
 
     manifest = args.output_dir / "dispatch_manifest.json"
