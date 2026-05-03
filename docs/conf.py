@@ -37,10 +37,10 @@ exclude_patterns = [
 # -- Options for HTML output -------------------------------------------------
 
 html_theme = "pydata_sphinx_theme"
-html_static_path = ["_static"]
+html_static_path = []
 
 html_theme_options = {
-    "github_url": "https://github.com/econirl/econirl",
+    "github_url": "https://github.com/rawatpranjal/EconIRL",
     "show_toc_level": 2,
     "navigation_with_keys": True,
 }
