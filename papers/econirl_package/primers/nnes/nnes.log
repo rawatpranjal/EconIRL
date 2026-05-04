@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  4 MAY 2026 07:51
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.3.8)  4 MAY 2026 09:46
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -598,14 +598,14 @@ LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `nnes.out' has not changed.
-(rerunfilecheck)             Checksum: EC7F12702E793C7D4F4B0B71BAB12121;1483.
+(rerunfilecheck)             Checksum: B443DDF9ABB8B02005DF6038FCE8D28E;1738.
  ) 
 Here is how much of TeX's memory you used:
- 15162 strings out of 473190
- 233631 string characters out of 5715801
- 835879 words of memory out of 5000000
- 38095 multiletter control sequences out of 15000+600000
- 571659 words of font info for 121 fonts, out of 8000000 for 9000
+ 15170 strings out of 473190
+ 233715 string characters out of 5715801
+ 836879 words of memory out of 5000000
+ 38097 multiletter control sequences out of 15000+600000
+ 571812 words of font info for 124 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  80i,14n,82p,1001b,477s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
@@ -633,10 +633,10 @@ st/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2025/texmf-dis
 t/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2025/texmf-dist
 /fonts/type1/public/amsfonts/cm/cmtt9.pfb></usr/local/texlive/2025/texmf-dist/f
 onts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on nnes.pdf (5 pages, 299533 bytes).
+Output written on nnes.pdf (5 pages, 299037 bytes).
 PDF statistics:
- 245 PDF objects out of 1000 (max. 8388607)
- 186 compressed objects within 2 object streams
+ 251 PDF objects out of 1000 (max. 8388607)
+ 192 compressed objects within 2 object streams
  42 named destinations out of 1000 (max. 500000)
- 29793 words of extra memory for PDF output out of 29859 (max. 10000000)
+ 29809 words of extra memory for PDF output out of 29859 (max. 10000000)
 

@@ -38,8 +38,11 @@ principle scale beyond low-dimensional tabular state spaces.
 This document is a known-truth validation tutorial. It does not use real data.
 The synthetic DGP supplies the true reward, transition law, value function,
 policy, and Type A/B/C counterfactual oracle objects. The package
-implementation runs on this DGP and must pass the hard structural recovery
-gates before the generated results are written.
+implementation runs on two DGP cells and must pass the hard structural recovery
+gates before the generated results are written. The low-dimensional cell is a
+sanity check. The high-dimensional cell is the main NNES validation because it
+is the setting where the neural value approximation is meant to add value over
+fully tabular estimators.
 
 \section{Source Paper}
 
@@ -136,32 +139,36 @@ avoids the Schur-complement information matrix needed by SEES. In the
 finite-state validation harness, the profiled NPL step gives an exact
 policy-evaluation specialization of the paper's neural approximation idea.
 
-\section{Known-Truth DGP}
+\section{Known-Truth DGPs}
 
-The validation cell is \texttt{canonical\_low\_action}, the same
-low-dimensional action-dependent structural benchmark used for NFXP, CCP,
-MPEC, and SEES.
+The generator runs two cells. The first is \texttt{canonical\_low\_action}, the
+same low-dimensional action-dependent structural benchmark used as a sanity
+check for NFXP, CCP, MPEC, and SEES. The second is
+\texttt{canonical\_high\_action}, a higher-dimensional action-dependent
+benchmark with richer state and reward features. This second cell is the more
+important NNES result: it tests whether the estimator still recovers structural
+objects when the state representation and reward basis are no longer tiny.
 
 \begin{table}[H]
 \centering\small
-\caption{Canonical NNES validation DGP.}
-\begin{tabular}{lr}
+\caption{Canonical NNES validation DGPs.}
+\begin{tabular}{lrr}
 \toprule
-Quantity & Value \\
+Quantity & Low-dimensional & High-dimensional \\
 \midrule
-Regular states & 20 \\
-Absorbing states & 1 \\
-Total states & 21 \\
-Actions & 3 \\
-Exit action & 2 \\
-Discount factor & 0.95 \\
-Shock scale & 1.0 \\
-Reward mode & action-dependent \\
-Reward dimension & low \\
-State mode & low-dimensional \\
-Simulated individuals & 2,000 \\
-Periods per individual & 80 \\
-Observations & 160,000 \\
+Regular states & 20 & 80 \\
+Absorbing states & 1 & 1 \\
+Total states & 21 & 81 \\
+State-feature dimension & 2 & 16 \\
+Reward parameters & 4 & 32 \\
+Actions & 3 & 3 \\
+Exit action & 2 & 2 \\
+Discount factor & 0.95 & 0.95 \\
+Shock scale & 1.0 & 1.0 \\
+Reward mode & action-dependent & action-dependent \\
+Simulated individuals & 2,000 & 2,000 \\
+Periods per individual & 80 & 80 \\
+Observations & 160,000 & 160,000 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -175,22 +182,29 @@ section is generated only when all checks pass.
 
 \section{Interpretation}
 
-The validation run confirms that the NNES implementation recovers the same
+The validation runs confirm that the NNES implementation recovers the same
 structural objects checked for the other validated estimators: reward
 parameters, policy, Bellman-level values, Q values, and counterfactual
-policies. The key implementation detail is that the structural MLE step
-profiles policy evaluation through \(\theta\), matching the source paper's
-one-step NPL construction.
+policies. The low-dimensional result shows that the implementation works on the
+easy case. The high-dimensional result is the substantive NNES evidence: it
+shows that the profiled NPL/neural-value path remains inside all hard gates
+with 81 states, 16-dimensional state features, and 32 reward parameters.
+
+The key implementation detail is that the structural MLE step profiles policy
+evaluation through \(\theta\), matching the source paper's one-step NPL
+construction. This avoids freezing the continuation value at the previous
+parameter vector during the likelihood step.
 
 \section{Reproduce}
 
 From the repository root:
 \begin{verbatim}
-PYTHONPATH=src:. python papers/econirl_package/primers/nnes/nnes_run.py
+PYTHONPATH=src:. python papers/econirl_package/primers/nnes/nnes_run.py --quiet-progress
 \end{verbatim}
 
-The script writes \texttt{nnes\_results.tex},
-\texttt{nnes\_results.json}, and a full JSON copy under:
+By default the script runs both the low-dimensional sanity check and the
+high-dimensional primary validation. It writes \texttt{nnes\_results.tex},
+\texttt{nnes\_results.json}, and full JSON copies under:
 \begin{verbatim}
 /tmp/econirl_nnes_primer_known_truth
 \end{verbatim}
