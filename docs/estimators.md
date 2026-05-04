@@ -5,8 +5,8 @@ the estimator-specific reference PDF. The PDFs are built from dedicated TeX
 files and use the shared known-truth synthetic DGP harness rather than real
 data examples.
 
-NFXP, CCP, MPEC, and SEES are fully migrated estimator pages and PDFs. NNES is
-wired into the same harness but currently reports a failing diagnostic run. The
+NFXP, CCP, MPEC, SEES, and NNES are fully migrated estimator pages and PDFs.
+Each migrated structural estimator now reports enforced known-truth gates. The
 remaining estimator pages are kept compact while their known-truth PDFs are
 migrated.
 

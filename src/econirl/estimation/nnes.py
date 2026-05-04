@@ -4,20 +4,24 @@ Two estimator variants that combine neural V(s) approximation with
 structural MLE:
 
 NNESEstimator (NPL-based, default):
-    Phase 1 trains V_phi on the NPL Bellman target using data CCPs and
-    the Hotz-Miller emax correction. The zero Jacobian property of the
-    NPL mapping implies Neyman orthogonality: first-order errors in
-    V_phi drop out of the Phase 2 score, so the pseudo-likelihood
-    Hessian is the correct semiparametrically efficient variance
-    estimator without bias correction (Nguyen 2025, Propositions 3-4).
+    For fixed conditional choice probabilities P, the policy-evaluation
+    equation is linear in theta. NNES profiles that equation, maximizes
+    the resulting one-step pseudo-likelihood, and then updates P by the
+    softmax policy-improvement map. The zero Jacobian property of the NPL
+    mapping implies Neyman orthogonality: first-order errors in V_phi drop
+    out of the Phase 2 score, so the pseudo-likelihood Hessian is the
+    correct semiparametrically efficient variance estimator without bias
+    correction (Nguyen 2025, Propositions 3-4).
 
 NNESNFXPEstimator (NFXP-based, legacy):
     Phase 1 trains V_phi on the NFXP soft Bellman operator via residual
     minimization. Does NOT have the Neyman orthogonality property.
     V-approximation errors feed directly into the Phase 2 score.
 
-Both share the same Phase 2: plug learned V_phi into a CCP
-log-likelihood and optimize over structural parameters theta.
+The NPL-based estimator does not freeze the learned network inside the
+theta objective. The finite-state implementation below computes the exact
+profiled value components W_z(P), W_e(P); the network is trained on the
+same target for diagnostics and for the large-state approximation path.
 
 Reference:
     Nguyen, H. (2025). "Neural Network Estimators for Dynamic Discrete
@@ -614,7 +618,8 @@ class NNESNFXPEstimator(BaseEstimator):
         )
 
 
-# Euler-Mascheroni constant for Hotz-Miller emax correction
+# Legacy constant retained for older Hotz-Miller notes. The NPL estimator
+# below follows the package's social-surplus convention and does not add it.
 EULER_GAMMA = 0.5772156649015329
 
 
@@ -626,7 +631,16 @@ def _nnes_profiled_logit_neg_ll_mean(
     all_actions: jnp.ndarray,
     inv_sigma: jnp.ndarray,
 ) -> jnp.ndarray:
-    """Mean profiled NPL negative log-likelihood for linear utility."""
+    """Mean profiled NPL negative log-likelihood for linear utility.
+
+    The profiled choice value has already absorbed policy evaluation:
+
+        Q_theta^P(s,a) = z_tilde(s,a)' theta + e_tilde(s,a)
+
+    The optimizer minimizes a mean objective for stable scaling across sample
+    sizes; _optimize multiplies the optimum back by n_obs when reporting the
+    summed log-likelihood.
+    """
     theta = params.astype(z_tilde.dtype)
     values = jnp.einsum("sak,k->sa", z_tilde, theta) + e_tilde
     log_probs = jax.nn.log_softmax(values * inv_sigma, axis=1)
@@ -641,10 +655,18 @@ _nnes_profiled_logit_neg_ll_mean_and_grad = jax.jit(
 class NNESEstimator(BaseEstimator):
     """NNES with NPL Bellman (correct variant, Nguyen 2025).
 
-    Phase 1 trains V_phi on the NPL value function target using data CCPs.
-    Phase 2 profiles the NPL value representation and optimizes theta in
-    the one-step policy operator. Outer iterations update CCPs from estimated
-    theta and retrain V_phi.
+    For a fixed CCP iterate P, policy evaluation solves
+
+        W_theta[P] = E_P[u(s,a;theta)] + sigma H(P(s))
+                     + beta E_P[W_theta[P](s')]
+
+    and, because u(s,a;theta) = phi(s,a)' theta, the solution is affine:
+
+        W_theta[P] = W_z(P) theta + W_e(P).
+
+    Phase 1 trains V_phi on this NPL value target. Phase 2 maximizes the
+    profiled pseudo-likelihood through W_z(P), W_e(P). Outer iterations update
+    CCPs from the estimated policy-improvement map and retrain V_phi.
 
     The zero Jacobian property of the NPL mapping guarantees Neyman
     orthogonality (Nguyen 2025, Propositions 3-4): first-order errors in
@@ -655,16 +677,18 @@ class NNESEstimator(BaseEstimator):
     Algorithm:
         For each outer iteration:
             Phase 1 (NPL V-network):
-                1. Compute emax correction: e(a,s) = gamma - log(pi(a|s))
-                2. Compute policy-weighted transitions: F_pi = sum_a pi(a|s) P(s'|s,a)
-                3. Compute NPL target: W = expected_flow_theta + sigma*expected_e + beta*F_pi @ W
-                4. Train V_phi to approximate W via supervised regression
+                1. Compute F_P[s,t] = sum_a P(a|s) T_a[s,t]
+                2. Compute b_z[s,k] = sum_a P(a|s) phi(s,a,k)
+                3. Compute b_e[s] = -sigma sum_a P(a|s) log P(a|s)
+                4. Solve W_z = (I - beta F_P)^(-1) b_z and
+                   W_e = (I - beta F_P)^(-1) b_e
+                5. Train V_phi to approximate W_z theta + W_e, after the
+                   optional anchor-state level normalization
 
             Phase 2 (Structural MLE):
-                1. Compute W_z(P) and W_e(P) for the fixed CCP iterate P
-                2. Q(s,a;theta) = [z(s,a) + beta E W_z(s')] theta
-                   + beta E W_e(s')
-                3. Maximize CCP log-likelihood over theta
+                1. Form z_tilde(s,a) = phi(s,a) + beta E[W_z(s')|s,a]
+                2. Form e_tilde(s,a) = beta E[W_e(s')|s,a]
+                3. Maximize log softmax((z_tilde theta + e_tilde) / sigma)
 
             Update CCPs from estimated theta for next iteration.
 
@@ -784,23 +808,44 @@ class NNESEstimator(BaseEstimator):
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute profiled NPL value components for fixed CCPs.
 
-        The package's soft Bellman operator uses the social-surplus
-        convention V = sigma * logsumexp(Q / sigma), without adding the
-        Euler-constant level term. Under that convention,
+        Given pi(a|s) from the current NPL outer iterate, define
 
-            W(P, theta) = W_z(P) theta + W_e(P)
+            F_pi[s,t] = sum_a pi(a|s) T_a[s,t],
+            b_z[s,k] = sum_a pi(a|s) phi(s,a,k),
+            b_e[s] = -sigma sum_a pi(a|s) log pi(a|s).
 
-        where W_e contains sigma times the policy entropy.
+        The profiled policy value solves
+
+            (I - beta F_pi) W_theta = b_z theta + b_e.
+
+        Since the right-hand side is affine in theta, solve the two reusable
+        components
+
+            W_z = (I - beta F_pi)^(-1) b_z,
+            W_e = (I - beta F_pi)^(-1) b_e,
+            W_theta(pi) = W_z theta + W_e.
+
+        The package's soft Bellman operator uses the social-surplus convention
+        V = sigma * logsumexp(Q / sigma), without the Euler-constant level term
+        used in some Hotz-Miller notation. Under this convention W_e contains
+        sigma times the Shannon entropy.
         """
         dtype = jnp.float64
         ccps64 = ccps.astype(dtype)
         transitions64 = transitions.astype(dtype)
         features64 = feature_matrix.astype(dtype)
 
+        # F_pi[s,t] is the transition matrix induced by the fixed CCP iterate.
         F_pi = jnp.einsum("sa,ast->st", ccps64, transitions64)
+
+        # b_z[s,k] is the policy-weighted reward feature entering the affine
+        # right-hand side b_z theta + b_e.
         expected_features = jnp.einsum("sa,sak->sk", ccps64, features64)
 
         safe_ccps = jnp.maximum(ccps64, 1e-12)
+
+        # b_e[s] is sigma times policy entropy. Constants in the EV1 surplus
+        # convention are common value-level shifts and do not affect CCPs.
         expected_entropy = -jnp.einsum("sa,sa->s", ccps64, jnp.log(safe_ccps))
 
         lhs = jnp.eye(n_states, dtype=dtype) - beta * F_pi
@@ -819,7 +864,17 @@ class NNESEstimator(BaseEstimator):
         n_states: int,
         n_actions: int,
     ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-        """Choice-specific values for the profiled one-step NPL operator."""
+        """Choice-specific values for the profiled one-step NPL operator.
+
+        With W_theta[P] = W_z theta + W_e,
+
+            Q_theta^P(s,a)
+                = phi(s,a)' theta + beta sum_t T_a[s,t] W_theta[P](t)
+                = z_tilde(s,a)' theta + e_tilde(s,a),
+
+        where z_tilde(s,a) = phi(s,a) + beta E[W_z(s')|s,a] and
+        e_tilde(s,a) = beta E[W_e(s')|s,a].
+        """
         W_z, W_e = self._compute_npl_components(
             ccps, transitions, feature_matrix, sigma, beta, n_states,
         )
@@ -832,6 +887,9 @@ class NNESEstimator(BaseEstimator):
             [transitions64[a] @ W_e for a in range(n_actions)],
             axis=1,
         )
+        # These are the objects optimized in Phase 2. The beta E[W_z] term is
+        # what makes the continuation value move with theta; omitting it would
+        # freeze the nuisance value and break the NPL profiling step.
         z_tilde = feature_matrix.astype(jnp.float64) + beta * E_W_z
         e_tilde = beta * E_W_e
         values = jnp.einsum(
@@ -854,13 +912,17 @@ class NNESEstimator(BaseEstimator):
     ) -> jnp.ndarray:
         """Compute NPL value function target W via matrix inversion.
 
-        W = W_z(P) theta + W_e(P), where W_e(P) is the entropy term under
-        the package's log-sum-exp Bellman convention.
+        W = W_z(P) theta + W_e(P), where W_e(P) is the entropy term under the
+        package's log-sum-exp Bellman convention.
 
         where:
-            F_pi[s,s'] = sum_a pi(a|s) P(s'|s,a)
-            expected_flow_theta[s] = sum_a pi(a|s) u(s,a;theta)
-            expected_entropy[s] = -sum_a pi(a|s) log(pi(a|s))
+            F_pi[s,t] = sum_a pi(a|s) T_a[s,t]
+            b_z[s,k] = sum_a pi(a|s) phi(s,a,k)
+            b_e[s] = -sigma sum_a pi(a|s) log(pi(a|s))
+
+        This returns the unanchored Bellman-level value. Anchoring is applied
+        only to the neural regression target because the absolute level of W is
+        not identified by the likelihood.
         """
         W_z, W_e = self._compute_npl_components(
             ccps, transitions, feature_matrix, sigma, beta, n_states,
@@ -893,7 +955,10 @@ class NNESEstimator(BaseEstimator):
         sigma = problem.scale_parameter
         beta = problem.discount_factor
 
-        # Compute NPL target via matrix inversion (exact for tabular)
+        # Compute the unanchored NPL target W_theta[P] by exact policy
+        # evaluation. The optional subtraction below enforces the paper's
+        # V_gamma(x) = G(x; gamma) - G(x0; gamma) normalization for the neural
+        # approximator only; CCPs and likelihood are invariant to this level.
         W_target = self._compute_npl_target(
             ccps, transitions, feature_matrix, params,
             sigma, beta, n_states, n_actions,
@@ -985,10 +1050,11 @@ class NNESEstimator(BaseEstimator):
         n_actions: int,
         bounds: list,
     ) -> jnp.ndarray:
-        """Estimate initial params from data CCPs via Hotz-Miller inversion."""
+        """Estimate initial params from data CCPs via the profiled NPL solve."""
         ccps = self._estimate_ccps(panel, n_states, n_actions)
 
-        # Hotz-Miller: compute EV via matrix inversion
+        # Same affine policy-evaluation algebra as _compute_npl_components,
+        # using empirical CCPs only to produce a stable starting point.
         P_pi = jnp.einsum("sa,ast->st", ccps, transitions)
         flow_features = jnp.einsum("sa,sak->sk", ccps, feature_matrix)
         safe_ccps = jnp.maximum(ccps, 1e-10)
@@ -1111,7 +1177,8 @@ class NNESEstimator(BaseEstimator):
         for outer_iter in range(self._n_outer_iterations):
             self._log(f"Outer iteration {outer_iter + 1}/{self._n_outer_iterations}")
 
-            # Phase 1: Train V-network on NPL target
+            # Phase 1 in Algorithm 1: evaluate W_theta[P_{k-1}] at the current
+            # theta and distill that profiled value into the anchored network.
             key, train_key = jax.random.split(key)
             v_net, v_loss_history = self._train_value_network_npl(
                 problem, transitions, ccps, feature_matrix,
@@ -1120,7 +1187,10 @@ class NNESEstimator(BaseEstimator):
             v_loss_per_outer.append(v_loss_history[-1] if v_loss_history else float("nan"))
             all_v_loss_history.append(v_loss_history)
 
-            # Extract V(s) for all states
+            # Extract the fitted network for diagnostics. The finite-state
+            # likelihood below uses exact W_z/W_e profiling instead of this
+            # approximate V_phi, matching the paper's "solve for every trial
+            # theta considered by the likelihood" step.
             v_all = jax.vmap(v_net)(all_state_feat)  # (S,)
 
             # Precompute E[V(s') | s, a] = transitions[a] @ V
@@ -1128,11 +1198,13 @@ class NNESEstimator(BaseEstimator):
             for a in range(n_actions):
                 ev_sa = ev_sa.at[:, a].set(transitions[a] @ v_all)
 
-            # Phase 2: Structural MLE
+            # Phase 2 in Algorithm 1: hold P_{k-1} fixed, precompute
+            # z_tilde/e_tilde, and optimize theta through
+            # Q_theta^P = z_tilde theta + e_tilde.
             self._log("  Phase 2: Profiled NPL MLE over theta")
 
             (
-                profiled_values,
+                _profiled_values_at_current_params,
                 W_z,
                 W_e,
                 z_tilde,
@@ -1188,7 +1260,8 @@ class NNESEstimator(BaseEstimator):
             last_profiled_W = W_z @ current_params.astype(jnp.float64) + W_e
             self._log(f"  Params: {np.asarray(current_params)}, LL: {last_ll_sum:.2f}")
 
-            # Update CCPs from estimated policy for next iteration
+            # Outer policy improvement:
+            # P_k(a|s) = softmax(Q_{theta_k}^{P_{k-1}}(s,a) / sigma).
             ccps = jax.nn.softmax(last_profiled_values / sigma, axis=1)
 
         def log_likelihood(params: jnp.ndarray) -> float:
