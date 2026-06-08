@@ -3,15 +3,14 @@
 ## Overview
 
 TD-CCP estimates dynamic discrete choice models by combining the CCP likelihood
-with temporal-difference estimates of the recursive value terms. It does not
-estimate or use transition densities for structural parameter estimation. The
-implementation learns \(h(a,x)\) and \(g(a,x)\) from observed
-state-action-next-state tuples, then optimizes the CCP pseudo-likelihood.
+with temporal-difference estimates of the recursive value terms. It learns the
+recursive terms from observed state-action-next-state tuples, then optimizes the
+CCP pseudo-likelihood.
 
 Known transitions are only needed after estimation if you want final policy,
 value, or counterfactual evaluation.
 
-## When to Use TD-CCP
+## When to Use
 
 Use TD-CCP when:
 
@@ -22,9 +21,9 @@ Use TD-CCP when:
 - you have panel trajectories with current and next state-action pairs;
 - you want structural parameters from a CCP-style estimator.
 
-Avoid TD-CCP when the observed policy has very sparse action support, the reward
-features are weakly identified, or you need raw nonparametric neural reward
-recovery from choices alone.
+Avoid TD-CCP when observed policy support is sparse, reward features are weakly
+identified, or you need raw nonparametric neural reward recovery from choices
+alone.
 
 ## Basic Usage
 
@@ -50,38 +49,25 @@ print(model.summary())
 ```
 
 For custom reward features or lower-level control over the dynamic discrete
-choice problem, use `econirl.estimation.TDCCPEstimator` directly.
+choice problem, use `econirl.estimation.TDCCPEstimator`.
 
 ## Validation Status
 
-TD-CCP passes the package known-truth gates on `canonical_low_action`.
+TD-CCP passes the package known-truth gates on the low-dimensional
+action-dependent DGP.
 
 TD-CCP also passes the paper-faithful hard flexible DGP
-`shapeshifter_linear_reward_neural_features`: stochastic shapeshifter
-transitions, frozen neural state features, and a finite linear structural
-reward with an action-0 normalization. This is the hard-case showcase that
-matches the TD-CCP paper's finite-\(\theta\) setup.
+with stochastic flexible transitions, frozen neural state features, and a
+finite linear structural reward with an action-0 normalization.
 
-The `canonical_high_action` encoded-state stress cell currently runs but fails
-the same structural recovery gates. Treat the high-dimensional path as
-diagnostic, not fully migrated.
+The high-dimensional action-dependent encoded-state stress DGP and the raw
+neural flexible DGP are comparison artifacts. The public validation scope is
+finite-parameter reward recovery.
 
-The raw `shapeshifter_neural_neural` diagnostic is retained as a failure
-artifact. It has a frozen neural reward matrix and no finite true
-\(\theta\), so it should not be described as raw reward recovery by TD-CCP.
-
-The reference PDF contains the validation tables, estimator settings, gate
-audit, counterfactual checks, and generated JSON details.
+Here, low-dimensional action-dependent DGP means the compact known-truth dynamic
+choice benchmark. The hard flexible DGP tests finite-theta recovery with neural
+state features, while the raw neural diagnostic has no finite true theta.
 
 ## Further Reading
 
-- Reference PDF: [TD-CCP reference and known-truth validation tutorial](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp.pdf)
-- Estimator source: [`src/econirl/estimation/td_ccp.py`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/td_ccp.py)
-- Result generator: [`papers/econirl_package/primers/tdccp/tdccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_run.py)
-- Generated JSON: [`papers/econirl_package/primers/tdccp/tdccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.json)
-
-Regenerate the TD-CCP validation artifacts from the repository root with:
-
-```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/tdccp/tdccp_run.py --quiet-progress
-```
+- Machine-readable artifact: [tdccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.json)

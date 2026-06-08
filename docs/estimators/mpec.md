@@ -1,55 +1,57 @@
 # MPEC
 
-**Reference PDF:** [MPEC reference and known-truth validation tutorial](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec.pdf)
+## Overview
 
-MPEC, mathematical programming with equilibrium constraints, estimates the
-same structural dynamic discrete choice likelihood as NFXP but treats the
-Bellman fixed point as an explicit equality constraint. The optimizer solves
-jointly for reward parameters and the value function.
+MPEC estimates the same structural dynamic discrete choice likelihood as NFXP,
+but it treats the Bellman fixed point as an explicit equality constraint. The
+optimizer solves jointly for reward parameters and value functions.
 
-Use MPEC when the state-action space is tabular, transitions are known or
-first-stage estimated, the Bellman constraint dimension is moderate, and you
-want a constrained-optimization check on the NFXP likelihood.
+MPEC is useful as a constrained-optimization counterpart to NFXP when the
+Bellman constraint dimension is moderate.
 
-## Current Validation Status
+## When to Use
 
-The reference PDF documents the full known-truth synthetic DGP validation. No
-real data are used. The canonical validation cell is `canonical_low_action`,
-with 2,000 simulated individuals, 80 periods per individual, 21 states, 3
-actions, known transitions, an exit-action normalization, and action-dependent
-reward features.
+Use MPEC when:
 
-| Metric | Value | Gate |
-| --- | ---: | ---: |
-| Bellman constraint violation | 7.72e-12 | <= 1e-6 |
-| Parameter cosine similarity | 0.998867 | >= 0.98 |
-| Parameter relative RMSE | 0.065378 | <= 0.15 |
-| Policy total variation | 0.005697 | <= 0.03 |
-| Value RMSE | 0.019445 | <= 0.10 |
-| Q RMSE | 0.022437 | <= 0.10 |
+- choices are discrete and forward-looking;
+- the state-action space is tabular and moderate in size;
+- transitions are known or estimated before fitting;
+- you want to inspect Bellman constraint violations directly;
+- a constrained optimizer is a useful check on NFXP or CCP estimates.
 
-The same run also solves Type A, Type B, and Type C counterfactuals against
-known oracle objects and recovers all three with small policy error and regret.
+Avoid MPEC when the value-function constraint is too large for the optimizer or
+when a faster CCP-style estimator is already sufficient.
 
-## Reproduce
+## Basic Usage
 
-From the repository root:
+```python
+from econirl.estimation import MPEC, MPECConfig
 
-```bash
-PYTHONPATH=src:. python -m experiments.known_truth \
-    --estimator MPEC \
-    --cell-id canonical_low_action \
-    --output-dir outputs/known_truth \
-    --show-progress \
-    --verbose
+config = MPECConfig(solver="sqp")
+estimator = MPEC(config=config)
+
+summary = estimator.estimate(
+    panel=panel,
+    utility=utility,
+    problem=problem,
+    transitions=transitions,
+)
+
+print(summary.parameters)
 ```
 
-The full PDF contains the model math, identification checks, DGP design,
-estimator settings, recovery tables, counterfactual results, and practical
-debugging notes.
+The lower-level API expects an `econirl.core.Panel`, a utility object, a
+`DDCProblem`, and transition matrices.
 
-## Implementation
+## Validation Status
 
-- Estimator: `src/econirl/estimation/mpec.py`
-- Known-truth harness: `experiments/known_truth.py`
-- Fast validation tests: `tests/test_known_truth.py`
+MPEC passes the package known-truth gates on the low-dimensional
+action-dependent DGP.
+
+Here, low-dimensional action-dependent DGP means a compact finite-state dynamic
+choice benchmark with action-specific rewards, known transitions, and known
+reward, policy, value, and counterfactual truth.
+
+## Further Reading
+
+- Primer artifact: [mpec_results.tex](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.tex)

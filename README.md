@@ -1,14 +1,11 @@
 # econirl
 
-Structural dynamic discrete choice and inverse reinforcement learning tools,
-with estimator validation built around synthetic data-generating processes where
-the truth is known exactly.
+Structural dynamic discrete choice and inverse reinforcement learning in
+Python.
 
-The current development focus is a shared **known-truth validation harness**.
-For each estimator, the harness generates a DGP with known rewards,
-transitions, policies, values, Q functions, and Type A/B/C counterfactual
-oracles. An estimator is treated as migrated only after it recovers the relevant
-truth objects and passes hard gates.
+EconIRL helps researchers and applied teams estimate forward-looking choice
+models, recover interpretable reward functions, and evaluate policy
+counterfactuals from panel data.
 
 **Docs:** https://econirl.readthedocs.io/
 
@@ -18,77 +15,56 @@ truth objects and passes hard gates.
 pip install econirl
 ```
 
-## Try It
+## Quick Start
 
-Load a bundled dataset and fit one structural estimator.
+Load a bundled Rust bus dataset and fit the structural reference estimator.
 
 ```python
 from econirl.datasets import load_rust_bus
-from econirl import CCP
+from econirl import NFXP
 
 df = load_rust_bus()
-model = CCP(n_states=90, discount=0.9999)
+model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 print(model.params_)
-print(model.summary())
+cf = model.counterfactual(RC=4.0)
+print(cf.policy[50, 1])
+```
+
+Output
+
+```text
+{'theta_c': 0.0010028828858836278, 'RC': 3.0722093435989524}
+0.05519477716656161
 ```
 
 ## What Is Validated Now
 
-The structural-estimator pages below have been migrated to the shared
-known-truth workflow. Each page is a short front door to a generated PDF and
-the exact run artifacts.
+The estimator pages state the supported target and link to validation evidence
+where a machine-readable artifact is available.
 
 | Estimator | Role | Current validation status |
 | --- | --- | --- |
-| [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact nested fixed-point MLE | Low-dimensional structural reference |
-| [CCP / NPL](https://econirl.readthedocs.io/en/latest/estimators/ccp.html) | Hotz-Miller inversion plus NPL updates | Low-dimensional structural recovery |
-| [MPEC](https://econirl.readthedocs.io/en/latest/estimators/mpec.html) | Constrained likelihood formulation | Low-dimensional structural recovery |
-| [SEES](https://econirl.readthedocs.io/en/latest/estimators/sees.html) | Sieve value approximation | Low-dimensional structural recovery |
-| [NNES](https://econirl.readthedocs.io/en/latest/estimators/nnes.html) | Neural NPL value approximation | Low-dimensional sanity check plus high-dimensional primary validation |
+| [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact nested fixed-point MLE | Validated reference estimator |
+| [CCP / NPL](https://econirl.readthedocs.io/en/latest/estimators/ccp.html) | Hotz-Miller inversion with NPL updates | Validated with stated support conditions |
+| [MPEC](https://econirl.readthedocs.io/en/latest/estimators/mpec.html) | Constrained likelihood formulation | Validated as an NFXP counterpart |
+| [SEES](https://econirl.readthedocs.io/en/latest/estimators/sees.html) | Sieve value approximation | Validated with optimizer-scope notes |
+| [NNES](https://econirl.readthedocs.io/en/latest/estimators/nnes.html) | Neural NPL value approximation | Validated on low- and high-dimensional cells |
+| [MCE-IRL](https://econirl.readthedocs.io/en/latest/estimators/mce_irl.html) | Maximum causal entropy feature matching | Validated for supplied reward features |
 
-NNES is the first migrated page where the high-dimensional DGP is central to
-the story: it passes both the easy low-dimensional cell and the 81-state,
-32-reward-parameter high-dimensional cell.
+## Estimator Families
 
-## Known-Truth Harness
-
-The harness lives in `experiments/known_truth.py`. It checks more than
-in-sample choice fit:
-
-- structural parameter recovery when the estimator has structural parameters;
-- reward, value, Q, and policy recovery;
-- Type A reward/state-shift counterfactuals;
-- Type B transition-change counterfactuals;
-- Type C action-restriction counterfactuals;
-- compatibility with low-dimensional, high-dimensional, and latent-segment
-  synthetic DGPs where appropriate.
-
-Useful commands:
-
-```bash
-PYTHONPATH=src:. pytest tests/test_known_truth.py -v
-PYTHONPATH=src:. python papers/econirl_package/primers/nnes/nnes_run.py --quiet-progress
-```
-
-## Estimators In The Repo
-
-These are the main estimator families currently exposed or wired into the
-known-truth migration plan.
+EconIRL covers classical structural estimators and modern IRL estimators behind
+a common workflow.
 
 | Family | Estimators |
 | --- | --- |
 | Structural econometrics | NFXP, CCP / NPL, MPEC, SEES, NNES, TD-CCP |
-| Entropy and feature-matching IRL | MCE-IRL, neural MCE-IRL, MaxEnt IRL, Deep MaxEnt IRL, Bayesian IRL |
+| Entropy and feature-matching IRL | MCE-IRL, Deep MCE-IRL, MaxEnt IRL, Bayesian IRL |
 | Margin and distribution matching | Max Margin IRL, Max Margin Planning, f-IRL |
 | Neural / Q-based methods | GLADIUS, Neural GLADIUS, IQ-Learn |
 | Adversarial IRL | AIRL, Neural AIRL, AIRL-Het, GAIL, GCL |
 | Baselines and utilities | Behavioral cloning, transition estimation, Rust bus replication tools |
-
-The migration status is intentionally not the same as "code exists." Some
-estimators are already validated in the shared known-truth framework; others
-are present in the package and are being brought into that framework
-estimator-by-estimator.
 
 ## Package Surface
 
@@ -114,19 +90,14 @@ from econirl import (
 ```
 
 Lower-level estimator implementations remain available under
-`econirl.estimation` and `econirl.contrib` for research workflows that need
-direct access to configuration objects or diagnostics. For example, the MPEC
-implementation is currently available as `econirl.estimation.mpec.MPECEstimator`
-while its public docs page is already part of the known-truth validation set.
-The lower-level namespace also includes f-IRL and behavioral cloning, and
-`econirl.contrib` keeps the older MaxEnt, Deep MaxEnt, max-margin, GAIL, GCL,
-and Bayesian IRL implementations available for comparison work.
+`econirl.estimation` and `econirl.contrib` for advanced workflows that need
+direct access to configuration objects, panel objects, transition tensors, or
+research implementations.
 
 ## Reference Pages
 
 - Estimator index: https://econirl.readthedocs.io/en/latest/estimators.html
-- NNES page: https://econirl.readthedocs.io/en/latest/estimators/nnes.html
-- NNES PDF: https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes.pdf
+- NFXP guide: https://econirl.readthedocs.io/en/latest/estimators/nfxp.html
 
 ## License
 

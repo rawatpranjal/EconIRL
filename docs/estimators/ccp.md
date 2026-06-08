@@ -1,55 +1,61 @@
 # CCP
 
-**Reference PDF:** [CCP reference and known-truth validation tutorial](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp.pdf)
+## Overview
 
-CCP, the conditional choice probability estimator, estimates structural dynamic
-discrete choice models by replacing repeated NFXP Bellman solves with
-Hotz-Miller policy inversion. Empirical CCPs initialize the estimator, and NPL
-iterations move the pseudo-likelihood mapping toward the MLE fixed point.
+CCP estimates structural dynamic discrete choice models with conditional choice
+probabilities. It avoids repeated NFXP Bellman solves by using policy inversion
+and, in NPL mode, iterating the pseudo-likelihood mapping.
 
-Use CCP when the state-action space is tabular, transitions are known or
-first-stage estimated, action support is strong, and you want a structural
-estimator that avoids an inner dynamic-programming solve at every likelihood
-evaluation.
+This is the natural starting point when the state-action space is tabular and
+empirical choice probabilities are well supported.
 
-## Current Validation Status
+## When to Use
 
-The reference PDF documents the full known-truth synthetic DGP validation. No
-real data are used. The canonical validation cell is `canonical_low_action`,
-with 2,000 simulated individuals, 80 periods per individual, 21 states, 3
-actions, known transitions, an exit-action normalization, and action-dependent
-reward features.
+Use CCP when:
 
-| Metric | Value | Gate |
-| --- | ---: | ---: |
-| Parameter cosine similarity | 0.998867 | >= 0.98 |
-| Parameter relative RMSE | 0.065372 | <= 0.15 |
-| Policy total variation | 0.005697 | <= 0.03 |
-| Value RMSE | 0.019438 | <= 0.10 |
-| Q RMSE | 0.022432 | <= 0.10 |
+- choices are discrete and forward-looking;
+- states and actions are tabular;
+- observed action support is strong enough to estimate CCPs;
+- transitions are known or can be estimated in a first stage;
+- you want a structural estimator that is cheaper than NFXP.
 
-The same run also solves Type A, Type B, and Type C counterfactuals against
-known oracle objects and recovers all three with small policy error and regret.
+Avoid CCP when important states or actions have sparse support, or when the
+Hotz-Miller inversion is numerically fragile for the data at hand.
 
-## Reproduce
+## Basic Usage
 
-From the repository root:
+```python
+import pandas as pd
 
-```bash
-PYTHONPATH=src:. python -m experiments.known_truth \
-    --estimator CCP \
-    --cell-id canonical_low_action \
-    --output-dir outputs/known_truth \
-    --show-progress \
-    --verbose
+from econirl.estimators import CCP
+
+data = pd.read_csv("zurcher_bus.csv")
+
+model = CCP(
+    n_states=90,
+    n_actions=2,
+    discount=0.9999,
+    utility="linear_cost",
+    num_policy_iterations=10,
+)
+model.fit(data, state="mileage_bin", action="replaced", id="bus_id")
+
+print(model.params_)
+print(model.summary())
 ```
 
-The full PDF contains the model math, identification checks, DGP design,
-estimator settings, recovery tables, counterfactual results, and practical
-debugging notes.
+Use `num_policy_iterations=1` for a one-step Hotz-Miller style run. Use more
+iterations for NPL.
 
-## Implementation
+## Validation Status
 
-- Estimator: `src/econirl/estimation/ccp.py`
-- Known-truth harness: `experiments/known_truth.py`
-- Fast validation tests: `tests/test_known_truth.py`
+CCP passes the package known-truth gates on the low-dimensional
+action-dependent DGP.
+
+Here, low-dimensional action-dependent DGP means a compact finite-state dynamic
+choice benchmark with action-specific rewards, known transitions, and known
+reward, policy, value, and counterfactual truth.
+
+## Further Reading
+
+- Machine-readable artifact: [ccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.json)
