@@ -23,7 +23,6 @@ References:
 
 from __future__ import annotations
 
-import math
 import time
 from typing import Literal
 
@@ -141,6 +140,8 @@ class CCPEstimator(BaseEstimator):
             compute_hessian=compute_hessian,
             verbose=verbose,
         )
+        if mode not in {None, "one_step", "npl"}:
+            raise ValueError("mode must be one of None, 'one_step', or 'npl'.")
         if mode is not None and num_policy_iterations is not None:
             raise ValueError(
                 "Pass either `mode` or `num_policy_iterations`, not both."
@@ -149,6 +150,20 @@ class CCPEstimator(BaseEstimator):
             num_policy_iterations = 1 if mode == "one_step" else -1
         elif num_policy_iterations is None:
             num_policy_iterations = 1
+        if num_policy_iterations != -1 and num_policy_iterations < 1:
+            raise ValueError(
+                "num_policy_iterations must be a positive integer or -1."
+            )
+        if ccp_min_count < 1:
+            raise ValueError("ccp_min_count must be at least 1.")
+        if ccp_smoothing < 0:
+            raise ValueError("ccp_smoothing must be non-negative.")
+        if convergence_tol <= 0:
+            raise ValueError("convergence_tol must be positive.")
+        if outer_tol <= 0:
+            raise ValueError("outer_tol must be positive.")
+        if outer_max_iter < 1:
+            raise ValueError("outer_max_iter must be at least 1.")
         self._mode = mode
         self._num_policy_iterations = num_policy_iterations
         self._ccp_min_count = ccp_min_count
@@ -184,31 +199,30 @@ class CCPEstimator(BaseEstimator):
         Returns:
             CCP matrix of shape (num_states, num_actions)
         """
-        # Count state-action frequencies
-        all_states = panel.get_all_states()
-        all_actions = panel.get_all_actions()
+        dtype = jnp.float64
+
+        # Count state-action frequencies.
+        all_states = jnp.asarray(panel.get_all_states(), dtype=jnp.int32)
+        all_actions = jnp.asarray(panel.get_all_actions(), dtype=jnp.int32)
         idx = all_states * num_actions + all_actions
-        counts = jnp.zeros(num_states * num_actions, dtype=jnp.float32).at[
-            idx.astype(jnp.int32)
-        ].add(jnp.ones(idx.shape[0])).reshape(num_states, num_actions)
+        counts = jnp.zeros(num_states * num_actions, dtype=dtype).at[idx].add(
+            jnp.ones(idx.shape[0], dtype=dtype)
+        ).reshape(num_states, num_actions)
 
-        # Get state counts
-        state_counts = counts.sum(axis=1)
+        state_counts = counts.sum(axis=1, keepdims=True)
+        smoothing = jnp.asarray(self._ccp_smoothing, dtype=dtype)
 
-        # Compute CCPs with smoothing
-        ccps = jnp.zeros((num_states, num_actions), dtype=jnp.float32)
-        for s in range(num_states):
-            if state_counts[s] >= self._ccp_min_count:
-                # Use empirical frequencies with smoothing
-                ccps = ccps.at[s].set(
-                    (counts[s] + self._ccp_smoothing)
-                    / (state_counts[s] + num_actions * self._ccp_smoothing)
-                )
-            else:
-                # Not enough data: use uniform distribution
-                ccps = ccps.at[s].set(1.0 / num_actions)
+        denom = state_counts + num_actions * smoothing
+        safe_denom = jnp.where(denom > 0, denom, jnp.ones_like(denom))
+        empirical = (counts + smoothing) / safe_denom
 
-        return ccps
+        uniform = jnp.full(
+            (num_states, num_actions),
+            1.0 / num_actions,
+            dtype=dtype,
+        )
+        supported = state_counts >= self._ccp_min_count
+        return jnp.where(supported, empirical, uniform)
 
     def _compute_emax_correction(self, ccps: jnp.ndarray) -> jnp.ndarray:
         """Compute emax correction for logit errors.
@@ -223,8 +237,11 @@ class CCPEstimator(BaseEstimator):
         Returns:
             Emax correction matrix of shape (num_states, num_actions)
         """
-        # Clamp CCPs to avoid log(0)
-        ccps_safe = jnp.maximum(ccps, self._ccp_smoothing)
+        # Clamp CCPs to avoid log(0), even when callers request zero smoothing
+        # for exact frequency checks.
+        tiny = np.finfo(np.float64).tiny
+        floor = jnp.asarray(max(float(self._ccp_smoothing), tiny), dtype=ccps.dtype)
+        ccps_safe = jnp.clip(ccps, floor, 1.0)
         return EULER_GAMMA - jnp.log(ccps_safe)
 
     def _compute_policy_weighted_transitions(
@@ -284,15 +301,14 @@ class CCPEstimator(BaseEstimator):
         """
         beta = problem.discount_factor
         num_states = problem.num_states
-        num_actions = problem.num_actions
 
         # Compute policy-weighted transition matrix
         F_pi = self._compute_policy_weighted_transitions(ccps, transitions)
 
         # Compute (I - β·F_π)⁻¹
         dtype = F_pi.dtype
-        I = jnp.eye(num_states, dtype=dtype)
-        inv_matrix = jnp.linalg.inv(I - beta * F_pi)
+        identity = jnp.eye(num_states, dtype=dtype)
+        inv_matrix = jnp.linalg.inv(identity - beta * F_pi)
 
         # Compute emax corrections
         e = self._compute_emax_correction(ccps)
@@ -308,7 +324,6 @@ class CCPEstimator(BaseEstimator):
         # u(s,a) = θ · φ(s,a), so we compute expected features
         if hasattr(utility, 'feature_matrix'):
             features = utility.feature_matrix  # shape (num_states, num_actions, num_features)
-            num_features = features.shape[2]
 
             # Compute Σ_a P(a|s) · φ(s,a) for each state
             # expected_features[s, k] = Σ_a P(a|s) · φ(s,a,k)
@@ -380,7 +395,7 @@ class CCPEstimator(BaseEstimator):
                 E_W_e = E_W_e.at[:, a].set(transitions[a] @ W_e)
 
             # z̃(a,x) = z(a,x) + β·E[W_z(x') | x, a]
-            z_tilde = features.astype(E_W_z.dtype) + beta * E_W_z  # (num_states, num_actions, num_features)
+            z_tilde = features.astype(E_W_z.dtype) + beta * E_W_z
 
             # ẽ(a,x) = β·E[W_e(x') | x, a]
             e_tilde = beta * E_W_e  # (num_states, num_actions)
@@ -545,10 +560,22 @@ class CCPEstimator(BaseEstimator):
         num_actions = problem.num_actions
         sigma = problem.scale_parameter
         lower, upper = utility.get_parameter_bounds()
+        if lower is None and upper is None:
+            opt_bounds = None
+        else:
+            if lower is None:
+                lower = jnp.full((utility.num_parameters,), -jnp.inf)
+            if upper is None:
+                upper = jnp.full((utility.num_parameters,), jnp.inf)
+            opt_bounds = (
+                jnp.asarray(lower, dtype=jnp.float64),
+                jnp.asarray(upper, dtype=jnp.float64),
+            )
         states_arr = jnp.asarray(panel.get_all_states())
         actions_arr = jnp.asarray(panel.get_all_actions())
         inv_sigma_f64 = jnp.float64(1.0 / sigma)
         _is_linear = hasattr(utility, 'feature_matrix')
+        initial_ccps = ccps
 
         if _is_linear:
             features_f64 = jnp.array(utility.feature_matrix, dtype=jnp.float64)
@@ -575,11 +602,23 @@ class CCPEstimator(BaseEstimator):
                     eps = max(1e-5, abs(float(params_x[i])) * 1e-4)
                     pf = params_x.at[i].add(eps)
                     pb = params_x.at[i].add(-eps)
-                    grad[i] = (float(-self._compute_log_likelihood(
-                        jnp.array(pf, dtype=jnp.float32), panel, utility, ccps, transitions, problem,
-                    )) - float(-self._compute_log_likelihood(
-                        jnp.array(pb, dtype=jnp.float32), panel, utility, ccps, transitions, problem,
-                    ))) / (2 * eps)
+                    ll_plus = self._compute_log_likelihood(
+                        jnp.array(pf, dtype=jnp.float32),
+                        panel,
+                        utility,
+                        ccps,
+                        transitions,
+                        problem,
+                    )
+                    ll_minus = self._compute_log_likelihood(
+                        jnp.array(pb, dtype=jnp.float32),
+                        panel,
+                        utility,
+                        ccps,
+                        transitions,
+                        problem,
+                    )
+                    grad[i] = (-ll_plus - (-ll_minus)) / (2 * eps)
                 return val, jnp.array(grad)
 
         # Step 2: Policy iteration loop
@@ -617,8 +656,7 @@ class CCPEstimator(BaseEstimator):
             result = minimize_lbfgsb(
                 neg_ll_base,
                 jnp.array(current_params, dtype=jnp.float64),
-                bounds=(jnp.asarray(lower, dtype=jnp.float64),
-                        jnp.asarray(upper, dtype=jnp.float64)),
+                bounds=opt_bounds,
                 maxiter=self._outer_max_iter,
                 tol=self._outer_tol,
                 verbose=False,
@@ -729,8 +767,22 @@ class CCPEstimator(BaseEstimator):
             message=f"CCP estimation completed in {num_policy_iterations} policy iterations",
             optimization_time=optimization_time,
             metadata={
+                "mode": (
+                    "one_step"
+                    if self._num_policy_iterations == 1
+                    else "npl"
+                ),
                 "num_policy_iterations": num_policy_iterations,
                 "npl_converged": converged,
+                "requested_policy_iterations": self._num_policy_iterations,
+                "ccp_min_count": self._ccp_min_count,
+                "ccp_smoothing": self._ccp_smoothing,
+                "initial_ccps": initial_ccps,
+                "final_ccps": final_policy,
+                "min_initial_ccp": float(jnp.min(initial_ccps)),
+                "min_final_ccp": float(jnp.min(final_policy)),
+                "outer_tol": self._outer_tol,
+                "outer_max_iter": self._outer_max_iter,
             },
         )
 
@@ -750,12 +802,6 @@ class CCPEstimator(BaseEstimator):
 
         gradients = jnp.zeros((n_obs, n_params))
         sigma = problem.scale_parameter
-
-        # Pre-compute log probabilities at current params
-        v_base = self._compute_choice_specific_values(
-            ccps, transitions, utility, params, problem
-        )
-        log_probs_base = jax.nn.log_softmax(v_base / sigma, axis=1)
 
         # Compute gradient for each parameter
         for k in range(n_params):

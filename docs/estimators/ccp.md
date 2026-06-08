@@ -1,61 +1,73 @@
 # CCP
 
-## Overview
+Conditional choice probability estimation is the fast tabular counterpart to
+NFXP. It estimates first-stage action probabilities, uses Hotz-Miller inversion
+to recover continuation values, and optionally iterates the
+Aguirregabiria-Mira NPL mapping.
 
-CCP estimates structural dynamic discrete choice models with conditional choice
-probabilities. It avoids repeated NFXP Bellman solves by using policy inversion
-and, in NPL mode, iterating the pseudo-likelihood mapping.
+Use CCP when the state-action space is tabular, transitions are known or
+estimated first, and empirical action support is strong. Use NFXP when you need
+the most direct likelihood reference or when the first-stage policy is too
+sparse for stable inversion.
 
-This is the natural starting point when the state-action space is tabular and
-empirical choice probabilities are well supported.
+## Quick Decision
 
-## When to Use
+| Use CCP when | Prefer another estimator when |
+| --- | --- |
+| States and actions are discrete. | Many states have weak or one-action support. |
+| Transitions are known or can be estimated first. | Transition estimation is the main modeling problem. |
+| The reward has a compact parametric form. | The reward must be high-dimensional or neural. |
+| NFXP is too expensive for repeated comparison runs. | You need the reference nested fixed-point likelihood. |
+| You want a Hotz-Miller or NPL structural estimate. | You only need a behavioral cloning baseline. |
 
-Use CCP when:
-
-- choices are discrete and forward-looking;
-- states and actions are tabular;
-- observed action support is strong enough to estimate CCPs;
-- transitions are known or can be estimated in a first stage;
-- you want a structural estimator that is cheaper than NFXP.
-
-Avoid CCP when important states or actions have sparse support, or when the
-Hotz-Miller inversion is numerically fragile for the data at hand.
-
-## Basic Usage
+## Minimal Fit
 
 ```python
-import pandas as pd
+from econirl.datasets import load_rust_bus
+from econirl import CCP
 
-from econirl.estimators import CCP
-
-data = pd.read_csv("zurcher_bus.csv")
+df = load_rust_bus()
 
 model = CCP(
     n_states=90,
-    n_actions=2,
     discount=0.9999,
     utility="linear_cost",
     num_policy_iterations=10,
 )
-model.fit(data, state="mileage_bin", action="replaced", id="bus_id")
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
 print(model.summary())
 ```
 
-Use `num_policy_iterations=1` for a one-step Hotz-Miller style run. Use more
-iterations for NPL.
+Set `num_policy_iterations=1` for the one-step Hotz-Miller estimator. Set a
+larger value for fixed-iteration NPL.
 
-## Validation Status
+## What Is Certified
 
-CCP passes the package known-truth gates on the low-dimensional
-action-dependent DGP.
+CCP is certified on the low-dimensional action-dependent known-truth DGP. The
+validation cell has known rewards, transitions, policies, values, Q functions,
+and Type A, Type B, and Type C counterfactual oracles. The machine-readable
+artifact and generated primer results are the release source of truth.
 
-Here, low-dimensional action-dependent DGP means a compact finite-state dynamic
-choice benchmark with action-specific rewards, known transitions, and known
-reward, policy, value, and counterfactual truth.
+| Evidence | Current state |
+| --- | --- |
+| Release status | Certified with support conditions. |
+| Primary cell | `canonical_low_action`. |
+| Machine-readable artifact | [ccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.json). |
+| Counterfactual gates | Type A, Type B, and Type C all pass. |
+| Public example | Uses `CCP` with `utility="linear_cost"`. |
 
-## Further Reading
+## CCP Guide
 
-- Machine-readable artifact: [ccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.json)
+```{toctree}
+:maxdepth: 2
+
+ccp/context
+ccp/quick_start
+ccp/under_the_hood
+ccp/pre_estimation
+ccp/validation
+ccp/counterfactuals
+ccp/rust_bus
+```

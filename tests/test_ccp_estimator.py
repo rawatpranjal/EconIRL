@@ -8,15 +8,15 @@ Tests cover:
 5. Standard errors and inference
 """
 
-import pytest
+import warnings
+
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
-from econirl.core.types import DDCProblem, Panel
-from econirl.environments.rust_bus import RustBusEnvironment
-from econirl.preferences.linear import LinearUtility
-from econirl.estimation.ccp import CCPEstimator, EULER_GAMMA
+from econirl.estimation.ccp import EULER_GAMMA, CCPEstimator
 from econirl.estimation.nfxp import NFXPEstimator
+from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel
 
 
@@ -31,7 +31,11 @@ class TestCCPEstimation:
         )
 
         row_sums = ccps.sum(axis=1)
-        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
+        np.testing.assert_allclose(
+            np.asarray(row_sums),
+            np.asarray(jnp.ones_like(row_sums)),
+            atol=1e-5,
+        )
 
     def test_ccps_non_negative(self, rust_env_small, small_panel, problem_spec_small):
         """Test that estimated CCPs are non-negative."""
@@ -68,6 +72,35 @@ class TestCCPEstimation:
         np.testing.assert_allclose(
             np.asarray(ccps[visited_states]), np.asarray(empirical_ccps[visited_states]), atol=1e-5
         )
+
+    def test_ccp_estimation_avoids_jax_scatter_dtype_warning(
+        self,
+        small_panel,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """Test that CCP fitting is dtype-clean under JAX scatter rules."""
+        estimator = CCPEstimator(
+            num_policy_iterations=1,
+            compute_hessian=False,
+            verbose=False,
+        )
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error",
+                message="scatter inputs have incompatible types.*",
+                category=FutureWarning,
+            )
+            result = estimator.estimate(
+                small_panel,
+                utility_small,
+                problem_spec_small,
+                transitions_small,
+            )
+
+        assert result.converged
 
 
 class TestEmaxCorrection:
@@ -112,6 +145,11 @@ class TestHotzMillerEstimation:
         assert result is not None
         assert len(result.parameters) == utility_small.num_parameters
         assert result.converged
+        assert result.metadata["mode"] == "one_step"
+        assert result.metadata["final_ccps"].shape == (
+            problem_spec_small.num_states,
+            problem_spec_small.num_actions,
+        )
 
     def test_hotz_miller_name(self):
         """Test that Hotz-Miller has correct name."""
@@ -130,14 +168,14 @@ class TestHotzMillerEstimation:
 
         # Time Hotz-Miller
         start = time.time()
-        hm_result = hm_estimator.estimate(
+        hm_estimator.estimate(
             panel, utility_small, problem_spec_small, transitions_small
         )
         hm_time = time.time() - start
 
         # Time NFXP
         start = time.time()
-        nfxp_result = nfxp_estimator.estimate(
+        nfxp_estimator.estimate(
             panel, utility_small, problem_spec_small, transitions_small
         )
         nfxp_time = time.time() - start
@@ -171,6 +209,14 @@ class TestNPLEstimation:
 
         estimator2 = CCPEstimator(num_policy_iterations=-1)
         assert "convergence" in estimator2.name.lower()
+
+    def test_mode_aliases(self):
+        """Test that named modes map to the documented estimators."""
+        one_step = CCPEstimator(mode="one_step")
+        npl = CCPEstimator(mode="npl")
+
+        assert one_step.name == "Hotz-Miller (CCP)"
+        assert "convergence" in npl.name.lower()
 
     def test_npl_improves_over_hotz_miller(self, rust_env_small, utility_small,
                                            problem_spec_small, transitions_small):
@@ -309,6 +355,21 @@ class TestCCPInference:
 class TestCCPEdgeCases:
     """Tests for edge cases and error handling."""
 
+    def test_invalid_mode_raises(self):
+        """Test that invalid mode names fail at construction."""
+        with pytest.raises(ValueError, match="mode"):
+            CCPEstimator(mode="bad")
+
+    def test_invalid_policy_iteration_count_raises(self):
+        """Test that invalid NPL iteration counts fail at construction."""
+        with pytest.raises(ValueError, match="num_policy_iterations"):
+            CCPEstimator(num_policy_iterations=0)
+
+    def test_invalid_smoothing_raises(self):
+        """Test that negative CCP smoothing fails at construction."""
+        with pytest.raises(ValueError, match="ccp_smoothing"):
+            CCPEstimator(ccp_smoothing=-1e-6)
+
     def test_sparse_data(self, rust_env_small, problem_spec_small, transitions_small):
         """Test handling of sparse data (few observations per state)."""
         # Small panel with sparse coverage
@@ -341,7 +402,7 @@ class TestCCPEdgeCases:
             verbose=False,
         )
 
-        result = estimator.estimate(
+        estimator.estimate(
             panel, utility, problem_spec_small, transitions_small
         )
 
