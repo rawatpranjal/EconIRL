@@ -27,7 +27,7 @@ external analysis.
 | [GLADIUS](estimators/gladius.md) | Neural Q and continuation modeling with anchor moments. | Research preview for projected reward analysis. |
 | [IQ-Learn](estimators/iq_learn.md) | Inverse soft-Q learning. | Research preview for imitation and Q diagnostics. |
 
-## How to Read This Map
+## Estimators
 
 Validated pages state the target and the evidence behind it. Research preview
 pages are useful for exploration, benchmarking, and method development, but
