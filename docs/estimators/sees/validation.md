@@ -1,10 +1,9 @@
 # Validation
 
-SEES is certified on the `canonical_high_action` known-truth cell. The
+SEES is reported on the `canonical_high_action` known-truth cell. The
 low-dimensional `canonical_low_action` cell remains in the artifact as a
 sanity check for the historical state-index basis. The primary cell uses
-encoded states and a richer reward-feature basis, so it tests the SEES path
-where the estimator is meant to matter.
+encoded states and a richer reward-feature basis.
 
 These results are not hand-entered examples. They come from the known-truth
 validation harness, where the reward, transition law, optimal policy, value
@@ -45,10 +44,10 @@ Read the tables as a sequence. The design rows state which known-truth cells
 were run. The fit summary reports the optimizer flag, Bellman residuals,
 likelihood, and run time. Recovery metrics compare the estimated structural
 object to oracle reward, policy, value, and Q objects. Hard gates are the
-pass/fail release criteria.
+reported thresholds.
 
 The optimizer flag is reported exactly as returned by L-BFGS-B. The SEES
-release gate is not the optimizer flag alone; it is the Bellman residual,
+evidence does not rely on the optimizer flag alone; it also uses the Bellman residual,
 finite standard errors, known-truth recovery, and counterfactual regret.
 
 ## Design
@@ -116,5 +115,52 @@ The primary high-dimensional cell ran in 3.92 seconds.
 | Type C | 0.001231 | 6.91e-6 | 0.000027 | 0.000014 |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-release claim is recovery within strict tolerances in the frozen known-truth
-cells.
+reported scope is recovery within the listed tolerances in the frozen
+known-truth cells.
+
+## Exact Rust Bus Oracle Check
+
+The component test suite also includes a smaller Rust bus oracle check with a
+full B-spline basis. At the true Rust parameters, `solution="value"`,
+`solution="q"`, `solution="ev"`, `solution="policy"`, and
+`solution="collocation"` match the oracle policy, value function, and
+Q function with Bellman residual below `1e-8`.
+
+That is an oracle representability and equilibrium-residual check, not evidence
+that a finite stochastic panel produces bit-for-bit parameter equality. Run it
+with:
+
+```bash
+pytest tests/test_sees_known_truth_components.py
+```
+
+## Random-Start Rust Bus Recovery
+
+The slow benchmark also checks practical finite-sample recovery from random
+structural starts. It simulates the same Rust bus panel, fits NFXP as the
+finite-sample structural reference, then runs all five SEES solution modes
+from random initial parameters with `num_theta_starts=4`.
+
+The gate compares SEES to the NFXP estimate on the same panel. It does not
+compare directly to the population truth, because finite stochastic panels do
+not make the sample MLE exactly equal to the DGP parameters.
+
+```bash
+pytest tests/benchmarks/test_parameter_recovery.py::test_sees_rust_bus_solution_variants
+```
+
+Generated artifacts:
+
+- [`sees_rust_random_start_results.md`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_rust_random_start_results.md)
+- [`sees_rust_random_start_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_rust_random_start_results.json)
+
+| Mode | Gate count | Max param RMSE | Max policy TV | Max value RMSE | Max Q RMSE | Max Bellman | Max grad norm | Optimizer flags |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `value` | 9/9 | 0.000859 | 0.000046 | 0.005762 | 0.005820 | 3.365e-04 | 1.062e-03 | 0/9 |
+| `q` | 9/9 | 0.001960 | 0.000109 | 0.015739 | 0.015420 | 9.297e-04 | 8.793e-04 | 0/9 |
+| `ev` | 9/9 | 0.002212 | 0.000082 | 0.014964 | 0.014944 | 8.389e-04 | 6.783e-04 | 0/9 |
+| `policy` | 9/9 | 0.006692 | 0.000200 | 0.031827 | 0.033279 | 7.661e-04 | 5.564e-03 | 0/9 |
+| `collocation` | 9/9 | 0.000859 | 0.000046 | 0.005762 | 0.005820 | 3.365e-04 | 1.062e-03 | 0/9 |
+
+The optimizer flag is the JAXopt gradient flag. The recovery gate is
+based on the finite-sample recovery metrics and Bellman residuals above.

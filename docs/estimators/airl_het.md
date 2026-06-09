@@ -3,10 +3,10 @@
 ## Overview
 
 AIRL-Het extends AIRL to latent heterogeneous segments with segment-specific
-rewards and policies. It uses anchor restrictions to identify
+rewards and policies. It uses anchor constraints to identify
 action-dependent rewards and an EM loop to recover segment membership.
 
-The package validation is tied to a serialized-content DGP with repeated
+The current evidence is tied to a serialized-content DGP with repeated
 observations per user, not to a generic one-trajectory-per-agent IRL problem.
 
 ## When to Use
@@ -49,10 +49,10 @@ print(summary.parameters)
 Use user-level trajectory metadata consistently when repeated trajectories
 belong to the same individual.
 
-## Validation Status
+## Evidence
 
-AIRL-Het passes the known-truth gates on the serialized-content heterogeneous
-DGP. The validated cell has two latent segments, repeated books per user,
+The reported known-truth evidence uses the serialized-content heterogeneous
+DGP. The cell has two latent segments, repeated books per user,
 pay/wait/exit actions, an exit-action reward anchor, an absorbing terminal
 state, an 18-dimensional state encoding, and 20 finite reward features.
 

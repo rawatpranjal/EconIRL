@@ -1,7 +1,8 @@
 # Under the Hood
 
 SEES estimates a structural dynamic discrete choice likelihood while replacing
-the full value vector with a sieve approximation.
+the full Bellman solution object with a sieve approximation. The default path
+is V-SEES, which approximates the value function.
 
 ## Model
 
@@ -17,7 +18,7 @@ $$
 u_\theta(s, a) = \phi(s, a)^\top \theta
 $$
 
-The value function is approximated by basis functions.
+For V-SEES, the value function is approximated by basis functions.
 
 $$
 V_\alpha(s) = \Psi(s)^\top \alpha
@@ -52,11 +53,33 @@ $$
 The penalty weight controls how strongly the estimated value approximation
 must satisfy the Bellman equation.
 
+For nonconvex finite-sample problems, SEES can run deterministic theta
+multistart before the joint theta-alpha optimization. Set
+`num_theta_starts > 1` to include the supplied start, a static-logit start,
+and neutral variants; the selected fit is the one with the best penalized
+criterion.
+
+## Solution Modes
+
+The `solution` option selects which Bellman object the sieve represents.
+
+| Mode | Approximated object | Residual |
+| --- | --- | --- |
+| `value` | Integrated value `V(s)`. | Soft Bellman residual. |
+| `q` | Choice-specific value `Q(s,a)`. | Q-Bellman residual. |
+| `ev` | Expected continuation value by state and action. | Continuation consistency. |
+| `policy` | Centered policy logits. | Logit optimality consistency. |
+| `collocation` | Integrated value `V(s)`. | Bellman residual on deterministic collocation states. |
+
+The strongest direct SEES-theory fit is `value`, with `q` as an equivalent
+Bellman representation. The other modes are exposed for diagnostics and
+numerical experiments in DDC/IRL problems.
+
 ## Basis Paths
 
 For compact tabular problems, the implementation can build a basis over state
 indices. For encoded-state problems, it can build an encoded-state basis from
-the `DDCProblem` state encoder. The certified high-dimensional SEES validation
+the `DDCProblem` state encoder. The high-dimensional SEES validation
 uses the encoded-state path with 81 basis functions and numerical rank 81.
 
 ## Inference
@@ -64,4 +87,5 @@ uses the encoded-state path with 81 basis functions and numerical rank 81.
 The lower-level estimator returns an `EstimationSummary` with reward
 parameters, standard errors, policy, value function, likelihood, and metadata.
 The metadata records the basis source, basis dimension, penalty weight,
-Bellman violation, Bellman RMSE, and projection diagnostics.
+solution type, theta-start diagnostics, Bellman violation, Bellman RMSE, and
+projection diagnostics.

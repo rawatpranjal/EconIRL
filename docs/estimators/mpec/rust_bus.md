@@ -49,7 +49,7 @@ print(summary.policy[states, 1])
 ## Counterfactual Replacement Cost
 
 MPEC's lower-level estimator does not currently provide the one-call
-dataframe-wrapper `counterfactual` method used by NFXP and CCP. For release
+dataframe-wrapper `counterfactual` method used by NFXP and CCP. For validation
 evidence, counterfactual replacement-cost and transition interventions are
 tested through the known-truth validation harness and reported on the
 [counterfactuals page](counterfactuals.md).
@@ -57,6 +57,5 @@ tested through the known-truth validation harness and reported on the
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The certified release evidence is the known-truth validation
-cell, because it has known reward, policy, value, Q, and counterfactual oracle
-objects.
+replication. The reported validation evidence is the known-truth cell, which
+has known reward, policy, value, Q, and counterfactual oracle objects.

@@ -4,9 +4,9 @@ Nested fixed point is the reference estimator for tabular structural dynamic
 discrete choice. It estimates primitive reward parameters by solving the
 agent's dynamic program inside each likelihood evaluation.
 
-Start here when you want a trustworthy baseline for a small or moderate
-dynamic discrete choice problem. The page tree below replaces the old primer
-document as the public documentation surface.
+Start here for a small or moderate tabular dynamic discrete choice problem.
+The page tree below replaces the old primer document as the public
+documentation surface.
 
 ## Quick Decision
 
@@ -16,7 +16,7 @@ document as the public documentation surface.
 | Transitions are known or can be estimated first. | Transition estimation is the main modeling challenge. |
 | The reward has a compact parametric form. | The reward must be high-dimensional or neural. |
 | You need a structural reference estimate. | You only need a fast imitation baseline. |
-| Counterfactual policy analysis is central. | The estimator has no structural counterfactual claim. |
+| Counterfactual policy analysis is central. | You only need fitted choice probabilities. |
 
 ## Minimal Fit
 
@@ -33,19 +33,19 @@ print(model.params_)
 print(model.summary())
 ```
 
-## What Is Certified
+## Evidence
 
-NFXP is certified on the low-dimensional action-dependent known-truth DGP. The
+NFXP is reported on the low-dimensional action-dependent known-truth DGP. The
 validation cell has known rewards, transitions, policies, values, Q functions,
 and Type A, Type B, and Type C counterfactual oracles. The machine-readable
-artifact is the release source of truth.
+artifact records the reported evidence.
 
 | Evidence | Current state |
 | --- | --- |
-| Release status | Certified. |
+| Evidence scope | Known-truth tabular cell. |
 | Primary cell | `canonical_low_action`. |
 | Machine-readable artifact | [nfxp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_results.json). |
-| Counterfactual gates | Type A, Type B, and Type C all pass. |
+| Counterfactual gates | Type A, Type B, and Type C are reported in the artifact. |
 | Public example | Uses `NFXP` with `utility="linear_cost"`. |
 
 ## NFXP Guide

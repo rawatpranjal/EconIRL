@@ -3,7 +3,7 @@
 ## Overview
 
 Deep MCE-IRL uses the maximum causal entropy occupancy-matching objective with
-a neural reward map. The validated package target is nonlinear reward-map
+a neural reward map. The current evidence target is nonlinear reward-map
 recovery over supplied state encodings and known transitions.
 
 The validation is about the recovered reward matrix, not the raw neural network
@@ -56,10 +56,10 @@ print(model.summary())
 Pass `features=` only when you want an interpretable projection of the learned
 reward map onto supplied reward features.
 
-## Validation Status
+## Evidence
 
-Deep MCE-IRL passes the anchored neural reward-map known-truth gates on the
-primary Shapeshifter cell. Finite-theta projections are reported only when the
+The reported known-truth evidence covers the anchored neural reward-map
+Shapeshifter cell. Finite-theta projections are reported only when the
 projection basis is numerically identified.
 
 Anchored neural reward-map DGP means a known-transition synthetic environment

@@ -14,9 +14,11 @@ model = SEES(
     n_actions=2,
     discount=0.9999,
     utility="linear_cost",
+    solution="value",
     basis_type="fourier",
     basis_dim=8,
     penalty_weight=0.01,
+    num_theta_starts=1,
     max_iter=500,
 )
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
@@ -38,7 +40,11 @@ Output
 
 The fitted wrapper exposes the structural parameter estimates, standard
 errors, estimated policy, value function, transition estimate, and sieve
-coefficients.
+coefficients. The default `solution="value"` is V-SEES. The wrapper also
+accepts `solution="q"`, `solution="ev"`, `solution="policy"`, and
+`solution="collocation"` for alternative Bellman-SEES formulations.
+Use `num_theta_starts > 1` when the finite-sample objective is sensitive to
+the initial structural parameters.
 
 | Attribute | Meaning |
 | --- | --- |
@@ -59,9 +65,11 @@ the basis and penalty.
 from econirl.estimation.sees import SEESEstimator
 
 estimator = SEESEstimator(
+    solution="value",
     basis_type="bspline",
     basis_dim=21,
     penalty_weight=100.0,
+    num_theta_starts=1,
     max_iter=1000,
     compute_se=True,
 )

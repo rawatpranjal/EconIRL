@@ -1,37 +1,35 @@
 # Estimator Map
 
 Use this page to choose an estimator for your data and decision problem. The
-status column describes the current validation scope for public examples and
-external analysis.
+evidence column states the current public scope.
 
 ## Structural Econometrics
 
-| Estimator | Best for | Current status |
+| Estimator | Best for | Evidence scope |
 | --- | --- | --- |
-| [NFXP](estimators/nfxp.md) | Exact tabular dynamic discrete choice. | Validated reference estimator. |
-| [CCP](estimators/ccp.md) | Hotz-Miller and NPL-style tabular DDC. | Validated with support conditions. |
-| [MPEC](estimators/mpec.md) | Constrained-optimization check on the DDC likelihood. | Validated as an NFXP counterpart. |
-| [SEES](estimators/sees.md) | Sieve value-function structural estimation. | Validated with optimizer-scope notes. |
-| [NNES](estimators/nnes.md) | Neural value approximation inside NPL. | Validated on low- and high-dimensional cells. |
-| [TD-CCP](estimators/tdccp.md) | Transition-free CCP estimation with TD recursion. | Validated for finite-parameter reward settings. |
+| [NFXP](estimators/nfxp.md) | Exact tabular dynamic discrete choice. | Known-truth tabular cell. |
+| [CCP](estimators/ccp.md) | Hotz-Miller and NPL-style tabular DDC. | Known-truth tabular cell with support conditions. |
+| [MPEC](estimators/mpec.md) | Constrained-optimization check on the DDC likelihood. | Known-truth constrained-likelihood counterpart. |
+| [SEES](estimators/sees.md) | Sieve value-function structural estimation. | Known-truth encoded-state cell. |
+| [NNES](estimators/nnes.md) | Neural value approximation inside NPL. | Known-truth low- and high-dimensional cells. |
+| [TD-CCP](estimators/tdccp.md) | Transition-free CCP estimation with TD recursion. | Known-truth finite-parameter reward cells. |
 
 ## Inverse Reinforcement Learning
 
-| Estimator | Best for | Current status |
+| Estimator | Best for | Evidence scope |
 | --- | --- | --- |
-| [MCE-IRL](estimators/mce_irl.md) | Maximum causal entropy reward-feature matching. | Validated for supplied action-dependent reward features. |
-| [Deep MCE-IRL](estimators/deep_mce_irl.md) | Nonlinear reward-map recovery from known transitions. | Validated for anchored neural reward maps. |
-| [AIRL](estimators/airl.md) | Adversarial state-reward recovery under original AIRL assumptions. | Validated for state-only AIRL settings. |
-| [AIRL-Het](estimators/airl_het.md) | Anchored adversarial recovery with latent segments. | Validated for the heterogeneous serialized-content setting. |
-| [f-IRL](estimators/f_irl.md) | f-divergence state-marginal matching. | Validated for state-marginal reward recovery. |
-| [GLADIUS](estimators/gladius.md) | Neural Q and continuation modeling with anchor moments. | Research preview for projected reward analysis. |
-| [IQ-Learn](estimators/iq_learn.md) | Inverse soft-Q learning. | Research preview for imitation and Q diagnostics. |
+| [MCE-IRL](estimators/mce_irl.md) | Maximum causal entropy reward-feature matching. | Known-truth supplied-feature cells. |
+| [Deep MCE-IRL](estimators/deep_mce_irl.md) | Nonlinear reward-map recovery from known transitions. | Known-truth anchored neural reward maps. |
+| [AIRL](estimators/airl.md) | Adversarial state-reward recovery under original AIRL assumptions. | Known-truth state-only AIRL setting. |
+| [AIRL-Het](estimators/airl_het.md) | Anchored adversarial recovery with latent segments. | Known-truth serialized-content setting. |
+| [f-IRL](estimators/f_irl.md) | f-divergence state-marginal matching. | Known-truth state-marginal target. |
+| [GLADIUS](estimators/gladius.md) | Neural Q and continuation modeling with anchor moments. | Preview: projected reward diagnostics. |
+| [IQ-Learn](estimators/iq_learn.md) | Inverse soft-Q learning. | Preview: imitation and Q diagnostics. |
 
 ## Estimators
 
-Validated pages state the target and the evidence behind it. Research preview
-pages are useful for exploration, benchmarking, and method development, but
-their pages also state the current scope of counterfactual evidence.
+Each page states the target, evidence, and current scope. Preview pages are
+for exploration, benchmarking, and method development.
 
 ```{toctree}
 :caption: Structural Econometrics

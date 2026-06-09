@@ -3,7 +3,7 @@
 ## Overview
 
 GLADIUS learns Q and continuation-value approximations and projects the implied
-reward back onto structural features. The package validation uses a stable
+reward back onto structural features. The reported evidence uses a stable
 anchor-moment Q loss for known-truth cells. The literal bi-conjugate minimax
 mode remains available for method research.
 
@@ -16,8 +16,8 @@ Use GLADIUS when:
 - high-dimensional state features make tabular value methods unattractive;
 - projected structural reward recovery is the target.
 
-Avoid GLADIUS when there is no credible anchor action or when you need strict
-tabular structural estimation.
+Avoid GLADIUS when there is no credible anchor action or when you need tabular
+structural estimation.
 
 ## Basic Usage
 
@@ -42,12 +42,12 @@ print(summary.parameters)
 ```
 
 The high-level `econirl.estimators.GLADIUS` alias points to the neural wrapper.
-The strict primer validation uses the lower-level `GLADIUSEstimator`.
+The primer evidence uses the lower-level `GLADIUSEstimator`.
 
-## Validation Status
+## Evidence
 
 GLADIUS is currently positioned as a research preview for projected reward
-analysis. The strongest evidence covers projected parameters, projected
+analysis. The reported evidence covers projected parameters, projected
 rewards, policies, Q functions, and Type A/B/C counterfactual checks on the
 paper-side high-dimensional-state cell and its scaled variant.
 

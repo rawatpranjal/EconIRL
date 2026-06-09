@@ -1,6 +1,6 @@
 # Validation
 
-MPEC is certified on the `canonical_low_action` known-truth cell. This is the
+MPEC is reported on the `canonical_low_action` known-truth cell. This is the
 same low-dimensional action-dependent structural benchmark used for NFXP and
 CCP, but MPEC exposes an additional Bellman equality constraint diagnostic.
 
@@ -43,7 +43,7 @@ The fit summary reports convergence, constrained-optimizer iterations, and the
 final Bellman constraint violation. Parameter recovery compares estimated
 reward parameters to truth. Recovery metrics compare the recovered reward,
 value, Q function, and policy to oracle objects. Hard gates are the pass/fail
-release criteria.
+reported thresholds.
 
 ## Design
 
@@ -77,7 +77,7 @@ that anchors the reward level.
 | Standard errors finite | true |
 
 The constrained optimizer satisfies the Bellman equality gate by several orders
-of magnitude. The release claim still depends on recovery gates, not on the
+of magnitude. The reported evidence still depends on recovery gates, not on the
 constraint diagnostic alone.
 
 ## Parameter Recovery
@@ -120,8 +120,8 @@ constraint diagnostic alone.
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-release claim is recovery within strict tolerances in the frozen known-truth
-cell.
+reported scope is recovery within the listed tolerances in the frozen
+known-truth cell.
 
 ## Counterfactual Recovery
 

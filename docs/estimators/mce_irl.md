@@ -3,7 +3,7 @@
 ## Overview
 
 MCE-IRL learns reward parameters by matching expert feature expectations under
-the maximum causal entropy policy. In econirl, the validated path uses known
+the maximum causal entropy policy. In econirl, the current evidence path uses known
 transitions and explicit reward features.
 
 This is the finite-dimensional IRL baseline for structural reward-feature
@@ -46,11 +46,11 @@ print(model.summary())
 For multi-action structural recovery, pass an explicit reward specification to
 `fit()` or provide `feature_matrix` at construction time.
 
-## Validation Status
+## Evidence
 
-MCE-IRL passes the package known-truth gates on the validated
-action-dependent reward-feature cells. The wrapper no longer treats
-`feature_matrix=None` as a validated structural default for multi-action
+The reported known-truth evidence covers action-dependent reward-feature
+cells. The wrapper no longer treats `feature_matrix=None` as an
+evidence-backed structural default for multi-action
 models.
 
 The validation DGPs are finite-state dynamic choice benchmarks with known

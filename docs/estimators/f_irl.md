@@ -3,7 +3,7 @@
 ## Overview
 
 f-IRL learns a reward by matching expert and model visitation distributions
-under an f-divergence. The paper-side claim is state-marginal matching with a
+under an f-divergence. The paper-side target is state-marginal matching with a
 state-only reward.
 
 Action-dependent DDC examples are comparison exercises in the current package.
@@ -45,10 +45,10 @@ print(summary.parameters)
 Use `marginal_space="state_action"` only when the project is explicitly about a
 state-action comparison exercise.
 
-## Validation Status
+## Evidence
 
 The current validation target is the paper-faithful state-marginal f-IRL DGP.
-That is the structural claim supported by this page.
+That is the structural scope reported by this page.
 
 The state-marginal f-IRL DGP uses state-only rewards and state-marginal
 matching.

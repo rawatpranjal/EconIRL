@@ -59,9 +59,9 @@ Use `econirl.estimation.sees.SEESEstimator` when you need direct control over
 the `Panel`, utility object, `DDCProblem`, transition tensor, basis choice, or
 Bellman penalty.
 
-## What Is Certified
+## Evidence
 
-SEES is certified on the high-dimensional action-dependent known-truth DGP.
+SEES is reported on the high-dimensional action-dependent known-truth DGP.
 The low-dimensional cell is retained as a sanity check, while the primary
 cell uses encoded states and a richer reward-feature basis. Both cells have
 known rewards, transitions, policies, values, Q functions, and Type A, Type B,
@@ -69,11 +69,11 @@ and Type C counterfactual oracles.
 
 | Evidence | Current state |
 | --- | --- |
-| Release status | Certified. |
+| Evidence scope | Known-truth encoded-state cell. |
 | Primary cell | `canonical_high_action`. |
 | Machine-readable artifact | [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json). |
-| Primary Bellman gate | Passes with violation `3.08e-6`. |
-| Primary recovery gates | Parameter, reward, policy, value, Q, and counterfactual gates pass. |
+| Primary Bellman gate | Reported violation `3.08e-6`. |
+| Primary recovery gates | Parameter, reward, policy, value, Q, and counterfactual gates are reported in the artifact. |
 | Public example | Uses `SEES` with `utility="linear_cost"`; validation uses `SEESEstimator`. |
 
 ## SEES Guide

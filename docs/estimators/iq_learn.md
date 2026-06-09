@@ -6,8 +6,8 @@ IQ-Learn parameterizes soft Q-values directly and recovers a Bellman-implied
 reward as a byproduct. The current package position is a research preview for
 imitation quality and Q-based diagnostics.
 
-Use the structural estimators when the project requires validated
-counterfactual policy analysis.
+Use the structural estimators when the project requires reported
+counterfactual policy evidence.
 
 ## When to Use
 
@@ -17,8 +17,8 @@ Use IQ-Learn when:
 - you want to compare policy imitation with structural reward recovery;
 - transitions are available for the inverse Bellman reward calculation.
 
-Avoid IQ-Learn when you need a currently validated structural counterfactual
-estimator in this package.
+Avoid IQ-Learn when you need structural counterfactual evidence in this
+package.
 
 ## Basic Usage
 
@@ -42,10 +42,10 @@ summary = estimator.estimate(
 print(summary.parameters)
 ```
 
-Use `q_type="neural"` for a neural Q diagnostic, but keep validation claims
+Use `q_type="neural"` for a neural Q diagnostic, but keep evidence scope
 separate from imitation accuracy.
 
-## Validation Status
+## Evidence
 
 IQ-Learn is available as a research preview. The current evidence is strongest
 for imitation and Q diagnostics rather than full structural reward recovery.

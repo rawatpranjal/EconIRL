@@ -3,7 +3,7 @@
 ## Overview
 
 AIRL learns a reward through an adversarial discriminator with a
-potential-based shaping term. The validated package claim follows the original
+potential-based shaping term. The current evidence follows the original
 state-only AIRL identification setting.
 
 Use AIRL-Het, not plain AIRL, for the anchored heterogeneous action-dependent
@@ -14,7 +14,7 @@ surface.
 Use AIRL when:
 
 - demonstrations come from a discrete dynamic decision problem;
-- the reward claim is state-only;
+- the reward target is state-only;
 - transitions are available for validation or post-fit evaluation;
 - adversarial recovery is the research object.
 
@@ -46,11 +46,11 @@ print(summary.parameters)
 ```
 
 The high-level `econirl.estimators.AIRL` alias points to the neural wrapper. The
-validated tabular primer uses `AIRLEstimator`.
+tabular primer uses `AIRLEstimator`.
 
-## Validation Status
+## Evidence
 
-AIRL is validated on the original AIRL identification DGP.
+AIRL is reported on the original AIRL identification DGP.
 
 The original AIRL identification DGP is a state-only reward setting close to
 the paper's assumptions. Anchored action-dependent reward recovery belongs to

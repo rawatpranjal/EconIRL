@@ -1,12 +1,11 @@
 # Validation
 
-EconIRL validation claims are based on known-truth synthetic environments. The
-validation harness knows the reward, transition law, policy, value function,
-Q function, and counterfactual oracle before fitting the estimator.
+EconIRL validation pages use known-truth synthetic environments. The harness
+knows the reward, transition law, policy, value function, Q function, and
+counterfactual oracle before fitting the estimator.
 
-This is stricter than checking that an estimator imports or produces a numeric
-answer. A validated structural estimator recovers the objects required by its
-target use case.
+The tables report more than imports or numeric outputs. They state which
+objects are checked for each estimator target.
 
 ## Gate Families
 
@@ -24,9 +23,9 @@ target use case.
 
 | Status | Meaning |
 | --- | --- |
-| Validated | The target passes the documented validation gates. |
-| Validated with scope | The target passes under the stated conditions. |
-| Research preview | The implementation is available for experiments while evidence is still narrower than the full structural claim. |
+| Evidence reported | The page reports gates for the stated target. |
+| Evidence with scope | The reported gates are tied to stated conditions. |
+| Research preview | The implementation is available for experiments; current evidence is narrower than the target. |
 
 Estimator pages link to artifacts when machine-readable evidence is available.
-When the evidence is scoped, the page states the recommended use clearly.
+When the evidence is scoped, the page states the current use clearly.

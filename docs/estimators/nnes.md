@@ -44,12 +44,11 @@ print(model.summary())
 
 Use `econirl.estimation.NNESEstimator` for the lower-level NPL implementation.
 
-## Validation Status
+## Evidence
 
-NNES passes the enforced known-truth gates on both the low-dimensional
-structural DGP and the high-dimensional structural DGP. The high-dimensional
-cell is the more informative stress test because it exercises encoded state
-features and a larger reward-feature basis.
+The reported known-truth evidence covers both the low-dimensional structural
+DGP and the high-dimensional structural DGP. The high-dimensional cell
+exercises encoded state features and a larger reward-feature basis.
 
 The low-dimensional cell is the compact finite-state action-dependent benchmark.
 The high-dimensional cell keeps known reward, policy, value, and counterfactual

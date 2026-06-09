@@ -48,20 +48,20 @@ The MPEC public surface is currently the lower-level estimator API. It expects
 an `econirl.core.Panel`, a utility object, a `DDCProblem`, and transition
 matrices.
 
-## What Is Certified
+## Evidence
 
-MPEC is certified on the low-dimensional action-dependent known-truth DGP. The
+MPEC is reported on the low-dimensional action-dependent known-truth DGP. The
 validation cell has known rewards, transitions, policies, values, Q functions,
 and Type A, Type B, and Type C counterfactual oracles. The machine-readable
-artifact and generated primer results are the release source of truth.
+artifact and generated primer results record the reported evidence.
 
 | Evidence | Current state |
 | --- | --- |
-| Release status | Certified. |
+| Evidence scope | Known-truth constrained-likelihood counterpart. |
 | Primary cell | `canonical_low_action`. |
 | Machine-readable artifact | [mpec_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json). |
-| Bellman constraint gate | Passes with final violation `7.72e-12`. |
-| Counterfactual gates | Type A, Type B, and Type C all pass. |
+| Bellman constraint gate | Reported final violation `7.72e-12`. |
+| Counterfactual gates | Type A, Type B, and Type C are reported in the artifact. |
 | Public example | Uses `MPECEstimator` with the tabular DDC lower-level API. |
 
 ## MPEC Guide

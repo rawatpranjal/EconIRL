@@ -26,7 +26,7 @@ the relevant actions. Sparse empirical CCPs make the inversion noisy.
 ## Where CCP Fits
 
 CCP targets the same structural reward object as NFXP in finite tabular
-dynamic discrete choice models. It is a useful production estimator when the
+dynamic discrete choice models. It is a practical estimator when the
 first-stage policy is well supported, and it is a useful comparison estimator
 when NFXP is the reference.
 

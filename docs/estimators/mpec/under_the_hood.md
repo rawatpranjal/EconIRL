@@ -81,10 +81,9 @@ derivatives, and updates the joint parameter-value vector until the optimizer
 converges. The fitted object returns structural parameters, standard errors,
 policy, value function, likelihood, and constraint diagnostics.
 
-The certified validation run uses the SQP path and reports the final Bellman
-constraint violation as a hard release gate. The validation claim requires both
-constraint satisfaction and recovery of reward, policy, value, Q, and
-counterfactual oracle objects.
+The validation run uses the SQP path and reports the final Bellman constraint
+violation as a gate. The evidence includes both constraint satisfaction and
+recovery of reward, policy, value, Q, and counterfactual oracle objects.
 
 ## Score Calculation
 

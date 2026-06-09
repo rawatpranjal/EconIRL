@@ -31,6 +31,6 @@ objects, and diagnostic metadata.
 
 ## Design Rule
 
-The public API makes the validated path obvious. Research estimators remain
-available for advanced users, and their pages describe the scope of their
-current evidence.
+The public API keeps the main evidence-backed path easy to find. Research
+estimators remain available for advanced users, and their pages describe the
+scope of their current evidence.

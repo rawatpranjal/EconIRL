@@ -51,14 +51,14 @@ print(model.summary())
 For custom reward features or lower-level control over the dynamic discrete
 choice problem, use `econirl.estimation.TDCCPEstimator`.
 
-## Validation Status
+## Evidence
 
-TD-CCP passes the package known-truth gates on the low-dimensional
-action-dependent DGP.
+The reported known-truth evidence covers the low-dimensional action-dependent
+DGP.
 
-TD-CCP also passes the paper-faithful hard flexible DGP
-with stochastic flexible transitions, frozen neural state features, and a
-finite linear structural reward with an action-0 normalization.
+The evidence also includes the paper-faithful hard flexible DGP with
+stochastic flexible transitions, frozen neural state features, and a finite
+linear structural reward with an action-0 normalization.
 
 The high-dimensional action-dependent encoded-state stress DGP and the raw
 neural flexible DGP are comparison artifacts. The public validation scope is

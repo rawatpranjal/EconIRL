@@ -71,6 +71,6 @@ Output from the low-dimensional validation objects:
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The certified release evidence is the known-truth validation
-artifact, because it has known reward, policy, value, Q, and counterfactual
-oracle objects. See [Validation](validation.md) for that evidence path.
+replication. The reported validation evidence is the known-truth artifact,
+which has known reward, policy, value, Q, and counterfactual oracle objects.
+See [Validation](validation.md) for that evidence path.

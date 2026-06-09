@@ -1,6 +1,6 @@
 # Validation
 
-CCP is certified on the `canonical_low_action` known-truth cell. This is the
+CCP is reported on the `canonical_low_action` known-truth cell. This is the
 same low-dimensional action-dependent structural benchmark used for NFXP.
 
 These results are not hand-entered examples. They come from the known-truth
@@ -41,7 +41,7 @@ Read the tables as a sequence. The design table states the known-truth cell.
 The fit summary reports how the estimator ran. Parameter recovery compares
 estimated reward parameters to truth. Recovery metrics compare the recovered
 reward, value, Q function, and policy to oracle objects. Hard gates are the
-pass/fail release criteria.
+reported thresholds.
 
 ## Design
 
@@ -99,7 +99,7 @@ that recovery metrics pass.
 | Policy max state L1 | 0.018902 |
 
 In this finite sample, the one-step estimate already recovers the policy well
-because empirical CCP support is strong. The certified release claim uses the
+because empirical CCP support is strong. The reported CCP evidence uses the
 NPL run with a ten-iteration cap because it is the structural CCP counterpart
 to the NFXP fixed point.
 
@@ -119,5 +119,5 @@ to the NFXP fixed point.
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-release claim is recovery within strict tolerances in the frozen known-truth
-cell.
+reported scope is recovery within the listed tolerances in the frozen
+known-truth cell.

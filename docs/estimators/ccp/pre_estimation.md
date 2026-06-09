@@ -16,7 +16,7 @@ starts. Run these checks before treating a result as structural evidence.
 
 ## Canonical Validation Checks
 
-The certified CCP artifact records these pre-estimation checks.
+The known-truth CCP artifact records these pre-estimation checks.
 See the [validation page](validation.md) for the generator script, rendered
 table source, and JSON artifact.
 
@@ -32,7 +32,7 @@ table source, and JSON artifact.
 | Minimum positive CCP | 0.153 | pass |
 | Exit and absorbing anchor | true | pass |
 
-The canonical cell has full support, so the CCP validation claim is about the
+The canonical cell has full support, so the CCP evidence is about the
 estimator rather than a sparse first-stage policy.
 
 ## Common Risk Patterns

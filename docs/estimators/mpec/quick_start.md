@@ -57,12 +57,12 @@ a value function, a likelihood, and constrained-optimizer diagnostics.
 ## Counterfactual Example
 
 MPEC does not currently expose the same one-call dataframe wrapper
-`counterfactual` method as NFXP and CCP. The release counterfactual evidence is
+`counterfactual` method as NFXP and CCP. The counterfactual evidence is
 therefore produced through the known-truth validation harness, which re-solves
 oracle Type A, Type B, and Type C counterfactuals against the recovered
 structural object.
 
-See [Counterfactuals](counterfactuals.md) for the certified counterfactual
+See [Counterfactuals](counterfactuals.md) for the reported counterfactual
 families and [Validation](validation.md) for the generator and artifact links.
 
 ## Lower-Level Control
