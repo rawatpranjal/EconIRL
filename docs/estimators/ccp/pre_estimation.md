@@ -1,28 +1,31 @@
-# Pre Estimation
+# Pre-Estimation Checks
 
-Run support checks before treating CCP as a structural estimate. The estimator
-can run on sparse data, but the interpretation depends on first-stage support.
+CCP can show estimation risk for reasons that are visible before optimization
+starts. Run these checks before treating a result as structural evidence.
 
-## Required Checks
-
-| Check | Why It Matters |
+| Check | Why it matters |
 | --- | --- |
 | Feature rank | Reward parameters are not identified when action-dependent features are collinear. |
 | Feature condition number | Near-collinearity inflates standard errors. |
+| Transition row sums | Each transition row must be a valid probability distribution. |
 | State coverage | Unvisited states require extrapolated CCPs. |
 | State-action coverage | One-action states make counterfactual action values weakly supported. |
 | Minimum positive CCP | Very small probabilities make the log correction unstable. |
-| Transition row sums | CCP inversion assumes valid transition probabilities. |
+| Reward normalization | Reward level and scale need a valid anchor. |
+| Transition orientation | CCP expects action, state, next-state transition tensors internally. |
 
-## Canonical Validation Diagnostics
+## Canonical Validation Checks
+
+The certified CCP artifact records these pre-estimation checks.
 
 | Check | Value | Status |
 | --- | ---: | --- |
-| Feature rank | 4 of 4 | pass |
+| Feature rank | 4 / 4 | pass |
 | Feature condition number | 4.512 | pass |
 | Transition row error | 2.42e-8 | pass |
-| Observed states | 21 of 21 | pass |
+| Observed states | 21 / 21 | pass |
 | State-action coverage | 1.000 | pass |
+| Action shares | 0.345, 0.330, 0.325 | pass |
 | Minimum action share | 0.325 | pass |
 | Minimum positive CCP | 0.153 | pass |
 | Exit and absorbing anchor | true | pass |
@@ -30,9 +33,11 @@ can run on sparse data, but the interpretation depends on first-stage support.
 The canonical cell has full support, so the CCP validation claim is about the
 estimator rather than a sparse first-stage policy.
 
-## Practical Rules
+## Common Risk Patterns
 
-If many states are unvisited, pool states or use a coarser state grid. If many
-states have only one action, report CCP as a weak-support estimate and compare
-against NFXP. If the feature matrix is rank deficient, change the reward
-specification before fitting any structural estimator.
+Data with many unvisited states force CCP to extrapolate the first-stage
+policy. States with only one observed action make counterfactual action values
+weakly supported. Too little smoothing can make log corrections unstable,
+while too much smoothing biases the empirical policy toward uniform choice.
+Transition matrices with wrong orientation can produce plausible arrays and
+wrong economics.

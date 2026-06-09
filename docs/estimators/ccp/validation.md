@@ -58,14 +58,6 @@ that recovery metrics pass.
 | Policy total variation | 0.005697 |
 | Policy max state L1 | 0.018905 |
 
-## NPL Comparison
-
-| Estimator | Iterations | Relative RMSE | Cosine | Policy TV | Value RMSE | Time |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Hotz-Miller K=1 | 1 | 0.058259 | 0.999211 | 0.005539 | 0.016469 | 1.57 seconds |
-| NPL K=3 | 3 | 0.065298 | 0.998871 | 0.005694 | 0.019416 | 4.53 seconds |
-| NPL K=10 | 10 | 0.065372 | 0.998867 | 0.005697 | 0.019438 | 20.77 seconds |
-
 In this finite sample, the one-step estimate already recovers the policy well
 because empirical CCP support is strong. The certified release claim uses the
 K=10 NPL row because it is the structural CCP counterpart to the NFXP fixed

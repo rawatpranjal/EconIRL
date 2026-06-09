@@ -22,6 +22,14 @@ print(model.se_)
 print(model.policy_.shape)
 ```
 
+Output
+
+```text
+{'theta_c': 0.0010028827236965299, 'RC': 3.072209358215332}
+{'theta_c': 0.00038928037896014613, 'RC': 0.07406123281287358}
+(90, 2)
+```
+
 The fitted estimator exposes structural parameters, standard errors, a policy,
 a value function, and a likelihood.
 
@@ -32,8 +40,6 @@ a value function, and a likelihood.
 | `policy_` | Estimated action probabilities by state. |
 | `value_` | Estimated policy value function by state. |
 | `log_likelihood_` | Maximized CCP pseudo log likelihood. |
-
-## Hotz-Miller And NPL
 
 ```python
 one_step = CCP(n_states=90, discount=0.9999, num_policy_iterations=1)
@@ -52,8 +58,15 @@ print(cf.params)
 print(cf.policy[50, 1])
 ```
 
-The counterfactual method solves the fitted structural model again under the
-changed parameter vector. This mirrors the NFXP public API.
+Output
+
+```text
+{'theta_c': 0.0010028827236965299, 'RC': 4.0}
+0.055194772664901845
+```
+
+This solves the fitted model again with a higher replacement cost and returns
+the new value function and policy.
 
 ## Lower-Level Control
 

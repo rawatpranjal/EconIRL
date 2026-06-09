@@ -1,7 +1,25 @@
-# Under The Hood
+# Under the Hood
 
-CCP starts from the empirical policy. For each state and action, EconIRL counts
-observed choices and applies smoothing.
+CCP replaces repeated Bellman solves with first-stage policy inversion. The
+estimator starts from empirical conditional choice probabilities, converts
+them into continuation-value terms, and maximizes a pseudo likelihood over
+augmented features.
+
+## Model
+
+The observed data are state, action, and next-state trajectories.
+
+$$
+(s_{it}, a_{it}, s_{i,t+1})
+$$
+
+The flow payoff is linear in known features.
+
+$$
+u_\theta(s, a) = \phi(s, a)^\top \theta
+$$
+
+CCP first estimates the observed policy.
 
 ```text
 pi_hat(a | s) = count(s, a) / count(s)
@@ -42,7 +60,14 @@ NPL repeats two steps. Given a policy, estimate parameters by logit
 pseudo-likelihood. Given parameters, update the policy from the implied
 choice-specific values.
 
-## Implementation Notes
+## Algorithm Sketch
+
+The estimation loop first estimates transitions or accepts a supplied
+transition tensor. It then estimates empirical CCPs, builds the
+policy-weighted transition matrix, computes Hotz-Miller continuation terms,
+maximizes the augmented-feature logit pseudo likelihood, and updates the
+policy for the next NPL step. The fitted object returns structural parameters,
+standard errors, policy, value function, and diagnostics.
 
 The frequency estimator uses float64 arrays so high-discount problems avoid
 JAX dtype promotion warnings. CCP probabilities are clamped before the log
@@ -55,3 +80,14 @@ across NPL iterations.
 The returned `value_` follows the package soft-Bellman convention. CCP uses the
 Euler-constant correction internally for inversion, but final diagnostics
 evaluate the recovered policy under the recovered structural reward.
+
+## Score Calculation
+
+For linear rewards, each NPL step is a multinomial logit over augmented
+features. The score has the same logit form as NFXP, but the derivatives are
+taken with respect to the CCP-augmented choice-specific value rather than a
+newly solved Bellman fixed point at every likelihood evaluation.
+
+Standard errors are computed from the full Bellman-constrained likelihood
+Hessian and per-observation gradients when requested. This keeps the fitted
+summary compatible with the shared inference interface used by NFXP.
