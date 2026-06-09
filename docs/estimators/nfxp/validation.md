@@ -4,6 +4,45 @@ NFXP is certified on the `canonical_low_action` known-truth cell. This cell is
 small enough to solve exactly and large enough to expose rank, support, and
 normalization issues.
 
+These results are not hand-entered examples. They come from the known-truth
+validation harness, where the reward, transition law, optimal policy, value
+function, Q function, and counterfactual oracle objects are all known before
+estimation starts. The NFXP page checks whether the estimator can recover those
+known objects from a finite simulated panel.
+
+The full result generator is
+[`nfxp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_run.py).
+It writes the rendered table source
+[`nfxp_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_results.tex)
+and the machine-readable artifact
+[`nfxp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_results.json).
+To rerun it from the repository root:
+
+```bash
+PYTHONPATH=src:. python papers/econirl_package/primers/nfxp/nfxp_run.py
+```
+
+The core harness flow is:
+
+```python
+from pathlib import Path
+
+from experiments.known_truth import run_cell_estimator
+
+run_cell_estimator(
+    "canonical_low_action",
+    "NFXP",
+    Path("/tmp/econirl_nfxp_primer_known_truth"),
+    smoke=False,
+)
+```
+
+Read the tables as a sequence. The design table states the known-truth cell.
+The fit summary reports how the estimator ran. Parameter recovery compares
+estimated reward parameters to truth. Recovery metrics compare the recovered
+reward, value, Q function, and policy to oracle objects. Hard gates are the
+pass/fail release criteria.
+
 ## Design
 
 | Quantity | Value |

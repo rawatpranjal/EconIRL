@@ -3,6 +3,46 @@
 CCP is certified on the `canonical_low_action` known-truth cell. This is the
 same low-dimensional action-dependent structural benchmark used for NFXP.
 
+These results are not hand-entered examples. They come from the known-truth
+validation harness, where the reward, transition law, optimal policy, value
+function, Q function, and counterfactual oracle objects are all known before
+estimation starts. The CCP page checks whether the estimator can recover those
+known objects from a finite simulated panel.
+
+The full result generator is
+[`ccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_run.py).
+It writes the rendered table source
+[`ccp_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.tex)
+and the machine-readable artifact
+[`ccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.json).
+To rerun it from the repository root:
+
+```bash
+PYTHONPATH=src:. python papers/econirl_package/primers/ccp/ccp_run.py
+```
+
+The core harness flow is:
+
+```python
+from experiments.known_truth import (
+    build_known_truth_dgp,
+    get_cell,
+    run_estimator,
+    simulate_known_truth_panel,
+)
+
+cell = get_cell("canonical_low_action")
+dgp = build_known_truth_dgp(cell.dgp_config)
+panel = simulate_known_truth_panel(dgp, cell.simulation_config)
+main_run = run_estimator("CCP", dgp, panel, smoke=False)
+```
+
+Read the tables as a sequence. The design table states the known-truth cell.
+The fit summary reports how the estimator ran. Parameter recovery compares
+estimated reward parameters to truth. Recovery metrics compare the recovered
+reward, value, Q function, and policy to oracle objects. Hard gates are the
+pass/fail release criteria.
+
 ## Design
 
 | Quantity | Value |
