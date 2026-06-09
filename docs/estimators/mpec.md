@@ -5,42 +5,48 @@ structural dynamic discrete choice likelihood as NFXP, but it treats the
 Bellman fixed point as an explicit equality constraint. The optimizer solves
 jointly for reward parameters and value functions.
 
-Use MPEC as a constrained-optimization counterpart to NFXP when the state space
-is moderate and you want to inspect Bellman constraint violations directly.
+Use MPEC as a constrained-optimization counterpart to NFXP when the state
+space is moderate and you want to inspect Bellman constraint violations
+directly. It targets the same tabular structural object as NFXP and CCP, but
+uses a different numerical representation of the fixed point.
 
-## When to Use
+## Quick Decision
 
-Use MPEC when:
+| Use MPEC when | Prefer another estimator when |
+| --- | --- |
+| States and actions are discrete. | The Bellman constraint is too large for a constrained optimizer. |
+| Transitions are known or can be estimated first. | Transition estimation is the main modeling problem. |
+| The reward has a compact parametric form. | The reward must be high-dimensional or neural. |
+| You need a constrained-likelihood check on NFXP. | You need the fastest repeated comparison run. |
+| Bellman constraint diagnostics are central. | You only need a behavioral cloning baseline. |
 
-- choices are discrete and forward-looking;
-- the state-action space is tabular and moderate in size;
-- transitions are known or estimated before fitting;
-- you want to inspect Bellman constraint violations directly;
-- a constrained optimizer is a useful check on NFXP or CCP estimates.
-
-Avoid MPEC when the value-function constraint is too large for the optimizer or
-when a faster CCP-style estimator is already sufficient.
-
-## Basic Usage
+## Minimal Fit
 
 ```python
-from econirl.estimation import MPEC, MPECConfig
+from econirl.environments.rust_bus import RustBusEnvironment
+from econirl.estimation.mpec import MPECEstimator, MPECConfig
+from econirl.preferences.linear import LinearUtility
+from econirl.simulation import simulate_panel
 
-config = MPECConfig(solver="sqp")
-estimator = MPEC(config=config)
+env = RustBusEnvironment(num_mileage_bins=20, discount_factor=0.99)
+panel = simulate_panel(env, n_individuals=100, n_periods=50)
+utility = LinearUtility.from_environment(env)
 
-summary = estimator.estimate(
+model = MPECEstimator(config=MPECConfig(solver="sqp"))
+summary = model.estimate(
     panel=panel,
     utility=utility,
-    problem=problem,
-    transitions=transitions,
+    problem=env.problem_spec,
+    transitions=env.transition_matrices,
 )
 
 print(summary.parameters)
+print(summary.metadata["final_constraint_violation"])
 ```
 
-The lower-level API expects an `econirl.core.Panel`, a utility object, a
-`DDCProblem`, and transition matrices.
+The MPEC public surface is currently the lower-level estimator API. It expects
+an `econirl.core.Panel`, a utility object, a `DDCProblem`, and transition
+matrices.
 
 ## What Is Certified
 
@@ -56,12 +62,18 @@ artifact and generated primer results are the release source of truth.
 | Machine-readable artifact | [mpec_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json). |
 | Bellman constraint gate | Passes with final violation `7.72e-12`. |
 | Counterfactual gates | Type A, Type B, and Type C all pass. |
-| Public example | Uses `MPEC` with the tabular DDC lower-level API. |
+| Public example | Uses `MPECEstimator` with the tabular DDC lower-level API. |
 
 ## MPEC Guide
 
 ```{toctree}
 :maxdepth: 2
 
+mpec/context
+mpec/quick_start
+mpec/under_the_hood
+mpec/pre_estimation
 mpec/validation
+mpec/counterfactuals
+mpec/rust_bus
 ```
