@@ -1,0 +1,381 @@
+{
+  "estimator": "MPEC",
+  "paper_target": "Su-Judd constrained maximum likelihood for tabular DDC",
+  "primary_cell_id": "canonical_low_action",
+  "release_status": "Certified",
+  "result": {
+    "cell": {
+      "cell_id": "canonical_low_action",
+      "description": "Universal DGP preset: low-dimensional action-dependent structural benchmark.",
+      "dgp_config": {
+        "discount_factor": 0.95,
+        "exit_action": 2,
+        "feature_scale": 1.0,
+        "heterogeneity": "none",
+        "high_reward_features": 24,
+        "high_state_dim": 12,
+        "initial_state_mode": "uniform_regular",
+        "num_actions": 3,
+        "num_regular_states": 20,
+        "num_segments": 2,
+        "reward_dim": "low",
+        "reward_mode": "action_dependent",
+        "scale_parameter": 1.0,
+        "seed": 42,
+        "state_mode": "low_dim",
+        "transition_noise": 0.05
+      },
+      "simulation_config": {
+        "n_individuals": 2000,
+        "n_periods": 80,
+        "seed": 42,
+        "show_progress": false
+      }
+    },
+    "compatibility": {
+      "compatible": true,
+      "errors": [],
+      "estimator": "MPEC",
+      "warnings": []
+    },
+    "diagnostics": {
+      "action_shares": [
+        0.3451625,
+        0.329925,
+        0.3249125
+      ],
+      "anchor_valid": true,
+      "condition_number": 4.512181117222974,
+      "errors": [],
+      "feature_rank": 4,
+      "is_action_dependent": true,
+      "max_transition_row_error": 2.421438694000244e-08,
+      "min_action_share": 0.3249125,
+      "min_positive_ccp": 0.15275590551181104,
+      "num_features": 4,
+      "num_states": 21,
+      "observed_states": 21,
+      "single_action_states": 0,
+      "state_action_coverage": 1.0,
+      "warnings": []
+    },
+    "estimator": "MPEC",
+    "exception": null,
+    "gates": [
+      {
+        "name": "converged",
+        "operator": "is",
+        "passed": true,
+        "threshold": true,
+        "value": true
+      },
+      {
+        "name": "constraint_violation",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 1e-06,
+        "value": 7.720046824033489e-12
+      },
+      {
+        "name": "standard_errors_finite",
+        "operator": "is",
+        "passed": true,
+        "threshold": true,
+        "value": true
+      },
+      {
+        "name": "parameter_cosine",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.98,
+        "value": 0.998866856098175
+      },
+      {
+        "name": "parameter_relative_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.15,
+        "value": 0.0653780996799469
+      },
+      {
+        "name": "policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.00569684222215914
+      },
+      {
+        "name": "value_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.019445205084564546
+      },
+      {
+        "name": "q_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.02243743714205972
+      },
+      {
+        "name": "type_a_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.00021271654460050312
+      },
+      {
+        "name": "type_b_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.0003622384388165333
+      },
+      {
+        "name": "type_c_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 8.64936144393287e-05
+      }
+    ],
+    "metrics": {
+      "anchor_projected_reward_normalized_rmse": 0.013205775425983252,
+      "anchor_projected_reward_rmse": 0.012165846959997104,
+      "counterfactuals": {
+        "type_a": {
+          "policy": {
+            "kl": 7.56430718239834e-05,
+            "l1": 0.010218621456903387,
+            "linf": 0.01813969825754419,
+            "tv": 0.005109310728451694
+          },
+          "regret": 0.00021271654460050312,
+          "value_rmse": 0.00023770589734563245
+        },
+        "type_b": {
+          "policy": {
+            "kl": 8.204292457693975e-05,
+            "l1": 0.010914644970316498,
+            "linf": 0.017679892536209718,
+            "tv": 0.005457322485158249
+          },
+          "regret": 0.0003622384388165333,
+          "value_rmse": 0.00036345087956330974
+        },
+        "type_c": {
+          "policy": {
+            "kl": 3.563004575324918e-05,
+            "l1": 0.007097053468230473,
+            "linf": 0.014116240229873844,
+            "tv": 0.0035485267341152367
+          },
+          "regret": 8.64936144393287e-05,
+          "value_rmse": 0.00011428770529241084
+        }
+      },
+      "parameters": {
+        "cosine_similarity": 0.998866856098175,
+        "max_abs_error": 0.028521955013275146,
+        "relative_rmse": 0.0653780996799469,
+        "rmse": 0.017904529348015785
+      },
+      "policy": {
+        "kl": 9.209366049059051e-05,
+        "l1": 0.01139368444431828,
+        "linf": 0.01890501068690903,
+        "tv": 0.00569684222215914
+      },
+      "projected_reward_normalized_rmse": 0.013205775425983252,
+      "projected_reward_rmse": 0.009693979285657406,
+      "q_normalized_rmse": 0.04888616522863663,
+      "q_rmse": 0.02243743714205972,
+      "raw_bellman_reward_normalized_rmse": null,
+      "raw_bellman_reward_rmse": null,
+      "reward_normalized_rmse": 0.013205775425983252,
+      "reward_rmse": 0.009693979285657406,
+      "value_normalized_rmse": 0.010024386317050714,
+      "value_rmse": 0.019445205084564546
+    },
+    "simulation": {
+      "n_individuals": 2000,
+      "n_periods": 80,
+      "seed": 42,
+      "show_progress": false
+    },
+    "summary": {
+      "converged": true,
+      "convergence_message": "Optimization terminated successfully",
+      "estimation_time": 1.9179730415344238,
+      "goodness_of_fit": {
+        "aic": 349759.5437633558,
+        "bic": 349799.4754797327,
+        "log_likelihood": -174875.7718816779,
+        "num_observations": 160000,
+        "num_parameters": 4,
+        "prediction_accuracy": 0.3451625,
+        "pseudo_r_squared": null
+      },
+      "log_likelihood": -174875.7718816779,
+      "metadata": {
+        "final_constraint_violation": 7.720046824033489e-12,
+        "method": "slsqp",
+        "scipy_message": "Optimization terminated successfully",
+        "scipy_success": true
+      },
+      "method": "MPEC (Su-Judd)",
+      "num_individuals": 2000,
+      "num_iterations": 19,
+      "num_observations": 160000,
+      "parameter_names": [
+        "action_0_intercept",
+        "action_0_progress",
+        "action_1_intercept",
+        "action_1_progress"
+      ],
+      "parameters": [
+        0.08389390259981155,
+        0.5285219550132751,
+        -0.01446096133440733,
+        -0.20051079988479614
+      ],
+      "policy": [
+        [
+          0.37248510122299194,
+          0.32710832357406616,
+          0.3004065752029419
+        ],
+        [
+          0.3847060799598694,
+          0.3249499201774597,
+          0.2903439998626709
+        ],
+        [
+          0.39647310972213745,
+          0.32283568382263184,
+          0.2806912064552307
+        ],
+        [
+          0.40779897570610046,
+          0.3203463852405548,
+          0.2718546390533447
+        ],
+        [
+          0.4186670184135437,
+          0.3173493444919586,
+          0.2639836370944977
+        ],
+        [
+          0.42916056513786316,
+          0.3137737214565277,
+          0.25706571340560913
+        ],
+        [
+          0.43944957852363586,
+          0.3096151053905487,
+          0.25093531608581543
+        ],
+        [
+          0.4497663378715515,
+          0.3049348294734955,
+          0.245298832654953
+        ],
+        [
+          0.4603751003742218,
+          0.29985103011131287,
+          0.23977385461330414
+        ],
+        [
+          0.47153568267822266,
+          0.2945232689380646,
+          0.23394103348255157
+        ],
+        [
+          0.4834601879119873,
+          0.2891327738761902,
+          0.22740702331066132
+        ],
+        [
+          0.4962630569934845,
+          0.2838621735572815,
+          0.21987475454807281
+        ],
+        [
+          0.5099101066589355,
+          0.27887722849845886,
+          0.2112126648426056
+        ],
+        [
+          0.5241789817810059,
+          0.2743130922317505,
+          0.20150795578956604
+        ],
+        [
+          0.5386475324630737,
+          0.27026575803756714,
+          0.19108670949935913
+        ],
+        [
+          0.5527220964431763,
+          0.266788512468338,
+          0.18048939108848572
+        ],
+        [
+          0.5657005906105042,
+          0.2638923227787018,
+          0.17040710151195526
+        ],
+        [
+          0.5768463611602783,
+          0.26154959201812744,
+          0.16160401701927185
+        ],
+        [
+          0.5854347348213196,
+          0.25970080494880676,
+          0.15486449003219604
+        ],
+        [
+          0.5907347202301025,
+          0.2582632601261139,
+          0.15100204944610596
+        ],
+        [
+          0.3333333432674408,
+          0.3333333432674408,
+          0.3333333432674408
+        ]
+      ],
+      "standard_errors": [
+        0.029335500672459602,
+        0.035889558494091034,
+        0.036733172833919525,
+        0.05250173807144165
+      ],
+      "value_function": [
+        22.076251983642578,
+        22.110322952270508,
+        22.144134521484375,
+        22.17612075805664,
+        22.205501556396484,
+        22.232057571411133,
+        22.256193161010742,
+        22.278911590576172,
+        22.301692962646484,
+        22.326318740844727,
+        22.354646682739258,
+        22.388330459594727,
+        22.428524017333984,
+        22.47555923461914,
+        22.528661727905273,
+        22.585716247558594,
+        22.643198013305664,
+        22.696239471435547,
+        22.73883819580078,
+        22.764095306396484,
+        21.972246170043945
+      ]
+    }
+  }
+}

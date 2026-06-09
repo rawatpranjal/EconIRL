@@ -4,6 +4,10 @@ Verifies that MPEC recovers the same parameters as NFXP, satisfies the
 Bellman constraint at convergence, and produces valid standard errors.
 """
 
+import json
+import math
+from pathlib import Path
+
 import numpy as np
 import jax.numpy as jnp
 import pytest
@@ -14,6 +18,65 @@ from econirl.estimation.mpec import MPECEstimator, MPECConfig
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.simulation import simulate_panel
 from econirl.core.bellman import SoftBellmanOperator
+
+
+def test_mpec_primer_json_artifact_has_release_gates():
+    """MPEC primer JSON should carry the public release evidence."""
+
+    def reject_constant(value):
+        raise ValueError(value)
+
+    artifact = (
+        Path(__file__).resolve().parents[1]
+        / "papers"
+        / "econirl_package"
+        / "primers"
+        / "mpec"
+        / "mpec_results.json"
+    )
+
+    assert artifact.exists()
+
+    payload = json.loads(
+        artifact.read_text(encoding="utf-8"),
+        parse_constant=reject_constant,
+    )
+    result = payload["result"]
+    summary = result["summary"]
+    metrics = result["metrics"]
+    gate_names = {gate["name"] for gate in result["gates"]}
+    counterfactuals = metrics["counterfactuals"]
+
+    assert payload["estimator"] == "MPEC"
+    assert payload["release_status"] == "Certified"
+    assert payload["primary_cell_id"] == "canonical_low_action"
+    assert summary["converged"] is True
+    assert summary["num_observations"] > 0
+    assert summary["estimation_time"] > 0
+    assert summary["metadata"]["final_constraint_violation"] < 1e-6
+    assert metrics["parameters"]["relative_rmse"] < 0.15
+    assert metrics["policy"]["tv"] < 0.03
+    assert all(gate["passed"] for gate in result["gates"])
+    assert set(counterfactuals) == {"type_a", "type_b", "type_c"}
+    for cf_metrics in counterfactuals.values():
+        assert math.isfinite(cf_metrics["regret"])
+        assert math.isfinite(cf_metrics["value_rmse"])
+        assert math.isfinite(cf_metrics["policy"]["tv"])
+        assert cf_metrics["regret"] < 0.05
+        assert cf_metrics["policy"]["tv"] < 0.03
+    assert {
+        "converged",
+        "constraint_violation",
+        "standard_errors_finite",
+        "parameter_cosine",
+        "parameter_relative_rmse",
+        "policy_tv",
+        "value_rmse",
+        "q_rmse",
+        "type_a_regret",
+        "type_b_regret",
+        "type_c_regret",
+    } <= gate_names
 
 
 @pytest.fixture

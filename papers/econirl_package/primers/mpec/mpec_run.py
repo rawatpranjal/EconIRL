@@ -14,8 +14,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
+import math
 import sys
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -24,21 +25,23 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 TEX_OUT = HERE / "mpec_results.tex"
+JSON_OUT = HERE / "mpec_results.json"
 DEFAULT_OUTPUT_DIR = Path("/tmp/econirl_mpec_primer_known_truth")
 CELL_ID = "canonical_low_action"
 ESTIMATOR = "MPEC"
+PAPER_TARGET = "Su-Judd constrained maximum likelihood for tabular DDC"
+RELEASE_STATUS = "Certified"
 
-for path in (ROOT, ROOT / "src"):
+for path in (HERE.parent, ROOT, ROOT / "src"):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
+from validation_display import validation_context  # noqa: E402
 from experiments.known_truth import (  # noqa: E402
     build_known_truth_dgp,
     get_cell,
-    run_estimator,
-    simulate_known_truth_panel,
-    stable_hash,
-    write_json,
+    run_cell_estimator,
+    to_jsonable,
 )
 
 
@@ -56,63 +59,70 @@ def main() -> None:
     print(f"  estimator: {ESTIMATOR}")
     print(f"  output_dir: {args.output_dir}")
 
-    cell = get_cell(args.cell_id)
-    dgp = build_known_truth_dgp(cell.dgp_config)
-    simulation_config = replace(
-        cell.simulation_config,
-        show_progress=args.show_progress,
-    )
-    panel = simulate_known_truth_panel(dgp, simulation_config)
-
-    main_run = run_estimator(
+    run_dir = run_cell_estimator(
+        args.cell_id,
         ESTIMATOR,
-        dgp,
-        panel,
+        args.output_dir,
         smoke=False,
+        show_progress=args.show_progress,
         verbose=args.verbose,
     )
+    result_path = run_dir / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
 
-    payload = {
-        "cell": cell,
-        "simulation": simulation_config,
-        "estimator": ESTIMATOR,
-        "diagnostics": main_run.diagnostics,
-        "compatibility": main_run.compatibility,
-        "summary": main_run.summary,
-        "metrics": main_run.metrics,
-        "gates": main_run.gates,
-    }
-    run_hash = stable_hash(
-        {
-            "cell": cell.dgp_config.to_dict(),
-            "simulation": simulation_config,
-            "estimator": ESTIMATOR,
-            "primer": "mpec",
-        }
+    cell = get_cell(args.cell_id)
+    dgp = build_known_truth_dgp(cell.dgp_config)
+    JSON_OUT.write_text(
+        json.dumps(compact_payload(result), indent=2, sort_keys=True, allow_nan=False)
+        + "\n",
+        encoding="utf-8",
     )
-    run_dir = args.output_dir / f"{args.cell_id}_mpec_primer_{run_hash}"
-    write_json(run_dir / "result.json", payload)
-
-    tex = render_results_tex(payload, dgp)
+    tex = render_results_tex(result, dgp)
     TEX_OUT.write_text(tex, encoding="utf-8")
 
-    print(f"  result: {run_dir / 'result.json'}")
+    print(f"  result: {result_path}")
+    print(f"  wrote: {JSON_OUT}")
     print(f"  wrote: {TEX_OUT}")
 
 
-def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
-    summary = payload["summary"]
-    diagnostics = payload["diagnostics"]
-    metrics = payload["metrics"]
-    gates = payload["gates"]
-    simulation = payload["simulation"]
+def compact_payload(result: dict[str, Any]) -> dict[str, Any]:
+    """Return the repo-local machine-readable release artifact."""
 
-    names = list(summary.parameter_names)
-    estimates = np.asarray(summary.parameters, dtype=float)
-    standard_errors = np.asarray(summary.standard_errors, dtype=float)
+    return {
+        "estimator": ESTIMATOR,
+        "paper_target": PAPER_TARGET,
+        "release_status": RELEASE_STATUS,
+        "primary_cell_id": result.get("cell", {}).get("cell_id", CELL_ID),
+        "result": _finite_jsonable(result),
+    }
+
+
+def _finite_jsonable(value: Any) -> Any:
+    """Return strict-JSON-compatible values for public artifacts."""
+
+    value = to_jsonable(value)
+    if isinstance(value, dict):
+        return {key: _finite_jsonable(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_finite_jsonable(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+def render_results_tex(result: dict[str, Any], dgp: Any) -> str:
+    summary = result["summary"]
+    diagnostics = result["diagnostics"]
+    metrics = result["metrics"]
+    gates = result["gates"]
+    simulation = result["simulation"]
+    metadata = summary["metadata"]
+
+    names = list(summary["parameter_names"])
+    estimates = np.asarray(summary["parameters"], dtype=float)
+    standard_errors = np.asarray(summary["standard_errors"], dtype=float)
     truth = np.asarray(dgp.homogeneous_parameters, dtype=float)
     errors = estimates - truth
-    metadata = summary.metadata
 
     lines: list[str] = []
     add = lines.append
@@ -120,12 +130,15 @@ def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
     add("% Auto-generated by mpec_run.py. Do not edit by hand.")
     add("% Known-truth DGP cell: canonical_low_action")
     add("")
-    add(r"\section{Generated Validation Results}")
+    add(r"\section{Known-Truth Validation Results}")
     add(
-        "This section is generated by \\texttt{mpec\\_run.py} from the "
-        "\\texttt{experiments.known\\_truth} harness and the canonical "
-        "known-truth DGP."
+        "This validation uses the low-dimensional action-dependent DGP with "
+        "known reward, value, policy, and counterfactual oracle objects."
     )
+    add("")
+    add(r"\subsection{Validation Design Context}")
+    cell_id = result.get("cell", {}).get("cell_id", CELL_ID)
+    add(validation_context([cell_id]))
     add("")
 
     add(r"\subsection{Pre-Estimation Checks}")
@@ -137,26 +150,26 @@ def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
     add(r"Check & Value & Status \\")
     add(r"\midrule")
     add(
-        f"Feature rank & {diagnostics.feature_rank} / "
-        f"{diagnostics.num_features} & {status(not diagnostics.errors)} \\\\"
+        f"Feature rank & {diagnostics['feature_rank']} / "
+        f"{diagnostics['num_features']} & {status(not diagnostics['errors'])} \\\\"
     )
-    add(f"Feature condition number & {fmt(diagnostics.condition_number, 3)} & pass \\\\")
+    add(f"Feature condition number & {fmt(diagnostics['condition_number'], 3)} & pass \\\\")
     add(
         "Transition row error & "
-        f"${sci(diagnostics.max_transition_row_error)}$ & pass \\\\"
+        f"${sci(diagnostics['max_transition_row_error'])}$ & pass \\\\"
     )
     add(
-        f"Observed states & {diagnostics.observed_states} / "
-        f"{diagnostics.num_states} & pass \\\\"
+        f"Observed states & {diagnostics['observed_states']} / "
+        f"{diagnostics['num_states']} & pass \\\\"
     )
     add(
-        f"State-action coverage & {fmt(diagnostics.state_action_coverage, 3)} "
+        f"State-action coverage & {fmt(diagnostics['state_action_coverage'], 3)} "
         "& pass \\\\"
     )
-    shares = ", ".join(fmt(value, 3) for value in diagnostics.action_shares)
+    shares = ", ".join(fmt(value, 3) for value in diagnostics["action_shares"])
     add(f"Action shares & {shares} & pass \\\\")
-    add(f"Minimum action share & {fmt(diagnostics.min_action_share, 3)} & pass \\\\")
-    add(f"Exit/absorbing anchor & {tf(diagnostics.anchor_valid)} & pass \\\\")
+    add(f"Minimum action share & {fmt(diagnostics['min_action_share'], 3)} & pass \\\\")
+    add(f"Exit/absorbing anchor & {tf(diagnostics['anchor_valid'])} & pass \\\\")
     add(r"\bottomrule")
     add(r"\end{tabular}")
     add(r"\end{table}")
@@ -165,9 +178,9 @@ def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
     add(r"\subsection{Estimator Fit}")
     add(
         "The medium-scale validation run uses "
-        f"{int(simulation.n_individuals):,} individuals, "
-        f"{int(simulation.n_periods):,} periods per individual, and "
-        f"{int(summary.num_observations):,} observations."
+        f"{int(simulation['n_individuals']):,} individuals, "
+        f"{int(simulation['n_periods']):,} periods per individual, and "
+        f"{int(summary['num_observations']):,} observations."
     )
     add("")
     add(r"\begin{table}[H]")
@@ -177,10 +190,10 @@ def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
     add(r"\toprule")
     add(r"Quantity & Value \\")
     add(r"\midrule")
-    add(f"Converged & {tf(summary.converged)} \\\\")
-    add(f"SQP iterations & {int(summary.num_iterations)} \\\\")
-    add(f"Log-likelihood & {fmt(summary.log_likelihood, 4)} \\\\")
-    add(f"Estimation time & {fmt(summary.estimation_time, 2)} seconds \\\\")
+    add(f"Converged & {tf(summary['converged'])} \\\\")
+    add(f"SQP iterations & {int(summary['num_iterations'])} \\\\")
+    add(f"Log-likelihood & {fmt(summary['log_likelihood'], 4)} \\\\")
+    add(f"Estimation time & {fmt(summary['estimation_time'], 2)} seconds \\\\")
     add(f"Solver & {tex_text(metadata['method'])} \\\\")
     add(f"SciPy success & {tf(metadata['scipy_success'])} \\\\")
     add(
@@ -221,18 +234,18 @@ def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
     add(r"\toprule")
     add(r"Metric & Value \\")
     add(r"\midrule")
-    add(f"Parameter RMSE & {fmt(parameter_metrics.rmse, 6)} \\\\")
-    add(f"Parameter relative RMSE & {fmt(parameter_metrics.relative_rmse, 6)} \\\\")
+    add(f"Parameter RMSE & {fmt(parameter_metrics['rmse'], 6)} \\\\")
+    add(f"Parameter relative RMSE & {fmt(parameter_metrics['relative_rmse'], 6)} \\\\")
     add(
         "Parameter cosine similarity & "
-        f"{fmt(parameter_metrics.cosine_similarity, 6)} \\\\"
+        f"{fmt(parameter_metrics['cosine_similarity'], 6)} \\\\"
     )
     add(f"Reward RMSE & {fmt(metrics['reward_rmse'], 6)} \\\\")
     add(f"Value RMSE & {fmt(metrics['value_rmse'], 6)} \\\\")
     add(f"Q RMSE & {fmt(metrics['q_rmse'], 6)} \\\\")
-    add(f"Policy KL & ${sci(policy_metrics.kl)}$ \\\\")
-    add(f"Policy total variation & {fmt(policy_metrics.tv, 6)} \\\\")
-    add(f"Policy max state L1 & {fmt(policy_metrics.linf, 6)} \\\\")
+    add(f"Policy KL & ${sci(policy_metrics['kl'])}$ \\\\")
+    add(f"Policy total variation & {fmt(policy_metrics['tv'], 6)} \\\\")
+    add(f"Policy max state L1 & {fmt(policy_metrics['linf'], 6)} \\\\")
     add(r"\bottomrule")
     add(r"\end{tabular}")
     add(r"\end{table}")
@@ -247,8 +260,8 @@ def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
     add(r"\midrule")
     for gate in gates:
         add(
-            f"{tex_text(gate.name)} & {gate_threshold(gate)} & "
-            f"{gate_value(gate.value)} & {status(gate.passed)} \\\\"
+            f"{tex_text(gate['name'])} & {gate_threshold(gate)} & "
+            f"{gate_value(gate['value'])} & {status(gate['passed'])} \\\\"
         )
     add(r"\bottomrule")
     add(r"\end{tabular}")
@@ -270,8 +283,9 @@ def render_results_tex(payload: dict[str, Any], dgp: Any) -> str:
     ):
         cf = metrics["counterfactuals"][kind]
         add(
-            f"{label} & {fmt(cf.policy.tv, 6)} & ${sci(cf.policy.kl)}$ & "
-            f"{fmt(cf.value_rmse, 6)} & {fmt(cf.regret, 6)} \\\\"
+            f"{label} & {fmt(cf['policy']['tv'], 6)} & "
+            f"${sci(cf['policy']['kl'])}$ & "
+            f"{fmt(cf['value_rmse'], 6)} & {fmt(cf['regret'], 6)} \\\\"
         )
     add(r"\bottomrule")
     add(r"\end{tabular}")
@@ -314,11 +328,11 @@ def tex_text(value: str) -> str:
     )
 
 
-def gate_threshold(gate: Any) -> str:
-    if gate.operator == "is":
-        return tf(gate.threshold)
-    operator = r"$\leq$" if gate.operator == "<=" else r"$\geq$"
-    return f"{operator} {gate_value(gate.threshold)}"
+def gate_threshold(gate: dict[str, Any]) -> str:
+    if gate["operator"] == "is":
+        return tf(gate["threshold"])
+    operator = r"$\leq$" if gate["operator"] == "<=" else r"$\geq$"
+    return f"{operator} {gate_value(gate['threshold'])}"
 
 
 def gate_value(value: Any) -> str:

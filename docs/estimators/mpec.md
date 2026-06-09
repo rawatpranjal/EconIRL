@@ -1,13 +1,12 @@
 # MPEC
 
-## Overview
+Mathematical programming with equilibrium constraints estimates the same
+structural dynamic discrete choice likelihood as NFXP, but it treats the
+Bellman fixed point as an explicit equality constraint. The optimizer solves
+jointly for reward parameters and value functions.
 
-MPEC estimates the same structural dynamic discrete choice likelihood as NFXP,
-but it treats the Bellman fixed point as an explicit equality constraint. The
-optimizer solves jointly for reward parameters and value functions.
-
-MPEC is useful as a constrained-optimization counterpart to NFXP when the
-Bellman constraint dimension is moderate.
+Use MPEC as a constrained-optimization counterpart to NFXP when the state space
+is moderate and you want to inspect Bellman constraint violations directly.
 
 ## When to Use
 
@@ -43,15 +42,26 @@ print(summary.parameters)
 The lower-level API expects an `econirl.core.Panel`, a utility object, a
 `DDCProblem`, and transition matrices.
 
-## Validation Status
+## What Is Certified
 
-MPEC passes the package known-truth gates on the low-dimensional
-action-dependent DGP.
+MPEC is certified on the low-dimensional action-dependent known-truth DGP. The
+validation cell has known rewards, transitions, policies, values, Q functions,
+and Type A, Type B, and Type C counterfactual oracles. The machine-readable
+artifact and generated primer results are the release source of truth.
 
-Here, low-dimensional action-dependent DGP means a compact finite-state dynamic
-choice benchmark with action-specific rewards, known transitions, and known
-reward, policy, value, and counterfactual truth.
+| Evidence | Current state |
+| --- | --- |
+| Release status | Certified. |
+| Primary cell | `canonical_low_action`. |
+| Machine-readable artifact | [mpec_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json). |
+| Bellman constraint gate | Passes with final violation `7.72e-12`. |
+| Counterfactual gates | Type A, Type B, and Type C all pass. |
+| Public example | Uses `MPEC` with the tabular DDC lower-level API. |
 
-## Further Reading
+## MPEC Guide
 
-- Primer artifact: [mpec_results.tex](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.tex)
+```{toctree}
+:maxdepth: 2
+
+mpec/validation
+```
