@@ -65,55 +65,55 @@ that anchors the reward level.
 
 | Quantity | Value |
 | --- | ---: |
-| NPL delta criterion met | false |
-| NPL iterations completed | 10 |
-| Log likelihood | -174875.9531 |
-| Estimation time | 20.77 seconds |
+| NPL delta criterion met | true |
+| NPL iterations completed | 8 |
+| Log likelihood | -174875.9375 |
+| Estimation time | 16.31 seconds |
 | Standard errors finite | true |
 
-The convergence flag is false because the hard validation uses a fixed K=10
-NPL run. The hard gate checks that at least five NPL iterations completed and
+The fitted run met the NPL delta criterion before the maximum of ten policy
+updates. The hard gate checks that at least five NPL iterations completed and
 that recovery metrics pass.
 
 ## Parameter Recovery
 
 | Parameter | Truth | Estimate | SE | Error |
 | --- | ---: | ---: | ---: | ---: |
-| `action_0_intercept` | 0.100000 | 0.083895 | 0.035995 | -0.016105 |
-| `action_0_progress` | 0.500000 | 0.528519 | 0.039855 | 0.028519 |
-| `action_1_intercept` | 0.000000 | -0.014460 | 0.117503 | -0.014460 |
-| `action_1_progress` | -0.200000 | -0.200513 | 0.158931 | -0.000513 |
+| `action_0_intercept` | 0.100000 | 0.083896 | 0.009450 | -0.016104 |
+| `action_0_progress` | 0.500000 | 0.528517 | 0.009222 | 0.028517 |
+| `action_1_intercept` | 0.000000 | -0.014458 | 0.026148 | -0.014458 |
+| `action_1_progress` | -0.200000 | -0.200517 | 0.020787 | -0.000517 |
 
 ## Recovery Metrics
 
 | Metric | Value |
 | --- | ---: |
-| Parameter RMSE | 0.017903 |
-| Parameter relative RMSE | 0.065372 |
+| Parameter RMSE | 0.017902 |
+| Parameter relative RMSE | 0.065367 |
 | Parameter cosine similarity | 0.998867 |
 | Reward RMSE | 0.009694 |
-| Value RMSE | 0.019438 |
-| Q RMSE | 0.022432 |
+| Value RMSE | 0.019436 |
+| Q RMSE | 0.022430 |
 | Policy KL | 9.21e-5 |
 | Policy total variation | 0.005697 |
-| Policy max state L1 | 0.018905 |
+| Policy max state L1 | 0.018902 |
 
 In this finite sample, the one-step estimate already recovers the policy well
 because empirical CCP support is strong. The certified release claim uses the
-K=10 NPL row because it is the structural CCP counterpart to the NFXP fixed
-point.
+NPL run with a ten-iteration cap because it is the structural CCP counterpart
+to the NFXP fixed point.
 
 ## Hard Gates
 
 | Gate | Threshold | Value | Status |
 | --- | --- | ---: | --- |
-| NPL iterations | at least 5 | 10 | pass |
+| NPL iterations | at least 5 | 8 | pass |
 | Standard errors finite | true | true | pass |
 | Parameter cosine | at least 0.98 | 0.998867 | pass |
-| Parameter relative RMSE | at most 0.15 | 0.065372 | pass |
+| Parameter relative RMSE | at most 0.15 | 0.065367 | pass |
 | Policy total variation | at most 0.03 | 0.005697 | pass |
-| Value RMSE | at most 0.10 | 0.019438 | pass |
-| Q RMSE | at most 0.10 | 0.022432 | pass |
+| Value RMSE | at most 0.10 | 0.019436 | pass |
+| Q RMSE | at most 0.10 | 0.022430 | pass |
 | Type A regret | at most 0.05 | 0.000213 | pass |
 | Type B regret | at most 0.05 | 0.000362 | pass |
 | Type C regret | at most 0.05 | 0.000086 | pass |

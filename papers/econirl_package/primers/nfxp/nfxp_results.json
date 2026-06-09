@@ -1,0 +1,364 @@
+{
+  "estimator": "NFXP",
+  "paper_target": "Exact nested fixed-point maximum likelihood for tabular DDC",
+  "primary_cell_id": "canonical_low_action",
+  "release_status": "Certified",
+  "result": {
+    "cell": {
+      "cell_id": "canonical_low_action",
+      "description": "Universal DGP preset: low-dimensional action-dependent structural benchmark.",
+      "dgp_config": {
+        "discount_factor": 0.95,
+        "exit_action": 2,
+        "feature_scale": 1.0,
+        "heterogeneity": "none",
+        "high_reward_features": 24,
+        "high_state_dim": 12,
+        "initial_state_mode": "uniform_regular",
+        "num_actions": 3,
+        "num_regular_states": 20,
+        "num_segments": 2,
+        "reward_dim": "low",
+        "reward_mode": "action_dependent",
+        "scale_parameter": 1.0,
+        "seed": 42,
+        "state_mode": "low_dim",
+        "transition_noise": 0.05
+      },
+      "simulation_config": {
+        "n_individuals": 2000,
+        "n_periods": 80,
+        "seed": 42,
+        "show_progress": false
+      }
+    },
+    "compatibility": {
+      "compatible": true,
+      "errors": [],
+      "estimator": "NFXP",
+      "warnings": []
+    },
+    "diagnostics": {
+      "action_shares": [
+        0.3451625,
+        0.329925,
+        0.3249125
+      ],
+      "anchor_valid": true,
+      "condition_number": 4.512181117222974,
+      "errors": [],
+      "feature_rank": 4,
+      "is_action_dependent": true,
+      "max_transition_row_error": 2.421438694000244e-08,
+      "min_action_share": 0.3249125,
+      "min_positive_ccp": 0.15275590551181104,
+      "num_features": 4,
+      "num_states": 21,
+      "observed_states": 21,
+      "single_action_states": 0,
+      "state_action_coverage": 1.0,
+      "warnings": []
+    },
+    "estimator": "NFXP",
+    "exception": null,
+    "gates": [
+      {
+        "name": "converged",
+        "operator": "is",
+        "passed": true,
+        "threshold": true,
+        "value": true
+      },
+      {
+        "name": "parameter_cosine",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.98,
+        "value": 0.9988668874531912
+      },
+      {
+        "name": "parameter_relative_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.15,
+        "value": 0.06537783513119098
+      },
+      {
+        "name": "policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.005696834663824405
+      },
+      {
+        "name": "value_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.019445307599481782
+      },
+      {
+        "name": "type_a_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.0002127167596803714
+      },
+      {
+        "name": "type_b_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.0003622348659171704
+      },
+      {
+        "name": "type_c_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 8.649176191920821e-05
+      }
+    ],
+    "metrics": {
+      "anchor_projected_reward_normalized_rmse": 0.013205703137642593,
+      "anchor_projected_reward_rmse": 0.012165858159127477,
+      "counterfactuals": {
+        "type_a": {
+          "policy": {
+            "kl": 7.56432815804979e-05,
+            "l1": 0.01021861837746116,
+            "linf": 0.018139755212044584,
+            "tv": 0.00510930918873058
+          },
+          "regret": 0.0002127167596803714,
+          "value_rmse": 0.00023770681967484562
+        },
+        "type_b": {
+          "policy": {
+            "kl": 8.204293751907378e-05,
+            "l1": 0.010914624732509606,
+            "linf": 0.01767995747897272,
+            "tv": 0.005457312366254803
+          },
+          "regret": 0.0003622348659171704,
+          "value_rmse": 0.00036344689892554117
+        },
+        "type_c": {
+          "policy": {
+            "kl": 3.562937927420677e-05,
+            "l1": 0.007096991019458939,
+            "linf": 0.014116074509625598,
+            "tv": 0.0035484955097294696
+          },
+          "regret": 8.649176191920821e-05,
+          "value_rmse": 0.00011428498247031823
+        }
+      },
+      "parameters": {
+        "cosine_similarity": 0.9988668874531912,
+        "max_abs_error": 0.028521728749146935,
+        "relative_rmse": 0.06537783513119098,
+        "rmse": 0.017904456254238275
+      },
+      "policy": {
+        "kl": 9.20920667760766e-05,
+        "l1": 0.01139366932764881,
+        "linf": 0.018905040579069887,
+        "tv": 0.005696834663824405
+      },
+      "projected_reward_normalized_rmse": 0.013205703137642593,
+      "projected_reward_rmse": 0.00969398781926228,
+      "q_normalized_rmse": 0.04888591133962119,
+      "q_rmse": 0.02243766434300749,
+      "raw_bellman_reward_normalized_rmse": null,
+      "raw_bellman_reward_rmse": null,
+      "reward_normalized_rmse": 0.013205703137642593,
+      "reward_rmse": 0.00969398781926228,
+      "value_normalized_rmse": 0.010024428630066671,
+      "value_rmse": 0.019445307599481782
+    },
+    "simulation": {
+      "n_individuals": 2000,
+      "n_periods": 80,
+      "seed": 42,
+      "show_progress": false
+    },
+    "summary": {
+      "converged": true,
+      "convergence_message": "Converged",
+      "estimation_time": 5.896517753601074,
+      "goodness_of_fit": {
+        "aic": 349759.54376335576,
+        "bic": 349799.4754797326,
+        "log_likelihood": -174875.77188167788,
+        "num_observations": 160000,
+        "num_parameters": 4,
+        "prediction_accuracy": 0.3451625,
+        "pseudo_r_squared": null
+      },
+      "log_likelihood": -174875.77188167788,
+      "metadata": {
+        "final_inner_iterations": 139,
+        "inner_solver": "hybrid",
+        "inner_tol": 1e-12,
+        "num_function_evals": 80,
+        "num_inner_iterations": 11259,
+        "optimizer": "BHHH",
+        "outer_tol": 1e-06,
+        "switch_tol": 0.001
+      },
+      "method": "NFXP (Nested Fixed Point)",
+      "num_individuals": 2000,
+      "num_iterations": 12,
+      "num_observations": 160000,
+      "parameter_names": [
+        "action_0_intercept",
+        "action_0_progress",
+        "action_1_intercept",
+        "action_1_progress"
+      ],
+      "parameters": [
+        0.0838939770715154,
+        0.5285217287491469,
+        -0.01446113810947556,
+        -0.20051055778230953
+      ],
+      "policy": [
+        [
+          0.3724851372190973,
+          0.32710827263188036,
+          0.3004065901490223
+        ],
+        [
+          0.38470611086550716,
+          0.3249498758889359,
+          0.29034401324555686
+        ],
+        [
+          0.39647314166429354,
+          0.3228356283637421,
+          0.28069122997196444
+        ],
+        [
+          0.4077990010456915,
+          0.32034633457994016,
+          0.27185466437436817
+        ],
+        [
+          0.4186670359504572,
+          0.31734931211762957,
+          0.2639836519319132
+        ],
+        [
+          0.4291605769529886,
+          0.31377369222082724,
+          0.2570657308261842
+        ],
+        [
+          0.4394495750105792,
+          0.309615081211597,
+          0.2509353437778237
+        ],
+        [
+          0.44976634487911354,
+          0.30493479570073007,
+          0.24529885942015628
+        ],
+        [
+          0.46037510040359636,
+          0.2998510195568649,
+          0.2397738800395387
+        ],
+        [
+          0.4715356709614283,
+          0.2945232609395739,
+          0.23394106809899765
+        ],
+        [
+          0.4834601698153333,
+          0.2891327750435429,
+          0.2274070551411239
+        ],
+        [
+          0.49626304357726714,
+          0.28386216773050016,
+          0.21987478869223262
+        ],
+        [
+          0.5099100885708943,
+          0.2788772161033212,
+          0.21121269532578438
+        ],
+        [
+          0.5241789260887804,
+          0.27431308071981925,
+          0.20150799319140036
+        ],
+        [
+          0.5386474777408133,
+          0.2702657676691503,
+          0.19108675459003624
+        ],
+        [
+          0.5527220477450671,
+          0.26678851651384305,
+          0.18048943574108997
+        ],
+        [
+          0.5657005252246737,
+          0.26389233178941657,
+          0.17040714298590967
+        ],
+        [
+          0.576846320635785,
+          0.2615496095570679,
+          0.161604069807147
+        ],
+        [
+          0.5854346406834489,
+          0.25970082038186915,
+          0.15486453893468202
+        ],
+        [
+          0.590734631649908,
+          0.2582632720759001,
+          0.15100209627419195
+        ],
+        [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ]
+      ],
+      "standard_errors": [
+        0.02933543175458908,
+        0.035889483988285065,
+        0.036733195185661316,
+        0.05250178277492523
+      ],
+      "value_function": [
+        22.076251906114024,
+        22.11032229116647,
+        22.144133524216628,
+        22.17612116233424,
+        22.205501586947644,
+        22.232056949512938,
+        22.25619345223827,
+        22.278911462156977,
+        22.301692450953997,
+        22.32631952576777,
+        22.35464715759426,
+        22.388330521654865,
+        22.42852310320663,
+        22.47555971463259,
+        22.5286612262396,
+        22.585716515366304,
+        22.643198231228194,
+        22.696239433456192,
+        22.73883797122414,
+        22.764095044347126,
+        21.972245773362204
+      ]
+    }
+  }
+}

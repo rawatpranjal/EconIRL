@@ -28,6 +28,9 @@ families against oracle solutions.
 
 ## Certified Results
 
+These rows come from the same known-truth artifact used on the
+[validation page](validation.md).
+
 | Counterfactual | Policy TV | Policy KL | Value RMSE | Regret |
 | --- | ---: | ---: | ---: | ---: |
 | Type A | 0.005109 | 7.56e-5 | 0.000238 | 0.000213 |

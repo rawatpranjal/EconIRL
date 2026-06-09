@@ -17,6 +17,8 @@ starts. Run these checks before treating a result as structural evidence.
 ## Canonical Validation Checks
 
 The certified CCP artifact records these pre-estimation checks.
+See the [validation page](validation.md) for the generator script, rendered
+table source, and JSON artifact.
 
 | Check | Value | Status |
 | --- | ---: | --- |

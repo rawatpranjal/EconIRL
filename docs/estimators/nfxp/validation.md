@@ -68,7 +68,7 @@ that anchors the reward level.
 | Converged | true |
 | Outer iterations | 12 |
 | Log likelihood | -174875.7719 |
-| Estimation time | 5.41 seconds |
+| Estimation time | 5.90 seconds |
 | Function evaluations | 80 |
 | Total inner iterations | 11259 |
 | Final inner iterations | 139 |
