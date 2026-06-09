@@ -1,0 +1,66 @@
+# Quick Start
+
+The public wrapper accepts dataframe-style panel data. Create a model, call
+`fit`, and read the fitted sklearn-style attributes.
+
+```python
+from econirl.datasets import load_rust_bus
+from econirl import SEES
+
+df = load_rust_bus()
+
+model = SEES(
+    n_states=90,
+    n_actions=2,
+    discount=0.9999,
+    utility="linear_cost",
+    basis_type="fourier",
+    basis_dim=8,
+    penalty_weight=0.01,
+    max_iter=500,
+)
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
+
+print(model.params_)
+print(model.se_)
+print(model.policy_.shape)
+print(model.alpha_.shape)
+```
+
+The fitted wrapper exposes the structural parameter estimates, standard
+errors, estimated policy, value function, transition estimate, and sieve
+coefficients.
+
+| Attribute | Meaning |
+| --- | --- |
+| `params_` | Estimated structural reward parameters. |
+| `se_` | Standard errors for reward parameters. |
+| `policy_` | Estimated action probabilities by state. |
+| `value_` | Estimated value function by state. |
+| `alpha_` | Estimated sieve coefficients. |
+| `transitions_` | First-stage transition matrix used by the wrapper. |
+
+## Lower-Level Control
+
+Use `econirl.estimation.sees.SEESEstimator` when the model already has
+package-native objects or when the validation surface needs exact control over
+the basis and penalty.
+
+```python
+from econirl.estimation.sees import SEESEstimator
+
+estimator = SEESEstimator(
+    basis_type="bspline",
+    basis_dim=21,
+    penalty_weight=100.0,
+    max_iter=1000,
+    compute_se=True,
+)
+summary = estimator.estimate(panel, utility, problem, transitions)
+
+print(summary.parameters)
+print(summary.metadata["bellman_violation"])
+```
+
+The known-truth validation uses the lower-level API because it supplies the
+true DDC problem, transition tensor, and reward specification directly.

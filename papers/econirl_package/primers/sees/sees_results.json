@@ -1,6 +1,308 @@
 {
   "estimator": "SEES",
+  "paper_target": "Sieve value approximation for structural dynamic discrete choice, validated on the encoded-state known-truth DGP.",
   "primary_cell_id": "canonical_high_action",
+  "release_status": "certified",
+  "result": {
+    "cell_id": "canonical_high_action",
+    "compatibility": {
+      "compatible": true,
+      "errors": [],
+      "estimator": "SEES",
+      "warnings": []
+    },
+    "diagnostics": {
+      "action_shares": [
+        0.33325625,
+        0.38551875,
+        0.281225
+      ],
+      "anchor_valid": true,
+      "condition_number": 1.376810450603823,
+      "errors": [],
+      "feature_rank": 32,
+      "is_action_dependent": true,
+      "max_transition_row_error": 2.421438694000244e-08,
+      "min_action_share": 0.281225,
+      "min_positive_ccp": 0.0005754843660080568,
+      "num_features": 32,
+      "num_states": 81,
+      "observed_states": 81,
+      "single_action_states": 0,
+      "state_action_coverage": 0.9588477366255144,
+      "warnings": []
+    },
+    "estimator": "SEES",
+    "gates": [
+      {
+        "name": "bellman_violation",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 3.0825301173820208e-06
+      },
+      {
+        "name": "standard_errors_finite",
+        "operator": "is",
+        "passed": true,
+        "threshold": true,
+        "value": true
+      },
+      {
+        "name": "parameter_cosine",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.99,
+        "value": 0.9999548191139602
+      },
+      {
+        "name": "parameter_relative_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.15,
+        "value": 0.009527906242059427
+      },
+      {
+        "name": "reward_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.004432482976170773
+      },
+      {
+        "name": "policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.02,
+        "value": 0.0021170444560423083
+      },
+      {
+        "name": "value_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.03783648924656937
+      },
+      {
+        "name": "q_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.031479876355587286
+      },
+      {
+        "name": "type_a_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.01,
+        "value": 0.00011329423156231024
+      },
+      {
+        "name": "type_b_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.01,
+        "value": 0.00018343574922296315
+      },
+      {
+        "name": "type_c_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.01,
+        "value": 1.3505573504200825e-05
+      }
+    ],
+    "metrics": {
+      "anchor_projected_reward_normalized_rmse": 0.007683908101929882,
+      "anchor_projected_reward_rmse": 0.005462484551564325,
+      "counterfactuals": {
+        "type_a": {
+          "policy": {
+            "kl": 2.782098252360862e-05,
+            "l1": 0.004192427013935183,
+            "linf": 0.02773052664766673,
+            "tv": 0.0020962135069675916
+          },
+          "regret": 0.00011329423156231024,
+          "value_rmse": 0.00023449530273864265
+        },
+        "type_b": {
+          "policy": {
+            "kl": 3.66789227862109e-05,
+            "l1": 0.004841559485908001,
+            "linf": 0.02354700817851893,
+            "tv": 0.0024207797429540005
+          },
+          "regret": 0.00018343574922296315,
+          "value_rmse": 0.0003085294056690557
+        },
+        "type_c": {
+          "policy": {
+            "kl": 6.909881171603242e-06,
+            "l1": 0.0024618148884905924,
+            "linf": 0.00864881162434089,
+            "tv": 0.0012309074442452962
+          },
+          "regret": 1.3505573504200825e-05,
+          "value_rmse": 2.684568232512872e-05
+        }
+      },
+      "parameters": {
+        "cosine_similarity": 0.9999548191139602,
+        "max_abs_error": 0.0031431610162114335,
+        "relative_rmse": 0.009527906242059427,
+        "rmse": 0.0009972236476341507
+      },
+      "policy": {
+        "kl": 2.8884406360947983e-05,
+        "l1": 0.004234088912084617,
+        "linf": 0.024416228973031723,
+        "tv": 0.0021170444560423083
+      },
+      "projected_reward_normalized_rmse": 0.007683908101929882,
+      "projected_reward_rmse": 0.004432482976170773,
+      "q_normalized_rmse": 0.010087214369227028,
+      "q_rmse": 0.031479876355587286,
+      "raw_bellman_reward_normalized_rmse": null,
+      "raw_bellman_reward_rmse": null,
+      "reward_normalized_rmse": 0.007683908101929882,
+      "reward_rmse": 0.004432482976170773,
+      "value_normalized_rmse": 0.010595061055293209,
+      "value_rmse": 0.03783648924656937
+    },
+    "simulation": {
+      "n_individuals": 2000,
+      "n_periods": 80,
+      "seed": 44,
+      "show_progress": false
+    },
+    "summary": {
+      "converged": false,
+      "convergence_message": "SEES: Maximum iterations reached",
+      "estimation_time": 3.9199271202087402,
+      "log_likelihood": -160289.80888862288,
+      "metadata": {
+        "basis_dim": 81,
+        "basis_family": "rbf_svd",
+        "basis_source": "encoded_state",
+        "basis_type": "bspline",
+        "bellman_rmse": 6.795873113775277e-07,
+        "bellman_violation": 3.0825301173820208e-06,
+        "configured_basis_dim": 81,
+        "encoded_basis_rank": 81,
+        "initial_value_projection_rmse": 3.3821690476846285e-14,
+        "penalty_objective_scale": "mean_loglik_minus_omega_bellman_mse",
+        "penalty_weight": 10000.0,
+        "rbf_bandwidth_sq": 0.12494853898715405,
+        "state_feature_dim": 16,
+        "warm_start_value": true
+      },
+      "num_iterations": 6,
+      "num_observations": 160000,
+      "parameter_names": [
+        "theta_0",
+        "theta_1",
+        "theta_2",
+        "theta_3",
+        "theta_4",
+        "theta_5",
+        "theta_6",
+        "theta_7",
+        "theta_8",
+        "theta_9",
+        "theta_10",
+        "theta_11",
+        "theta_12",
+        "theta_13",
+        "theta_14",
+        "theta_15",
+        "theta_16",
+        "theta_17",
+        "theta_18",
+        "theta_19",
+        "theta_20",
+        "theta_21",
+        "theta_22",
+        "theta_23",
+        "theta_24",
+        "theta_25",
+        "theta_26",
+        "theta_27",
+        "theta_28",
+        "theta_29",
+        "theta_30",
+        "theta_31"
+      ],
+      "parameters": [
+        -0.04919134028504841,
+        0.20632732503386736,
+        -0.07563660704208873,
+        -0.17505097139277562,
+        -0.22377287573120885,
+        -0.16232415086716287,
+        -0.08513779299965796,
+        -0.23952656696898042,
+        0.17808259664184103,
+        -0.23462017685788072,
+        0.04651656964902872,
+        -0.021726466897570233,
+        -0.02340253451162795,
+        -0.07582326511640276,
+        0.013911734916528591,
+        0.03094427198833442,
+        0.00272022185019285,
+        -0.005677082046810444,
+        -0.010232629640300092,
+        0.001546435349584577,
+        -0.02091836624621107,
+        0.024677608528687164,
+        0.057004611601512205,
+        0.04299751997625911,
+        -0.09378202731414245,
+        -0.032439175048191715,
+        -0.029574358782330203,
+        0.024523402267927645,
+        -0.08083066563804563,
+        -0.0383616019277831,
+        0.007462776969880556,
+        -0.07819567815913314
+      ],
+      "standard_errors": [
+        0.015640351413905067,
+        0.012611061307123162,
+        0.013862195587806077,
+        0.014906415357455714,
+        0.012940406641879693,
+        0.01534813266067422,
+        0.01821665459066135,
+        0.014468200702974615,
+        0.01436729460853216,
+        0.017704793314606157,
+        0.013033642759901543,
+        0.020330881176063187,
+        0.012759443903272837,
+        0.01773129983238878,
+        0.015807481447071406,
+        0.020591429853752636,
+        0.016355165488353984,
+        0.015790637603297953,
+        0.01602021058926254,
+        0.01607673411421916,
+        0.021556708451948448,
+        0.01959344482854538,
+        0.01654766237878642,
+        0.012732689616192793,
+        0.01612138534506903,
+        0.01889920057856375,
+        0.017596080842594453,
+        0.017733905844882422,
+        0.01877519508517784,
+        0.015084020662192795,
+        0.014639620319893316,
+        0.011117902747977379
+      ]
+    }
+  },
   "results": [
     {
       "cell_id": "canonical_low_action",
@@ -112,6 +414,8 @@
         }
       ],
       "metrics": {
+        "anchor_projected_reward_normalized_rmse": 0.011551159933035184,
+        "anchor_projected_reward_rmse": 0.011279828636887788,
         "counterfactuals": {
           "type_a": {
             "policy": {
@@ -156,8 +460,15 @@
           "linf": 0.016770340027594532,
           "tv": 0.005179064158829246
         },
+        "projected_reward_normalized_rmse": 0.011551159933035184,
+        "projected_reward_rmse": 0.008987982596798439,
+        "q_normalized_rmse": 0.04374337839732313,
         "q_rmse": 0.020513861571913344,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 0.011551159933035184,
         "reward_rmse": 0.008987982596798439,
+        "value_normalized_rmse": 0.00922981357391073,
         "value_rmse": 0.01759149039444483
       },
       "simulation": {
@@ -169,7 +480,7 @@
       "summary": {
         "converged": false,
         "convergence_message": "SEES: Maximum iterations reached",
-        "estimation_time": 3.687039852142334,
+        "estimation_time": 3.7706100940704346,
         "log_likelihood": -174875.78426020363,
         "metadata": {
           "basis_dim": 21,
@@ -319,6 +630,8 @@
         }
       ],
       "metrics": {
+        "anchor_projected_reward_normalized_rmse": 0.007683908101929882,
+        "anchor_projected_reward_rmse": 0.005462484551564325,
         "counterfactuals": {
           "type_a": {
             "policy": {
@@ -363,8 +676,15 @@
           "linf": 0.024416228973031723,
           "tv": 0.0021170444560423083
         },
+        "projected_reward_normalized_rmse": 0.007683908101929882,
+        "projected_reward_rmse": 0.004432482976170773,
+        "q_normalized_rmse": 0.010087214369227028,
         "q_rmse": 0.031479876355587286,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 0.007683908101929882,
         "reward_rmse": 0.004432482976170773,
+        "value_normalized_rmse": 0.010595061055293209,
         "value_rmse": 0.03783648924656937
       },
       "simulation": {
@@ -376,7 +696,7 @@
       "summary": {
         "converged": false,
         "convergence_message": "SEES: Maximum iterations reached",
-        "estimation_time": 3.808471202850342,
+        "estimation_time": 3.9199271202087402,
         "log_likelihood": -160289.80888862288,
         "metadata": {
           "basis_dim": 81,

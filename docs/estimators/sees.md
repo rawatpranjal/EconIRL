@@ -1,64 +1,78 @@
 # SEES
 
-## Overview
+Sieve estimation for economic structural models estimates dynamic discrete
+choice rewards while approximating the value function with a deterministic
+basis. It keeps the structural likelihood target, but avoids solving a full
+nested fixed point inside every likelihood evaluation.
 
-SEES estimates structural dynamic discrete choice models without solving a
-nested fixed point at every likelihood evaluation. It approximates the value
-function with a sieve and estimates the reward parameters and value-function
-approximation together.
+Use SEES when the model is structural, transitions are known or estimated
+first, and the value function can be represented well by a sieve. It is the
+deterministic-basis counterpart to MPEC and the nearest stepping stone before
+NNES.
 
-In practice, SEES is useful when you want a structural estimator like NFXP, but
-the repeated dynamic-programming solve is too expensive for the model you want
-to fit.
+## Quick Decision
 
-## When to Use
+| Use SEES when | Prefer another estimator when |
+| --- | --- |
+| Choices are discrete and forward-looking. | The state-action space is small enough for exact NFXP. |
+| Transitions are known or can be estimated first. | Transition estimation is the main modeling problem. |
+| Rewards are finite-dimensional and parametric. | The reward itself needs a neural or nonparametric form. |
+| A deterministic value basis is credible. | The value basis cannot approximate the Bellman solution. |
+| You want a scalable structural check after MPEC. | You need a pure CCP or behavioral-cloning baseline. |
 
-Use SEES when:
-
-- choices are discrete and forward-looking;
-- rewards are parametric;
-- transitions are known or can be estimated in a first stage;
-- the state space is moderate or can be represented with usable features;
-- you want structural parameters, value functions, and counterfactual policies.
-
-Avoid SEES when the reward is not parameterized, transitions are not credible,
-or the state representation is too rough for value-function approximation.
-
-## Basic Usage
+## Minimal Fit
 
 ```python
-import pandas as pd
+from econirl.datasets import load_rust_bus
+from econirl import SEES
 
-from econirl.estimators import SEES
-
-data = pd.read_csv("zurcher_bus.csv")
+df = load_rust_bus()
 
 model = SEES(
     n_states=90,
-    n_actions=2,
     discount=0.9999,
     utility="linear_cost",
+    basis_type="fourier",
+    basis_dim=8,
+    penalty_weight=0.01,
 )
-model.fit(data, state="mileage_bin", action="replaced", id="bus_id")
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
 print(model.summary())
 ```
 
-For custom reward features or lower-level control over the dynamic discrete
-choice problem, use `econirl.estimation.SEESEstimator`.
+Use `econirl.estimation.sees.SEESEstimator` when you need direct control over
+the `Panel`, utility object, `DDCProblem`, transition tensor, basis choice, or
+Bellman penalty.
 
-## Validation Status
+## What Is Certified
 
-SEES passes the package known-truth checks on both the low-dimensional and
-high-dimensional synthetic DGPs. The high-dimensional validation uses encoded
-state features, so it tests the state-feature path rather than only a tabular
-state index.
+SEES is certified on the high-dimensional action-dependent known-truth DGP.
+The low-dimensional cell is retained as a sanity check, while the primary
+cell uses encoded states and a richer reward-feature basis. Both cells have
+known rewards, transitions, policies, values, Q functions, and Type A, Type B,
+and Type C counterfactual oracles.
 
-The low-dimensional cell is the compact finite-state action-dependent benchmark.
-The high-dimensional cell keeps known reward, policy, value, and counterfactual
-truth but uses encoded states and a richer reward-feature basis.
+| Evidence | Current state |
+| --- | --- |
+| Release status | Certified. |
+| Primary cell | `canonical_high_action`. |
+| Machine-readable artifact | [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json). |
+| Primary Bellman gate | Passes with violation `3.08e-6`. |
+| Primary recovery gates | Parameter, reward, policy, value, Q, and counterfactual gates pass. |
+| Public example | Uses `SEES` with `utility="linear_cost"`; validation uses `SEESEstimator`. |
 
-## Further Reading
+## SEES Guide
 
-- Machine-readable artifact: [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json)
+```{toctree}
+:maxdepth: 2
+
+sees/context
+sees/quick_start
+sees/under_the_hood
+sees/pre_estimation
+sees/validation
+sees/counterfactuals
+sees/rust_bus
+```
