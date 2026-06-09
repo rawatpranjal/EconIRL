@@ -27,6 +27,15 @@ print(model.policy_.shape)
 print(model.alpha_.shape)
 ```
 
+Output
+
+```text
+{'theta_c': -0.006116096477516279, 'RC': 3.1677777161163605}
+{'theta_c': 0.0034203120881012004, 'RC': 0.13696627998075603}
+(90, 2)
+(8,)
+```
+
 The fitted wrapper exposes the structural parameter estimates, standard
 errors, estimated policy, value function, transition estimate, and sieve
 coefficients.
@@ -60,6 +69,13 @@ summary = estimator.estimate(panel, utility, problem, transitions)
 
 print(summary.parameters)
 print(summary.metadata["bellman_violation"])
+```
+
+Output from the low-dimensional validation objects:
+
+```text
+[ 0.084825  0.526234 -0.011571 -0.203976]
+5.826541219988712e-05
 ```
 
 The known-truth validation uses the lower-level API because it supplies the

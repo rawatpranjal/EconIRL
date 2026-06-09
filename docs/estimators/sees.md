@@ -42,6 +42,19 @@ print(model.params_)
 print(model.summary())
 ```
 
+Output
+
+```text
+{'theta_c': -0.006116096477516279, 'RC': 3.1677777161163605}
+
+Method:                    SEES (fourier, Luo & Sang 2024)
+No. Observations:          9,410
+Log-Likelihood:            -1,899.51
+theta_c                 -0.0061     0.0034    -1.79    0.074
+RC                       3.1678     0.1370    23.13    0.000
+Prediction Accuracy:         94.9%
+```
+
 Use `econirl.estimation.sees.SEESEstimator` when you need direct control over
 the `Panel`, utility object, `DDCProblem`, transition tensor, basis choice, or
 Bellman penalty.

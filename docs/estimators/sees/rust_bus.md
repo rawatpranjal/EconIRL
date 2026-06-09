@@ -27,6 +27,13 @@ print(model.params_)
 print(model.policy_[[0, 20, 40, 60, 80], 1])
 ```
 
+Output
+
+```text
+{'theta_c': -0.006116096477516279, 'RC': 3.1677777161163605}
+[0.04039647 0.05791052 0.07768549 0.07905037 0.05619696]
+```
+
 ## Interpretation
 
 The Rust-style linear utility specification estimates operating-cost and
@@ -52,6 +59,13 @@ summary = estimator.estimate(panel, utility, problem, transitions)
 
 print(summary.parameters)
 print(summary.metadata["bellman_violation"])
+```
+
+Output from the low-dimensional validation objects:
+
+```text
+[ 0.084825  0.526234 -0.011571 -0.203976]
+5.826541219988712e-05
 ```
 
 ## Replication Boundary
