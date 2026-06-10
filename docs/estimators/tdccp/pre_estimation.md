@@ -1,57 +1,61 @@
 # Pre-Estimation Checks
 
-TD-CCP can fail for reasons that are visible before optimization starts. Run
-these checks before treating a result as structural evidence.
+TD-CCP is most reliable when the reward features, observed choices, and panel
+transitions support the structural parameter target. These checks are meant to
+catch problems before a result is treated as evidence.
 
-| Check | Why it matters |
+## Before Fitting
+
+Confirm that the reward is written as a finite set of known features. The
+features should have enough variation to identify the parameters, and one
+action or reward level should be normalized so the model has an anchor.
+
+Check that every relevant state-action pair has enough observed support. TD-CCP
+uses observed successor tuples to learn continuation terms, so weak support in
+the current or next state-action data can make the recursion unstable.
+
+Finally, check the first-stage choice probabilities. The log correction used
+by TD-CCP is unstable when fitted choice probabilities are too close to zero.
+
+## During Fitting
+
+Watch the conditioning of the basis used for the continuation terms. A nearly
+singular basis can make the projected TD equations unstable even when the
+likelihood optimizer appears to run.
+
+For locally robust inference, split folds by individual rather than by row.
+This keeps the held-out moment evaluation separate from the quantities learned
+on the other fold and matches the covariance unit used in the validation
+artifact.
+
+## After Fitting
+
+Do not judge the run only by a returned parameter vector. Check that the final
+moment is small, the correction recursion is stable, the optimizer reached a
+stationary point, and reported standard errors are finite and positive.
+
+Also keep estimation and evaluation separate. The parameter-estimation step
+should not silently use a transition tensor. Transition tensors may enter later
+for policy values, Q functions, or counterfactual evaluation.
+
+## Current Certified Case
+
+The release validation uses two encoded state coordinates and a finite linear
+reward. Action 0 is fixed as the baseline action, leaving six reward
+parameters for the two non-baseline actions.
+
+| Check | Current artifact |
 | --- | --- |
-| Feature rank | Reward parameters are not identified when known features are collinear. |
-| Reward normalization | Reward level and action baselines need an anchor. |
-| State-action-successor coverage | TD estimates need support over observed current and next tuples. |
-| Minimum positive CCP | The log CCP correction is unstable near zero. |
-| Basis conditioning | Semi-gradient normal equations become unstable when the basis is nearly singular. |
-| Bounded encoded features | Paper-style approximation arguments assume controlled feature support. |
-| Individual-level fold split | Algorithm 2 inference should keep held-out moments separate from nuisance estimates. |
-| Moment stationarity | The final `zeta` solve should have a small mean moment and optimizer gradient. |
-| Lambda recursion residual | Locally robust correction needs a stable backward recursion. |
-| State encoder meaning | Encoded bases should use real state features, not arbitrary labels. |
-| Estimation/evaluation boundary | `theta` estimation should not silently use transition tensors reserved for evaluation. |
-| Transition orientation for evaluation | Final policy/value checks expect action, state, next-state tensors. |
+| States and actions | 81 states, 3 actions |
+| Reward target | 6 finite reward parameters |
+| Reward form | Linear in encoded state features |
+| Choice model | Logit with degree-2 state features |
+| TD basis | Encoded semigradient basis, degree 2 |
+| Fold split | By individual |
+| Inference | Cross-fitted locally robust standard errors |
+| Max moment norm | 7.91e-06 |
+| Max correction residual norm | 0.002610 |
+| Optimizer status | Preliminary and final robust folds converged |
 
-## Certified Hard-Case Checks
-
-The certified TD-CCP hard case uses two-dimensional encoded state coordinates,
-then builds a finite linear reward by interacting an intercept and the two
-coordinates with non-baseline actions. Action 0 is fixed to zero as the utility
-normalization.
-
-| Check | Current state |
-| --- | --- |
-| Structural target | Finite-dimensional `theta`. |
-| Feature source | Encoded state coordinates. |
-| Reward form | Linear in known features. |
-| Action normalization | Action 0 reward fixed to zero. |
-| States and actions | 81 states, 3 actions. |
-| Reward parameters | 6 finite parameters. |
-| State-action support | Simulated from the known optimal policy. |
-| First-stage CCP | Logit with degree-2 state features. |
-| Basis | Encoded semigradient basis, degree 2. |
-| Fold split | Cross-fitting by individual. |
-| Inference path | Algorithm 2 cross-fitting with locally robust SEs. |
-| Zeta moment | Max norm 7.91e-06 in the current artifact. |
-| Lambda recursion | Max fold residual norm 0.002610 in the current artifact. |
-| Optimizer stationarity | Preliminary projected-gradient max 2.00e-07; final robust folds 2/2 converged. |
-| Estimation transition density | Not used. |
-| Evaluation transitions | Supplied after estimation for oracle checks. |
-
-See the [validation page](validation.md) for the generator script, rendered
-table source, JSON artifact, and hard gates.
-
-## Common Risk Patterns
-
-Raw neural reward matrices do not provide a finite true `theta`, so parameter
-recovery is not a meaningful certification gate. Sparse action support makes
-the CCP correction noisy. High-dimensional encoded bases can be weakly
-conditioned unless the basis is chosen carefully. Transition tensors with the
-wrong orientation can make post-estimation policy/value diagnostics look
-plausible while evaluating the wrong model.
+See the [validation page](validation.md) for the full artifact, hard gates, and
+Monte Carlo standard-error check.

@@ -1,29 +1,27 @@
 # Counterfactuals
 
-TD-CCP estimates structural parameters without fitting a transition-density
-model. Counterfactual analysis is separate: after `theta` is estimated, policy
-and value evaluation may still require supplied or estimated transitions for
-the counterfactual environment.
+TD-CCP estimates reward parameters without fitting a transition-density model
+for the original data-generating process. Counterfactual analysis is a separate
+step. Once `theta` is estimated, policy and value evaluation still need a
+transition environment for the counterfactual being studied.
 
-The public wrapper does not currently expose the same one-call parameter
+The public wrapper does not yet expose the same one-call parameter
 counterfactual interface as NFXP and CCP. The validation harness evaluates
 counterfactuals directly after fitting the lower-level estimator.
 
 ## Counterfactual Families
 
-The known-truth validation harness evaluates three counterfactual families
-against oracle solutions.
+The known-truth validation harness checks three common counterfactual types.
 
-| Type | Intervention | Purpose |
+| Type | Intervention | What it tests |
 | --- | --- | --- |
-| Type A | Shift rewards and hold transitions fixed. | Payoff counterfactual. |
-| Type B | Change transitions and hold rewards fixed. | State-dynamics counterfactual. |
-| Type C | Disable one non-baseline action. | Action-set or design counterfactual. |
+| Type A | Shift rewards and hold transitions fixed | Payoff counterfactuals |
+| Type B | Change transitions and hold rewards fixed | State-dynamics counterfactuals |
+| Type C | Disable one non-baseline action | Action-set counterfactuals |
 
 ## Reported Results
 
-These rows come from the certified hard-case artifact used on the
-[validation page](validation.md).
+These rows come from the certified validation artifact.
 
 | Counterfactual | Policy TV | Value RMSE | Regret |
 | --- | ---: | ---: | ---: |
@@ -31,15 +29,13 @@ These rows come from the certified hard-case artifact used on the
 | Type B | 0.004840 | 0.001867 | 0.001864 |
 | Type C | 0.006953 | 0.003208 | 0.003200 |
 
-The regret values report how the policy from the recovered structural reward
-compares with the oracle counterfactual policy.
+Regret measures how much value is lost when the policy implied by the
+estimated reward is used instead of the oracle counterfactual policy.
 
 ## Boundary
 
-The TD-CCP paper's computational advantage is about structural parameter
-estimation: it avoids estimating the original transition density to estimate
-`theta`. Counterfactuals can involve new transition processes, so the
-counterfactual step must still define the transition environment being
-evaluated. In other words, TD-CCP separates structural-parameter estimation
-from counterfactual transition modeling; it does not make counterfactual
-evaluation transition-free.
+TD-CCP separates reward-parameter estimation from transition modeling. That is
+the computational advantage. It does not remove the need for transition
+information in counterfactual evaluation. If the counterfactual changes the
+transition process, that new process must still be supplied or estimated for
+the evaluation step.

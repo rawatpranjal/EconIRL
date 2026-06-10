@@ -1,43 +1,31 @@
 # Validation
 
-TD-CCP is certified on `shapeshifter_encoded_state_locally_robust`. This is
-the paper-faithful hard case: two-dimensional encoded state coordinates enter
-a finite linear structural reward, action 0 is normalized to zero, and
-Algorithm 2 locally robust standard errors are computed.
+The TD-CCP release evidence is built around one certified known-truth case:
+`shapeshifter_encoded_state_locally_robust`. The case uses encoded state
+features and a finite linear reward, so the true reward parameters are known.
+That makes it possible to check parameter recovery, reward recovery, policies,
+values, Q functions, counterfactuals, and standard errors.
 
-These results are not hand-entered examples. They come from the known-truth
-validation harness and the TD-CCP primer generator. The validation target is
-recovery of structural parameters, rewards, policies, values, Q functions, and
-Type A/B/C counterfactual decisions in the finite-theta setting, with
-fold-specific zeta moments, individual-clustered sandwich covariance, and
-repeated-seed standard-error coverage recorded in the artifact.
-
-The full result generator is
+The result generator is
 [`tdccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_run.py).
 It writes the rendered table source
 [`tdccp_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.tex)
 and the machine-readable artifact
 [`tdccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.json).
-To rerun it from the repository root:
+
+To rerun the generator from the repository root:
 
 ```bash
 PYTHONPATH=src:. python papers/econirl_package/primers/tdccp/tdccp_run.py --quiet-progress
 ```
 
-The hard-case harness flow is:
+## How To Read This Page
 
-```python
-from papers.econirl_package.primers.tdccp.tdccp_run import (
-    build_paper_hard_case_dgp,
-    evaluate_paper_hard_case_summary,
-    tdccp_paper_hard_case_gates,
-)
-```
-
-Read the tables as a sequence. The design table states the known-truth cell.
-The fit summary reports how the estimator ran. Recovery metrics compare the
-estimated structural objects to oracle objects. Hard gates are the reported
-thresholds.
+The design table describes the known-truth problem. The fit summary describes
+whether the estimator and inference path ran correctly. Recovery metrics
+compare estimated objects with oracle objects. The Monte Carlo section checks
+whether the reported standard errors behave reasonably across repeated seeds.
+The hard gates are the exact thresholds used by the release artifact.
 
 ## Design
 
@@ -54,11 +42,15 @@ thresholds.
 | Reward form | Linear in encoded-state basis |
 | Action normalization | Action 0 fixed to zero |
 
-The hard case is deliberately not raw neural reward recovery. It keeps a
-finite structural parameter vector and uses encoded state features with
-stochastic transitions.
+This is not a raw neural reward-recovery test. It is a structural parameter
+test with encoded state features and stochastic transitions.
 
 ## Fit Summary
+
+The estimator converged on both preliminary folds and both final robust folds.
+Known transition tensors were not used to estimate `theta`; they were supplied
+after fitting so the validation harness could compare recovered policies,
+values, Q functions, and counterfactual decisions with oracle solutions.
 
 | Quantity | Value |
 | --- | ---: |
@@ -66,37 +58,30 @@ stochastic transitions.
 | Outer iterations | 121 |
 | Log likelihood | -99831.3015 |
 | Estimation time | 10.71 seconds |
-| Standard errors | Algorithm 2 locally robust |
+| Standard errors | Locally robust |
 | Covariance unit | Individual |
 | Max standard error | 0.034212 |
-| Max zeta moment norm | 7.91e-06 |
-| Max lambda fixed-point residual norm | 0.002610 |
-| Max lambda fixed-point residual RMS | 0.292447 |
-| Max absolute lambda fixed-point residual | 1.022835 |
-| Preliminary plug-in optimizer status | 2/2 folds converged |
+| Max locally robust moment norm | 7.91e-06 |
+| Max correction residual norm | 0.002610 |
+| Max correction residual RMS | 0.292447 |
+| Max absolute correction residual | 1.022835 |
+| Preliminary optimizer status | 2/2 folds converged |
 | Preliminary projected-gradient max | 2.00e-07 |
-| Final robust zeta optimizer status | 2/2 folds converged |
+| Final robust optimizer status | 2/2 folds converged |
 | Method | `semigradient` |
 | Basis | `encoded`, degree 2 |
 | CCP model | `logit`, degree 2 |
 | Cross-fitting | true |
 | Robust SE | true |
 
-Known transitions are not used to estimate `theta`. They enter after
-estimation so the validation harness can evaluate policies, values, Q
-functions, and counterfactual decisions against oracle solutions.
-
-The preliminary plug-in folds and final robust zeta folds all satisfy the
-optimizer stationarity checks. The artifact also records projected-gradient
-norms and lambda fixed-point residual summaries so this claim is auditable.
-
 ## Repeated-Seed SE Coverage
 
-The standard-error check re-simulates the same encoded-state DGP 25 times with
-300 individuals and 35 periods per replication. It uses the same TD-CCP
-Algorithm 2 settings, with individual-clustered fold covariances.
+The standard-error check re-simulates the same encoded-state design 25 times
+with 300 individuals and 35 periods per replication. Each replication uses the
+same cross-fitted, locally robust TD-CCP settings and individual-clustered
+covariances.
 
-The 25-replication run is the current RTD evidence because it is light enough
+The 25-replication run is the current RTD evidence because it is small enough
 to regenerate routinely. A paper-final audit should rerun the same command
 with `--mc-replications 100` under a CPU budget before claiming final Monte
 Carlo precision.
@@ -107,14 +92,14 @@ Carlo precision.
 | Overall 95% CI coverage | 0.900 |
 | Mean parameter relative RMSE | 0.125000 |
 | Strict gate-passing replications | 15/25 |
-| Final robust zeta optimizer success | 25/25 |
-| Preliminary plug-in optimizer success | 25/25 |
-| Preliminary plug-in optimizer stationarity | 25/25 |
+| Final robust optimizer success | 25/25 |
+| Preliminary optimizer success | 25/25 |
+| Preliminary optimizer stationarity | 25/25 |
 | Preliminary projected-gradient max | 6.88e-07 |
-| Max zeta moment norm | 2.20e-05 |
-| Max lambda fixed-point residual norm | 0.035225 |
-| Max lambda fixed-point residual RMS | 0.312355 |
-| Max absolute lambda fixed-point residual | 1.137664 |
+| Max locally robust moment norm | 2.20e-05 |
+| Max correction residual norm | 0.035225 |
+| Max correction residual RMS | 0.312355 |
+| Max absolute correction residual | 1.137664 |
 
 | Parameter | Bias | RMSE | Empirical SD | Mean SE | 95% coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -127,6 +112,10 @@ Carlo precision.
 
 ## Recovery Metrics
 
+These metrics compare the fitted structural objects with the known truth. They
+are the main evidence that the estimator recovers the finite reward target and
+the implied dynamic decisions in this design.
+
 | Metric | Value |
 | --- | ---: |
 | Parameter cosine similarity | 0.998658 |
@@ -137,6 +126,10 @@ Carlo precision.
 | Q normalized RMSE | 0.000733 |
 
 ## Counterfactual Metrics
+
+The counterfactual checks are run after fitting, using supplied transition
+environments. They test whether the recovered reward leads to the same
+counterfactual decisions as the oracle reward.
 
 | Counterfactual | Policy TV | Value RMSE | Regret |
 | --- | ---: | ---: | ---: |
@@ -149,9 +142,9 @@ Carlo precision.
 | Gate | Threshold | Value | Status |
 | --- | --- | ---: | --- |
 | Converged | true | true | pass |
-| Algorithm 2 locally robust path | true | true | pass |
+| Locally robust path | true | true | pass |
 | Finite positive standard errors | true | true | pass |
-| Zeta moment norm | at most 1e-4 | 7.91e-06 | pass |
+| Moment norm | at most 1e-4 | 7.91e-06 | pass |
 | Covariance minimum eigenvalue | at least -1e-10 | 2.27e-05 | pass |
 | Parameter cosine | at least 0.99 | 0.998658 | pass |
 | Parameter relative RMSE | at most 0.15 | 0.059104 | pass |
@@ -168,5 +161,5 @@ Carlo precision.
 The `canonical_low_action` cell remains a simple sanity check and passes 10/10
 gates. The `canonical_high_action` cell remains a diagnostic stress test and
 currently fails 10/10 gates. The raw neural-reward diagnostic passes 5/8 gates
-and fails reward, value, and Q recovery. It has no finite true `theta`, so it
-is not part of the certified claim.
+and fails reward, value, and Q recovery. It has no finite true reward
+parameter vector, so it is not part of the certified claim.

@@ -1,31 +1,35 @@
 # Under the Hood
 
-TD-CCP estimates the recursive terms that appear in a CCP pseudo-likelihood.
-It does not solve a Bellman equation inside each likelihood evaluation and it
-does not need a transition-density model while estimating `theta`.
+TD-CCP estimates the reward parameters in two stages. First it learns the
+future-utility terms that enter the CCP likelihood. Then it estimates the
+reward parameters using those learned terms.
 
-## Model
+The important boundary is that known transition tensors are not used to
+estimate `theta`. They may be used later for validation, policy evaluation, or
+counterfactual analysis.
 
-The observed data are current and successor state-action tuples.
+## Model Objects
+
+The observed panel supplies current and next state-action tuples.
 
 $$
 (a_t, x_t, a_{t+1}, x_{t+1})
 $$
 
-The flow payoff is finite-dimensional and linear in known features.
+The flow payoff is linear in known reward features.
 
 $$
 u_\theta(a, x) = z(a, x)^\top \theta
 $$
 
-The CCP index uses two recursive objects.
+The CCP likelihood needs an index for each action. TD-CCP writes that index
+using two learned continuation objects, `h` and `g`.
 
 $$
 \tilde Q_\theta(a, x) = h(a, x)^\top \theta + g(a, x)
 $$
 
-The implied choice probability is the usual soft-max over choice-specific
-indices.
+The implied policy is a soft-max over those action indices.
 
 $$
 \pi_\theta(a \mid x)
@@ -34,7 +38,9 @@ $$
      {\sum_b \exp\{h(b, x)^\top\theta + g(b, x)\}}
 $$
 
-The recursive terms satisfy TD fixed-point equations.
+The objects `h` and `g` satisfy TD fixed-point equations. The first equation
+tracks the future reward features. The second tracks the future choice-shock
+correction.
 
 $$
 h(a, x) = z(a, x) + \beta E[h(a', x') \mid a, x]
@@ -46,61 +52,47 @@ g(a, x) =
 \quad e(a, x) = \gamma_E - \log P(a \mid x)
 $$
 
-## Paper Alignment
+## Estimation Flow
 
-| Paper step | EconIRL implementation and evidence |
-| --- | --- |
-| Estimate CCPs `P(a given x)` | Logit first stage with degree-2 encoded-state features in the certified artifact. |
-| Estimate `h` | Semigradient projected TD solve using encoded basis functions. |
-| Estimate `g` | Semigradient projected TD solve using the log-CCP shock correction. |
-| Obtain preliminary `tilde theta` | Fold-specific plug-in CCP pseudo-likelihood solve with projected-gradient diagnostics. |
-| Estimate `lambda` | Fold-specific backward recursion; residual norms are written to the artifact. |
-| Solve zeta moment | Held-out fold solves the locally robust moment using opposite-fold nuisances. |
-| Report covariance | Fold covariance is averaged and clustered by individual for the reported SEs. |
+The certified EconIRL path follows the semigradient version of the paper.
 
-## Algorithm Sketch
+1. Estimate conditional choice probabilities from observed actions.
+2. Build observed current and successor tuples from the panel.
+3. Learn `h` and `g` with projected TD equations.
+4. Estimate a preliminary reward parameter vector.
+5. Estimate the correction recursion used by the locally robust estimator.
+6. Solve the held-out moment equation in each fold.
+7. Average fold estimates and compute standard errors clustered by individual.
 
-TD-CCP first estimates conditional choice probabilities from observed actions.
-It then extracts current and successor state-action tuples from the panel.
-
-1. Estimate CCPs and the Type I Extreme Value shock correction.
-2. Estimate recursive terms `h` and `g`.
-3. Compute a preliminary plug-in `theta` for each training fold.
-4. Estimate the backward `lambda` correction on the same nuisance fold.
-5. Solve the held-out locally robust `zeta` moment using the opposite-fold
-   nuisances.
-6. Average fold estimates and compute the locally robust covariance.
-
-Known transitions are not used for the parameter-estimation step. In EconIRL
-validation, supplied transitions are used after estimation to evaluate the
-recovered reward through policies, values, Q functions, and counterfactual
-oracle comparisons.
+The correction recursion is the paper's `lambda` object. The held-out moment
+equation is the paper's `zeta` moment. EconIRL records both diagnostics in the
+validation artifact, but the user-facing interpretation is simple: they correct
+for first-stage estimation error and support valid standard errors.
 
 ## Semigradient and AVI
 
-The certified release path is semigradient TD. With linear basis functions,
-the `h` and `g` recursions reduce to projected TD normal equations, so the
-recursive-term step is a matrix solve rather than a transition-density
-integration problem.
+The semigradient path uses linear basis functions for the continuation terms.
+That makes the recursive-term step a matrix problem rather than an integration
+problem over a fitted transition density.
 
-AVI is the more flexible paper path. It repeatedly solves prediction problems
-for the next recursive approximation and can use machine-learning learners.
-EconIRL exposes this path, but the current RTD certification does not use it
-for the release claim because the artifact's finite-theta inference evidence
-is attached to the semigradient Algorithm 2 path.
+The AVI path is more flexible. It repeatedly solves prediction problems for
+the continuation terms and can use machine-learning learners. EconIRL exposes
+this path, but the current release evidence is tied to the semigradient,
+locally robust path.
 
-## Locally Robust Inference
+## Paper Alignment
 
-The reported standard errors come from the Algorithm 2 moment, not from a
-plain plug-in Hessian. Each fold stores the preliminary plug-in solution, the
-lambda fixed-point residual, the zeta mean, and the fold covariance. The final
-artifact averages fold estimates and reports individual-clustered covariance.
-Optimizer stationarity diagnostics are archived for both preliminary and final
-robust solves.
+| Paper step | EconIRL implementation |
+| --- | --- |
+| Estimate CCPs `P(a given x)` | Logit first stage with degree-2 encoded-state features |
+| Estimate `h` | Semigradient TD solve using encoded basis functions |
+| Estimate `g` | Semigradient TD solve using the log-CCP shock correction |
+| Preliminary parameter estimate | Fold-specific CCP pseudo-likelihood solve |
+| Correction recursion | Fold-specific backward recursion with residual diagnostics |
+| Locally robust moment | Held-out fold solve using quantities learned on the other fold |
+| Standard errors | Fold covariance averaged and clustered by individual |
 
-## Certified Path
-
-The certified TD-CCP artifact uses:
+## Certified Settings
 
 | Setting | Value |
 | --- | --- |
@@ -108,10 +100,6 @@ The certified TD-CCP artifact uses:
 | Basis | `encoded`, degree 2 |
 | CCP model | `logit`, degree 2 |
 | Cross-fitting | `True`, split by individual |
-| Robust standard errors | `True`, Algorithm 2 locally robust covariance clustered by individual |
+| Robust standard errors | `True`, locally robust covariance clustered by individual |
 | Policy iterations | `1` |
 | Outer optimizer tolerance | `1e-7` |
-
-This is the strongest package evidence because the hard case keeps the paper's
-finite-dimensional `theta` target while using encoded state features and
-transition-free TD estimates of the recursive CCP terms.

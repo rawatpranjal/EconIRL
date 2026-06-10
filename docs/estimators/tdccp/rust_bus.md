@@ -1,11 +1,10 @@
 # Rust Bus Engine Example
 
-The Rust bus-engine replacement problem is the canonical dynamic discrete
+The Rust bus-engine replacement problem is the standard dynamic discrete
 choice example. A bus operator observes mileage and chooses whether to keep the
 current engine or replace it.
 
-EconIRL ships a bundled Rust-style dataset that is suitable for a quick public
-TD-CCP smoke test.
+EconIRL ships a small Rust-style dataset for a public TD-CCP smoke test.
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -28,26 +27,22 @@ print(model.summary())
 
 ## Interpretation
 
-The `linear_cost` specification estimates two parameters. The first is the
-operating cost slope over mileage states. The second is the replacement cost.
-The fitted policy gives the replacement probability by mileage state.
+The `linear_cost` specification estimates two parameters: the mileage cost
+slope and the replacement cost. The fitted policy gives the replacement
+probability at each mileage state.
 
 ```python
 states = [0, 10, 50, 89]
 print(model.predict_proba(states))
 ```
 
-## Transition Boundary
+## Boundary
 
-TD-CCP uses observed successor tuples to estimate the recursive CCP terms.
-The wrapper can estimate transitions from the panel for final fitted policy
-and value outputs, but the structural parameter step is not a transition-density
-model.
+This page is a usage example, not the release certification. The certified
+evidence is the known-truth validation case, where the true reward, policy,
+value function, Q function, and counterfactual decisions are available for
+comparison.
 
-## Replication Boundary
-
-This page is a package smoke example, not the TD-CCP release certification.
-The reported validation evidence is the hard finite-theta known-truth cell,
-which has known reward, policy, value, Q, and counterfactual oracle objects.
-For paper Algorithm 2 evidence, use the validation page rather than this Rust
-bus wrapper example.
+The wrapper may estimate transitions from the panel for fitted policy and
+value outputs. The structural parameter step remains separate from
+transition-density modeling.
