@@ -32,6 +32,13 @@ print(model.params_)
 print(model.predict_proba([0, 20, 40, 60, 80])[:, 1])
 ```
 
+Output from the package smoke run:
+
+```text
+{'theta_c': 0.001034, 'RC': 3.073617}
+[0.044209 0.060566 0.081061 0.103800 0.114049]
+```
+
 ## Interpretation
 
 The Rust-style linear utility specification estimates operating-cost and
@@ -62,6 +69,9 @@ summary = estimator.estimate(panel, utility, problem, transitions)
 print(summary.parameters)
 print(summary.metadata["v_loss_per_outer"][-1])
 ```
+
+No fixed output is shown for the lower-level snippet because `panel`,
+`utility`, `problem`, and `transitions` are caller-supplied objects.
 
 ## Replication Boundary
 

@@ -30,6 +30,15 @@ print(model.policy_.shape)
 print(model.v_network_.shape)
 ```
 
+Output from the package smoke run:
+
+```text
+{'theta_c': 0.001034, 'RC': 3.073617}
+{'theta_c': 0.000383, 'RC': 0.077527}
+(90, 2)
+(90,)
+```
+
 The fitted wrapper exposes structural parameter estimates, standard errors,
 the estimated policy, the value function, the first-stage transition estimate,
 and the trained value-network predictions over states.
@@ -70,6 +79,9 @@ summary = estimator.estimate(panel, utility, problem, transitions)
 print(summary.parameters)
 print(summary.metadata["v_loss_per_outer"][-1])
 ```
+
+No fixed output is shown for the lower-level snippet because `panel`,
+`utility`, `problem`, and `transitions` are caller-supplied objects.
 
 The known-truth validation uses the lower-level API because it supplies the
 true DDC problem, transition tensor, and reward specification directly. That is

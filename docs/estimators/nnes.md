@@ -64,6 +64,14 @@ print(model.policy_.shape)
 print(model.v_network_.shape)
 ```
 
+Output from the package smoke run:
+
+```text
+{'theta_c': 0.001034, 'RC': 3.073617}
+(90, 2)
+(90,)
+```
+
 Set `bellman="npl"` for the certified NNES path. Set `bellman="nfxp"` for the
 neural soft-Bellman diagnostic variant, which does not carry the same
 orthogonality claim.
