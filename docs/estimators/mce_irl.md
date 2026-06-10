@@ -1,62 +1,82 @@
 # MCE-IRL
 
-## Overview
+Maximum causal entropy IRL recovers reward parameters by matching demonstrated
+feature expectations to the feature expectations implied by a soft dynamic
+policy. In EconIRL, the validated tabular path uses known transitions and
+explicit action-dependent reward features.
 
-MCE-IRL learns reward parameters by matching expert feature expectations under
-the maximum causal entropy policy. In econirl, the current evidence path uses known
-transitions and explicit reward features.
+Use this page for finite-dimensional tabular IRL. Use Deep MCE-IRL when the
+target is a neural reward map rather than a fixed feature vector.
 
-This is the finite-dimensional IRL baseline for structural reward-feature
-recovery.
+## Quick Decision
 
-## When to Use
+| Use MCE-IRL when | Prefer another estimator when |
+| --- | --- |
+| Demonstrations come from a discrete sequential decision problem. | You need likelihood-based structural standard errors. |
+| Transitions are known or can be supplied. | Transition estimation is the main difficulty. |
+| Reward features are explicit and action-dependent. | Reward features are unknown or purely neural. |
+| The behavioral model is maximum causal entropy. | The target is deterministic optimal control without entropy regularization. |
+| You want reward, policy, value, Q, and counterfactual recovery checks. | You only need fitted conditional choice probabilities. |
 
-Use MCE-IRL when:
-
-- demonstrations come from a discrete dynamic decision problem;
-- transitions are known or supplied;
-- reward features are explicit and finite-dimensional;
-- you want reward, policy, value, Q, and counterfactual recovery;
-- maximum causal entropy is the right behavioral regularization.
-
-Avoid MCE-IRL when reward features are unknown, transitions are unavailable, or
-you need a neural reward map. For the neural variant, use Deep MCE-IRL.
-
-## Basic Usage
+## Minimal Fit
 
 ```python
-import pandas as pd
+import numpy as np
 
+from econirl.datasets import load_rust_bus
 from econirl.estimators import MCEIRL
 
-data = pd.read_csv("dynamic_choices.csv")
+n_states = 90
+n_actions = 2
+features = np.zeros((n_states, n_actions, 2))
+features[:, 0, 0] = -np.arange(n_states) / 100.0
+features[:, 1, 1] = -1.0
+
+df = load_rust_bus()
 
 model = MCEIRL(
-    n_states=25,
-    n_actions=3,
-    discount=0.95,
-    feature_matrix=reward_features,
+    n_states=n_states,
+    n_actions=n_actions,
+    discount=0.99,
+    feature_matrix=features,
+    feature_names=["keep_mileage_cost", "replace_cost"],
 )
-model.fit(data, state="state", action="action", id="agent_id")
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
-print(model.summary())
+print(model.policy_.shape)
 ```
 
-For multi-action structural recovery, pass an explicit reward specification to
-`fit()` or provide `feature_matrix` at construction time.
+For multi-action recovery, pass a `RewardSpec` to `fit()` or provide an
+explicit `feature_matrix` at construction time. The wrapper no longer treats
+`feature_matrix=None` as an evidence-backed structural default.
 
-## Evidence
+## What Is Certified
 
-The reported known-truth evidence covers action-dependent reward-feature
-cells. The wrapper no longer treats `feature_matrix=None` as an
-evidence-backed structural default for multi-action
-models.
+MCE-IRL is reported on two action-dependent known-truth cells. The primary cell
+has 25 states, 3 actions, 8 reward features, known transitions, known rewards,
+known policies, known value and Q functions, and Type A, Type B, and Type C
+counterfactual oracles.
 
-The validation DGPs are finite-state dynamic choice benchmarks with known
-transitions, known action-specific reward features, and known policy, value, and
-counterfactual truth.
+| Evidence | Current state |
+| --- | --- |
+| Evidence scope | Tabular maximum causal entropy feature matching. |
+| Primary cell | `mce_low_high_reward`. |
+| Machine-readable artifact | [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json). |
+| Release status | Certified with caveat. |
+| Hard gates | 20 pass, 0 fail across the sanity and primary cells. |
+| Public example | Uses `MCEIRL` with explicit action-dependent features. |
 
-## Further Reading
+## MCE-IRL Guide
 
-- Machine-readable artifact: [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json)
+```{toctree}
+:maxdepth: 2
+
+mce_irl/context
+mce_irl/quick_start
+mce_irl/under_the_hood
+mce_irl/pre_estimation
+mce_irl/validation
+mce_irl/counterfactuals
+mce_irl/rust_bus
+```
