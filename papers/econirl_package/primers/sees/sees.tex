@@ -267,97 +267,12 @@ Parameter & Truth \\
 \end{tabular}
 \end{table}
 
-\section{Pre-Estimation Diagnostics}
+\section{Validation Results}
 
-Run diagnostics before fitting. For SEES, basis and penalty choices are only
-meaningful after identification checks pass.
-
-\begin{lstlisting}
-from experiments.known_truth import (
-    SimulationConfig,
-    build_known_truth_dgp,
-    get_cell,
-    run_pre_estimation_diagnostics,
-    simulate_known_truth_panel,
-)
-
-cell = get_cell("canonical_high_action")
-dgp = build_known_truth_dgp(cell.dgp_config)
-panel = simulate_known_truth_panel(
-    dgp,
-    cell.simulation_config,
-)
-diagnostics = run_pre_estimation_diagnostics(dgp, panel)
-
-assert diagnostics.passed
-assert diagnostics.feature_rank == diagnostics.num_features
-assert diagnostics.is_action_dependent
-assert diagnostics.observed_states == diagnostics.num_states
-\end{lstlisting}
-
-\section{Run the Tutorial}
-
-From the repository root:
-
-\begin{lstlisting}
-PYTHONPATH=src:. python -m experiments.known_truth \
-    --estimator SEES \
-    --cell-id canonical_high_action \
-    --output-dir outputs/known_truth \
-    --show-progress \
-    --verbose
-\end{lstlisting}
-
-The command builds the DGP, simulates the panel with \texttt{tqdm} progress,
-runs pre-estimation diagnostics, fits SEES with Schur-complement standard
-errors, evaluates reward/value/Q/policy recovery, solves Type A/B/C
-counterfactual oracles, writes one \texttt{result.json}, and raises if any
-non-smoke hard gate fails.
-
-To regenerate the full primer tables for both cells:
-
-\begin{lstlisting}
-PYTHONPATH=src:. python papers/econirl_package/primers/sees/sees_run.py
-\end{lstlisting}
-
-Direct estimator usage:
-
-\begin{lstlisting}
-from experiments.known_truth import (
-    build_known_truth_dgp,
-    get_cell,
-    simulate_known_truth_panel,
-)
-from econirl.estimation.sees import SEESEstimator
-
-cell = get_cell("canonical_low_action")
-dgp = build_known_truth_dgp(cell.dgp_config)
-panel = simulate_known_truth_panel(dgp, cell.simulation_config)
-
-estimator = SEESEstimator(
-    basis_type="bspline",
-    basis_dim=dgp.problem.num_states,
-    penalty_weight=100.0,
-    max_iter=1000,
-    tol=1e-7,
-    compute_se=True,
-    verbose=True,
-)
-
-summary = estimator.estimate(
-    panel=panel,
-    utility=dgp.utility(),
-    problem=dgp.problem,
-    transitions=dgp.transitions,
-)
-\end{lstlisting}
-
-For the high-dimensional validation, the known-truth harness uses
-\texttt{basis\_dim=dgp.problem.num\_states}, an encoded-state basis selected
-automatically from \texttt{problem.state\_encoder}, and a stronger Bellman
-penalty. The deterministic starting point is near the truth because this hard
-validation checks the SEES basis and Bellman formulation, not global discovery
-from an arbitrary 32-parameter start.
+For the high-dimensional validation, SEES uses an encoded-state basis and a
+stronger Bellman penalty. The deterministic starting point is near the truth
+because this hard validation checks the SEES basis and Bellman formulation,
+not global discovery from an arbitrary 32-parameter start.
 
 \input{sees_results}
 
@@ -388,48 +303,6 @@ changed, reward levels can drift.
 \item \textbf{Soft gates.} Do not accept a non-smoke run that only warns.
 Known-truth validation should pass hard gates or raise.
 \end{enumerate}
-
-\section{Practical Defaults}
-
-Recommended non-smoke validation settings for the low-dimensional sanity cell:
-
-\begin{lstlisting}
-SEESEstimator(
-    basis_type="bspline",
-    basis_dim=dgp.problem.num_states,
-    penalty_weight=100.0,
-    max_iter=1000,
-    tol=1e-7,
-    compute_se=True,
-)
-\end{lstlisting}
-
-Recommended high-dimensional validation settings:
-
-\begin{lstlisting}
-SEESEstimator(
-    basis_type="bspline",
-    basis_dim=dgp.problem.num_states,
-    penalty_weight=10000.0,
-    max_iter=1000,
-    tol=1e-7,
-    compute_se=True,
-)
-\end{lstlisting}
-
-Use smoke settings only for code-path tests. A smoke test shows that the
-estimator runs and returns finite objects; it is not evidence of recovery.
-
-\section{Implementation Paths}
-
-\begin{itemize}
-\item Estimator: \texttt{src/econirl/estimation/sees.py}
-\item Known-truth harness: \texttt{experiments/known\_truth.py}
-\item Component tests: \texttt{tests/test\_sees\_known\_truth\_components.py}
-\item Fast validation tests: \texttt{tests/test\_known\_truth.py}
-\item Master plan: \texttt{papers/econirl\_package\_jss/plans/README.md}
-\item SEES alignment audit: \texttt{papers/econirl\_package\_jss/plans/alignment/13\_sees.md}
-\end{itemize}
 
 \section{References}
 

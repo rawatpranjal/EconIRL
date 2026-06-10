@@ -13,11 +13,12 @@ from experiments.known_truth import (
     DEFAULT_CELLS,
     ESTIMATOR_CONTRACTS,
     REQUIRED_ESTIMATORS,
+    ContentHeterogeneityKnownTruthConfig,
     CounterfactualConfig,
     KnownTruthDGPConfig,
     RecoveryGateFailure,
-    SimulationConfig,
     ShapeshifterKnownTruthConfig,
+    SimulationConfig,
     build_counterfactual,
     build_known_truth_dgp,
     check_estimator_compatibility,
@@ -116,6 +117,52 @@ def test_canonical_high_dim_action_preset_is_well_conditioned():
     assert diagnostics.feature_rank == diagnostics.num_features
     assert diagnostics.condition_number < 10.0
     assert cell.simulation_config.n_individuals == 2_000
+
+
+def test_gladius_paper_high_state_cell_is_low_reward_high_state():
+    cell = get_cell("gladius_paper_high_state")
+    dgp = build_known_truth_dgp(cell.dgp_config)
+    diagnostics = run_pre_estimation_diagnostics(dgp)
+
+    assert cell.cell_id == "gladius_paper_high_state"
+    assert dgp.config.state_mode == "high_dim"
+    assert dgp.config.reward_dim == "low"
+    assert dgp.state_features.shape == (21, 64)
+    assert dgp.feature_matrix.shape == (21, 3, 4)
+    assert diagnostics.passed
+    assert diagnostics.anchor_valid
+    assert diagnostics.is_action_dependent
+    assert jnp.allclose(dgp.homogeneous_reward[:, dgp.config.exit_action], 0.0)
+    assert cell.simulation_config.n_individuals == 1_000
+    assert cell.simulation_config.n_periods == 100
+
+
+def test_gladius_scaled_high_state_cell_doubles_nuisance_features():
+    cell = get_cell("gladius_paper_high_state_scaled")
+    dgp = build_known_truth_dgp(cell.dgp_config)
+    diagnostics = run_pre_estimation_diagnostics(dgp)
+
+    assert dgp.config.state_mode == "high_dim"
+    assert dgp.config.reward_dim == "low"
+    assert dgp.state_features.shape == (21, 128)
+    assert dgp.feature_matrix.shape == (21, 3, 4)
+    assert diagnostics.passed
+    assert diagnostics.anchor_valid
+    assert diagnostics.feature_rank == diagnostics.num_features
+    assert cell.simulation_config.n_individuals == 1_000
+    assert cell.simulation_config.n_periods == 100
+
+
+def test_gladius_known_truth_estimator_receives_anchor_rewards():
+    dgp = build_known_truth_dgp(get_cell("gladius_paper_high_state").dgp_config)
+    estimator = make_estimator("GLADIUS", dgp, smoke=True)
+
+    assert estimator.config.anchor_action == dgp.config.exit_action
+    assert estimator.config.anchor_bellman_loss
+    assert estimator.config.anchor_bellman_mode == "anchor_moment"
+    assert estimator.config.anchor_rewards is not None
+    assert len(estimator.config.anchor_rewards) == dgp.problem.num_states
+    assert all(abs(value) < 1e-12 for value in estimator.config.anchor_rewards)
 
 
 def test_latent_segment_dgp_tracks_segment_truth():
@@ -235,7 +282,12 @@ def test_nfxp_uses_universal_canonical_preset():
     assert {
         "canonical_low_action",
         "canonical_low_state_only",
+        "airl_paper_identification",
+        "f_irl_paper_state_marginal",
+        "airl_het_paper_identification",
         "canonical_high_action",
+        "gladius_paper_high_state",
+        "gladius_paper_high_state_scaled",
         "canonical_latent_segments",
         "deep_mce_neural_reward",
         "deep_mce_neural_features",
@@ -255,6 +307,90 @@ def test_nfxp_uses_universal_canonical_preset():
     assert not check_estimator_compatibility("NFXP", state_only).compatible
     assert not check_estimator_compatibility("NFXP", high_action).compatible
     assert not check_estimator_compatibility("NFXP", latent).compatible
+
+
+def test_airl_paper_identification_cell_matches_original_assumptions():
+    cell = get_cell("airl_paper_identification")
+    dgp = build_known_truth_dgp(cell.dgp_config)
+    diagnostics = run_pre_estimation_diagnostics(dgp)
+
+    assert cell.cell_id == "airl_paper_identification"
+    assert dgp.config.reward_mode == "state_only"
+    assert dgp.config.absorbing_state is None
+    assert dgp.config.exit_action is None
+    assert diagnostics.passed
+    assert not diagnostics.is_action_dependent
+    assert check_estimator_compatibility("AIRL", dgp).compatible
+    assert jnp.allclose(
+        dgp.homogeneous_reward,
+        dgp.homogeneous_reward[:, :1],
+    )
+    estimator = make_estimator("AIRL", dgp, smoke=False)
+    assert estimator.config.reward_type == "linear"
+    assert estimator.config.reward_arg == "state"
+    assert estimator.config.generator_reward == "f"
+    assert estimator.config.min_rounds == 150
+    transition_rows = dgp.transitions.sum(axis=2)
+    transition_max = dgp.transitions.max(axis=2)
+    assert jnp.allclose(transition_rows, 1.0)
+    assert jnp.allclose(transition_max, 1.0)
+
+
+def test_f_irl_paper_state_marginal_cell_matches_paper_assumptions():
+    cell = get_cell("f_irl_paper_state_marginal")
+    dgp = build_known_truth_dgp(cell.dgp_config)
+    diagnostics = run_pre_estimation_diagnostics(dgp)
+    estimator = make_estimator("f-IRL", dgp, smoke=True)
+
+    assert cell.cell_id == "f_irl_paper_state_marginal"
+    assert dgp.config.reward_mode == "state_only"
+    assert dgp.config.absorbing_state is None
+    assert dgp.config.exit_action is None
+    assert diagnostics.passed
+    assert not diagnostics.is_action_dependent
+    assert check_estimator_compatibility("f-IRL", dgp).compatible
+    assert jnp.allclose(dgp.homogeneous_reward, dgp.homogeneous_reward[:, :1])
+    assert estimator._marginal_space == "state"
+    assert estimator._reward_scope == "state"
+    transition_rows = dgp.transitions.sum(axis=2)
+    transition_max = dgp.transitions.max(axis=2)
+    assert jnp.allclose(transition_rows, 1.0)
+    assert jnp.allclose(transition_max, 1.0)
+
+
+def test_airl_het_paper_identification_cell_matches_anchor_assumptions():
+    cell = get_cell("airl_het_paper_identification")
+    dgp = build_known_truth_dgp(cell.dgp_config)
+    panel = simulate_known_truth_panel(dgp, cell.simulation_config)
+    diagnostics = run_pre_estimation_diagnostics(dgp)
+
+    assert cell.cell_id == "airl_het_paper_identification"
+    assert isinstance(cell.dgp_config, ContentHeterogeneityKnownTruthConfig)
+    assert dgp.config.heterogeneity == "latent_segments"
+    assert dgp.config.reward_mode == "action_dependent"
+    assert dgp.config.exit_action == 2
+    assert dgp.config.absorbing_state == dgp.problem.num_states - 1
+    assert dgp.num_segments == 2
+    assert dgp.config.books_per_user == 4
+    assert dgp.state_features.shape[1] == 18
+    assert dgp.feature_matrix.shape[-1] == 20
+    assert diagnostics.feature_rank == 20
+    assert len(panel.trajectories) == (
+        cell.simulation_config.n_individuals * dgp.config.books_per_user
+    )
+    assert len({traj.individual_id for traj in panel.trajectories}) == (
+        cell.simulation_config.n_individuals
+    )
+    assert len(panel.metadata["segment_labels"]) == len(panel.trajectories)
+    assert diagnostics.passed
+    assert diagnostics.anchor_valid
+    assert check_estimator_compatibility("AIRL-Het", dgp).compatible
+
+    estimator = make_estimator("AIRL-Het", dgp, smoke=True)
+    assert estimator.config.reward_type == "linear"
+    assert estimator.config.generator_reward == "f"
+    assert estimator.config.initialization == "behavioral_anchor"
+    assert estimator.config.min_airl_rounds == 1
 
 
 def test_legacy_cell_ids_are_aliases_not_separate_dgps():
@@ -327,7 +463,10 @@ def test_shapeshifter_neural_reward_bridge_has_no_finite_theta_and_full_masks():
     assert "projected_parameter_cosine" not in gate_names
     assert "projected_parameter_relative_rmse" not in gate_names
     assert "occupancy_moment_residual" in gate_names
-    assert all(gate.passed for gate in recovery_gates("MCE-IRL Deep", summary, metrics, smoke=False))
+    assert all(
+        gate.passed
+        for gate in recovery_gates("MCE-IRL Deep", summary, metrics, smoke=False)
+    )
 
 
 def test_known_truth_initialization_is_deterministic_and_near_truth():
@@ -756,6 +895,254 @@ def test_mce_irl_deep_accepts_shapeshifter_neural_reward_smoke_case():
     assert math.isfinite(result.metrics["value_normalized_rmse"])
     assert math.isfinite(result.metrics["q_normalized_rmse"])
     assert set(result.metrics["counterfactuals"]) == {"type_a", "type_b", "type_c"}
+
+
+def test_airl_smoke_fit_produces_diagnostic_known_truth_gates():
+    dgp = build_known_truth_dgp(
+        KnownTruthDGPConfig(
+            state_mode="low_dim",
+            reward_mode="state_only",
+            reward_dim="low",
+            heterogeneity="none",
+            num_regular_states=5,
+            transition_noise=0.0,
+            seed=932,
+        )
+    )
+    panel = simulate_known_truth_panel(
+        dgp,
+        SimulationConfig(n_individuals=12, n_periods=6, seed=933),
+    )
+
+    result = run_estimator("AIRL", dgp, panel, smoke=True)
+
+    assert result.compatibility.compatible
+    assert result.summary.metadata["reward_arg"] == "state"
+    assert result.summary.metadata["generator_reward"] == "recovered"
+    assert result.summary.metadata["learned_shaping"]
+    assert result.summary.policy.shape == (
+        dgp.problem.num_states,
+        dgp.problem.num_actions,
+    )
+    assert result.summary.value_function.shape == (dgp.problem.num_states,)
+    assert math.isfinite(result.metrics["reward_normalized_rmse"])
+    assert math.isfinite(result.metrics["value_normalized_rmse"])
+    assert math.isfinite(result.metrics["q_normalized_rmse"])
+
+    gate_names = {
+        gate.name
+        for gate in recovery_gates("AIRL", result.summary, result.metrics, smoke=False)
+    }
+    assert {
+        "converged",
+        "reward_normalized_rmse",
+        "policy_tv",
+        "value_normalized_rmse",
+        "q_normalized_rmse",
+        "type_a_regret",
+        "type_b_regret",
+        "type_c_regret",
+    } == gate_names
+    assert "parameter_cosine" not in gate_names
+
+
+def test_f_irl_state_action_non_smoke_gates_are_diagnostic_only():
+    summary = SimpleNamespace(
+        converged=True,
+        metadata={
+            "occupancy_l1": 0.16,
+            "reward_range": 1.20,
+            "marginal_space": "state_action",
+            "reward_scope": "state_action",
+        },
+    )
+
+    gates = recovery_gates("f-IRL", summary, metrics={}, smoke=False)
+    gate_names = {gate.name for gate in gates}
+
+    assert gate_names == {"converged", "occupancy_l1", "reward_range"}
+    assert "reward_normalized_rmse" not in gate_names
+    assert "policy_tv" not in gate_names
+    assert all(gate.passed for gate in gates)
+
+
+def test_f_irl_paper_state_gates_require_structural_recovery():
+    summary = SimpleNamespace(
+        converged=True,
+        metadata={
+            "occupancy_l1": 0.01,
+            "reward_range": 1.20,
+            "marginal_space": "state",
+            "reward_scope": "state",
+        },
+    )
+    metrics = {
+        "reward_normalized_rmse": 0.20,
+        "policy": SimpleNamespace(tv=0.02),
+        "value_normalized_rmse": 0.12,
+        "q_normalized_rmse": 0.10,
+        "counterfactuals": {
+            "type_a": SimpleNamespace(regret=0.01),
+            "type_b": SimpleNamespace(regret=0.02),
+            "type_c": SimpleNamespace(regret=0.01),
+        },
+    }
+
+    gates = recovery_gates("f-IRL", summary, metrics=metrics, smoke=False)
+    gate_names = {gate.name for gate in gates}
+
+    assert {
+        "converged",
+        "state_marginal_l1",
+        "reward_range",
+        "reward_normalized_rmse",
+        "policy_tv",
+        "value_normalized_rmse",
+        "q_normalized_rmse",
+        "type_a_regret",
+        "type_b_regret",
+        "type_c_regret",
+    } == gate_names
+    assert all(gate.passed for gate in gates)
+
+
+def test_gladius_non_smoke_gates_require_structural_recovery():
+    summary = SimpleNamespace(
+        converged=True,
+        metadata={"final_loss": 0.50},
+    )
+    metrics = {
+        "parameters": SimpleNamespace(
+            cosine_similarity=0.95,
+            relative_rmse=0.20,
+        ),
+        "policy": SimpleNamespace(tv=0.05),
+        "raw_bellman_reward_normalized_rmse": 0.10,
+        "projected_reward_normalized_rmse": 0.10,
+        "value_normalized_rmse": 0.10,
+        "q_normalized_rmse": 0.10,
+        "counterfactuals": {
+            "type_a": SimpleNamespace(regret=0.02),
+            "type_b": SimpleNamespace(regret=0.03),
+            "type_c": SimpleNamespace(regret=0.04),
+        },
+    }
+
+    gates = recovery_gates("GLADIUS", summary, metrics, smoke=False)
+    gate_names = {gate.name for gate in gates}
+
+    assert gate_names == {
+        "converged",
+        "final_loss",
+        "parameter_cosine",
+        "parameter_relative_rmse",
+        "raw_bellman_reward_normalized_rmse",
+        "projected_reward_normalized_rmse",
+        "policy_tv",
+        "value_normalized_rmse",
+        "q_normalized_rmse",
+        "type_a_regret",
+        "type_b_regret",
+        "type_c_regret",
+    }
+    assert all(gate.passed for gate in gates)
+
+    weak_metrics = dict(metrics)
+    weak_metrics["projected_reward_normalized_rmse"] = 0.80
+    weak_gates = recovery_gates("GLADIUS", summary, weak_metrics, smoke=False)
+    projected_gate = next(
+        gate for gate in weak_gates
+        if gate.name == "projected_reward_normalized_rmse"
+    )
+    assert not projected_gate.passed
+
+
+def test_iq_learn_non_smoke_gates_require_structural_recovery():
+    summary = SimpleNamespace(
+        converged=True,
+        metadata={
+            "expert_state_coverage": 1.0,
+            "expert_state_action_coverage": 1.0,
+        },
+    )
+    metrics = {
+        "policy": SimpleNamespace(tv=0.04),
+        "raw_bellman_reward_normalized_rmse": 0.05,
+        "projected_reward_normalized_rmse": 0.05,
+        "value_normalized_rmse": 0.05,
+        "q_normalized_rmse": 0.05,
+        "counterfactuals": {
+            "type_a": SimpleNamespace(regret=0.01),
+            "type_b": SimpleNamespace(regret=0.02),
+            "type_c": SimpleNamespace(regret=0.01),
+        },
+    }
+
+    gates = recovery_gates("IQ-Learn", summary, metrics, smoke=False)
+    gate_names = {gate.name for gate in gates}
+
+    assert gate_names == {
+        "converged",
+        "expert_state_coverage",
+        "expert_state_action_coverage",
+        "policy_tv",
+        "raw_bellman_reward_normalized_rmse",
+        "projected_reward_normalized_rmse",
+        "value_normalized_rmse",
+        "q_normalized_rmse",
+        "type_a_regret",
+        "type_b_regret",
+        "type_c_regret",
+    }
+    assert all(gate.passed for gate in gates)
+
+    weak_metrics = dict(metrics)
+    weak_metrics["raw_bellman_reward_normalized_rmse"] = 0.40
+    weak_gates = recovery_gates("IQ-Learn", summary, weak_metrics, smoke=False)
+    raw_gate = next(
+        gate for gate in weak_gates
+        if gate.name == "raw_bellman_reward_normalized_rmse"
+    )
+    assert not raw_gate.passed
+
+
+def test_iq_learn_known_truth_q_type_selection_matches_dgp_matrix():
+    low = build_known_truth_dgp(get_cell("canonical_low_action").dgp_config)
+    high = build_known_truth_dgp(get_cell("canonical_high_action").dgp_config)
+
+    assert make_estimator("IQ-Learn", low, smoke=False).config.q_type == "tabular"
+    assert make_estimator("IQ-Learn", low, smoke=True).config.q_type == "tabular"
+    assert make_estimator("IQ-Learn", high, smoke=False).config.q_type == "neural"
+    assert make_estimator("IQ-Learn", high, smoke=True).config.q_type == "tabular"
+
+
+def test_anchor_projected_reward_diagnostic_removes_exit_action_gauge():
+    dgp = build_known_truth_dgp(
+        KnownTruthDGPConfig(
+            state_mode="low_dim",
+            reward_mode="action_dependent",
+            reward_dim="low",
+            num_regular_states=6,
+            seed=943,
+        )
+    )
+    state_offsets = jnp.linspace(-2.0, 2.0, dgp.problem.num_states)[:, None]
+    estimated_reward = dgp.homogeneous_reward + state_offsets
+    summary = SimpleNamespace(
+        parameters=jnp.asarray([], dtype=jnp.float32),
+        metadata={"reward_matrix": estimated_reward},
+        policy=None,
+        value_function=None,
+    )
+
+    metrics = evaluate_estimator_against_truth(dgp, summary)
+
+    assert math.isfinite(metrics["reward_normalized_rmse"])
+    assert metrics["anchor_projected_reward_normalized_rmse"] == pytest.approx(
+        0.0,
+        abs=1e-10,
+    )
+    assert metrics["anchor_projected_reward_rmse"] == pytest.approx(0.0, abs=1e-10)
 
 
 def test_irl_normalized_rmse_removes_affine_reward_ambiguity_only():

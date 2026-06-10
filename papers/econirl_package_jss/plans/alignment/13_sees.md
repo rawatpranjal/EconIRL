@@ -4,15 +4,15 @@
 
 ### Known-truth migration status
 
-- Status: **migrated**.
+- Status: **validated**.
 - RTD front door: `docs/estimators/sees.md`.
 - Dedicated TeX/PDF: `papers/econirl_package/primers/sees/sees.tex`.
 - Result generator: `papers/econirl_package/primers/sees/sees_run.py`.
 - Shared DGP harness: `experiments/known_truth.py`.
 - Fast test: `tests/test_known_truth.py::test_sees_smoke_fit_produces_known_truth_metrics_and_gates`.
 
-The migrated validation uses only the synthetic known-truth DGP. No real data
-or legacy examples are used on the RTD surface.
+The validated release artifact uses only the synthetic known-truth DGP. No real
+data or legacy examples are used on the RTD surface.
 
 ### Loss / objective
 
@@ -76,15 +76,15 @@ and no SE computation) did not recover the full known truth:
 The migrated harness uses the finite-state limiting logic from Luo and Sang:
 
 - `basis_type="bspline"`
-- `basis_dim=min(num_states, 21)` for the non-smoke canonical cell
-- `penalty_weight=100.0`
+- `basis_dim=21`, `penalty_weight=100.0` for the low-dimensional sanity cell
+- `basis_dim=81`, `penalty_weight=10000.0` for the high-dimensional primary cell
 - `max_iter=1000`
 - `tol=1e-7`
 - `compute_se=True`
 
-On the canonical 21-state DGP this makes the sieve as rich as the finite value
-vector. The Bellman penalty then enforces the dynamic structure while retaining
-the SEES joint-optimization path.
+On the canonical known-truth DGPs this makes the sieve as rich as the finite
+value vector. The Bellman penalty then enforces the dynamic structure while
+retaining the SEES joint-optimization path.
 
 ### Hard gates
 
@@ -100,16 +100,31 @@ The non-smoke SEES gates in `experiments/known_truth.py` require:
 - Q RMSE <= 0.10.
 - Type A/B/C counterfactual regret <= 0.01.
 
-Current canonical run:
+Current low-dimensional sanity cell:
 
-- Bellman violation: 0.044579.
-- parameter cosine: 0.995485.
-- parameter relative RMSE: 0.124955.
-- reward RMSE: 0.013579.
-- policy TV: 0.008884.
-- value RMSE: 0.080710.
-- Q RMSE: 0.080546.
-- Type A/B/C regret: 0.000526, 0.001281, 0.000313.
+- Cell: `canonical_low_action`.
+- Result: **Pass, 11/11 gates**.
+- Bellman violation: 0.000058.
+- parameter cosine: 0.999146.
+- parameter relative RMSE: 0.059671.
+- reward RMSE: 0.008988.
+- policy TV: 0.005179.
+- value RMSE: 0.017591.
+- Q RMSE: 0.020514.
+- Type A/B/C regret: 0.000179, 0.000299, 0.000071.
+
+Current high-dimensional primary cell:
+
+- Cell: `canonical_high_action`.
+- Result: **Pass, 11/11 gates**.
+- Bellman violation: 0.000003.
+- parameter cosine: 0.999955.
+- parameter relative RMSE: 0.009528.
+- reward RMSE: 0.004432.
+- policy TV: 0.002117.
+- value RMSE: 0.037836.
+- Q RMSE: 0.031480.
+- Type A/B/C regret: 0.000113, 0.000183, 0.000014.
 
 All hard gates pass.
 

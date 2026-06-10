@@ -1,8 +1,10 @@
 """Sieve Estimator (SEES) for dynamic discrete choice models.
 
-Approximates the value function V(s) with sieve basis functions, then performs
-penalized maximum likelihood jointly over structural parameters theta and basis
-coefficients alpha.
+Approximates a Bellman solution object with sieve basis functions, then
+performs penalized maximum likelihood jointly over structural parameters theta
+and basis coefficients alpha. The default mode approximates the value function
+V(s); action-value, continuation-value, policy-logit, and collocation variants
+are available through the ``solution`` configuration.
 
 This avoids both the costly inner fixed-point loop of NFXP and the
 neural network training of NNES, using a closed-form basis expansion
@@ -10,21 +12,20 @@ that can be solved with standard nonlinear optimization.
 
 Algorithm:
     1. Construct sieve basis Psi(s) of dimension K (Fourier or polynomial)
-    2. V(s) ~ Psi(s) . alpha, where alpha are basis coefficients
-    3. Q(s,a;theta,alpha) = u(s,a;theta) + beta * E[Psi(s').alpha | s,a]
-    4. P(a|s) = softmax(Q(s,a) / sigma)
-    5. Maximize: LL(theta, alpha) - omega * ||V(alpha) - T(V; theta)||^2
+    2. Approximate V, Q, EV, or policy logits with basis coefficients alpha
+    3. Compute the implied softmax policy
+    4. Maximize a likelihood minus a Bellman/equilibrium residual penalty
 
 Reference:
-    Luo, Y. & Sang, Y. (2024). "Sieve Estimation of Dynamic Discrete
-    Choice Models." Working Paper.
+    Luo, Y. & Sang, Y. (2024). "Efficient Estimation of Structural Models
+    via Sieves." Working Paper.
 """
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Literal
 
 import jax
 import jax.numpy as jnp
@@ -37,6 +38,16 @@ from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod
 from econirl.preferences.base import UtilityFunction
+
+
+SEESSolution = Literal["value", "q", "ev", "policy", "collocation"]
+VALID_SEES_SOLUTIONS: tuple[str, ...] = (
+    "value",
+    "q",
+    "ev",
+    "policy",
+    "collocation",
+)
 
 
 @dataclass
@@ -65,6 +76,14 @@ class SEESConfig:
             problem.state_encoder states; "auto" uses encoded features only
             for high-dimensional encoded state spaces and otherwise keeps the
             index basis.
+        solution: Solution object approximated by the sieve. "value" is the
+            existing V-SEES estimator; "q", "ev", and "policy" approximate
+            action values, expected continuation values, and policy logits;
+            "collocation" is V-SEES with the Bellman penalty evaluated on a
+            deterministic state subset.
+        num_theta_starts: Number of deterministic theta starts to try. The
+            first start is the supplied initial_params or utility default.
+            Additional starts include static-logit and neutral variants.
         warm_start_value: Whether to initialize sieve coefficients by solving
             the Bellman equation at the initial theta and projecting the value
             function into the sieve basis.
@@ -81,6 +100,8 @@ class SEESConfig:
     penalty_schedule: Callable[[int], float] | None = None
     spline_degree: int = 3
     state_basis_mode: str = "auto"
+    solution: SEESSolution = "value"
+    num_theta_starts: int = 1
     warm_start_value: bool = True
     max_iter: int = 500
     tol: float = 1e-6
@@ -92,10 +113,10 @@ class SEESConfig:
 class SEESEstimator(BaseEstimator):
     """Sieve Estimator for dynamic discrete choice.
 
-    Approximates V(s) with basis functions and jointly optimizes
-    structural parameters and basis coefficients via penalized MLE.
-    Standard errors use the Schur complement to marginalize out
-    basis coefficients alpha, giving the correct marginal Hessian for theta.
+    Approximates a Bellman solution object with basis functions and jointly
+    optimizes structural parameters and basis coefficients via penalized MLE.
+    Standard errors use the Schur complement to marginalize out basis
+    coefficients alpha, giving the marginal Hessian for theta.
 
     Args:
         config: SEESConfig or keyword arguments matching SEESConfig fields.
@@ -115,6 +136,8 @@ class SEESEstimator(BaseEstimator):
         penalty_schedule: Callable[[int], float] | None = None,
         spline_degree: int = 3,
         state_basis_mode: str = "auto",
+        solution: SEESSolution = "value",
+        num_theta_starts: int = 1,
         warm_start_value: bool = True,
         max_iter: int = 500,
         tol: float = 1e-6,
@@ -130,6 +153,8 @@ class SEESEstimator(BaseEstimator):
             penalty_schedule = config.penalty_schedule
             spline_degree = config.spline_degree
             state_basis_mode = config.state_basis_mode
+            solution = config.solution
+            num_theta_starts = config.num_theta_starts
             warm_start_value = config.warm_start_value
             max_iter = config.max_iter
             tol = config.tol
@@ -151,7 +176,16 @@ class SEESEstimator(BaseEstimator):
             raise ValueError(
                 "state_basis_mode must be one of 'auto', 'index', or 'encoded'"
             )
+        if solution not in VALID_SEES_SOLUTIONS:
+            raise ValueError(
+                "solution must be one of "
+                + ", ".join(repr(value) for value in VALID_SEES_SOLUTIONS)
+            )
+        if num_theta_starts < 1:
+            raise ValueError("num_theta_starts must be at least 1")
         self._state_basis_mode = state_basis_mode
+        self._solution = solution
+        self._num_theta_starts = int(num_theta_starts)
         self._warm_start_value = warm_start_value
         self._max_iter = max_iter
         self._tol = tol
@@ -163,6 +197,8 @@ class SEESEstimator(BaseEstimator):
             penalty_schedule=penalty_schedule,
             spline_degree=spline_degree,
             state_basis_mode=state_basis_mode,
+            solution=solution,
+            num_theta_starts=num_theta_starts,
             warm_start_value=warm_start_value,
             max_iter=max_iter,
             tol=tol,
@@ -174,7 +210,7 @@ class SEESEstimator(BaseEstimator):
 
     @property
     def name(self) -> str:
-        return f"SEES ({self._basis_type}, Luo & Sang 2024)"
+        return f"SEES-{self._solution} ({self._basis_type}, Luo & Sang 2024)"
 
     @property
     def config(self) -> SEESConfig:
@@ -381,6 +417,216 @@ class SEESEstimator(BaseEstimator):
             bool(solution.converged),
         )
 
+    def _project_state_action_solution(
+        self,
+        basis: jnp.ndarray,
+        target: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, float]:
+        """Project a state-action object into action-specific basis columns."""
+        basis_np = np.asarray(basis, dtype=np.float64)
+        target_np = np.asarray(target, dtype=np.float64)
+        if target_np.ndim != 2:
+            raise ValueError("state-action target must have shape (states, actions)")
+
+        coeffs = []
+        fitted = np.zeros_like(target_np)
+        for action in range(target_np.shape[1]):
+            alpha_a, *_ = np.linalg.lstsq(
+                basis_np,
+                target_np[:, action],
+                rcond=None,
+            )
+            coeffs.append(alpha_a)
+            fitted[:, action] = basis_np @ alpha_a
+        rmse = float(np.sqrt(np.mean((fitted - target_np) ** 2)))
+        return (
+            jnp.array(np.stack(coeffs, axis=0), dtype=jnp.float64).reshape(-1),
+            rmse,
+        )
+
+    def _collocation_state_indices(
+        self,
+        n_states: int,
+        obs_states: jnp.ndarray | None = None,
+    ) -> jnp.ndarray:
+        """Return deterministic collocation states plus observed states."""
+        n_collocation = min(n_states, max(1, int(self._basis_dim)))
+        base = np.linspace(0, n_states - 1, n_collocation).round().astype(np.int32)
+        if obs_states is not None:
+            base = np.concatenate([base, np.asarray(obs_states, dtype=np.int32)])
+        return jnp.asarray(np.unique(base), dtype=jnp.int32)
+
+    def _evaluate_solution_outputs(
+        self,
+        theta: jnp.ndarray,
+        alpha: jnp.ndarray,
+        *,
+        basis: jnp.ndarray,
+        feature_matrix: jnp.ndarray,
+        problem: DDCProblem,
+        transitions: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+        """Evaluate the SEES solution object and its Bellman residual."""
+        n_states = problem.num_states
+        n_actions = problem.num_actions
+        sigma = problem.scale_parameter
+        beta = problem.discount_factor
+
+        theta = jnp.asarray(theta, dtype=jnp.float64)
+        alpha = jnp.asarray(alpha, dtype=jnp.float64)
+        basis = jnp.asarray(basis, dtype=jnp.float64)
+        feature_matrix = jnp.asarray(feature_matrix, dtype=jnp.float64)
+        transitions_f64 = jnp.asarray(transitions, dtype=jnp.float64)
+        basis_cols = int(basis.shape[1])
+
+        flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta)
+        expected_basis = jnp.einsum("ast,tk->ask", transitions_f64, basis)
+
+        def expected_value(value: jnp.ndarray) -> jnp.ndarray:
+            return jnp.einsum("ast,t->as", transitions_f64, value).T
+
+        def state_action_from_alpha(alpha_flat: jnp.ndarray) -> jnp.ndarray:
+            alpha_by_action = alpha_flat.reshape((n_actions, basis_cols))
+            return jnp.einsum("sk,ak->sa", basis, alpha_by_action)
+
+        def center_actions(values: jnp.ndarray) -> jnp.ndarray:
+            return values - values.mean(axis=1, keepdims=True)
+
+        def policy_value(flow_u: jnp.ndarray, policy: jnp.ndarray) -> jnp.ndarray:
+            clipped = jnp.clip(policy, 1e-12, 1.0)
+            entropy_flow = -sigma * jnp.sum(policy * jnp.log(clipped), axis=1)
+            reward_pi = jnp.sum(policy * flow_u, axis=1) + entropy_flow
+            transition_pi = jnp.einsum("sa,ast->st", policy, transitions_f64)
+            lhs = jnp.eye(n_states, dtype=jnp.float64) - beta * transition_pi
+            return jnp.linalg.solve(lhs, reward_pi)
+
+        if self._solution in {"value", "collocation"}:
+            value_approx = basis @ alpha
+            continuation = beta * jnp.einsum("ask,k->sa", expected_basis, alpha)
+            q_vals = flow_u + continuation
+            logits = q_vals / sigma
+            policy = jax.nn.softmax(logits, axis=1)
+            bellman_value = sigma * jax.scipy.special.logsumexp(logits, axis=1)
+            residual = value_approx - bellman_value
+            return logits, bellman_value, policy, residual, q_vals
+
+        if self._solution == "q":
+            q_vals = state_action_from_alpha(alpha)
+            logits = q_vals / sigma
+            policy = jax.nn.softmax(logits, axis=1)
+            value = sigma * jax.scipy.special.logsumexp(logits, axis=1)
+            target_q = flow_u + beta * expected_value(value)
+            residual = q_vals - target_q
+            return logits, value, policy, residual, q_vals
+
+        if self._solution == "ev":
+            continuation_value = state_action_from_alpha(alpha)
+            q_vals = flow_u + beta * continuation_value
+            logits = q_vals / sigma
+            policy = jax.nn.softmax(logits, axis=1)
+            value = sigma * jax.scipy.special.logsumexp(logits, axis=1)
+            target_continuation = expected_value(value)
+            residual = continuation_value - target_continuation
+            return logits, value, policy, residual, q_vals
+
+        raw_logits = state_action_from_alpha(alpha)
+        logits = center_actions(raw_logits)
+        policy = jax.nn.softmax(logits, axis=1)
+        value = policy_value(flow_u, policy)
+        target_q = flow_u + beta * expected_value(value)
+        target_logits = center_actions(target_q / sigma)
+        residual = logits - target_logits
+        return logits, value, policy, residual, target_q
+
+    def _static_logit_start(
+        self,
+        state_action_counts: jnp.ndarray,
+        utility: UtilityFunction,
+        problem: DDCProblem,
+    ) -> jnp.ndarray | None:
+        """Estimate a static-logit theta start from observed choices."""
+        feature_matrix = jnp.asarray(utility.feature_matrix, dtype=jnp.float64)
+        n_obs = jnp.maximum(state_action_counts.sum(), 1.0)
+        sigma = problem.scale_parameter
+        ridge = 1e-4
+
+        def static_objective(theta: jnp.ndarray) -> jnp.ndarray:
+            flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta)
+            log_probs = jax.nn.log_softmax(flow_u / sigma, axis=1)
+            nll = -jnp.sum(state_action_counts * log_probs) / n_obs
+            return nll + ridge * jnp.sum(theta**2)
+
+        lower_theta, upper_theta = utility.get_parameter_bounds()
+        bounds = (
+            jnp.asarray(lower_theta, dtype=jnp.float64),
+            jnp.asarray(upper_theta, dtype=jnp.float64),
+        )
+        try:
+            result = minimize_lbfgsb(
+                static_objective,
+                utility.get_initial_parameters(),
+                bounds=bounds,
+                maxiter=min(200, self._max_iter),
+                tol=max(self._tol, 1e-8),
+                verbose=False,
+                desc="SEES static-logit start",
+                param_names=utility.parameter_names,
+            )
+        except Exception:
+            return None
+        theta = jnp.asarray(result.x, dtype=jnp.float64)
+        if bool(jnp.all(jnp.isfinite(theta))):
+            return theta
+        return None
+
+    def _theta_start_candidates(
+        self,
+        initial_params: jnp.ndarray,
+        state_action_counts: jnp.ndarray,
+        utility: UtilityFunction,
+        problem: DDCProblem,
+    ) -> list[jnp.ndarray]:
+        """Build deterministic theta starts for multistart SEES."""
+        candidates: list[jnp.ndarray] = []
+
+        def add(theta: jnp.ndarray | None) -> None:
+            if theta is None:
+                return
+            theta = jnp.asarray(theta, dtype=jnp.float64)
+            if theta.shape != (utility.num_parameters,):
+                return
+            if not bool(jnp.all(jnp.isfinite(theta))):
+                return
+            for existing in candidates:
+                if np.allclose(np.asarray(theta), np.asarray(existing), atol=1e-8):
+                    return
+            candidates.append(theta)
+
+        add(initial_params)
+        if self._num_theta_starts == 1:
+            return candidates
+
+        default_theta = jnp.asarray(
+            utility.get_initial_parameters(),
+            dtype=jnp.float64,
+        )
+        static_theta = self._static_logit_start(
+            state_action_counts,
+            utility,
+            problem,
+        )
+        add(default_theta)
+        add(static_theta)
+
+        if static_theta is not None:
+            neutral_static = static_theta.at[0].set(0.0)
+            add(neutral_static)
+            add(0.5 * static_theta)
+
+        add(jnp.zeros(utility.num_parameters, dtype=jnp.float64))
+
+        return candidates[: self._num_theta_starts]
+
     def _optimize(
         self,
         panel: Panel,
@@ -404,8 +650,6 @@ class SEESEstimator(BaseEstimator):
 
         n_states = problem.num_states
         n_actions = problem.num_actions
-        sigma = problem.scale_parameter
-        beta = problem.discount_factor
         if self._penalty_schedule is not None:
             n_obs = sum(len(t.actions) for t in panel.trajectories)
             omega = float(self._penalty_schedule(n_obs))
@@ -424,55 +668,96 @@ class SEESEstimator(BaseEstimator):
         # Build sieve basis
         basis = self._build_basis(n_states, problem)  # (S, basis_dim)
         basis_metadata = dict(self._last_basis_metadata)
-        n_alpha = int(basis.shape[1])
+        basis_cols = int(basis.shape[1])
+        n_alpha = (
+            basis_cols
+            if self._solution in {"value", "collocation"}
+            else n_actions * basis_cols
+        )
 
-        # Precompute E[Psi(s') | s, a] = transitions[a] @ basis
-        # Shape: (n_actions, n_states, basis_dim)
         transitions_f64 = jnp.array(transitions, dtype=jnp.float64)
-        expected_basis = jnp.einsum("ast,tk->ask", transitions_f64, basis)
 
         if initial_params is None:
             initial_params = utility.get_initial_parameters()
         initial_params = jnp.array(initial_params, dtype=jnp.float64)
 
-        # Joint parameter vector: [theta, alpha]
-        projection_rmse = float("nan")
-        projection_converged = False
-        if self._warm_start_value:
-            initial_alpha, projection_rmse, projection_converged = (
-                self._project_value_solution(
-                    basis=basis,
-                    feature_matrix=feature_matrix,
-                    initial_params=initial_params,
-                    problem=problem,
-                    transitions=transitions_f64,
-                )
+        collocation_indices = self._collocation_state_indices(n_states, obs_states)
+
+        def expected_value(value: jnp.ndarray) -> jnp.ndarray:
+            return jnp.einsum("ast,t->as", transitions_f64, value).T
+
+        def initial_alpha_for(
+            theta_start: jnp.ndarray,
+        ) -> tuple[jnp.ndarray, float, bool]:
+            """Build initial alpha for a specific theta start."""
+            if not self._warm_start_value:
+                return jnp.zeros(n_alpha, dtype=jnp.float64), float("nan"), False
+
+            flow_u0 = jnp.einsum("sak,k->sa", feature_matrix, theta_start)
+            operator = SoftBellmanOperator(problem, transitions_f64)
+            solution0 = value_iteration(
+                operator,
+                flow_u0,
+                tol=1e-10,
+                max_iter=10_000,
             )
-        else:
-            initial_alpha = jnp.zeros(n_alpha, dtype=jnp.float64)
-        x0 = jnp.concatenate([initial_params, initial_alpha])
+            projection_converged = bool(solution0.converged)
+            if self._solution in {"value", "collocation"}:
+                basis_np = np.asarray(basis, dtype=np.float64)
+                value_np = np.asarray(solution0.V, dtype=np.float64)
+                alpha_np, *_ = np.linalg.lstsq(basis_np, value_np, rcond=None)
+                projected = basis_np @ alpha_np
+                projection_rmse = float(
+                    np.sqrt(np.mean((projected - value_np) ** 2))
+                )
+                initial_alpha = jnp.array(alpha_np, dtype=jnp.float64)
+            elif self._solution == "q":
+                initial_alpha, projection_rmse = self._project_state_action_solution(
+                    basis,
+                    solution0.Q,
+                )
+            elif self._solution == "ev":
+                continuation0 = expected_value(solution0.V)
+                initial_alpha, projection_rmse = self._project_state_action_solution(
+                    basis,
+                    continuation0,
+                )
+            else:
+                policy0 = np.asarray(solution0.policy, dtype=np.float64)
+                logits0 = np.log(np.clip(policy0, 1e-12, 1.0))
+                logits0 = logits0 - logits0.mean(axis=1, keepdims=True)
+                initial_alpha, projection_rmse = self._project_state_action_solution(
+                    basis,
+                    jnp.array(logits0, dtype=jnp.float64),
+                )
+            return initial_alpha, projection_rmse, projection_converged
+
+        def solution_outputs(
+            theta: jnp.ndarray,
+            alpha: jnp.ndarray,
+        ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+            return self._evaluate_solution_outputs(
+                theta,
+                alpha,
+                basis=basis,
+                feature_matrix=feature_matrix,
+                problem=problem,
+                transitions=transitions_f64,
+            )
 
         def criterion_parts(x: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
             theta = x[:n_theta]
             alpha = x[n_theta:]
+            logits, _, _, residual, _ = solution_outputs(theta, alpha)
 
-            # V(s) = basis(s) @ alpha
-            V_approx = basis @ alpha  # (S,)
-
-            # Q(s,a) = u(s,a;theta) + beta * E[Psi(s') @ alpha | s, a]
-            flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta)
-            # expected_basis shape: (A, S, K), alpha shape: (K,)
-            continuation = beta * jnp.einsum("ask,k->sa", expected_basis, alpha)
-            q_vals = flow_u + continuation
-
-            # Log-likelihood
-            log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
+            log_probs = jax.nn.log_softmax(logits, axis=1)
             ll_sum = jnp.sum(state_action_counts * log_probs)
 
-            # Bellman penalty: ||V - T(V; theta)||^2
-            # T(V; theta) = sigma * logsumexp(Q / sigma)
-            TV = sigma * jax.scipy.special.logsumexp(q_vals / sigma, axis=1)
-            bellman_mse = jnp.mean((V_approx - TV) ** 2)
+            if self._solution == "collocation":
+                penalty_residual = residual[collocation_indices]
+            else:
+                penalty_residual = residual
+            bellman_mse = jnp.mean(penalty_residual ** 2)
 
             return ll_sum, bellman_mse
 
@@ -502,44 +787,102 @@ class SEESEstimator(BaseEstimator):
 
         self._log(
             f"SEES: {n_theta} structural + {n_alpha} basis params, "
-            f"omega={omega}, basis_source={basis_metadata.get('basis_source')}"
+            f"solution={self._solution}, omega={omega}, "
+            f"basis_source={basis_metadata.get('basis_source')}, "
+            f"theta_starts={self._num_theta_starts}"
         )
 
-        result = minimize_lbfgsb(
-            _neg_penalized_ll,
-            x0,
-            bounds=(lower, upper),
-            maxiter=self._max_iter,
-            tol=self._tol,
-            verbose=self._verbose,
-            desc="SEES L-BFGS-B",
-            param_names=utility.parameter_names,
+        theta_starts = self._theta_start_candidates(
+            initial_params,
+            state_action_counts,
+            utility,
+            problem,
         )
+        best_run: tuple[object, float, bool, jnp.ndarray, jnp.ndarray] | None = None
+        start_records: list[dict[str, object]] = []
+        total_iterations = 0
+        total_function_evals = 0
+        for start_idx, theta_start in enumerate(theta_starts):
+            initial_alpha, start_projection_rmse, start_projection_converged = (
+                initial_alpha_for(theta_start)
+            )
+            x0 = jnp.concatenate([theta_start, initial_alpha])
+            result_i = minimize_lbfgsb(
+                _neg_penalized_ll,
+                x0,
+                bounds=(lower, upper),
+                maxiter=self._max_iter,
+                tol=self._tol,
+                verbose=self._verbose,
+                desc=f"SEES L-BFGS-B start {start_idx + 1}/{len(theta_starts)}",
+                param_names=utility.parameter_names,
+            )
+            total_iterations += int(result_i.nit)
+            total_function_evals += int(result_i.nfev)
+            fun_i = float(result_i.fun)
+            start_records.append(
+                {
+                    "start_index": start_idx,
+                    "theta_start": np.asarray(theta_start, dtype=float).tolist(),
+                    "objective": fun_i,
+                    "converged": bool(result_i.success),
+                    "iterations": int(result_i.nit),
+                    "initial_solution_projection_rmse": start_projection_rmse,
+                    "initial_solution_projection_converged": (
+                        start_projection_converged
+                    ),
+                }
+            )
+            if not np.isfinite(fun_i):
+                continue
+            if best_run is None or fun_i < float(best_run[0].fun):
+                best_run = (
+                    result_i,
+                    start_projection_rmse,
+                    start_projection_converged,
+                    theta_start,
+                    initial_alpha,
+                )
+
+        if best_run is None:
+            raise RuntimeError("SEES optimization failed for every theta start")
+
+        result, projection_rmse, projection_converged, selected_theta_start, _ = best_run
 
         x_opt = jnp.array(result.x, dtype=jnp.float64)
         theta_opt = x_opt[:n_theta]
         alpha_opt = x_opt[n_theta:]
+        try:
+            final_gradient_norm = float(
+                jnp.linalg.norm(jax.grad(_neg_penalized_ll)(x_opt))
+            )
+        except Exception:
+            final_gradient_norm = float("nan")
 
         self._log(f"theta: {np.asarray(theta_opt)}")
         self._log(f"alpha: {np.asarray(alpha_opt)}")
 
         # Compute final policy and value function
-        flow_u = jnp.einsum("sak,k->sa", feature_matrix, theta_opt)
-        continuation = beta * jnp.einsum(
-            "ask,k->sa", expected_basis, alpha_opt
+        logits, V, policy, bellman_residual, q_vals = solution_outputs(
+            theta_opt,
+            alpha_opt,
         )
-        q_vals = flow_u + continuation
-        policy = jax.nn.softmax(q_vals / sigma, axis=1)
-        V = sigma * jax.scipy.special.logsumexp(q_vals / sigma, axis=1)
 
         # Compute pure log-likelihood (without penalty) for reporting
-        log_probs = jax.nn.log_softmax(q_vals / sigma, axis=1)
+        log_probs = jax.nn.log_softmax(logits, axis=1)
         ll_opt = float(log_probs[obs_states, obs_actions].sum())
 
         # Bellman violation at solution
-        bellman_residual = basis @ alpha_opt - V
         bellman_viol = float(jnp.max(jnp.abs(bellman_residual)))
         bellman_rmse = float(jnp.sqrt(jnp.mean(bellman_residual**2)))
+        collocation_viol = float("nan")
+        collocation_rmse = float("nan")
+        if self._solution == "collocation":
+            collocation_residual = bellman_residual[collocation_indices]
+            collocation_viol = float(jnp.max(jnp.abs(collocation_residual)))
+            collocation_rmse = float(
+                jnp.sqrt(jnp.mean(collocation_residual**2))
+            )
 
         # Hessian for theta SEs via Schur complement (Corollary 3.1)
         # H = H_theta_theta - H'_beta_theta @ H_beta_beta^{-1} @ H_beta_theta
@@ -580,17 +923,40 @@ class SEESEstimator(BaseEstimator):
             optimization_time=elapsed,
             metadata={
                 "alpha": alpha_opt,
+                "solution_type": self._solution,
+                "num_theta_starts": len(theta_starts),
+                "selected_theta_start": np.asarray(
+                    selected_theta_start,
+                    dtype=float,
+                ).tolist(),
+                "theta_start_results": start_records,
+                "multistart_total_iterations": total_iterations,
+                "multistart_total_function_evals": total_function_evals,
+                "selected_objective": float(result.fun),
+                "selected_gradient_norm": final_gradient_norm,
+                "optimizer_success": bool(result.success),
                 "basis_type": self._basis_type,
                 "basis_dim": n_alpha,
+                "state_basis_dim": basis_cols,
                 "configured_basis_dim": self._basis_dim,
                 "basis_matrix": basis,
                 "bellman_violation": bellman_viol,
                 "bellman_rmse": bellman_rmse,
+                "collocation_violation": collocation_viol,
+                "collocation_rmse": collocation_rmse,
+                "collocation_state_count": int(collocation_indices.shape[0]),
+                "alpha_shape": (
+                    (basis_cols,)
+                    if self._solution in {"value", "collocation"}
+                    else (n_actions, basis_cols)
+                ),
                 "penalty_weight": omega,
                 "penalty_objective_scale": "mean_loglik_minus_omega_bellman_mse",
                 "warm_start_value": self._warm_start_value,
                 "initial_value_projection_rmse": projection_rmse,
+                "initial_solution_projection_rmse": projection_rmse,
                 "initial_value_projection_converged": projection_converged,
+                "initial_solution_projection_converged": projection_converged,
                 **basis_metadata,
             },
         )

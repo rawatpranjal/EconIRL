@@ -125,6 +125,38 @@ class TestBasicFit:
     def test_converged(self, fitted_model_fast):
         assert fitted_model_fast.converged_ is not None
 
+    def test_default_solution_is_value(self):
+        model = SEES(n_states=_N_STATES_FAST, verbose=False)
+        assert model.solution == "value"
+
+    def test_invalid_solution_raises(self):
+        with pytest.raises(ValueError, match="solution must be one of"):
+            SEES(n_states=_N_STATES_FAST, solution="bad")
+
+    def test_invalid_num_theta_starts_raises(self):
+        with pytest.raises(ValueError, match="num_theta_starts"):
+            SEES(n_states=_N_STATES_FAST, num_theta_starts=0)
+
+    def test_q_solution_fit_sets_solution_metadata_and_action_alpha(self, bus_df_fast):
+        model = SEES(
+            n_states=_N_STATES_FAST,
+            discount=_DISCOUNT_FAST,
+            solution="q",
+            basis_type="fourier",
+            basis_dim=3,
+            penalty_weight=10.0,
+            num_theta_starts=2,
+            max_iter=20,
+            verbose=False,
+        )
+        model.fit(bus_df_fast, state="mileage_bin", action="replaced", id="bus_id")
+
+        assert model.params_ is not None
+        assert model.solution_type_ == "q"
+        assert model.alpha_ is not None
+        assert model.alpha_.shape == (2, 3)
+        assert model.num_theta_starts == 2
+
 
 # ---------------------------------------------------------------------------
 # 2. Parameters recovered (positive theta_c and RC)

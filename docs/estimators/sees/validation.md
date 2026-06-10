@@ -72,12 +72,12 @@ finite standard errors, known-truth recovery, and counterfactual regret.
 | Optimizer flag | false | false |
 | Iterations | 181 | 6 |
 | Log likelihood | -174875.7843 | -160289.8089 |
-| Estimation time | 3.77 seconds | 3.92 seconds |
+| Estimation time | 8.27 seconds | 6.01 seconds |
 | Bellman violation | 5.83e-5 | 3.08e-6 |
 | Bellman RMSE | 2.74e-5 | 6.80e-7 |
 | Standard errors finite | true | true |
 
-The primary high-dimensional cell ran in 3.92 seconds.
+The primary high-dimensional cell ran in 6.01 seconds.
 
 ## Recovery Metrics
 

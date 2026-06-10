@@ -5,10 +5,10 @@ the underlying SEESEstimator from econirl.estimation.sees. It accepts pandas
 DataFrames with column names instead of the low-level Panel API.
 
 SEES (Sieve Estimation of Economic Structural models, Luo & Sang 2024)
-approximates V(s) with sieve basis functions (Fourier or polynomial),
-then jointly optimizes structural parameters theta and basis coefficients
-alpha via penalized MLE. This avoids the costly inner fixed-point loop
-of NFXP and the neural network training of NNES.
+approximates a Bellman solution object with sieve basis functions, then
+jointly optimizes structural parameters theta and basis coefficients alpha via
+penalized MLE. This avoids the costly inner fixed-point loop of NFXP and the
+neural network training of NNES.
 
 Example:
     >>> from econirl.estimators import SEES
@@ -18,7 +18,13 @@ Example:
     >>> df = pd.read_csv("zurcher_bus.csv")
     >>>
     >>> # Create estimator and fit
-    >>> model = SEES(n_states=90, discount=0.9999, basis_type="fourier", basis_dim=8)
+    >>> model = SEES(
+    ...     n_states=90,
+    ...     discount=0.9999,
+    ...     solution="value",
+    ...     basis_type="fourier",
+    ...     basis_dim=8,
+    ... )
     >>> model.fit(data=df, state="mileage_bin", action="replaced", id="bus_id")
     >>>
     >>> # Access results sklearn-style
@@ -37,7 +43,12 @@ from scipy.stats import norm as scipy_norm
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import DDCProblem, Panel, TrajectoryPanel
-from econirl.estimation.sees import SEESConfig, SEESEstimator
+from econirl.estimation.sees import (
+    SEESConfig,
+    SEESEstimator,
+    SEESSolution,
+    VALID_SEES_SOLUTIONS,
+)
 from econirl.preferences.linear import LinearUtility
 from econirl.transitions import TransitionEstimator
 
@@ -45,11 +56,10 @@ from econirl.transitions import TransitionEstimator
 class SEES:
     """Sklearn-style SEES estimator for dynamic discrete choice models.
 
-    SEES (Sieve Estimation of Economic Structural models) approximates the
-    value function V(s) with sieve basis functions and jointly optimizes
-    structural parameters and basis coefficients via penalized MLE. This
-    avoids the inner fixed-point loop of NFXP while using a closed-form
-    basis expansion instead of neural network training (Luo & Sang 2024).
+    SEES (Sieve Estimation of Economic Structural models) approximates a
+    Bellman solution object with sieve basis functions and jointly optimizes
+    structural parameters and basis coefficients via penalized MLE. The
+    default ``solution="value"`` is the historical value-function SEES path.
 
     Parameters
     ----------
@@ -69,6 +79,8 @@ class SEES:
         Sieve basis type. Options: "fourier", "polynomial".
     basis_dim : int, default=8
         Number of basis functions for the value function approximation.
+    solution : {"value", "q", "ev", "policy", "collocation"}, default="value"
+        Bellman solution object approximated by the sieve.
     penalty_weight : float, default=0.01
         Weight on the Bellman equilibrium penalty (Luo and Sang 2024).
     max_iter : int, default=500
@@ -93,7 +105,9 @@ class SEES:
     value_ : numpy.ndarray
         Estimated value function V(s) of shape (n_states,).
     alpha_ : numpy.ndarray or None
-        Estimated basis coefficients after fitting, shape (basis_dim,).
+        Estimated basis coefficients after fitting. Value and collocation
+        modes return shape ``(basis_dim,)``; action-specific modes return
+        ``(n_actions, basis_dim)``.
     converged_ : bool
         Whether the optimization converged.
     reward_spec_ : RewardSpec
@@ -101,8 +115,8 @@ class SEES:
 
     References
     ----------
-    Luo, Y. and Sang, Y. (2024). "Sieve Estimation of Dynamic Discrete
-        Choice Models." Working Paper.
+    Luo, Y. and Sang, Y. (2024). "Efficient Estimation of Structural Models
+        via Sieves." Working Paper.
     """
 
     def __init__(
@@ -114,10 +128,19 @@ class SEES:
         se_method: Literal["robust", "asymptotic"] = "asymptotic",
         basis_type: str = "fourier",
         basis_dim: int = 8,
+        solution: SEESSolution = "value",
         penalty_weight: float = 0.01,
+        num_theta_starts: int = 1,
         max_iter: int = 500,
         verbose: bool = False,
     ):
+        if solution not in VALID_SEES_SOLUTIONS:
+            raise ValueError(
+                "solution must be one of "
+                + ", ".join(repr(value) for value in VALID_SEES_SOLUTIONS)
+            )
+        if num_theta_starts < 1:
+            raise ValueError("num_theta_starts must be at least 1")
         self.n_states = n_states
         self.n_actions = n_actions
         self.discount = discount
@@ -125,7 +148,9 @@ class SEES:
         self.se_method = se_method
         self.basis_type = basis_type
         self.basis_dim = basis_dim
+        self.solution = solution
         self.penalty_weight = penalty_weight
+        self.num_theta_starts = num_theta_starts
         self.max_iter = max_iter
         self.verbose = verbose
 
@@ -141,6 +166,7 @@ class SEES:
         self.converged_: bool | None = None
         self.reward_spec_: RewardSpec | None = None
         self.alpha_: np.ndarray | None = None
+        self.solution_type_: str | None = None
 
         # Internal storage
         self._result = None
@@ -244,7 +270,9 @@ class SEES:
         config = SEESConfig(
             basis_type=self.basis_type,
             basis_dim=self.basis_dim,
+            solution=self.solution,
             penalty_weight=self.penalty_weight,
+            num_theta_starts=self.num_theta_starts,
             max_iter=self.max_iter,
             compute_se=True,
             se_method=self.se_method,
@@ -358,9 +386,14 @@ class SEES:
 
         # SEES-specific: basis coefficients
         if self._result.metadata:
+            self.solution_type_ = self._result.metadata.get("solution_type")
             alpha = self._result.metadata.get("alpha")
             if alpha is not None:
-                self.alpha_ = np.asarray(alpha)
+                alpha_array = np.asarray(alpha)
+                alpha_shape = self._result.metadata.get("alpha_shape")
+                if alpha_shape is not None:
+                    alpha_array = alpha_array.reshape(tuple(alpha_shape))
+                self.alpha_ = alpha_array
 
     @property
     def reward_matrix_(self) -> np.ndarray | None:
@@ -445,10 +478,14 @@ class SEES:
             return (
                 f"SEES(n_states={self.n_states}, n_actions={self.n_actions}, "
                 f"discount={self.discount}, basis_type='{self.basis_type}', "
-                f"basis_dim={self.basis_dim}, fitted=True)"
+                f"basis_dim={self.basis_dim}, solution='{self.solution}', "
+                f"num_theta_starts={self.num_theta_starts}, "
+                "fitted=True)"
             )
         return (
             f"SEES(n_states={self.n_states}, n_actions={self.n_actions}, "
             f"discount={self.discount}, basis_type='{self.basis_type}', "
-            f"basis_dim={self.basis_dim}, fitted=False)"
+            f"basis_dim={self.basis_dim}, solution='{self.solution}', "
+            f"num_theta_starts={self.num_theta_starts}, "
+            "fitted=False)"
         )

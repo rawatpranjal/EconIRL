@@ -1,0 +1,391 @@
+{
+  "design": {
+    "discount_factor": 0.8,
+    "environment": "linear low-dimensional known-truth DDC",
+    "n_individuals": 4000,
+    "n_periods": 80,
+    "num_actions": 3,
+    "num_regular_states": 30,
+    "num_states": 31,
+    "panel_seeds": [
+      43,
+      65,
+      91
+    ],
+    "reward": "action-specific intercept and progress slope",
+    "reward_dim": "strict_linear",
+    "reward_mode": "action_dependent",
+    "start_kinds": [
+      "near_truth",
+      "zero",
+      "random"
+    ],
+    "state_mode": "low_dim",
+    "transition_noise": 0.0,
+    "value_basis_compression": "20/31",
+    "value_basis_dim": 20,
+    "value_basis_type": "bspline"
+  },
+  "records": [
+    {
+      "estimated_params": [
+        0.14887144140169403,
+        0.39688150481376544,
+        0.020265206984117837,
+        -0.1987440688858432
+      ],
+      "metrics": {
+        "bellman_violation": 0.0026556314132459846,
+        "param_rmse": 0.05795277748534369,
+        "policy_tv": 0.0116515182991623,
+        "q_rmse": 0.04067031311123682,
+        "value_rmse": 0.03679121245497688
+      },
+      "num_iterations": 120,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 43,
+      "passed": true,
+      "selected_gradient_norm": 0.00024056458151734727,
+      "selected_objective": 1.0962479625262516,
+      "selected_theta_start": [
+        0.2307063908304547,
+        0.6920247373766741,
+        0.13283470514149157,
+        0.033800605579811405
+      ],
+      "start_kind": "near_truth",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.14887144140169403,
+        0.39688150481376544,
+        0.020265206984117837,
+        -0.1987440688858432
+      ],
+      "metrics": {
+        "bellman_violation": 0.0026556314132459846,
+        "param_rmse": 0.05795277748534369,
+        "policy_tv": 0.0116515182991623,
+        "q_rmse": 0.04067031311123682,
+        "value_rmse": 0.03679121245497688
+      },
+      "num_iterations": 120,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 43,
+      "passed": true,
+      "selected_gradient_norm": 0.00024056458151734727,
+      "selected_objective": 1.0962479625262516,
+      "selected_theta_start": [
+        0.2307063908304547,
+        0.6920247373766741,
+        0.13283470514149157,
+        0.033800605579811405
+      ],
+      "start_kind": "zero",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.14887144140169403,
+        0.39688150481376544,
+        0.020265206984117837,
+        -0.1987440688858432
+      ],
+      "metrics": {
+        "bellman_violation": 0.0026556314132459846,
+        "param_rmse": 0.05795277748534369,
+        "policy_tv": 0.0116515182991623,
+        "q_rmse": 0.04067031311123682,
+        "value_rmse": 0.03679121245497688
+      },
+      "num_iterations": 120,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 43,
+      "passed": true,
+      "selected_gradient_norm": 0.00024056458151734727,
+      "selected_objective": 1.0962479625262516,
+      "selected_theta_start": [
+        0.2307063908304547,
+        0.6920247373766741,
+        0.13283470514149157,
+        0.033800605579811405
+      ],
+      "start_kind": "random",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.08074519954992028,
+        0.49326874796618136,
+        -0.008968630765719443,
+        -0.20048444466691637
+      ],
+      "metrics": {
+        "bellman_violation": 0.0028184085216826915,
+        "param_rmse": 0.011143699713947828,
+        "policy_tv": 0.008017376056639464,
+        "q_rmse": 0.03546070955923245,
+        "value_rmse": 0.033719059633381614
+      },
+      "num_iterations": 92,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 65,
+      "passed": true,
+      "selected_gradient_norm": 0.0012395272974702123,
+      "selected_objective": 1.096183068662081,
+      "selected_theta_start": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "start_kind": "near_truth",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.08074519954992028,
+        0.49326874796618136,
+        -0.008968630765719443,
+        -0.20048444466691637
+      ],
+      "metrics": {
+        "bellman_violation": 0.0028184085216826915,
+        "param_rmse": 0.011143699713947828,
+        "policy_tv": 0.008017376056639464,
+        "q_rmse": 0.03546070955923245,
+        "value_rmse": 0.033719059633381614
+      },
+      "num_iterations": 92,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 65,
+      "passed": true,
+      "selected_gradient_norm": 0.0012395272974702123,
+      "selected_objective": 1.096183068662081,
+      "selected_theta_start": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "start_kind": "zero",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.08074519954992028,
+        0.49326874796618136,
+        -0.008968630765719443,
+        -0.20048444466691637
+      ],
+      "metrics": {
+        "bellman_violation": 0.0028184085216826915,
+        "param_rmse": 0.011143699713947828,
+        "policy_tv": 0.008017376056639464,
+        "q_rmse": 0.03546070955923245,
+        "value_rmse": 0.033719059633381614
+      },
+      "num_iterations": 92,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 65,
+      "passed": true,
+      "selected_gradient_norm": 0.0012395272974702123,
+      "selected_objective": 1.096183068662081,
+      "selected_theta_start": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "start_kind": "random",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.08229976268377152,
+        0.48204069835162766,
+        0.032879496242202114,
+        -0.271409382770825
+      ],
+      "metrics": {
+        "bellman_violation": 0.002579748852411967,
+        "param_rmse": 0.04128012767881464,
+        "policy_tv": 0.011033093868397372,
+        "q_rmse": 0.046468515610399566,
+        "value_rmse": 0.04311319858486742
+      },
+      "num_iterations": 56,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 91,
+      "passed": true,
+      "selected_gradient_norm": 0.0025557434137250144,
+      "selected_objective": 1.096316202425104,
+      "selected_theta_start": [
+        0.1647009551525116,
+        0.443188339471817,
+        -0.007069374434649944,
+        -0.1502411812543869
+      ],
+      "start_kind": "near_truth",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.06156734923656619,
+        0.5117502299516276,
+        -0.0007506464454573921,
+        -0.2299774773944189
+      ],
+      "metrics": {
+        "bellman_violation": 0.0027168236900338982,
+        "param_rmse": 0.02507164287346222,
+        "policy_tv": 0.011994528943452988,
+        "q_rmse": 0.05109496237884897,
+        "value_rmse": 0.04680344183148068
+      },
+      "num_iterations": 95,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 91,
+      "passed": true,
+      "selected_gradient_norm": 0.0005420047779438308,
+      "selected_objective": 1.09631679962593,
+      "selected_theta_start": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "start_kind": "zero",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    },
+    {
+      "estimated_params": [
+        0.06156734923656619,
+        0.5117502299516276,
+        -0.0007506464454573921,
+        -0.2299774773944189
+      ],
+      "metrics": {
+        "bellman_violation": 0.0027168236900338982,
+        "param_rmse": 0.02507164287346222,
+        "policy_tv": 0.011994528943452988,
+        "q_rmse": 0.05109496237884897,
+        "value_rmse": 0.04680344183148068
+      },
+      "num_iterations": 95,
+      "num_states": 31,
+      "num_theta_starts": 4,
+      "optimizer_success": false,
+      "panel_seed": 91,
+      "passed": true,
+      "selected_gradient_norm": 0.0005420047779438308,
+      "selected_objective": 1.09631679962593,
+      "selected_theta_start": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "start_kind": "random",
+      "summary_converged": false,
+      "true_params": [
+        0.10000000149011612,
+        0.5,
+        0.0,
+        -0.20000000298023224
+      ],
+      "value_basis_dim": 20
+    }
+  ],
+  "summary": {
+    "max_bellman_violation": 0.0028184085216826915,
+    "max_gradient_norm": 0.0025557434137250144,
+    "max_param_rmse": 0.05795277748534369,
+    "max_policy_tv": 0.011994528943452988,
+    "max_q_rmse": 0.05109496237884897,
+    "max_value_rmse": 0.04680344183148068,
+    "optimizer_successes": 0,
+    "passes": 9,
+    "runs": 9
+  },
+  "thresholds": {
+    "bellman_violation": 0.01,
+    "param_rmse": 0.08,
+    "policy_tv": 0.02,
+    "q_rmse": 0.08,
+    "value_rmse": 0.08
+  }
+}

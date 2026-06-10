@@ -179,7 +179,7 @@
     "summary": {
       "converged": false,
       "convergence_message": "SEES: Maximum iterations reached",
-      "estimation_time": 3.9199271202087402,
+      "estimation_time": 6.006173849105835,
       "log_likelihood": -160289.80888862288,
       "metadata": {
         "basis_dim": 81,
@@ -480,7 +480,7 @@
       "summary": {
         "converged": false,
         "convergence_message": "SEES: Maximum iterations reached",
-        "estimation_time": 3.7706100940704346,
+        "estimation_time": 8.270920276641846,
         "log_likelihood": -174875.78426020363,
         "metadata": {
           "basis_dim": 21,
@@ -696,7 +696,7 @@
       "summary": {
         "converged": false,
         "convergence_message": "SEES: Maximum iterations reached",
-        "estimation_time": 3.9199271202087402,
+        "estimation_time": 6.006173849105835,
         "log_likelihood": -160289.80888862288,
         "metadata": {
           "basis_dim": 81,

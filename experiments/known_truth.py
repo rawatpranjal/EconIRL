@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import time
 import traceback
@@ -186,6 +187,119 @@ class ShapeshifterKnownTruthConfig:
 
 
 @dataclass(frozen=True)
+class ContentHeterogeneityKnownTruthConfig:
+    """Paper-style serialized-content DGP for AIRL-Het validation.
+
+    The generic high-dimensional grid is useful as a stress test, but it does
+    not encode the core structure of the AIRL-Het paper setting: repeated
+    series for each user, latent segment membership that is constant across
+    those series, a pay/wait/exit choice set, high-dimensional observed
+    content controls, and an exit-action reward anchor.
+    """
+
+    num_chapters: int = 5
+    wait_bins: int = 3
+    price_levels: int = 2
+    quality_levels: int = 2
+    num_segments: int = 2
+    discount_factor: float = 0.92
+    scale_parameter: float = 0.85
+    seed: int = 4506
+    exit_action: int = 2
+    transition_noise: float = 0.0
+    books_per_user: int = 4
+    segment_probabilities: tuple[float, ...] = (0.48, 0.52)
+    high_state_dim: int = 18
+    high_reward_features: int = 20
+
+    @property
+    def state_mode(self) -> StateMode:
+        return "high_dim"
+
+    @property
+    def reward_mode(self) -> RewardMode:
+        return "action_dependent"
+
+    @property
+    def reward_dim(self) -> RewardDim:
+        return "high"
+
+    @property
+    def heterogeneity(self) -> HeterogeneityMode:
+        return "latent_segments"
+
+    @property
+    def num_actions(self) -> int:
+        return 3
+
+    @property
+    def num_regular_states(self) -> int:
+        return (
+            self.num_chapters
+            * self.wait_bins
+            * self.price_levels
+            * self.quality_levels
+        )
+
+    @property
+    def num_states(self) -> int:
+        return self.num_regular_states + 1
+
+    @property
+    def absorbing_state(self) -> int:
+        return self.num_regular_states
+
+    @property
+    def uses_exit_anchor(self) -> bool:
+        return True
+
+    def validate(self) -> None:
+        if self.num_chapters < 3:
+            raise ValueError("num_chapters must be at least 3")
+        if self.wait_bins < 2:
+            raise ValueError("wait_bins must be at least 2")
+        if self.price_levels < 2 or self.quality_levels < 2:
+            raise ValueError("price_levels and quality_levels must be at least 2")
+        if self.num_segments != 2:
+            raise ValueError("content AIRL-Het DGP is calibrated for two segments")
+        if not 0 <= self.discount_factor < 1:
+            raise ValueError("discount_factor must be in [0, 1)")
+        if self.scale_parameter <= 0:
+            raise ValueError("scale_parameter must be positive")
+        if self.exit_action != 2:
+            raise ValueError("content AIRL-Het DGP expects action 2 to be exit")
+        if not 0 <= self.transition_noise < 1:
+            raise ValueError("transition_noise must be in [0, 1)")
+        if self.books_per_user < 1:
+            raise ValueError("books_per_user must be positive")
+        if len(self.segment_probabilities) != self.num_segments:
+            raise ValueError("segment_probabilities must match num_segments")
+        if any(weight < 0 for weight in self.segment_probabilities):
+            raise ValueError("segment_probabilities must be nonnegative")
+        if sum(self.segment_probabilities) <= 0:
+            raise ValueError("segment_probabilities must have positive mass")
+        if self.high_state_dim < 7:
+            raise ValueError("high_state_dim must be at least 7")
+        if self.high_reward_features < 11:
+            raise ValueError("high_reward_features must be at least 11")
+        if self.high_reward_features > 32:
+            raise ValueError("high_reward_features must be at most 32")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["kind"] = "content_heterogeneity"
+        payload["state_mode"] = self.state_mode
+        payload["reward_mode"] = self.reward_mode
+        payload["reward_dim"] = self.reward_dim
+        payload["heterogeneity"] = self.heterogeneity
+        payload["num_regular_states"] = self.num_regular_states
+        payload["num_states"] = self.num_states
+        payload["num_actions"] = self.num_actions
+        payload["absorbing_state"] = self.absorbing_state
+        return payload
+
+
+@dataclass(frozen=True)
 class SimulationConfig:
     """Panel simulation controls."""
 
@@ -210,7 +324,11 @@ class CounterfactualConfig:
 class KnownTruthDGP:
     """A fully specified synthetic DGP with all truth objects exposed."""
 
-    config: KnownTruthDGPConfig | ShapeshifterKnownTruthConfig
+    config: (
+        KnownTruthDGPConfig
+        | ShapeshifterKnownTruthConfig
+        | ContentHeterogeneityKnownTruthConfig
+    )
     problem: DDCProblem
     transitions: jnp.ndarray
     feature_matrix: jnp.ndarray
@@ -267,7 +385,12 @@ class KnownTruthDGP:
 
 
 def build_known_truth_dgp(
-    config: KnownTruthDGPConfig | ShapeshifterKnownTruthConfig | None = None,
+    config: (
+        KnownTruthDGPConfig
+        | ShapeshifterKnownTruthConfig
+        | ContentHeterogeneityKnownTruthConfig
+        | None
+    ) = None,
 ) -> KnownTruthDGP:
     """Build a known-truth DGP from a config."""
 
@@ -275,6 +398,8 @@ def build_known_truth_dgp(
         config = KnownTruthDGPConfig()
     if isinstance(config, ShapeshifterKnownTruthConfig):
         return build_shapeshifter_known_truth_dgp(config)
+    if isinstance(config, ContentHeterogeneityKnownTruthConfig):
+        return build_content_heterogeneity_known_truth_dgp(config)
     config.validate()
 
     transitions = _build_transitions(config)
@@ -345,6 +470,386 @@ def build_shapeshifter_known_truth_dgp(
     )
 
 
+def build_content_heterogeneity_known_truth_dgp(
+    config: ContentHeterogeneityKnownTruthConfig,
+) -> KnownTruthDGP:
+    """Build the serialized-content latent-segment AIRL-Het DGP."""
+
+    config.validate()
+    transitions = _build_content_transitions(config)
+    state_features = _build_content_state_features(config)
+    feature_matrix, parameter_names = _build_content_reward_features(
+        config, state_features
+    )
+    true_parameters = _build_content_parameters(config, parameter_names)
+    reward_matrix = _compute_rewards(feature_matrix, true_parameters)
+    initial_distribution = _build_content_initial_distribution(config)
+
+    problem = DDCProblem(
+        num_states=config.num_states,
+        num_actions=config.num_actions,
+        discount_factor=config.discount_factor,
+        scale_parameter=config.scale_parameter,
+        state_dim=int(state_features.shape[1]),
+        state_encoder=lambda states: state_features[states],
+    )
+
+    segment_probabilities = np.asarray(config.segment_probabilities, dtype=np.float64)
+    segment_probabilities = segment_probabilities / segment_probabilities.sum()
+
+    return KnownTruthDGP(
+        config=config,
+        problem=problem,
+        transitions=transitions,
+        feature_matrix=feature_matrix,
+        state_features=state_features,
+        parameter_names=parameter_names,
+        true_parameters=true_parameters,
+        reward_matrix=reward_matrix,
+        initial_distribution=initial_distribution,
+        segment_probabilities=jnp.asarray(segment_probabilities, dtype=jnp.float32),
+    )
+
+
+def _content_state_index(
+    config: ContentHeterogeneityKnownTruthConfig,
+    chapter: int,
+    wait_bin: int,
+    price_level: int,
+    quality_level: int,
+) -> int:
+    return (
+        (((chapter * config.wait_bins) + wait_bin) * config.price_levels + price_level)
+        * config.quality_levels
+        + quality_level
+    )
+
+
+def _content_state_tuple(
+    config: ContentHeterogeneityKnownTruthConfig,
+    state: int,
+) -> tuple[int, int, int, int]:
+    quality = state % config.quality_levels
+    state //= config.quality_levels
+    price = state % config.price_levels
+    state //= config.price_levels
+    wait_bin = state % config.wait_bins
+    chapter = state // config.wait_bins
+    return chapter, wait_bin, price, quality
+
+
+def _build_content_initial_distribution(
+    config: ContentHeterogeneityKnownTruthConfig,
+) -> jnp.ndarray:
+    dist = np.zeros(config.num_states, dtype=np.float64)
+    for price in range(config.price_levels):
+        for quality in range(config.quality_levels):
+            state = _content_state_index(config, 0, 0, price, quality)
+            dist[state] = 1.0
+    dist = dist / dist.sum()
+    return jnp.asarray(dist, dtype=jnp.float32)
+
+
+def _build_content_transitions(
+    config: ContentHeterogeneityKnownTruthConfig,
+) -> jnp.ndarray:
+    transitions = np.zeros(
+        (config.num_actions, config.num_states, config.num_states),
+        dtype=np.float64,
+    )
+    absorbing = config.absorbing_state
+    last_chapter = config.num_chapters - 1
+    last_wait = config.wait_bins - 1
+
+    for state in range(config.num_regular_states):
+        chapter, wait_bin, price, quality = _content_state_tuple(config, state)
+
+        if chapter == last_chapter:
+            read_target = absorbing
+            wait_target = absorbing if wait_bin == last_wait else _content_state_index(
+                config, chapter, wait_bin + 1, price, quality
+            )
+        else:
+            read_target = _content_state_index(config, chapter + 1, 0, price, quality)
+            if wait_bin == last_wait:
+                wait_target = _content_state_index(
+                    config, chapter + 1, 0, price, quality
+                )
+            else:
+                wait_target = _content_state_index(
+                    config, chapter, wait_bin + 1, price, quality
+                )
+
+        targets = {0: read_target, 1: wait_target, config.exit_action: absorbing}
+        for action, target in targets.items():
+            transitions[action, state, target] += 1.0 - config.transition_noise
+            if config.transition_noise > 0 and action != config.exit_action:
+                fallback = _content_state_index(config, chapter, 0, price, quality)
+                transitions[action, state, fallback] += config.transition_noise
+
+    transitions[:, absorbing, absorbing] = 1.0
+    transitions = transitions / transitions.sum(axis=2, keepdims=True)
+    return jnp.asarray(transitions, dtype=jnp.float32)
+
+
+def _build_content_state_features(
+    config: ContentHeterogeneityKnownTruthConfig,
+) -> jnp.ndarray:
+    regular_rows: list[list[float]] = []
+    denom_chapter = max(config.num_chapters - 1, 1)
+    denom_wait = max(config.wait_bins - 1, 1)
+    denom_price = max(config.price_levels - 1, 1)
+    denom_quality = max(config.quality_levels - 1, 1)
+
+    for state in range(config.num_regular_states):
+        chapter, wait_bin, price, quality = _content_state_tuple(config, state)
+        progress = chapter / denom_chapter
+        wait_norm = wait_bin / denom_wait
+        price_norm = price / denom_price
+        quality_norm = quality / denom_quality
+        cliffhanger = (
+            0.45 * quality_norm
+            + 0.35 * np.sin(np.pi * (chapter + 1) / config.num_chapters)
+            + 0.20 * (1.0 if chapter in {2, config.num_chapters - 2} else 0.0)
+        )
+        final_chapter = 1.0 if chapter == config.num_chapters - 1 else 0.0
+        unlock_ready = 1.0 if wait_bin == config.wait_bins - 1 else 0.0
+        regular_rows.append(
+            [
+                progress,
+                wait_norm,
+                price_norm,
+                quality_norm,
+                cliffhanger,
+                final_chapter,
+                unlock_ready,
+            ]
+        )
+
+    regular = np.asarray(regular_rows, dtype=np.float64)
+    progress = regular[:, 0]
+    wait_norm = regular[:, 1]
+    price = regular[:, 2]
+    quality = regular[:, 3]
+    cliffhanger = regular[:, 4]
+    unlock_ready = regular[:, 6]
+    extras = [
+        progress * quality,
+        progress * price,
+        wait_norm * price,
+        wait_norm * quality,
+        cliffhanger * price,
+        cliffhanger * wait_norm,
+        unlock_ready * price,
+        np.sin(np.pi * progress),
+        np.cos(np.pi * progress),
+        np.sin(2.0 * np.pi * progress),
+        np.cos(2.0 * np.pi * progress),
+    ]
+    for extra in extras:
+        if regular.shape[1] >= config.high_state_dim:
+            break
+        regular = np.column_stack([regular, _standardize_feature(extra)])
+
+    while regular.shape[1] < config.high_state_dim:
+        idx = regular.shape[1] - 6
+        wave = np.sin((idx + 1) * np.pi * progress + 0.3 * idx * price)
+        regular = np.column_stack([regular, _standardize_feature(wave)])
+
+    absorbing = np.zeros((1, regular.shape[1]), dtype=np.float64)
+    features = np.vstack([regular, absorbing])
+    return jnp.asarray(features, dtype=jnp.float32)
+
+
+def _standardize_feature(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=np.float64)
+    centered = values - values.mean()
+    scale = values.std()
+    if scale < 1e-8:
+        return centered
+    return centered / scale
+
+
+def _build_content_reward_features(
+    config: ContentHeterogeneityKnownTruthConfig,
+    state_features: jnp.ndarray,
+) -> tuple[jnp.ndarray, list[str]]:
+    sf = np.asarray(state_features, dtype=np.float64)
+    progress = sf[:, 0]
+    wait_norm = sf[:, 1]
+    price = sf[:, 2]
+    quality = sf[:, 3]
+    cliffhanger = sf[:, 4]
+    final_chapter = sf[:, 5]
+    unlock_ready = sf[:, 6]
+    episode_wave = (
+        np.sin(np.pi * progress)
+        if sf.shape[1] <= 8
+        else sf[:, 14]
+    )
+    late_unlock = final_chapter * unlock_ready
+
+    read_candidates = [
+        ("read_intercept", np.ones(config.num_states)),
+        ("read_quality", quality),
+        ("read_cliffhanger", cliffhanger),
+        ("read_progress", progress),
+        ("read_price", price),
+        ("read_unlock_ready", unlock_ready),
+        ("read_price_quality", price * quality),
+        ("read_progress_quality", progress * quality),
+        ("read_price_cliffhanger", price * cliffhanger),
+        ("read_wait_delay", wait_norm),
+        ("read_final_chapter", final_chapter),
+        ("read_episode_wave", episode_wave),
+        ("read_unlock_price", unlock_ready * price),
+        ("read_late_unlock", late_unlock),
+        ("read_progress_price", progress * price),
+        ("read_wait_cliffhanger", wait_norm * cliffhanger),
+    ]
+    wait_candidates = [
+        ("wait_intercept", np.ones(config.num_states)),
+        ("wait_quality", quality),
+        ("wait_delay", wait_norm),
+        ("wait_unlock_ready", unlock_ready),
+        ("wait_progress", progress),
+        ("wait_price", price),
+        ("wait_price_quality", price * quality),
+        ("wait_cliffhanger", cliffhanger),
+        ("wait_progress_quality", progress * quality),
+        ("wait_final_chapter", final_chapter),
+        ("wait_price_delay", price * wait_norm),
+        ("wait_cliffhanger_delay", cliffhanger * wait_norm),
+        ("wait_unlock_price", unlock_ready * price),
+        ("wait_late_unlock", late_unlock),
+        ("wait_episode_wave", episode_wave),
+        ("wait_progress_price", progress * price),
+    ]
+    target_read = min(
+        len(read_candidates),
+        max(6, config.high_reward_features // 2),
+    )
+    target_wait = min(
+        len(wait_candidates),
+        max(5, config.high_reward_features - target_read),
+    )
+    selected_read = read_candidates[:target_read]
+    selected_wait = wait_candidates[:target_wait]
+    names = [name for name, _ in selected_read] + [
+        name for name, _ in selected_wait
+    ]
+    features = np.zeros(
+        (config.num_states, config.num_actions, len(names)),
+        dtype=np.float64,
+    )
+    regular = slice(0, config.num_regular_states)
+    for col, (_, values) in enumerate(selected_read):
+        values = np.asarray(values, dtype=np.float64)
+        if col >= 6:
+            values = _standardize_feature(values[: config.num_regular_states])
+            features[regular, 0, col] = values
+        else:
+            features[regular, 0, col] = values[regular]
+
+    wait_offset = len(selected_read)
+    for pos, (_, values) in enumerate(selected_wait):
+        values = np.asarray(values, dtype=np.float64)
+        col = wait_offset + pos
+        if pos >= 5:
+            values = _standardize_feature(values[: config.num_regular_states])
+            features[regular, 1, col] = values
+        else:
+            features[regular, 1, col] = values[regular]
+
+    features[:, config.exit_action, :] = 0.0
+    features[config.absorbing_state, :, :] = 0.0
+    return jnp.asarray(features, dtype=jnp.float32), names
+
+
+def _build_content_parameters(
+    config: ContentHeterogeneityKnownTruthConfig,
+    parameter_names: list[str],
+) -> jnp.ndarray:
+    del config
+    binge_reader = {
+        "read_intercept": 0.05,
+        "read_quality": 0.85,
+        "read_cliffhanger": 0.45,
+        "read_progress": 0.18,
+        "read_price": -0.45,
+        "read_unlock_ready": 0.10,
+        "read_price_quality": 0.00,
+        "read_progress_quality": 0.00,
+        "read_price_cliffhanger": 0.00,
+        "read_wait_delay": 0.00,
+        "read_final_chapter": 0.00,
+        "read_episode_wave": 0.00,
+        "read_unlock_price": 0.00,
+        "read_late_unlock": 0.00,
+        "read_progress_price": 0.00,
+        "read_wait_cliffhanger": 0.00,
+        "wait_intercept": -0.45,
+        "wait_quality": 0.20,
+        "wait_delay": -0.25,
+        "wait_unlock_ready": 0.25,
+        "wait_progress": -0.10,
+        "wait_price": 0.00,
+        "wait_price_quality": 0.00,
+        "wait_cliffhanger": 0.00,
+        "wait_progress_quality": 0.00,
+        "wait_final_chapter": 0.00,
+        "wait_price_delay": 0.00,
+        "wait_cliffhanger_delay": 0.00,
+        "wait_unlock_price": 0.00,
+        "wait_late_unlock": 0.00,
+        "wait_episode_wave": 0.00,
+        "wait_progress_price": 0.00,
+    }
+    patient_reader = {
+        "read_intercept": -0.20,
+        "read_quality": 0.65,
+        "read_cliffhanger": 0.25,
+        "read_progress": 0.05,
+        "read_price": -1.00,
+        "read_unlock_ready": 0.45,
+        "read_price_quality": 0.00,
+        "read_progress_quality": 0.00,
+        "read_price_cliffhanger": 0.00,
+        "read_wait_delay": 0.00,
+        "read_final_chapter": 0.00,
+        "read_episode_wave": 0.00,
+        "read_unlock_price": 0.00,
+        "read_late_unlock": 0.00,
+        "read_progress_price": 0.00,
+        "read_wait_cliffhanger": 0.00,
+        "wait_intercept": -0.10,
+        "wait_quality": 0.35,
+        "wait_delay": -0.05,
+        "wait_unlock_ready": 0.65,
+        "wait_progress": 0.10,
+        "wait_price": 0.00,
+        "wait_price_quality": 0.00,
+        "wait_cliffhanger": 0.00,
+        "wait_progress_quality": 0.00,
+        "wait_final_chapter": 0.00,
+        "wait_price_delay": 0.00,
+        "wait_cliffhanger_delay": 0.00,
+        "wait_unlock_price": 0.00,
+        "wait_late_unlock": 0.00,
+        "wait_episode_wave": 0.00,
+        "wait_progress_price": 0.00,
+    }
+    return jnp.asarray(
+        np.vstack(
+            [
+                [binge_reader.get(name, 0.0) for name in parameter_names],
+                [patient_reader.get(name, 0.0) for name in parameter_names],
+            ]
+        ),
+        dtype=jnp.float32,
+    )
+
+
 def simulate_known_truth_panel(
     dgp: KnownTruthDGP,
     config: SimulationConfig | None = None,
@@ -354,6 +859,8 @@ def simulate_known_truth_panel(
 
     if config is None:
         config = SimulationConfig()
+    if isinstance(dgp.config, ContentHeterogeneityKnownTruthConfig):
+        return _simulate_content_heterogeneity_panel(dgp, config)
 
     rng = np.random.default_rng(config.seed)
     solutions = [
@@ -417,6 +924,92 @@ def simulate_known_truth_panel(
                 "seed": config.seed,
             },
             "segment_labels": segment_labels,
+        }
+    )
+    return Panel(trajectories=trajectories, metadata=metadata)
+
+
+def _simulate_content_heterogeneity_panel(
+    dgp: KnownTruthDGP,
+    config: SimulationConfig,
+) -> Panel:
+    """Simulate repeated content series with fixed latent user types."""
+
+    dgp_config = dgp.config
+    if not isinstance(dgp_config, ContentHeterogeneityKnownTruthConfig):
+        raise TypeError("content simulation requires ContentHeterogeneityKnownTruthConfig")
+
+    rng = np.random.default_rng(config.seed)
+    solutions = [
+        solve_known_truth(dgp, segment_index=g)
+        for g in range(dgp.num_segments)
+    ]
+    segment_probs = np.asarray(dgp.segment_probabilities, dtype=np.float64)
+    segment_probs = segment_probs / segment_probs.sum()
+    initial_distribution = np.asarray(dgp.initial_distribution, dtype=np.float64)
+
+    iterator = range(config.n_individuals)
+    if config.show_progress:
+        from tqdm.auto import tqdm
+
+        iterator = tqdm(iterator, desc="simulate content known-truth panel")
+
+    trajectories: list[Trajectory] = []
+    trajectory_segment_labels: list[int] = []
+    user_segment_labels: list[int] = []
+
+    for user_id in iterator:
+        segment = int(rng.choice(dgp.num_segments, p=segment_probs))
+        user_segment_labels.append(segment)
+        policy = np.asarray(solutions[segment].policy, dtype=np.float64)
+
+        for book_id in range(dgp_config.books_per_user):
+            state = int(rng.choice(dgp.problem.num_states, p=initial_distribution))
+            states: list[int] = []
+            actions: list[int] = []
+            next_states: list[int] = []
+
+            for _ in range(config.n_periods):
+                action_probs = policy[state].astype(np.float64)
+                action_probs = action_probs / action_probs.sum()
+                action = int(rng.choice(dgp.problem.num_actions, p=action_probs))
+                transition_probs = np.asarray(
+                    dgp.transitions[action, state],
+                    dtype=np.float64,
+                )
+                transition_probs = transition_probs / transition_probs.sum()
+                next_state = int(rng.choice(dgp.problem.num_states, p=transition_probs))
+
+                states.append(state)
+                actions.append(action)
+                next_states.append(next_state)
+                state = next_state
+                if state == dgp_config.absorbing_state:
+                    break
+
+            trajectories.append(
+                Trajectory(
+                    states=jnp.asarray(states, dtype=jnp.int32),
+                    actions=jnp.asarray(actions, dtype=jnp.int32),
+                    next_states=jnp.asarray(next_states, dtype=jnp.int32),
+                    individual_id=user_id,
+                    metadata={"segment": segment, "book_id": book_id},
+                )
+            )
+            trajectory_segment_labels.append(segment)
+
+    metadata = dgp.metadata()
+    metadata.update(
+        {
+            "simulation": {
+                "n_individuals": config.n_individuals,
+                "n_periods": config.n_periods,
+                "seed": config.seed,
+                "books_per_user": dgp_config.books_per_user,
+                "trajectory_unit": "book",
+            },
+            "segment_labels": trajectory_segment_labels,
+            "user_segment_labels": user_segment_labels,
         }
     )
     return Panel(trajectories=trajectories, metadata=metadata)
@@ -1134,6 +1727,23 @@ def _affine_align_for_recovery(
     return scale * estimated + offset
 
 
+def _anchor_project_reward(dgp: Any, reward: jnp.ndarray) -> jnp.ndarray | None:
+    """Project a reward table into the DGP's exit-action anchor convention."""
+
+    exit_action = _exit_action(dgp)
+    if exit_action is None or not 0 <= exit_action < dgp.problem.num_actions:
+        return None
+
+    projected = jnp.asarray(reward, dtype=jnp.float64)
+    projected = projected - projected[:, exit_action][:, None]
+    projected = projected.at[:, exit_action].set(0.0)
+
+    absorbing = _absorbing_state(dgp)
+    if absorbing is not None and 0 <= absorbing < dgp.problem.num_states:
+        projected = projected.at[absorbing, :].set(0.0)
+    return projected
+
+
 def parameter_metrics(
     truth: jnp.ndarray,
     estimated: jnp.ndarray,
@@ -1245,6 +1855,7 @@ def evaluate_estimator_against_truth(
     dgp: Any,
     summary: Any,
     *,
+    panel: Panel | None = None,
     segment_index: int = 0,
     counterfactual_kinds: tuple[str, ...] = ("type_a", "type_b", "type_c"),
 ) -> dict[str, Any]:
@@ -1255,6 +1866,13 @@ def evaluate_estimator_against_truth(
     that policy in the true counterfactual environment.
     """
 
+    if dgp.num_segments > 1 and summary.metadata.get("segment_reward_matrices") is not None:
+        return evaluate_segmented_estimator_against_truth(
+            dgp,
+            summary,
+            panel=panel,
+            counterfactual_kinds=counterfactual_kinds,
+        )
 
 
     truth = solve_known_truth(dgp, segment_index=segment_index)
@@ -1265,6 +1883,10 @@ def evaluate_estimator_against_truth(
         "parameters": None,
         "reward_rmse": None,
         "reward_normalized_rmse": None,
+        "raw_bellman_reward_rmse": None,
+        "raw_bellman_reward_normalized_rmse": None,
+        "projected_reward_rmse": None,
+        "projected_reward_normalized_rmse": None,
         "value_rmse": None,
         "value_normalized_rmse": None,
         "q_rmse": None,
@@ -1276,21 +1898,74 @@ def evaluate_estimator_against_truth(
     if estimated_params.shape == true_params.shape and true_params.size > 0:
         metrics["parameters"] = parameter_metrics(true_params, estimated_params)
 
-    estimated_reward = _extract_estimated_reward(dgp, summary, estimated_params)
     true_reward = get_segment_reward(dgp, segment_index)
+    reward_mask = _reward_recovery_mask(dgp)
+    raw_bellman_reward = _extract_metadata_reward_table(
+        dgp,
+        summary,
+        "raw_bellman_reward_table",
+        "reward_table",
+    )
+    if raw_bellman_reward is not None:
+        metrics["raw_bellman_reward_rmse"] = rmse(raw_bellman_reward, true_reward)
+        metrics["raw_bellman_reward_normalized_rmse"] = normalized_rmse(
+            raw_bellman_reward,
+            true_reward,
+            reward_mask,
+        )
+
+    projected_reward = _extract_metadata_reward_table(
+        dgp,
+        summary,
+        "projected_reward_matrix",
+    )
+    if (
+        projected_reward is None
+        and estimated_params.shape == true_params.shape
+        and true_params.size > 0
+    ):
+        projected_reward = dgp.utility().compute(estimated_params)
+    if projected_reward is not None:
+        metrics["projected_reward_rmse"] = rmse(projected_reward, true_reward)
+        metrics["projected_reward_normalized_rmse"] = normalized_rmse(
+            projected_reward,
+            true_reward,
+            reward_mask,
+        )
+
+    if (
+        summary.metadata.get("counterfactual_reward_source")
+        == "raw_bellman_reward_table"
+        and raw_bellman_reward is not None
+    ):
+        estimated_reward = raw_bellman_reward
+    else:
+        estimated_reward = _extract_estimated_reward(dgp, summary, estimated_params)
     counterfactual_estimated_reward = estimated_reward
     if estimated_reward is not None:
         metrics["reward_rmse"] = rmse(estimated_reward, true_reward)
         metrics["reward_normalized_rmse"] = normalized_rmse(
             estimated_reward,
             true_reward,
-            _reward_recovery_mask(dgp),
+            reward_mask,
         )
+        estimated_anchor_reward = _anchor_project_reward(dgp, estimated_reward)
+        true_anchor_reward = _anchor_project_reward(dgp, true_reward)
+        if estimated_anchor_reward is not None and true_anchor_reward is not None:
+            metrics["anchor_projected_reward_rmse"] = rmse(
+                estimated_anchor_reward[reward_mask],
+                true_anchor_reward[reward_mask],
+            )
+            metrics["anchor_projected_reward_normalized_rmse"] = normalized_rmse(
+                estimated_anchor_reward,
+                true_anchor_reward,
+                reward_mask,
+            )
         if summary.metadata.get("counterfactual_reward_normalization") == "affine":
             counterfactual_estimated_reward = _affine_align_for_recovery(
                 estimated_reward,
                 true_reward,
-                _reward_recovery_mask(dgp),
+                reward_mask,
             )
 
     if summary.value_function is not None:
@@ -1337,13 +2012,180 @@ def evaluate_estimator_against_truth(
                     oracle_value=oracle.counterfactual_solution.V,
                     estimated_policy=estimated_cf.policy,
                     reward=cf_reward,
-                transitions=oracle.counterfactual.transitions,
-                discount_factor=dgp.problem.discount_factor,
-                initial_distribution=dgp.initial_distribution,
-                scale_parameter=dgp.problem.scale_parameter,
-            )
+                    transitions=oracle.counterfactual.transitions,
+                    discount_factor=dgp.problem.discount_factor,
+                    initial_distribution=dgp.initial_distribution,
+                    scale_parameter=dgp.problem.scale_parameter,
+                )
 
     return metrics
+
+
+def evaluate_segmented_estimator_against_truth(
+    dgp: KnownTruthDGP,
+    summary: EstimationSummary,
+    *,
+    panel: Panel | None = None,
+    counterfactual_kinds: tuple[str, ...] = ("type_a", "type_b", "type_c"),
+) -> dict[str, Any]:
+    """Evaluate latent-segment estimators after resolving label switching."""
+
+    metadata = summary.metadata
+    estimated_rewards = jnp.asarray(metadata["segment_reward_matrices"])
+    estimated_policies = jnp.asarray(metadata.get("segment_policies", []))
+    estimated_values = jnp.asarray(metadata.get("segment_value_functions", []))
+
+    true_count = int(dgp.num_segments)
+    estimated_count = int(estimated_rewards.shape[0])
+    matched_count = min(true_count, estimated_count)
+    reward_mask = _reward_recovery_mask(dgp)
+    value_mask = _value_recovery_mask(dgp)
+    q_mask = _q_recovery_mask(dgp)
+
+    reward_cost = np.full((estimated_count, true_count), np.inf, dtype=float)
+    for est_idx in range(estimated_count):
+        for true_idx in range(true_count):
+            reward_cost[est_idx, true_idx] = normalized_rmse(
+                estimated_rewards[est_idx],
+                get_segment_reward(dgp, true_idx),
+                reward_mask,
+            )
+
+    best_perm: tuple[int, ...] = tuple(range(matched_count))
+    best_cost = float("inf")
+    for perm in itertools.permutations(range(estimated_count), matched_count):
+        cost = sum(reward_cost[perm[true_idx], true_idx] for true_idx in range(matched_count))
+        if cost < best_cost:
+            best_cost = cost
+            best_perm = tuple(int(idx) for idx in perm)
+
+    true_to_estimated = list(best_perm)
+    estimated_to_true = {
+        estimated_idx: true_idx
+        for true_idx, estimated_idx in enumerate(true_to_estimated)
+    }
+
+    reward_errors: list[float] = []
+    value_errors: list[float] = []
+    q_errors: list[float] = []
+    policy_metrics: list[PolicyMetrics] = []
+    segment_counterfactuals: dict[str, list[CounterfactualMetrics]] = {
+        kind: [] for kind in counterfactual_kinds
+    }
+
+    for true_idx, estimated_idx in enumerate(true_to_estimated):
+        truth = solve_known_truth(dgp, segment_index=true_idx)
+        true_reward = get_segment_reward(dgp, true_idx)
+        estimated_reward = estimated_rewards[estimated_idx]
+        reward_errors.append(
+            normalized_rmse(estimated_reward, true_reward, reward_mask)
+        )
+
+        estimated_policy = estimated_policies[estimated_idx]
+        policy_metrics.append(policy_divergence(truth.policy, estimated_policy))
+
+        estimated_value = estimated_values[estimated_idx]
+        value_errors.append(normalized_rmse(estimated_value, truth.V, value_mask))
+        estimated_q = q_from_value(
+            estimated_reward,
+            estimated_value,
+            dgp.transitions,
+            dgp.problem.discount_factor,
+        )
+        q_errors.append(normalized_rmse(estimated_q, truth.Q, q_mask))
+
+        for kind in counterfactual_kinds:
+            oracle = solve_counterfactual_oracle(dgp, kind, segment_index=true_idx)
+            cf_reward = oracle.counterfactual_solution.reward_matrix
+            reward_delta = cf_reward - true_reward
+            estimated_cf_reward = estimated_reward + reward_delta
+            operator = SoftBellmanOperator(dgp.problem, oracle.counterfactual.transitions)
+            estimated_cf = value_iteration(
+                operator,
+                estimated_cf_reward,
+                tol=1e-8,
+                max_iter=10_000,
+            )
+            segment_counterfactuals[kind].append(
+                counterfactual_metrics(
+                    oracle_policy=oracle.counterfactual_solution.policy,
+                    oracle_value=oracle.counterfactual_solution.V,
+                    estimated_policy=estimated_cf.policy,
+                    reward=cf_reward,
+                    transitions=oracle.counterfactual.transitions,
+                    discount_factor=dgp.problem.discount_factor,
+                    initial_distribution=dgp.initial_distribution,
+                    scale_parameter=dgp.problem.scale_parameter,
+                )
+            )
+
+    priors = np.asarray(metadata.get("segment_priors", []), dtype=float)
+    true_priors = np.asarray(
+        dgp.segment_probabilities
+        if dgp.segment_probabilities is not None
+        else np.ones(true_count) / true_count,
+        dtype=float,
+    )
+    aligned_priors = np.full(true_count, np.nan, dtype=float)
+    if priors.shape[0] == estimated_count:
+        for true_idx, estimated_idx in enumerate(true_to_estimated):
+            aligned_priors[true_idx] = priors[estimated_idx]
+    prior_abs_error = np.abs(aligned_priors - true_priors)
+
+    assignment_accuracy = None
+    labels = None if panel is None else panel.metadata.get("segment_labels")
+    assignments = metadata.get("segment_assignments")
+    if labels is not None and assignments is not None:
+        labels_arr = np.asarray(labels, dtype=int)
+        assignments_arr = np.asarray(assignments, dtype=int)
+        if labels_arr.shape[0] == assignments_arr.shape[0]:
+            mapped = np.array(
+                [estimated_to_true.get(int(idx), -1) for idx in assignments_arr],
+                dtype=int,
+            )
+            assignment_accuracy = float(np.mean(mapped == labels_arr))
+
+    cf_max_regret = {
+        kind: max((cf.regret for cf in values), default=float("inf"))
+        for kind, values in segment_counterfactuals.items()
+    }
+
+    return {
+        "parameters": None,
+        "reward_rmse": None,
+        "reward_normalized_rmse": max(reward_errors, default=float("inf")),
+        "value_rmse": None,
+        "value_normalized_rmse": max(value_errors, default=float("inf")),
+        "q_rmse": None,
+        "q_normalized_rmse": max(q_errors, default=float("inf")),
+        "policy": None,
+        "counterfactuals": {},
+        "num_true_segments": true_count,
+        "num_estimated_segments": estimated_count,
+        "segment_permutation": {
+            "true_to_estimated": true_to_estimated,
+            "estimated_to_true": {
+                str(key): value for key, value in estimated_to_true.items()
+            },
+        },
+        "segment_reward_normalized_rmse": reward_errors,
+        "max_segment_reward_normalized_rmse": max(reward_errors, default=float("inf")),
+        "segment_value_normalized_rmse": value_errors,
+        "max_segment_value_normalized_rmse": max(value_errors, default=float("inf")),
+        "segment_q_normalized_rmse": q_errors,
+        "max_segment_q_normalized_rmse": max(q_errors, default=float("inf")),
+        "segment_policy": policy_metrics,
+        "max_segment_policy_tv": max(
+            (metric.tv for metric in policy_metrics),
+            default=float("inf"),
+        ),
+        "segment_counterfactuals": segment_counterfactuals,
+        "max_segment_counterfactual_regret": cf_max_regret,
+        "aligned_segment_priors": aligned_priors.tolist(),
+        "segment_prior_l1": float(np.nansum(prior_abs_error)),
+        "segment_prior_max_abs_error": float(np.nanmax(prior_abs_error)),
+        "segment_assignment_accuracy": assignment_accuracy,
+    }
 
 
 def _reward_recovery_mask(dgp: KnownTruthDGP) -> jnp.ndarray:
@@ -1377,6 +2219,21 @@ def _q_recovery_mask(dgp: KnownTruthDGP) -> jnp.ndarray:
     if absorbing is not None and 0 <= absorbing < dgp.problem.num_states:
         mask[absorbing, :] = False
     return jnp.asarray(mask)
+
+
+def _extract_metadata_reward_table(
+    dgp: Any,
+    summary: Any,
+    *keys: str,
+) -> jnp.ndarray | None:
+    for key in keys:
+        metadata_reward = summary.metadata.get(key)
+        if metadata_reward is None:
+            continue
+        reward = jnp.asarray(metadata_reward)
+        if reward.shape == dgp.homogeneous_reward.shape:
+            return reward
+    return None
 
 
 def _extract_estimated_reward(
@@ -1556,7 +2413,11 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
         type_b_support="diagnostic_only",
         type_c_support="diagnostic_only",
         gpu_recommended=True,
-        notes="Without observed rewards, Type B and Type C expose structural bias.",
+        notes=(
+            "Known-truth path uses a stable anchor-moment Q loss when known "
+            "anchor rewards are supplied; literal paper minimax mode remains "
+            "diagnostic because it is numerically unstable in this harness."
+        ),
     ),
     "IQ-Learn": EstimatorContract(
         name="IQ-Learn",
@@ -1575,7 +2436,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
         name="AIRL",
         code_path="src/econirl/estimation/adversarial/airl.py",
         paper_paths=("papers/priority/fu_2018_airl.pdf",),
-        required_reward_modes=("state_only",),
+        required_reward_modes=("state_only", "action_dependent"),
         required_state_modes=("low_dim", "high_dim"),
         requires_transitions=False,
         recovers=("reward", "policy"),
@@ -1583,6 +2444,10 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
         type_b_support="valid_with_normalization",
         type_c_support="valid_with_normalization",
         gpu_recommended=True,
+        notes=(
+            "State-only AIRL matches Fu et al.; action-dependent AIRL must use "
+            "an anchor action to be interpretable."
+        ),
     ),
     "AIRL-Het": EstimatorContract(
         name="AIRL-Het",
@@ -2044,6 +2909,12 @@ def make_estimator(
     if estimator_name == "GLADIUS":
         from econirl.estimation.gladius import GLADIUSConfig, GLADIUSEstimator
 
+        anchor_action = _exit_action(dgp)
+        anchor_rewards = None
+        if anchor_action is not None:
+            anchor_rewards = tuple(
+                float(x) for x in np.asarray(dgp.homogeneous_reward[:, anchor_action])
+            )
         return GLADIUSEstimator(
             config=GLADIUSConfig(
                 q_hidden_dim=16 if smoke else 128,
@@ -2052,6 +2923,9 @@ def make_estimator(
                 v_num_layers=1 if smoke else 3,
                 max_epochs=10 if smoke else 500,
                 batch_size=128 if smoke else 512,
+                anchor_action=anchor_action,
+                anchor_rewards=anchor_rewards,
+                anchor_bellman_mode="anchor_moment",
                 compute_se=False,
                 verbose=verbose,
             )
@@ -2059,20 +2933,68 @@ def make_estimator(
     if estimator_name == "IQ-Learn":
         from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
 
+        neural_q = (
+            dgp.config.state_mode == "high_dim"
+            and dgp.config.reward_dim == "high"
+            and not smoke
+        )
         return IQLearnEstimator(
             config=IQLearnConfig(
-                max_iter=25 if smoke else 500,
-                optimizer="adam" if smoke else "L-BFGS-B",
+                q_type="neural" if neural_q else "tabular",
+                max_iter=25 if smoke else (800 if neural_q else 500),
+                optimizer="adam" if (smoke or neural_q) else "L-BFGS-B",
+                learning_rate=0.003 if neural_q else 0.01,
+                hidden_dim=64 if neural_q else 32,
+                num_layers=2,
+                seed=int(dgp.config.seed),
+                convergence_tol=1e-4 if not smoke else 1e-6,
                 verbose=verbose,
             )
         )
     if estimator_name == "AIRL":
         from econirl.estimation.adversarial.airl import AIRLConfig, AIRLEstimator
 
+        reward_arg = (
+            "state_action"
+            if dgp.config.reward_mode == "action_dependent"
+            else "state"
+        )
+        paper_identification_case = bool(
+            reward_arg == "state"
+            and getattr(dgp.config, "exit_action", None) is None
+            and getattr(dgp.config, "absorbing_state", None) is None
+            and dgp.homogeneous_parameters.size > 0
+        )
+        reward_type = "linear" if paper_identification_case else "tabular"
+        anchor_action = dgp.config.exit_action if reward_arg == "state_action" else None
+        absorbing_state = (
+            dgp.config.absorbing_state if reward_arg == "state_action" else None
+        )
         return AIRLEstimator(
             config=AIRLConfig(
-                reward_type="tabular",
+                reward_type=reward_type,
+                reward_arg=reward_arg,
+                anchor_action=anchor_action,
+                absorbing_state=absorbing_state,
+                reward_lr=0.02,
+                discriminator_steps=3 if smoke else 5,
+                policy_step_size=(
+                    0.3
+                    if smoke
+                    else (0.1 if paper_identification_case else 0.3)
+                ),
                 max_rounds=10 if smoke else 200,
+                min_rounds=(
+                    3
+                    if smoke
+                    else (150 if paper_identification_case else 20)
+                ),
+                convergence_tol=(
+                    1e-4
+                    if smoke
+                    else (0.01 if paper_identification_case else 1e-4)
+                ),
+                generator_reward="f" if paper_identification_case else "recovered",
                 generator_max_iter=500 if smoke else 5_000,
                 compute_se=False,
                 verbose=verbose,
@@ -2081,14 +3003,33 @@ def make_estimator(
     if estimator_name == "AIRL-Het":
         from econirl.estimation.adversarial.airl_het import AIRLHetConfig, AIRLHetEstimator
 
+        content_cell = isinstance(dgp.config, ContentHeterogeneityKnownTruthConfig)
         return AIRLHetEstimator(
             config=AIRLHetConfig(
                 num_segments=dgp.config.num_segments,
                 exit_action=dgp.config.exit_action,
                 absorbing_state=dgp.config.absorbing_state,
-                reward_type="tabular",
-                max_airl_rounds=5 if smoke else 100,
-                max_em_iterations=3 if smoke else 50,
+                reward_type="linear",
+                reward_lr=(
+                    0.001
+                    if content_cell
+                    else 0.02
+                ),
+                discriminator_steps=2 if content_cell else (3 if smoke else 5),
+                policy_step_size=0.1 if content_cell else (0.3 if smoke else 0.1),
+                generator_reward="f",
+                max_airl_rounds=3 if content_cell else (5 if smoke else 80),
+                min_airl_rounds=1 if content_cell else (2 if smoke else 20),
+                max_em_iterations=8 if content_cell else (3 if smoke else 30),
+                airl_convergence_tol=1e-4 if smoke else 0.01,
+                em_convergence_tol=1e-3,
+                prior_min=0.05,
+                prior_damping=0.8 if content_cell else 0.2,
+                consistency_weight=1.0 if content_cell else 0.1,
+                antisymmetric_init=not content_cell,
+                initialization="behavioral_anchor" if content_cell else "random",
+                initialization_smoothing=1.0,
+                initialization_l2_penalty=10.0 if content_cell else 0.0,
                 generator_max_iter=500 if smoke else 5_000,
                 verbose=verbose,
             )
@@ -2096,9 +3037,17 @@ def make_estimator(
     if estimator_name == "f-IRL":
         from econirl.estimation.f_irl import FIRLEstimator
 
+        paper_state_marginal = (
+            dgp.config.reward_mode == "state_only" and _exit_action(dgp) is None
+        )
         return FIRLEstimator(
-            max_iter=20 if smoke else 500,
+            f_divergence="fkl",
+            lr=0.20 if paper_state_marginal else 0.50,
+            max_iter=20 if smoke else (250 if paper_state_marginal else 500),
             inner_max_iter=500 if smoke else 5_000,
+            marginal_space="state" if paper_state_marginal else "state_action",
+            reward_scope="state" if paper_state_marginal else "state_action",
+            selection_metric="occupancy_l1" if paper_state_marginal else "log_likelihood",
             compute_se=False,
             verbose=verbose,
         )
@@ -2142,7 +3091,7 @@ def run_estimator(
         transitions=dgp.transitions,
         initial_params=initial_params,
     )
-    metrics = evaluate_estimator_against_truth(dgp, summary)
+    metrics = evaluate_estimator_against_truth(dgp, summary, panel=panel)
     gates = recovery_gates(estimator_name, summary, metrics, smoke=smoke)
     if enforce_gates:
         failed = [gate for gate in gates if not gate.passed]
@@ -2446,6 +3395,87 @@ def recovery_gates(
             )
         return checks
 
+    if estimator_name == "AIRL":
+        checks = [
+            _bool_gate("converged", bool(summary.converged), True),
+            _numeric_gate(
+                "reward_normalized_rmse",
+                metrics["reward_normalized_rmse"],
+                "<=",
+                0.15,
+            ),
+            _numeric_gate("policy_tv", metrics["policy"].tv, "<=", 0.05),
+            _numeric_gate(
+                "value_normalized_rmse",
+                metrics["value_normalized_rmse"],
+                "<=",
+                0.15,
+            ),
+            _numeric_gate(
+                "q_normalized_rmse",
+                metrics["q_normalized_rmse"],
+                "<=",
+                0.15,
+            ),
+        ]
+        for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
+            checks.append(
+                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.08)
+            )
+        return checks
+
+    if estimator_name == "AIRL-Het":
+        assignment_accuracy = metrics["segment_assignment_accuracy"]
+        if assignment_accuracy is None:
+            assignment_accuracy = float("-inf")
+        checks = [
+            _bool_gate(
+                "num_segments_match",
+                metrics["num_estimated_segments"] == metrics["num_true_segments"],
+                True,
+            ),
+            _bool_gate("converged", bool(summary.converged), True),
+            _numeric_gate(
+                "segment_prior_l1",
+                metrics["segment_prior_l1"],
+                "<=",
+                0.35,
+            ),
+            _numeric_gate(
+                "segment_assignment_accuracy",
+                assignment_accuracy,
+                ">=",
+                0.70,
+            ),
+            _numeric_gate(
+                "max_segment_reward_normalized_rmse",
+                metrics["max_segment_reward_normalized_rmse"],
+                "<=",
+                0.30,
+            ),
+            _numeric_gate(
+                "max_segment_policy_tv",
+                metrics["max_segment_policy_tv"],
+                "<=",
+                0.12,
+            ),
+            _numeric_gate(
+                "max_segment_value_normalized_rmse",
+                metrics["max_segment_value_normalized_rmse"],
+                "<=",
+                0.30,
+            ),
+            _numeric_gate(
+                "max_segment_q_normalized_rmse",
+                metrics["max_segment_q_normalized_rmse"],
+                "<=",
+                0.30,
+            ),
+        ]
+        for kind, regret in sorted(metrics["max_segment_counterfactual_regret"].items()):
+            checks.append(_numeric_gate(f"{kind}_max_regret", regret, "<=", 0.12))
+        return checks
+
     if estimator_name == "TD-CCP":
         checks = [
             _bool_gate("converged", bool(summary.converged), True),
@@ -2469,6 +3499,146 @@ def recovery_gates(
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
             checks.append(
                 _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.01)
+            )
+        return checks
+
+    if estimator_name == "f-IRL":
+        occupancy_l1 = float(summary.metadata.get("occupancy_l1", float("inf")))
+        reward_range = float(summary.metadata.get("reward_range", 0.0))
+        paper_state_marginal = (
+            summary.metadata.get("marginal_space") == "state"
+            and summary.metadata.get("reward_scope") == "state"
+        )
+        if paper_state_marginal:
+            checks = [
+                _bool_gate("converged", bool(summary.converged), True),
+                _numeric_gate("state_marginal_l1", occupancy_l1, "<=", 0.08),
+                _numeric_gate("reward_range", reward_range, ">=", 1e-3),
+                _numeric_gate(
+                    "reward_normalized_rmse",
+                    metrics["reward_normalized_rmse"],
+                    "<=",
+                    0.30,
+                ),
+                _numeric_gate("policy_tv", metrics["policy"].tv, "<=", 0.08),
+                _numeric_gate(
+                    "value_normalized_rmse",
+                    metrics["value_normalized_rmse"],
+                    "<=",
+                    0.30,
+                ),
+                _numeric_gate(
+                    "q_normalized_rmse",
+                    metrics["q_normalized_rmse"],
+                    "<=",
+                    0.30,
+                ),
+            ]
+            for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
+                checks.append(
+                    _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
+                )
+            return checks
+        checks = [
+            _bool_gate("converged", bool(summary.converged), True),
+            _numeric_gate("occupancy_l1", occupancy_l1, "<=", 0.40),
+            _numeric_gate("reward_range", reward_range, ">=", 1e-3),
+        ]
+        return checks
+
+    if estimator_name == "GLADIUS":
+        final_loss = float(summary.metadata.get("final_loss", float("inf")))
+        checks = [
+            _bool_gate("converged", bool(summary.converged), True),
+            _numeric_gate("final_loss", final_loss, "<=", 2.0),
+            _numeric_gate(
+                "parameter_cosine",
+                metrics["parameters"].cosine_similarity,
+                ">=",
+                0.90,
+            ),
+            _numeric_gate(
+                "parameter_relative_rmse",
+                metrics["parameters"].relative_rmse,
+                "<=",
+                0.50,
+            ),
+            _numeric_gate(
+                "raw_bellman_reward_normalized_rmse",
+                metrics["raw_bellman_reward_normalized_rmse"],
+                "<=",
+                0.30,
+            ),
+            _numeric_gate(
+                "projected_reward_normalized_rmse",
+                metrics["projected_reward_normalized_rmse"],
+                "<=",
+                0.30,
+            ),
+            _numeric_gate("policy_tv", metrics["policy"].tv, "<=", 0.12),
+            _numeric_gate(
+                "value_normalized_rmse",
+                metrics["value_normalized_rmse"],
+                "<=",
+                0.30,
+            ),
+            _numeric_gate(
+                "q_normalized_rmse",
+                metrics["q_normalized_rmse"],
+                "<=",
+                0.30,
+            ),
+        ]
+        for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
+            checks.append(
+                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.12)
+            )
+        return checks
+
+    if estimator_name == "IQ-Learn":
+        checks = [
+            _bool_gate("converged", bool(summary.converged), True),
+            _numeric_gate(
+                "expert_state_coverage",
+                float(summary.metadata.get("expert_state_coverage", 0.0)),
+                ">=",
+                1.0,
+            ),
+            _numeric_gate(
+                "expert_state_action_coverage",
+                float(summary.metadata.get("expert_state_action_coverage", 0.0)),
+                ">=",
+                0.95,
+            ),
+            _numeric_gate("policy_tv", metrics["policy"].tv, "<=", 0.05),
+            _numeric_gate(
+                "raw_bellman_reward_normalized_rmse",
+                metrics["raw_bellman_reward_normalized_rmse"],
+                "<=",
+                0.10,
+            ),
+            _numeric_gate(
+                "projected_reward_normalized_rmse",
+                metrics["projected_reward_normalized_rmse"],
+                "<=",
+                0.10,
+            ),
+            _numeric_gate(
+                "value_normalized_rmse",
+                metrics["value_normalized_rmse"],
+                "<=",
+                0.10,
+            ),
+            _numeric_gate(
+                "q_normalized_rmse",
+                metrics["q_normalized_rmse"],
+                "<=",
+                0.10,
+            ),
+        ]
+        for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
+            checks.append(
+                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
             )
         return checks
 
@@ -2578,7 +3748,11 @@ def to_jsonable(value: Any) -> Any:
 @dataclass(frozen=True)
 class KnownTruthCell:
     cell_id: str
-    dgp_config: KnownTruthDGPConfig | ShapeshifterKnownTruthConfig
+    dgp_config: (
+        KnownTruthDGPConfig
+        | ShapeshifterKnownTruthConfig
+        | ContentHeterogeneityKnownTruthConfig
+    )
     simulation_config: SimulationConfig = field(default_factory=SimulationConfig)
     description: str = ""
 
@@ -2610,6 +3784,60 @@ DEFAULT_CELLS: tuple[KnownTruthCell, ...] = (
         description="Universal DGP preset: state-only reward benchmark for AIRL-style assumptions.",
     ),
     KnownTruthCell(
+        cell_id="airl_paper_identification",
+        dgp_config=ShapeshifterKnownTruthConfig(
+            env_config=ShapeshifterConfig(
+                num_states=16,
+                num_actions=4,
+                num_features=4,
+                reward_type="linear",
+                feature_type="linear",
+                action_dependent=False,
+                stochastic_transitions=False,
+                stochastic_rewards=False,
+                num_periods=None,
+                discount_factor=0.95,
+                scale_parameter=1.0,
+                state_dim=1,
+                reward_scale=1.0,
+                seed=1710,
+            ),
+        ),
+        simulation_config=SimulationConfig(n_individuals=300, n_periods=80, seed=1711),
+        description=(
+            "AIRL paper-assumption diagnostic: deterministic transitions, no "
+            "exit/absorbing anchor, full observability, and a state-only "
+            "reward tiled across every action."
+        ),
+    ),
+    KnownTruthCell(
+        cell_id="f_irl_paper_state_marginal",
+        dgp_config=ShapeshifterKnownTruthConfig(
+            env_config=ShapeshifterConfig(
+                num_states=8,
+                num_actions=3,
+                num_features=3,
+                reward_type="linear",
+                feature_type="linear",
+                action_dependent=False,
+                stochastic_transitions=False,
+                stochastic_rewards=False,
+                num_periods=None,
+                discount_factor=0.95,
+                scale_parameter=1.0,
+                state_dim=1,
+                reward_scale=1.0,
+                seed=4400,
+            ),
+        ),
+        simulation_config=SimulationConfig(n_individuals=1_000, n_periods=100, seed=4401),
+        description=(
+            "f-IRL paper-side state-marginal cell: deterministic dynamics, "
+            "full observability, no exit/absorbing anchor, and a state-only "
+            "reward tiled across every action."
+        ),
+    ),
+    KnownTruthCell(
         cell_id="canonical_high_action",
         dgp_config=KnownTruthDGPConfig(
             state_mode="high_dim",
@@ -2625,6 +3853,45 @@ DEFAULT_CELLS: tuple[KnownTruthCell, ...] = (
         description="Universal DGP preset: high-dimensional state and reward stress benchmark.",
     ),
     KnownTruthCell(
+        cell_id="gladius_paper_high_state",
+        dgp_config=KnownTruthDGPConfig(
+            state_mode="high_dim",
+            reward_mode="action_dependent",
+            reward_dim="low",
+            heterogeneity="none",
+            num_regular_states=20,
+            high_state_dim=64,
+            seed=144,
+            initial_state_mode="uniform_regular",
+            transition_noise=0.05,
+        ),
+        simulation_config=SimulationConfig(n_individuals=1_000, n_periods=100, seed=145),
+        description=(
+            "GLADIUS paper-side high-dimensional-state cell: many nuisance "
+            "state controls, a low-dimensional action-dependent reward basis, "
+            "and an exit-action reward anchor."
+        ),
+    ),
+    KnownTruthCell(
+        cell_id="gladius_paper_high_state_scaled",
+        dgp_config=KnownTruthDGPConfig(
+            state_mode="high_dim",
+            reward_mode="action_dependent",
+            reward_dim="low",
+            heterogeneity="none",
+            num_regular_states=20,
+            high_state_dim=128,
+            seed=244,
+            initial_state_mode="uniform_regular",
+            transition_noise=0.05,
+        ),
+        simulation_config=SimulationConfig(n_individuals=1_000, n_periods=100, seed=245),
+        description=(
+            "GLADIUS scaled paper-side cell: doubled nuisance state dimension "
+            "with the same low-dimensional anchored reward structure."
+        ),
+    ),
+    KnownTruthCell(
         cell_id="canonical_latent_segments",
         dgp_config=KnownTruthDGPConfig(
             state_mode="high_dim",
@@ -2638,6 +3905,26 @@ DEFAULT_CELLS: tuple[KnownTruthCell, ...] = (
             seed=45,
         ),
         description="Universal DGP preset: latent-segment benchmark for heterogeneous estimators.",
+    ),
+    KnownTruthCell(
+        cell_id="airl_het_paper_identification",
+        dgp_config=ContentHeterogeneityKnownTruthConfig(
+            num_chapters=5,
+            wait_bins=3,
+            price_levels=2,
+            quality_levels=2,
+            books_per_user=4,
+            discount_factor=0.92,
+            scale_parameter=0.85,
+            seed=4506,
+        ),
+        simulation_config=SimulationConfig(n_individuals=800, n_periods=16, seed=4507),
+        description=(
+            "AIRL-Het serialized-content identification cell: two latent "
+            "segments, repeated books per user, pay/wait/exit actions, an "
+            "exit reward anchor, deterministic chapter transitions, and "
+            "known finite reward features."
+        ),
     ),
     KnownTruthCell(
         cell_id="deep_mce_neural_reward",
@@ -2733,7 +4020,12 @@ DEFAULT_CELLS: tuple[KnownTruthCell, ...] = (
 CELL_ALIASES: dict[str, str] = {
     "low_state_action_reward": "canonical_low_action",
     "low_state_state_only_reward": "canonical_low_state_only",
+    "airl_original_conditions": "airl_paper_identification",
+    "f_irl_original_conditions": "f_irl_paper_state_marginal",
     "high_state_high_reward": "canonical_high_action",
+    "gladius_paper": "gladius_paper_high_state",
+    "gladius_high_state": "gladius_paper_high_state",
+    "gladius_scaled": "gladius_paper_high_state_scaled",
     "latent_segments": "canonical_latent_segments",
     "deep_mce_state_reward_32": "deep_mce_neural_reward",
 }

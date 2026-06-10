@@ -1,0 +1,256 @@
+{
+  "grid_explosion": [
+    {
+      "bins_per_dim": 5,
+      "state_dim": 1,
+      "num_states": 5,
+      "nfxp_value_unknowns": 5,
+      "sees_value_unknowns": 5,
+      "transition_tensor_gib_float64": 5.587935447692871e-07,
+      "nfxp_status": "run"
+    },
+    {
+      "bins_per_dim": 5,
+      "state_dim": 2,
+      "num_states": 25,
+      "nfxp_value_unknowns": 25,
+      "sees_value_unknowns": 25,
+      "transition_tensor_gib_float64": 1.3969838619232178e-05,
+      "nfxp_status": "run"
+    },
+    {
+      "bins_per_dim": 5,
+      "state_dim": 3,
+      "num_states": 125,
+      "nfxp_value_unknowns": 125,
+      "sees_value_unknowns": 40,
+      "transition_tensor_gib_float64": 0.00034924596548080444,
+      "nfxp_status": "run"
+    },
+    {
+      "bins_per_dim": 5,
+      "state_dim": 4,
+      "num_states": 625,
+      "nfxp_value_unknowns": 625,
+      "sees_value_unknowns": 40,
+      "transition_tensor_gib_float64": 0.008731149137020111,
+      "nfxp_status": "skip"
+    },
+    {
+      "bins_per_dim": 5,
+      "state_dim": 5,
+      "num_states": 3125,
+      "nfxp_value_unknowns": 3125,
+      "sees_value_unknowns": 40,
+      "transition_tensor_gib_float64": 0.21827872842550278,
+      "nfxp_status": "skip"
+    },
+    {
+      "bins_per_dim": 5,
+      "state_dim": 6,
+      "num_states": 15625,
+      "nfxp_value_unknowns": 15625,
+      "sees_value_unknowns": 40,
+      "transition_tensor_gib_float64": 5.456968210637569,
+      "nfxp_status": "skip"
+    },
+    {
+      "bins_per_dim": 5,
+      "state_dim": 7,
+      "num_states": 78125,
+      "nfxp_value_unknowns": 78125,
+      "sees_value_unknowns": 40,
+      "transition_tensor_gib_float64": 136.42420526593924,
+      "nfxp_status": "skip"
+    },
+    {
+      "bins_per_dim": 5,
+      "state_dim": 8,
+      "num_states": 390625,
+      "nfxp_value_unknowns": 390625,
+      "sees_value_unknowns": 40,
+      "transition_tensor_gib_float64": 3410.605131648481,
+      "nfxp_status": "skip"
+    }
+  ],
+  "runs": [
+    {
+      "config": {
+        "bins_per_dim": 5,
+        "state_dim": 2,
+        "num_actions": 3,
+        "num_features": 8,
+        "n_individuals": 250,
+        "n_periods": 25,
+        "seed": 2026,
+        "sees_basis_dim": 40,
+        "sees_penalty_weight": 100.0
+      },
+      "num_states": 25,
+      "observations": 6250,
+      "transition_tensor_gib_float64": 1.3969838619232178e-05,
+      "true_params": [
+        -0.2519601285457611,
+        0.225161612033844,
+        0.011335783638060093,
+        0.8013261556625366,
+        -0.3435609042644501,
+        -0.44549795985221863,
+        -0.6218544840812683,
+        1.0222153663635254
+      ],
+      "truth_solver": {
+        "converged": true,
+        "iterations": 289,
+        "final_error": 9.50208800531982e-11
+      },
+      "sees": {
+        "converged": false,
+        "iterations": 262,
+        "time_seconds": 5.998517990112305,
+        "log_likelihood": -5060.261852729748,
+        "estimated_params": [
+          -0.20833900751248116,
+          0.056643704797012535,
+          0.3428272839672332,
+          0.3674991174213254,
+          0.057469243672248274,
+          -0.5557215160513186,
+          -0.7322280050640383,
+          1.0259073750558636
+        ],
+        "param_rmse": 0.25336829865754057,
+        "policy_tv": 0.008223474546557214,
+        "value_rmse": 0.3310476140729728,
+        "q_rmse": 0.32420961746137905,
+        "bellman_violation": 0.00067221072662349,
+        "basis_source": "encoded_state",
+        "basis_family": "rbf_svd",
+        "state_basis_dim": 25,
+        "configured_basis_dim": 25,
+        "gradient_norm": 0.012364751654142142,
+        "message": "SEES: Maximum iterations reached",
+        "wall_seconds": 6.113910913467407
+      },
+      "nfxp": {
+        "converged": true,
+        "iterations": 12,
+        "time_seconds": 4.819703817367554,
+        "log_likelihood": -5055.980129780484,
+        "estimated_params": [
+          -0.25324185183283526,
+          0.6439160931033864,
+          -1.2014428027641058,
+          1.098556637814431,
+          -0.7012451878545294,
+          4.014292462090979,
+          -4.345252106469541,
+          1.0187736158262677
+        ],
+        "param_rmse": 2.1099734942595645,
+        "policy_tv": 0.007316878756141271,
+        "value_rmse": 0.2734371251519579,
+        "q_rmse": 0.2676639561894992,
+        "bellman_violation": null,
+        "basis_source": null,
+        "basis_family": null,
+        "state_basis_dim": null,
+        "configured_basis_dim": null,
+        "gradient_norm": null,
+        "message": "Converged",
+        "wall_seconds": 4.82757306098938
+      }
+    },
+    {
+      "config": {
+        "bins_per_dim": 5,
+        "state_dim": 3,
+        "num_actions": 3,
+        "num_features": 8,
+        "n_individuals": 250,
+        "n_periods": 25,
+        "seed": 2027,
+        "sees_basis_dim": 40,
+        "sees_penalty_weight": 100.0
+      },
+      "num_states": 125,
+      "observations": 6250,
+      "transition_tensor_gib_float64": 0.00034924596548080444,
+      "true_params": [
+        -0.053242046386003494,
+        0.13693323731422424,
+        0.17627371847629547,
+        -0.0450114831328392,
+        0.33745813369750977,
+        -0.5486089587211609,
+        0.08227009326219559,
+        0.24994871020317078
+      ],
+      "truth_solver": {
+        "converged": true,
+        "iterations": 282,
+        "final_error": 9.206146955875738e-11
+      },
+      "sees": {
+        "converged": false,
+        "iterations": 320,
+        "time_seconds": 7.031135082244873,
+        "log_likelihood": -6763.785887316773,
+        "estimated_params": [
+          0.16774447985018215,
+          0.14012273084842572,
+          -0.2189937712043146,
+          -0.017941297579751252,
+          0.014334976835185188,
+          -0.04082244939315765,
+          0.0399036665475552,
+          0.09943213411330395
+        ],
+        "param_rmse": 0.27214891795159857,
+        "policy_tv": 0.06905218964856923,
+        "value_rmse": 0.744242876832814,
+        "q_rmse": 0.7408935659355752,
+        "bellman_violation": 0.015388723686623251,
+        "basis_source": "encoded_state",
+        "basis_family": "rbf_svd",
+        "state_basis_dim": 40,
+        "configured_basis_dim": 40,
+        "gradient_norm": 0.0022190332847676847,
+        "message": "SEES: Maximum iterations reached",
+        "wall_seconds": 7.212502956390381
+      },
+      "nfxp": {
+        "converged": true,
+        "iterations": 12,
+        "time_seconds": 5.732410192489624,
+        "log_likelihood": -6652.58978480097,
+        "estimated_params": [
+          -0.20071024080290803,
+          0.1958189720751674,
+          0.049165915526137555,
+          -0.034868362560548975,
+          0.2853627182538817,
+          -0.6992667814052735,
+          0.2798525421169477,
+          0.3413041742804941
+        ],
+        "param_rmse": 0.11951465984716261,
+        "policy_tv": 0.019631136564583235,
+        "value_rmse": 0.15785393055709085,
+        "q_rmse": 0.16583301893815247,
+        "bellman_violation": null,
+        "basis_source": null,
+        "basis_family": null,
+        "state_basis_dim": null,
+        "configured_basis_dim": null,
+        "gradient_norm": null,
+        "message": "Converged",
+        "wall_seconds": 5.73400616645813
+      }
+    }
+  ],
+  "notes": {
+    "scope": "Encoded finite product-grid stress. Current SEES still uses dense finite-state transitions; true continuous-state advantage requires a sparse/collocation path.",
+    "nfxp_skip_rule": "NFXP skipped above 250 states to avoid long exact Bellman estimation in an interactive run."
+  }
+}

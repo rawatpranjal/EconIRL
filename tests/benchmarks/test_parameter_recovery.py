@@ -6,37 +6,38 @@ checks that RMSE relative to the true parameter vector is below a tolerance.
 All tests in this module are marked ``@pytest.mark.slow``.
 """
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from econirl.environments import (
-    RustBusEnvironment,
     MultiComponentBusEnvironment,
+    RustBusEnvironment,
 )
 from econirl.estimation import (
-    NFXPEstimator,
-    CCPEstimator,
-    MCEIRLEstimator,
-    MCEIRLConfig,
-    MaxEntIRLEstimator,
-    TDCCPEstimator,
-    TDCCPConfig,
-    GLADIUSEstimator,
-    GLADIUSConfig,
-    GAILEstimator,
-    GAILConfig,
-    AIRLEstimator,
     AIRLConfig,
+    AIRLEstimator,
+    CCPEstimator,
+    GAILConfig,
+    GAILEstimator,
+    GLADIUSConfig,
+    GLADIUSEstimator,
+    MaxEntIRLEstimator,
+    MCEIRLConfig,
+    MCEIRLEstimator,
+    NFXPEstimator,
+    TDCCPConfig,
+    TDCCPEstimator,
 )
-from econirl.estimation.mpec import MPECEstimator, MPECConfig
+from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
+from econirl.estimation.mpec import MPECConfig, MPECEstimator
 from econirl.estimation.nnes import NNESEstimator
 from econirl.estimation.sees import SEESEstimator
-from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
-from econirl.preferences.linear import LinearUtility
 from econirl.preferences.action_reward import ActionDependentReward
+from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel
-
+from experiments.sees_linear_value_spline import run_benchmark as run_linear_value_spline_benchmark
+from experiments.sees_rust_random_start import run_benchmark as run_rust_random_start_benchmark
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -177,6 +178,42 @@ def test_sees_rust_bus():
     alpha = result.metadata.get("alpha")
     if alpha is not None:
         assert jnp.all(jnp.isfinite(jnp.asarray(alpha))), "SEES sieve coefficients contain NaN/Inf"
+
+
+@pytest.mark.slow
+def test_sees_rust_bus_solution_variants():
+    """SEES solution formulations recover Rust bus across seeds and starts."""
+    payload = run_rust_random_start_benchmark(panel_seeds=(2, 17, 29))
+
+    failed = [
+        record
+        for record in payload["records"]
+        if not record["passed"]
+    ]
+    assert not failed
+    assert len(payload["records"]) == 45
+    assert all(row["passes"] == row["runs"] for row in payload["summary"])
+    assert all(
+        np.isfinite(record["selected_gradient_norm"])
+        for record in payload["records"]
+    )
+
+
+@pytest.mark.slow
+def test_sees_linear_reward_value_spline_benchmark():
+    """SEES recovers linear reward with a compressed B-spline value basis."""
+    payload = run_linear_value_spline_benchmark(panel_seeds=(65,))
+    summary = payload["summary"]
+    thresholds = payload["thresholds"]
+
+    assert summary["passes"] == summary["runs"] == 3
+    assert summary["max_param_rmse"] <= thresholds["param_rmse"]
+    assert summary["max_policy_tv"] <= thresholds["policy_tv"]
+    assert summary["max_value_rmse"] <= thresholds["value_rmse"]
+    assert summary["max_q_rmse"] <= thresholds["q_rmse"]
+    assert summary["max_bellman_violation"] <= thresholds["bellman_violation"]
+    assert payload["design"]["reward_dim"] == "strict_linear"
+    assert payload["design"]["value_basis_compression"] == "20/31"
 
 
 # ---------------------------------------------------------------------------
