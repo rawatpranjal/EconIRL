@@ -1,8 +1,8 @@
 # Rust Bus Engine Example
 
-The Rust bus-engine replacement problem is a useful package smoke example for
-MCE-IRL, but it is not the release validation cell. The MCE-IRL wrapper needs
-an explicit reward feature matrix for multi-action recovery.
+The Rust bus-engine replacement problem is a useful smoke example for MCE-IRL,
+but it is not the release validation cell. The wrapper needs an explicit reward
+feature matrix for multi-action recovery.
 
 ```python
 import numpy as np
@@ -34,8 +34,8 @@ print(model.predict_proba([0, 10, 50]))
 Output
 
 ```text
-No fixed output. The example is a package smoke fit whose estimates depend on
-the chosen action-dependent feature matrix and transition specification.
+No fixed output. This is a smoke fit, and estimates depend on the chosen
+action-dependent feature matrix and transition specification.
 ```
 
 ## Interpretation
@@ -47,5 +47,6 @@ gives replacement probabilities by mileage state.
 ## Validation Boundary
 
 This page is not a historical Rust replication and is not the certified
-evidence claim. The release evidence is the known-truth MCE cell with known
-reward, transition, policy, value, Q, and counterfactual oracle objects.
+evidence claim. The release evidence comes from the known-truth MCE cell, where
+reward, transition, policy, value, Q, and counterfactual oracle objects are all
+known.

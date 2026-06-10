@@ -1,8 +1,8 @@
 # Quick Start
 
-The public wrapper follows the sklearn-style convention: build an estimator,
-call `fit`, then read fitted attributes. For multi-action MCE-IRL, provide
-explicit reward features.
+The wrapper follows the sklearn-style pattern: build an estimator, call `fit`,
+then read fitted attributes. For multi-action MCE-IRL, provide reward features
+explicitly.
 
 ```python
 import numpy as np
@@ -39,7 +39,7 @@ specification, and inference settings.
 ```
 
 The fitted estimator exposes reward parameters, standard errors when requested,
-the recovered reward, a policy, a value function, and feature-matching
+the recovered reward, the policy, the value function, and feature-matching
 diagnostics.
 
 | Attribute | Meaning |
@@ -53,7 +53,7 @@ diagnostics.
 
 ## Validation Rerun
 
-The release artifact is generated from the lower-level known-truth harness:
+To reproduce the release evidence, run the lower-level known-truth harness:
 
 ```bash
 PYTHONPATH=src:. python papers/econirl_package/primers/mce_irl/mce_irl_run.py --quiet-progress --enforce-gates

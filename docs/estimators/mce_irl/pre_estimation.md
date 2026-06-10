@@ -1,8 +1,8 @@
 # Pre-Estimation Checks
 
-MCE-IRL can fail for reasons that are visible before optimization starts. The
-important checks are feature variation, support, transition validity, and
-normalization.
+Most MCE-IRL failures are visible before optimization starts. Check feature
+variation, support, transition validity, and normalization before treating a
+fit as reward evidence.
 
 | Check | Why it matters |
 | --- | --- |
@@ -16,8 +16,8 @@ normalization.
 
 ## Primary Validation Checks
 
-The primary `mce_low_high_reward` artifact records these checks. See the
-[validation page](validation.md) for the generator script, rendered table
+The primary `mce_low_high_reward` artifact records these checks. The
+[validation page](validation.md) links the generator script, rendered table
 source, and JSON artifact.
 
 | Check | Value | Status |
@@ -34,8 +34,8 @@ source, and JSON artifact.
 
 ## Common Risk Patterns
 
-A state-only feature matrix can produce a plausible-looking reward vector while
+A state-only feature matrix can produce a plausible reward vector while still
 failing to identify action-specific payoffs. Sparse demonstrations can match
 the dominant actions while leaving rare-action rewards weak. Transition tensors
-with the wrong orientation can still have valid row sums but produce the wrong
+with the wrong orientation can have valid row sums and still produce the wrong
 occupancy measure.

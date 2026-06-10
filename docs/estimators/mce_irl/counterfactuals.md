@@ -1,13 +1,14 @@
 # Counterfactuals
 
 The public `MCEIRL` wrapper exposes the recovered policy, reward matrix, and
-value function. It does not currently expose a one-call `counterfactual`
-method like the structural likelihood wrappers.
+value function. It does not yet provide a one-call `counterfactual` method like
+the structural likelihood wrappers.
 
-Counterfactual evidence for the release comes from the known-truth validation
-harness, which can rerun the dynamic program under controlled oracle changes.
-See the [validation page](validation.md) for the generator script, table
-source, and JSON artifact.
+The counterfactual evidence comes from the known-truth validation harness. The
+harness reruns the dynamic program under controlled changes and compares the
+recovered-reward policy with the oracle policy. See the
+[validation page](validation.md) for the generator script, table source, and
+JSON artifact.
 
 ## Counterfactual Families
 
@@ -27,12 +28,12 @@ These rows are from the primary `mce_low_high_reward` known-truth artifact.
 | Type B | 0.006284 | 0.000142 | 0.000523 | 0.000410 |
 | Type C | 0.004211 | 5.98e-5 | 0.000145 | 0.000094 |
 
-The regret values report how the policy induced by the recovered reward
-compares with the oracle counterfactual policy.
+Regret reports how the policy induced by the recovered reward compares with the
+oracle counterfactual policy.
 
 ## API Boundary
 
-For package users, the stable public surface is the fitted reward, policy, and
-value objects. For controlled payoff, transition, or action-set interventions,
+For package users, the stable public objects are the fitted reward, policy, and
+value arrays. For controlled payoff, transition, or action-set interventions,
 use the lower-level simulation and evaluation utilities with an explicit
 problem and transition environment.

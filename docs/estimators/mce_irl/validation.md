@@ -1,13 +1,12 @@
 # Validation
 
-MCE-IRL is reported on two known-truth cells. The primary cell is
+MCE-IRL is checked on two known-truth cells. The primary cell is
 `mce_low_high_reward`, a compact state-space problem with eight
 action-dependent reward features. The sanity cell is `canonical_low_action`.
 
-These results are not hand-entered examples. They come from the known-truth
-validation harness, where rewards, transitions, policies, value functions,
-Q functions, and counterfactual oracle objects are known before estimation
-starts.
+The numbers come from the known-truth validation harness. In that harness,
+rewards, transitions, policies, value functions, Q functions, and
+counterfactual oracle objects are known before estimation starts.
 
 The full result generator is
 [`mce_irl_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_run.py).
@@ -31,10 +30,10 @@ panel = simulate_panel(dgp, cell.simulation_config)
 result = run_estimator("MCE-IRL", dgp, panel, smoke=False)
 ```
 
-Read the tables as a sequence. The design table states the known-truth cells.
-The fit summary reports the primary run. Recovery metrics compare the recovered
-reward, value, Q function, policy, and feature moments to oracle objects. Hard
-gates are the reported thresholds.
+Read the tables in order. The design table states the known-truth cells. The
+fit summary reports the primary run. Recovery metrics compare the recovered
+reward, value, Q function, policy, and feature moments with oracle objects.
+Hard gates list the thresholds used for the release artifact.
 
 ## Design
 
@@ -68,7 +67,7 @@ feature-matching optimizer and standard-error computation disabled.
 | Parameter relative RMSE | 0.091725 |
 
 Raw parameter cosine is reported, but it is not a hard gate for MCE-IRL. The
-decision-critical checks are feature matching, occupancy moments, recovered
+release checks focus on feature matching, occupancy moments, recovered
 reward/value/Q objects, policy distance, and counterfactual regret.
 
 ## Recovery Metrics
@@ -84,8 +83,8 @@ reward/value/Q objects, policy distance, and counterfactual regret.
 
 ## Counterfactual Metrics
 
-The counterfactual checks are run after fitting by changing the oracle problem
-and comparing the recovered-reward policy to the oracle policy.
+The counterfactual checks run after fitting. They change the oracle problem and
+compare the recovered-reward policy with the oracle policy.
 
 | Counterfactual | Policy TV | Policy KL | Value RMSE | Regret |
 | --- | ---: | ---: | ---: | ---: |

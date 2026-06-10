@@ -1,12 +1,12 @@
 # MCE-IRL
 
-Maximum causal entropy IRL recovers reward parameters by matching demonstrated
-feature expectations to the feature expectations implied by a soft dynamic
-policy. In EconIRL, the validated tabular path uses known transitions and
-explicit action-dependent reward features.
+Maximum causal entropy IRL estimates reward parameters by matching the feature
+counts in demonstrations to the feature counts implied by a soft dynamic
+policy. In EconIRL, the tabular evidence path uses known transitions and
+action-dependent reward features supplied by the user.
 
 Use this page for finite-dimensional tabular IRL. Use Deep MCE-IRL when the
-target is a neural reward map rather than a fixed feature vector.
+target is a neural reward map instead of a fixed feature vector.
 
 ## Quick Decision
 
@@ -14,7 +14,7 @@ target is a neural reward map rather than a fixed feature vector.
 | --- | --- |
 | Demonstrations come from a discrete sequential decision problem. | You need likelihood-based structural standard errors. |
 | Transitions are known or can be supplied. | Transition estimation is the main difficulty. |
-| Reward features are explicit and action-dependent. | Reward features are unknown or purely neural. |
+| Reward features are supplied and action-dependent. | Reward features are unknown or purely neural. |
 | The behavioral model is maximum causal entropy. | The target is deterministic optimal control without entropy regularization. |
 | You want reward, policy, value, Q, and counterfactual recovery checks. | You only need fitted conditional choice probabilities. |
 
@@ -47,16 +47,17 @@ print(model.params_)
 print(model.policy_.shape)
 ```
 
-For multi-action recovery, pass a `RewardSpec` to `fit()` or provide an
-explicit `feature_matrix` at construction time. The wrapper no longer treats
-`feature_matrix=None` as an evidence-backed structural default.
+Multi-action MCE-IRL needs an explicit reward specification. Pass a
+`RewardSpec` to `fit()` or provide `feature_matrix` at construction time. The
+wrapper no longer treats `feature_matrix=None` as an evidence-backed structural
+default.
 
 ## What Is Certified
 
-MCE-IRL is reported on two action-dependent known-truth cells. The primary cell
-has 25 states, 3 actions, 8 reward features, known transitions, known rewards,
-known policies, known value and Q functions, and Type A, Type B, and Type C
-counterfactual oracles.
+The release artifact reports two action-dependent known-truth cells. The
+primary cell has 25 states, 3 actions, 8 reward features, known transitions,
+known rewards, known policies, known value and Q functions, and Type A, Type B,
+and Type C counterfactual oracles.
 
 | Evidence | Current state |
 | --- | --- |

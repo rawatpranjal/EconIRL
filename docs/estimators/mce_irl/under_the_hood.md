@@ -1,7 +1,7 @@
 # Under the Hood
 
-MCE-IRL chooses reward parameters so that the soft optimal policy induced by
-those parameters matches demonstrated feature expectations.
+MCE-IRL chooses reward parameters so the induced soft optimal policy matches
+demonstrated feature expectations.
 
 ## Model
 
@@ -17,8 +17,8 @@ $$
 r_\theta(s, a) = \phi(s, a)^\top \theta
 $$
 
-For a candidate reward, the integrated value function solves the soft Bellman
-fixed point.
+Given a candidate reward, the integrated value function solves the soft
+Bellman fixed point.
 
 $$
 V_\theta(s)
@@ -58,18 +58,18 @@ $$
 ## Algorithm Sketch
 
 The estimator starts with demonstrated trajectories, a transition tensor, and
-an explicit reward feature matrix. For each candidate parameter vector it
+an explicit reward feature matrix. For each candidate parameter vector, it
 computes the reward matrix, solves the soft Bellman equation, computes the
 policy-induced occupancy measure, and compares model feature counts with
 demonstrated feature counts.
 
-The validated primer path uses the root feature-matching optimizer with
-standard errors disabled. The public wrapper defaults are configurable, but the
-release claim is tied to the known-truth root path in the artifact.
+The primer evidence uses the root feature-matching optimizer with standard
+errors disabled. The public wrapper defaults are configurable, but the release
+claim is tied to the known-truth root path in the artifact.
 
 ## Identification Boundary
 
-Action-dependent features are required for the validated multi-action reward
-claim. State-only features broadcast across actions can leave action-specific
-payoff differences unidentified. MCE-IRL rewards are also interpreted up to the
+Action-dependent features are required for the multi-action reward claim.
+State-only features broadcast across actions can leave action-specific payoff
+differences unidentified. MCE-IRL rewards are interpreted with the
 normalization encoded by the supplied feature basis and anchor.
