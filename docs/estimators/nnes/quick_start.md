@@ -1,7 +1,9 @@
 # Quick Start
 
-The public wrapper accepts dataframe-style panel data. Create a model, call
-`fit`, and read the fitted sklearn-style attributes.
+The public wrapper accepts dataframe-style panel data. This quick start is the
+package smoke path: create a model, call `fit`, and read the fitted
+sklearn-style attributes. The full NNES validation evidence lives in the
+known-truth artifact linked from [Validation](validation.md).
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -70,4 +72,6 @@ print(summary.metadata["v_loss_per_outer"][-1])
 ```
 
 The known-truth validation uses the lower-level API because it supplies the
-true DDC problem, transition tensor, and reward specification directly.
+true DDC problem, transition tensor, and reward specification directly. That is
+also the route to use when reproducing paper-style designs with custom state
+encodings or supplied transition laws.

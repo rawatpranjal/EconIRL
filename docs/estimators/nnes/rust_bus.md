@@ -5,6 +5,9 @@ choice example. A bus operator observes mileage and chooses whether to keep
 the current engine or replace it.
 
 NNES can be used through the dataframe wrapper for a quick package smoke test.
+This page is intentionally smaller than Nguyen's original simulation, which
+uses multi-module continuous mileage states and compares NNES with an oracle
+NFXP benchmark.
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -63,6 +66,7 @@ print(summary.metadata["v_loss_per_outer"][-1])
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The reported validation evidence is the known-truth artifact,
-which has known reward, policy, value, Q, and counterfactual oracle objects.
-See [Validation](validation.md) for that evidence path.
+replication and not the full Nguyen Monte Carlo. The reported validation
+evidence is the known-truth artifact, which has known reward, policy, value,
+Q, and counterfactual oracle objects. See [Validation](validation.md) for that
+evidence path.

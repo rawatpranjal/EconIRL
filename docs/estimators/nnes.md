@@ -6,18 +6,37 @@ reward finite-dimensional while using a flexible value approximation to avoid
 exact dynamic programming in larger state spaces.
 
 Use NNES when the reward is still structural and finite-dimensional, but the
-state representation is large enough that repeated exact Bellman solves are no
-longer the best default.
+state representation is large, encoded, smooth, or multi-dimensional enough
+that repeated exact Bellman solves are no longer the best default.
+
+## Questions NNES Answers
+
+**What can NNES do that NFXP cannot do comfortably?** NFXP is the exact
+tabular reference when the state space is manageable. NNES keeps the same
+structural target but replaces the full tabular value object with a trained
+neural approximation, which makes larger or encoded state representations a
+natural validation target.
+
+**What is a concrete example?** In the Nguyen paper, the Monte Carlo design is
+a Rust-style replacement model with multiple bus modules. The true value
+function is additively separable across modules, but NNES is not told that
+shortcut. It trains a single value network and is compared with an oracle NFXP
+benchmark that knows the separability.
+
+**How does NNES work operationally?** It supplies or estimates transitions,
+trains a value network, combines structural rewards with continuation values,
+updates the likelihood through an NPL-style path, and reports structural
+parameters, standard errors, policies, values, and recovery metadata.
 
 ## Quick Decision
 
 | Use NNES when | Prefer another estimator when |
 | --- | --- |
-| Choices are discrete and forward-looking. | The state-action space is small enough for NFXP or CCP. |
-| Transitions are known or can be estimated first. | Transition estimation is the main modeling problem. |
-| Rewards are parametric and structural. | The reward itself must be a black-box neural function. |
-| The value function needs a flexible approximation. | You need a fully exact tabular likelihood reference. |
-| Counterfactual policy analysis is central. | You only need fitted choice probabilities. |
+| The value object is too large, smooth, or encoded for repeated exact DP. | The state-action space is small enough for exact NFXP or tabular CCP. |
+| Rewards are parametric and structural. | The reward itself must be an unrestricted neural function. |
+| Transitions are known or can be estimated before estimation. | Transition estimation is the main modeling problem. |
+| You want counterfactuals from a recovered structural object. | You only need fitted choice probabilities. |
+| Neural value approximation is the point of the exercise. | You need the cleanest exact likelihood reference. |
 
 ## Minimal Fit
 
@@ -66,8 +85,10 @@ it uses encoded states and a richer reward-feature basis.
 
 The caveat is the approximation boundary. The validation certifies recovery
 within the known-truth gates for the finite-dimensional structural reward and
-the NNES value-approximation path; it is not a claim that arbitrary neural
-reward models are identified.
+the NNES value-approximation path. It is paper-consistent evidence for the
+neural value route, not a claim that arbitrary neural reward models are
+identified or that the EconIRL harness literally replicates Nguyen's Monte
+Carlo design.
 
 ## NNES Guide
 

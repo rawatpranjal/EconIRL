@@ -11,6 +11,26 @@ validation harness, where the reward, transition law, optimal policy, value
 function, Q function, and counterfactual oracle objects are all known before
 estimation starts.
 
+## Paper Simulation vs EconIRL Validation
+
+The original Nguyen simulation and the EconIRL validation answer related but
+different questions.
+
+| Source | What it shows |
+| --- | --- |
+| Nguyen paper | NNES nearly matches oracle NFXP in Rust-style multi-module Monte Carlo designs where the oracle knows the separable structure and NNES does not. |
+| EconIRL validation | The package implementation recovers known reward, policy, value, Q, and counterfactual objects inside frozen low- and high-dimensional DGP cells. |
+
+The paper simulation uses continuous mileage states, joint replacement actions,
+50 buses, 20 kept periods after burn-in, 1,000 observations per replication,
+and 100 replications in the two-module baseline. It also reports a
+four-dimensional extension and high-discount anchoring checks.
+
+The EconIRL artifact is not a literal replication of that Monte Carlo. It is a
+package validation surface: the DGP is frozen, the oracle objects are known
+before estimation, the high-dimensional primary cell has encoded states and 32
+reward parameters, and every reported claim is tied to machine-readable gates.
+
 The full result generator is
 [`nnes_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_run.py).
 It writes the rendered table source

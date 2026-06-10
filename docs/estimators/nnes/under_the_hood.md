@@ -4,6 +4,24 @@ NNES estimates a structural dynamic discrete choice likelihood while learning
 a neural approximation to the integrated value function. The certified path is
 the NPL Bellman path.
 
+## Operational Loop
+
+1. Supply panel trajectories and either estimate or provide the transition
+   law.
+2. Keep the reward finite-dimensional, initialize structural parameters, and
+   initialize the value network.
+3. Use the value network to form continuation values and choice-specific
+   values for each state-action pair.
+4. Update choice probabilities and fit the structural likelihood along the
+   NPL Bellman path.
+5. Repeat the outer loop, then report reward parameters, standard errors,
+   policy, value, Q, likelihood, and value-network diagnostics.
+
+The important operational difference from NFXP is where the computation sits.
+NFXP solves the exact Bellman fixed point inside each likelihood evaluation.
+NNES trains a neural nuisance value object and uses that approximation inside
+the policy-iteration likelihood path.
+
 ## Model
 
 The observed data are state, action, and next-state trajectories.
@@ -44,6 +62,10 @@ $$
 The NPL path alternates value-network training with structural likelihood
 updates. In the public artifact, both validation cells run three outer NPL
 iterations.
+
+The value network is an approximation target, not the structural reward. The
+structural object remains `theta`; the network parameters are nuisance
+parameters used to represent the continuation value.
 
 ## Bellman Options
 
