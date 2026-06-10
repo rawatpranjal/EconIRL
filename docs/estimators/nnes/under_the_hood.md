@@ -67,6 +67,27 @@ The value network is an approximation target, not the structural reward. The
 structural object remains `theta`; the network parameters are nuisance
 parameters used to represent the continuation value.
 
+## Finite-State Profiled Path
+
+The package validation uses a finite-state version of the NPL argument. For a
+fixed CCP iterate `P`, the policy-evaluation value is affine in the structural
+parameters:
+
+$$
+W_\theta[P] = W_z(P)\theta + W_e(P).
+$$
+
+EconIRL solves the profiled components `W_z(P)` and `W_e(P)` exactly on the
+finite validation cells, then optimizes the structural likelihood through the
+choice-specific values implied by those components. The value network is
+trained on the same profiled target and reported through metadata such as
+`v_loss_per_outer`; in the current finite-state validation, it is also a
+diagnostic for the large-state approximation path rather than the only object
+driving the likelihood.
+
+This is why the validation can check reward, policy, value, Q, and
+counterfactual recovery directly against known oracle objects.
+
 ## Bellman Options
 
 | Option | Meaning | Validation role |
@@ -77,6 +98,18 @@ parameters used to represent the continuation value.
 The NPL path is the release surface because it is the path used by the
 known-truth gates and the artifact. The NFXP variant is useful for experiments
 but does not carry the same orthogonality interpretation.
+
+## Anchoring
+
+NNES uses an anchored value-network target by default, with `anchor_state=0`.
+The normalization subtracts the network value at the anchor state, so the
+neural value object satisfies the analogue of `V(anchor) = 0`.
+
+This matters because logit choice probabilities depend on value differences,
+not the absolute level of the value function. Without anchoring, high-discount
+problems can have a nearly flat value-level direction, producing numerical
+drift. Anchoring removes that redundant level while leaving CCPs, likelihoods,
+and structural reward parameters unchanged.
 
 ## State Encoding
 
@@ -89,5 +122,10 @@ from the known-truth DGP. The high-dimensional primary cell has 81 states, a
 
 The lower-level estimator returns an `EstimationSummary` with reward
 parameters, standard errors, policy, value function, likelihood, and metadata.
-The metadata records the profile mode, number of outer NPL iterations, and
-value-network loss by outer iteration.
+The metadata records `profile_mode="exact_finite_state_npl"`, the number of
+outer NPL iterations, the final CCPs, profiled choice values, the profiled
+value function, and value-network loss by outer iteration.
+
+The standard-error claim belongs to the NPL path. The legacy neural-NFXP
+Bellman-residual path can fit a model, but approximation error enters the score
+directly there, so it is not the certified inference surface.

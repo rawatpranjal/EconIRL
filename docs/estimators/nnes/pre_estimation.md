@@ -7,10 +7,14 @@ Run these checks before treating a NNES result as structural evidence.
 | --- | --- |
 | Feature rank | Rank below the number of reward parameters means theta is not identified. |
 | Feature condition number | A high condition number signals unstable reward estimates. |
+| Transition model | NNES is model-based, so transition probabilities must be known or estimated before policy evaluation. |
 | Transition row sums | NNES needs valid transition probabilities for continuation values. |
+| Logit DDC primitives | The paper's orthogonality result is for additive Type-I extreme-value shocks and separated transition dynamics. |
 | State coverage | Unobserved states weaken value-network training and validation. |
 | State-action coverage | Sparse action support weakens the likelihood and counterfactual fit. |
+| Initial CCP support | The NPL path starts from empirical or first-stage CCPs; weak support makes that start noisy. |
 | Reward normalization | Reward level and scale need a valid anchor. |
+| Value anchoring | High-discount problems need the value-level normalization to avoid drift. |
 | Value-network loss | A high final loss can contaminate recovered policy and value objects. |
 
 ## Artifact Checks
@@ -39,6 +43,10 @@ counterfactual objects.
 A low-rank reward matrix can make several reward parameters observationally
 equivalent. Sparse action support can make the fitted policy look plausible
 while the structural parameters drift. Wrong transition orientation can
-produce valid-looking arrays and wrong continuation values. A neural value
+produce valid-looking arrays and wrong continuation values.
+
+An unanchored value network can drift in high-discount problems because the
+absolute value level is weakly identified by choice data. A neural value
 network with poor fit can pass data likelihood checks while failing value, Q,
-or counterfactual recovery gates.
+or counterfactual recovery gates. These risks are why the validation table
+reports both structural recovery and final value-network loss.

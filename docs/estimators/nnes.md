@@ -28,6 +28,16 @@ trains a value network, combines structural rewards with continuation values,
 updates the likelihood through an NPL-style path, and reports structural
 parameters, standard errors, policies, values, and recovery metadata.
 
+## Core Contract
+
+| Contract | Meaning |
+| --- | --- |
+| Validated path | Use `bellman="npl"`. This is the NNES path tied to the paper's NPL orthogonality argument and the known-truth artifact. |
+| Diagnostic path | `bellman="nfxp"` trains a neural soft-Bellman approximation, but it does not carry the same zero-Jacobian or standard-error claim. |
+| Transition model | NNES is model-based. Transitions must be known or estimated before policy evaluation. |
+| Neural object | The neural network approximates the value or continuation object. The structural reward remains finite-dimensional. |
+| Inference claim | The paper's efficient-inference claim relies on NPL orthogonality and a sufficiently accurate first-stage value or policy approximation. |
+
 ## Quick Decision
 
 | Use NNES when | Prefer another estimator when |

@@ -25,6 +25,31 @@ function approximation. The reward remains finite-dimensional so the fitted
 object can still support structural interpretation, standard errors, and
 counterfactual policy analysis.
 
+## Paper Nuances
+
+NNES combines two ideas. From SEES, it takes a flexible approximator for the
+value object. From NPL, it takes policy iteration on conditional choice
+probabilities. That second choice is what gives the estimator its paper-level
+inference claim: at the fixed point, the policy-iteration map has a
+zero-Jacobian property, so the likelihood score is Neyman-orthogonal to
+first-stage policy and value approximation error.
+
+The practical implication is narrow but important. NNES can use a neural value
+network without adding an explicit debiasing correction to the structural
+score, as long as the first-stage approximation is accurate enough. The paper
+states this as a fourth-root-style requirement: the nuisance approximation
+error must be small enough that it enters the structural score only at second
+order.
+
+This is not a model-free estimator. The paper's NNES uses the transition law
+inside policy evaluation. Model-free NNES is discussed as a future extension,
+not as the current package claim. When transitions are unavailable, use a
+transition-free estimator such as TD-CCP instead.
+
+On small tabular problems, exact NFXP can still be the better estimator. NNES
+is attractive when the value object is too large, smooth, encoded, or
+continuous for repeated exact Bellman solves to be the natural workflow.
+
 ## Source Ideas
 
 The source target is Nguyen's neural network estimation of structural dynamic

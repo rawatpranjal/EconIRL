@@ -31,6 +31,22 @@ package validation surface: the DGP is frozen, the oracle objects are known
 before estimation, the high-dimensional primary cell has encoded states and 32
 reward parameters, and every reported claim is tied to machine-readable gates.
 
+## Older Plans and Current Status
+
+Older NNES planning files are useful for provenance but are not all current
+claims. The alignment audit at
+`papers/econirl_package_jss/plans/alignment/12_nnes.md` records an earlier
+diagnostic failure where NNES fit policy surfaces but did not yet pass the
+structural recovery gates. That failure is stale: the current NPL-profiled,
+anchored path is the validated path, and the live artifact passes both the
+low-dimensional sanity cell and the high-dimensional primary cell.
+
+Other older plans, including `plan_rust_big.md` and the Keane-Wolpin JSS
+example plan, are planning or paper-example surfaces. They should not be read
+as current RTD validation claims. In particular, the docs should not claim that
+NFXP or CCP fail on a Rust-big extension until a measured artifact supports
+that result.
+
 The full result generator is
 [`nnes_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_run.py).
 It writes the rendered table source
