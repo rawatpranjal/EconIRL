@@ -12,7 +12,7 @@ evidence column states the current public scope.
 | [MPEC](estimators/mpec.md) | Constrained-optimization check on the DDC likelihood. | Known-truth constrained-likelihood counterpart. |
 | [SEES](estimators/sees.md) | Sieve value-function structural estimation. | Known-truth encoded-state cell. |
 | [NNES](estimators/nnes.md) | Neural value approximation inside NPL. | Known-truth low- and high-dimensional cells. |
-| [TD-CCP](estimators/tdccp.md) | Transition-free CCP estimation with TD recursion. | Known-truth finite-parameter reward cells. |
+| [TD-CCP](estimators/tdccp.md) | Transition-density-free CCP parameter estimation with TD recursion. | Encoded-state finite-theta hard case with Algorithm 2 locally robust SEs. |
 
 ## Inverse Reinforcement Learning
 

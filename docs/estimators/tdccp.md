@@ -1,38 +1,49 @@
 # TD-CCP
 
-## Overview
+Temporal-difference CCP estimates structural dynamic discrete choice
+parameters by learning the CCP recursive terms from observed successor tuples.
+It keeps the CCP pseudo-likelihood target from the paper, but avoids
+transition-density modeling while estimating the reward parameter.
 
-TD-CCP estimates dynamic discrete choice models by combining the CCP likelihood
-with temporal-difference estimates of the recursive value terms. It learns the
-recursive terms from observed state-action-next-state tuples, then optimizes the
-CCP pseudo-likelihood.
+Use TD-CCP when the reward is finite-dimensional and linear in known features,
+the state features may be flexible, and transition-density modeling is the
+bottleneck. Do not use it as evidence for unrestricted raw neural reward
+recovery.
 
-Known transitions are only needed after estimation if you want final policy,
-value, or counterfactual evaluation.
+The certified RTD claim is the paper's Algorithm 2 locally robust finite-theta
+path. Flexible encoders and neural AVI are supported as approximation tools,
+but the release artifact certifies a semigradient structural-parameter case
+with formula-level zeta, lambda, covariance, and Monte Carlo SE checks.
 
-## When to Use
+## Quick Decision
 
-Use TD-CCP when:
+| Use TD-CCP when | Prefer another estimator when |
+| --- | --- |
+| Choices are discrete and forward-looking. | The reward is not finite-dimensional in known features. |
+| Transition-density modeling is the bottleneck. | You need the exact tabular likelihood reference. |
+| State features are flexible or high-dimensional. | Observed policy support is sparse. |
+| You have current and next state-action tuples. | You need raw neural reward recovery from choices alone. |
+| You want CCP-style structural parameters without repeated transition integration. | You only need a fitted behavioral policy. |
 
-- choices are discrete and forward-looking;
-- rewards are finite-dimensional and linear in known features;
-- state features may be flexible, including neural state encodings;
-- transition-density modeling is the bottleneck;
-- you have panel trajectories with current and next state-action pairs;
-- you want structural parameters from a CCP-style estimator.
+## Paper Alignment
 
-Avoid TD-CCP when observed policy support is sparse, reward features are weakly
-identified, or you need raw nonparametric neural reward recovery from choices
-alone.
+| Paper object | EconIRL surface |
+| --- | --- |
+| Finite structural reward `u_theta(a, x) = z(a, x)' theta` | Action 0 is normalized; non-baseline actions have finite linear reward features. |
+| Observed panel tuples `(a, x, a', x')` | Panels provide current choices, encoded states, next choices, and next states. |
+| No parametric transition density for `theta` | Structural estimation uses observed successor tuples, not a fitted transition-density model. |
+| Semigradient TD recursion for `h` and `g` | Certified path uses encoded basis functions and projected TD normal equations. |
+| AVI with flexible learners | Available as a flexible approximation path, but not the certified release artifact. |
+| Algorithm 2 locally robust PMLE | Cross-fitting, preliminary plug-in `theta`, lambda recursion, held-out zeta solve, and fold covariance are recorded. |
+| Theorem 5 inference target | Artifact reports individual-clustered locally robust SEs and repeated-seed coverage diagnostics. |
 
-## Basic Usage
+## Minimal Fit
 
 ```python
-import pandas as pd
+from econirl.datasets import load_rust_bus
+from econirl import TDCCP
 
-from econirl.estimators import TDCCP
-
-data = pd.read_csv("zurcher_bus.csv")
+df = load_rust_bus()
 
 model = TDCCP(
     n_states=90,
@@ -40,34 +51,51 @@ model = TDCCP(
     discount=0.9999,
     utility="linear_cost",
     method="semigradient",
-    basis_type="encoded",
 )
-model.fit(data, state="mileage_bin", action="replaced", id="bus_id")
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
 print(model.summary())
 ```
 
-For custom reward features or lower-level control over the dynamic discrete
-choice problem, use `econirl.estimation.TDCCPEstimator`.
+For custom reward features or direct control over panel objects, utility
+objects, and transition tensors, use `econirl.estimation.TDCCPEstimator`.
 
-## Evidence
+## What Is Certified
 
-The reported known-truth evidence covers the low-dimensional action-dependent
-DGP.
+TD-CCP is certified for the paper-faithful finite-theta hard case. The reward
+is linear in two encoded state coordinates interacted with non-baseline
+actions, action 0 is normalized to zero, and the estimator uses logit CCPs,
+Algorithm 2 cross-fitting, and locally robust standard errors. It recovers
+structural parameters, rewards, policies, values, Q functions, and Type A/B/C
+counterfactual decisions within the reported gates.
 
-The evidence also includes the paper-faithful hard flexible DGP with
-stochastic flexible transitions, frozen neural state features, and a finite
-linear structural reward with an action-0 normalization.
+| Evidence | Current state |
+| --- | --- |
+| Release status | Certified with caveat. |
+| Primary cell | `shapeshifter_encoded_state_locally_robust`. |
+| Machine-readable artifact | [tdccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.json). |
+| Certified scope | Algorithm 2 finite-theta semigradient path with locally robust zeta moment and fold sandwich SEs. |
+| Optimizer evidence | Preliminary folds 2/2 converged; final robust zeta folds 2/2 converged; max preliminary projected gradient is 2.00e-07. |
+| Formula evidence | Artifact records zeta moment, lambda recursion residuals, finite covariance, and moment stationarity diagnostics. |
+| SE coverage evidence | 25 repeated-seed replications with 0.900 overall 95% CI coverage; run 100 reps for a paper-final CPU-budget audit. |
+| Diagnostic boundary | Raw neural reward has no finite true `theta` and is not a success claim. |
+| Transition boundary | Estimation avoids transition-density modeling; evaluation can use supplied transitions. |
 
-The high-dimensional action-dependent encoded-state stress DGP and the raw
-neural flexible DGP are comparison artifacts. The public validation scope is
-finite-parameter reward recovery.
+The `canonical_low_action` cell is retained as a sanity check. The
+`canonical_high_action` and raw neural-reward cases are diagnostic records, not
+release certification.
 
-Here, low-dimensional action-dependent DGP means the compact known-truth dynamic
-choice benchmark. The hard flexible DGP tests finite-theta recovery with neural
-state features, while the raw neural diagnostic has no finite true theta.
+## TD-CCP Guide
 
-## Further Reading
+```{toctree}
+:maxdepth: 2
 
-- Machine-readable artifact: [tdccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.json)
+tdccp/context
+tdccp/quick_start
+tdccp/under_the_hood
+tdccp/pre_estimation
+tdccp/validation
+tdccp/counterfactuals
+tdccp/rust_bus
+```

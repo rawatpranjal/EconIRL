@@ -1108,7 +1108,7 @@ class TDCCPEstimator(BaseEstimator):
         h_table: np.ndarray,
         g_table: np.ndarray,
         initial_params: np.ndarray | None = None,
-    ) -> tuple[np.ndarray, float, int, int, str, bool]:
+    ) -> tuple[np.ndarray, float, int, int, str, bool, dict[str, Any]]:
         """Optimize structural parameters theta via partial MLE.
 
         Maximizes Q(theta) = E_n[ln pi(a,x; theta, h, g)] from eq (2.1)
@@ -1170,7 +1170,26 @@ class TDCCPEstimator(BaseEstimator):
             obs_actions_jax,
             sigma,
         ))
-        return params_opt, ll_opt, result.nit, result.nfev, str(result.message), bool(result.success)
+        diagnostics = {
+            "message": str(result.message),
+            "success": bool(result.success),
+            "objective": result.fun,
+            "gradient_norm": result.grad_norm,
+            "projected_gradient_norm": result.projected_grad_norm,
+            "final_rel_change": result.final_rel_change,
+            "convergence_reason": result.convergence_reason,
+            "iterations": result.nit,
+            "function_evals": result.nfev,
+        }
+        return (
+            params_opt,
+            ll_opt,
+            result.nit,
+            result.nfev,
+            str(result.message),
+            bool(result.success),
+            diagnostics,
+        )
 
     # ==================================================================
     # Step 5: Locally robust inference (Section 4)
@@ -1212,20 +1231,19 @@ class TDCCPEstimator(BaseEstimator):
     ) -> np.ndarray:
         """Estimate the backward value function lambda (Algorithm 5).
 
-        Lambda is defined implicitly through a backward Bellman equation.
-        For each parameter component j, lambda_j(a,x) satisfies:
+        The paper defines lambda as the fixed point of a backward dynamic
+        programming operator with reward psi(a,x) = -m(a,x; theta, h, g),
+        where m is the pseudo-likelihood score. For each observed transition
+        tuple (a_t, x_t, a_{t+1}, x_{t+1}), the backward TD equation treats
+        (a_{t+1}, x_{t+1}) as the current state-action pair and
+        (a_t, x_t) as its lagged predecessor:
 
-            lambda_j(a,x) = d/d_h_j m(a,x; theta, h, g)
-                          + beta * E[lambda_j(a',x') | a,x]
+            lambda(a_{t+1}, x_{t+1})
+              = psi(a_{t+1}, x_{t+1})
+                + beta * lambda(a_t, x_t).
 
-        where m is the score of the pseudo-log-likelihood. In practice,
-        we approximate lambda using the same semi-gradient or AVI approach
-        but with the backward TD operator.
-
-        For the logit model, the score contribution from h_j is:
-            d/d_h_j m = theta_j * (indicator(a_obs) - pi(a|x))
-
-        We use linear semi-gradient to estimate lambda for simplicity.
+        We solve this with the same linear semi-gradient machinery used for
+        h and g, but with the empirical time direction reversed.
 
         Returns:
             lambda_table of shape (num_states, num_actions, num_params).
@@ -1235,21 +1253,9 @@ class TDCCPEstimator(BaseEstimator):
         num_params = len(params)
         sigma = problem.scale_parameter
 
-        # Compute policy pi(a|x) from current parameters
-        h_weighted = np.einsum("sak,k->sa", h_table, params)
-        v = (h_weighted + g_table) / sigma
-        v_max = v.max(axis=1, keepdims=True)
-        exp_v = np.exp(v - v_max)
-        pi = exp_v / exp_v.sum(axis=1, keepdims=True)
+        score_table = self._score_table(params, h_table, g_table, sigma)
+        psi_table = -score_table
 
-        # Score of the pseudo-log-likelihood with respect to h_j:
-        # For observation (a_i, x_i):
-        #   dm/dh_j = theta_j * (1{a=a_i} - pi(a_i|x_i)) / sigma
-        #
-        # This is the "reward" for the backward Bellman equation defining lambda.
-        # We solve the backward equation using the semi-gradient method.
-
-        # Build basis functions for the backward solve
         phi = self._build_basis_functions(
             actions, states, num_states, num_actions, problem, feature_matrix
         )
@@ -1273,11 +1279,7 @@ class TDCCPEstimator(BaseEstimator):
         lambda_table = np.zeros((num_states, num_actions, num_params), dtype=np.float64)
 
         for j in range(num_params):
-            # "reward" for backward equation: dm/dh_j at observed (a,x)
-            reward_j = np.array([
-                params[j] * (1.0 - pi[s, a]) / sigma
-                for s, a in zip(states, actions)
-            ])
+            reward_j = psi_table[next_states, next_actions, j]
             b_back = (phi_next.T @ reward_j) / n_samples
             lambda_omega_j = A_back_inv @ b_back
 
@@ -1291,6 +1293,336 @@ class TDCCPEstimator(BaseEstimator):
                 lambda_table[:, a, j] = phi_sa @ lambda_omega_j
 
         return lambda_table
+
+    @staticmethod
+    def _policy_from_h_g(
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        sigma: float,
+    ) -> np.ndarray:
+        h_weighted = np.einsum("sak,k->sa", h_table, params)
+        v = (h_weighted + g_table) / sigma
+        v_max = v.max(axis=1, keepdims=True)
+        exp_v = np.exp(v - v_max)
+        return exp_v / exp_v.sum(axis=1, keepdims=True)
+
+    def _score_table(
+        self,
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        sigma: float,
+    ) -> np.ndarray:
+        """Score m(a,x; theta, h, g) for every state-action pair."""
+        pi = self._policy_from_h_g(params, h_table, g_table, sigma)
+        expected_h = np.einsum("sa,sak->sk", pi, h_table)
+        return (h_table - expected_h[:, None, :]) / sigma
+
+    def _score_moments(
+        self,
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        states: np.ndarray,
+        actions: np.ndarray,
+        sigma: float,
+    ) -> np.ndarray:
+        score_table = self._score_table(params, h_table, g_table, sigma)
+        return score_table[states, actions]
+
+    @staticmethod
+    def _value_table(
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+    ) -> np.ndarray:
+        return np.einsum("sak,k->sa", h_table, params) + g_table
+
+    def _paper_value_residuals(
+        self,
+        tilde_params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        feature_matrix: np.ndarray,
+        actions: np.ndarray,
+        states: np.ndarray,
+        next_actions: np.ndarray,
+        next_states: np.ndarray,
+        ccps: np.ndarray,
+        gamma: float,
+    ) -> np.ndarray:
+        """Scalar TD residual inside the paper's feasible zeta moment."""
+        EULER_MASCHERONI = 0.5772156649015329
+        safe_ccps = np.clip(np.asarray(ccps), 1e-10, 1.0)
+        v_tilde = self._value_table(tilde_params, h_table, g_table)
+        flow = np.einsum("nk,k->n", feature_matrix[states, actions], tilde_params)
+        e_next = EULER_MASCHERONI - np.log(safe_ccps[next_states, next_actions])
+        return (
+            flow
+            + gamma * e_next
+            + gamma * v_tilde[next_states, next_actions]
+            - v_tilde[states, actions]
+        )
+
+    def _locally_robust_moments(
+        self,
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        lambda_table: np.ndarray,
+        tilde_params: np.ndarray,
+        feature_matrix: np.ndarray,
+        actions: np.ndarray,
+        states: np.ndarray,
+        next_actions: np.ndarray,
+        next_states: np.ndarray,
+        ccps: np.ndarray,
+        problem: DDCProblem,
+        gamma: float,
+    ) -> np.ndarray:
+        """Feasible zeta moment from equation (4.6)."""
+        score = self._score_moments(
+            params, h_table, g_table, states, actions, problem.scale_parameter
+        )
+        residual = self._paper_value_residuals(
+            tilde_params,
+            h_table,
+            g_table,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            ccps,
+            gamma,
+        )
+        correction = lambda_table[states, actions] * residual[:, None]
+        return score + correction
+
+    def _moment_jacobian(
+        self,
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        states: np.ndarray,
+        sigma: float,
+    ) -> np.ndarray:
+        """Mean derivative d E[m(a,x; theta,h,g)] / d theta'."""
+        pi = self._policy_from_h_g(params, h_table, g_table, sigma)
+        n_params = h_table.shape[2]
+        G = np.zeros((n_params, n_params), dtype=np.float64)
+        for state in states:
+            h_s = h_table[state]
+            pi_s = pi[state]
+            expected = np.einsum("a,ak->k", pi_s, h_s)
+            centered = h_s - expected[None, :]
+            cov = centered.T @ (centered * pi_s[:, None])
+            G -= cov / (sigma * sigma)
+        return G / max(len(states), 1)
+
+    def _solve_locally_robust_theta(
+        self,
+        panel: Panel,
+        utility: UtilityFunction,
+        problem: DDCProblem,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        lambda_table: np.ndarray,
+        tilde_params: np.ndarray,
+        feature_matrix: np.ndarray,
+        actions: np.ndarray,
+        states: np.ndarray,
+        next_actions: np.ndarray,
+        next_states: np.ndarray,
+        ccps: np.ndarray,
+        gamma: float,
+    ) -> tuple[np.ndarray, float, int, int, str, bool, float, dict[str, Any]]:
+        """Solve the held-out locally robust moment equation."""
+        residual = self._paper_value_residuals(
+            tilde_params,
+            h_table,
+            g_table,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            ccps,
+            gamma,
+        )
+        correction_mean = np.mean(lambda_table[states, actions] * residual[:, None], axis=0)
+
+        h_table_jax = jnp.asarray(h_table, dtype=jnp.float64)
+        g_table_jax = jnp.asarray(g_table, dtype=jnp.float64)
+        states_jax = jnp.asarray(states)
+        actions_jax = jnp.asarray(actions)
+        correction_jax = jnp.asarray(correction_mean, dtype=jnp.float64)
+        sigma = problem.scale_parameter
+
+        def moment(params):
+            h_weighted = jnp.einsum("sak,k->sa", h_table_jax, params)
+            values = (h_weighted + g_table_jax) / sigma
+            pi = jax.nn.softmax(values, axis=1)
+            h_obs = h_table_jax[states_jax, actions_jax]
+            h_state = h_table_jax[states_jax]
+            pi_state = pi[states_jax]
+            h_exp = jnp.einsum("na,nak->nk", pi_state, h_state)
+            score_mean = jnp.mean((h_obs - h_exp) / sigma, axis=0)
+            return score_mean + correction_jax
+
+        def objective(params):
+            zeta_bar = moment(params)
+            return 0.5 * jnp.sum(zeta_bar**2)
+
+        from econirl.core.optimizer import minimize_lbfgsb
+
+        lower, upper = utility.get_parameter_bounds()
+        result = minimize_lbfgsb(
+            objective,
+            jnp.asarray(tilde_params, dtype=jnp.float64),
+            bounds=(jnp.asarray(lower, dtype=jnp.float64), jnp.asarray(upper, dtype=jnp.float64)),
+            maxiter=self._config.outer_max_iter,
+            tol=self._config.outer_tol,
+            desc="TD-CCP locally robust moment",
+        )
+
+        params_opt = np.asarray(result.x, dtype=np.float64)
+        moment_norm = float(jnp.linalg.norm(moment(jnp.asarray(params_opt, dtype=jnp.float64))))
+        ll = float(
+            self._pseudo_log_likelihood_jax(
+                jnp.asarray(params_opt, dtype=jnp.float64),
+                jnp.asarray(h_table, dtype=jnp.float64),
+                jnp.asarray(g_table, dtype=jnp.float64),
+                jnp.asarray(feature_matrix, dtype=jnp.float64),
+                jnp.asarray(panel.get_all_states()),
+                jnp.asarray(panel.get_all_actions()),
+                problem.scale_parameter,
+            )
+        )
+        success = bool(result.success or moment_norm < max(1e-5, self._config.outer_tol * 100))
+        message = f"{result.message}; zeta_norm={moment_norm:.3e}"
+        diagnostics = {
+            "message": message,
+            "optimizer_message": str(result.message),
+            "success": success,
+            "objective": result.fun,
+            "gradient_norm": result.grad_norm,
+            "projected_gradient_norm": result.projected_grad_norm,
+            "final_rel_change": result.final_rel_change,
+            "convergence_reason": result.convergence_reason,
+            "zeta_norm": moment_norm,
+            "iterations": result.nit,
+            "function_evals": result.nfev,
+        }
+        return params_opt, ll, result.nit, result.nfev, message, success, moment_norm, diagnostics
+
+    def _paper_fold_covariance(
+        self,
+        params: np.ndarray,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        lambda_table: np.ndarray,
+        tilde_params: np.ndarray,
+        feature_matrix: np.ndarray,
+        actions: np.ndarray,
+        states: np.ndarray,
+        next_actions: np.ndarray,
+        next_states: np.ndarray,
+        ccps: np.ndarray,
+        problem: DDCProblem,
+        gamma: float,
+        individual_ids: np.ndarray | None = None,
+    ) -> dict[str, Any]:
+        """Fold-specific G, Omega, and asymptotic covariance from Theorem 5."""
+        zeta = self._locally_robust_moments(
+            params,
+            h_table,
+            g_table,
+            lambda_table,
+            tilde_params,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            ccps,
+            problem,
+            gamma,
+        )
+        n_obs = max(len(states), 1)
+        n_effective = n_obs
+        covariance_unit = "transition"
+        if individual_ids is not None and len(individual_ids) == len(states):
+            unique_ids, inverse = np.unique(individual_ids, return_inverse=True)
+            n_clusters = max(len(unique_ids), 1)
+            cluster_sums = np.zeros((n_clusters, zeta.shape[1]), dtype=np.float64)
+            for row, cluster_idx in enumerate(inverse):
+                cluster_sums[cluster_idx] += zeta[row]
+            avg_cluster_size = n_obs / n_clusters
+            cluster_moments = cluster_sums / max(avg_cluster_size, 1.0)
+            omega = (cluster_moments.T @ cluster_moments) / n_clusters
+            n_effective = n_clusters
+            covariance_unit = "individual"
+        else:
+            omega = (zeta.T @ zeta) / n_obs
+        omega = 0.5 * (omega + omega.T)
+        G = self._moment_jacobian(
+            params, h_table, g_table, states, problem.scale_parameter
+        )
+
+        omega_inv = np.linalg.pinv(omega, rcond=1e-10)
+        info = G.T @ omega_inv @ G
+        info = 0.5 * (info + info.T)
+        asymptotic_covariance = np.linalg.pinv(info, rcond=1e-10)
+        asymptotic_covariance = 0.5 * (
+            asymptotic_covariance + asymptotic_covariance.T
+        )
+
+        psi_table = -self._score_table(
+            tilde_params,
+            h_table,
+            g_table,
+            problem.scale_parameter,
+        )
+        lambda_residual = (
+            lambda_table[next_states, next_actions]
+            - psi_table[next_states, next_actions]
+            - gamma * lambda_table[states, actions]
+        )
+
+        return {
+            "n_observations": n_obs,
+            "n_effective_units": n_effective,
+            "covariance_unit": covariance_unit,
+            "zeta": zeta,
+            "zeta_mean": zeta.mean(axis=0),
+            "zeta_norm": float(np.linalg.norm(zeta.mean(axis=0))),
+            "lambda_fixed_point_residual_norm": float(
+                np.linalg.norm(lambda_residual.mean(axis=0))
+            ),
+            "lambda_fixed_point_residual_rms": float(
+                np.sqrt(np.mean(lambda_residual * lambda_residual))
+            ),
+            "lambda_fixed_point_residual_max_abs": float(
+                np.max(np.abs(lambda_residual))
+            ),
+            "G": G,
+            "Omega": omega,
+            "V_asymptotic": asymptotic_covariance,
+        }
+
+    @staticmethod
+    def _hessian_from_covariance(covariance: np.ndarray) -> tuple[jnp.ndarray, np.ndarray]:
+        """Return a Hessian adapter whose inverse is the supplied covariance."""
+        cov = np.asarray(covariance, dtype=np.float64)
+        cov = 0.5 * (cov + cov.T)
+        eigvals, eigvecs = np.linalg.eigh(cov)
+        scale = max(float(np.max(np.abs(eigvals))) if eigvals.size else 1.0, 1.0)
+        eigvals = np.maximum(eigvals, scale * 1e-12)
+        cov_pd = (eigvecs * eigvals) @ eigvecs.T
+        precision = np.linalg.inv(cov_pd)
+        return -jnp.asarray(precision, dtype=jnp.float64), cov_pd
 
     def _compute_robust_se(
         self,
@@ -1597,8 +1929,9 @@ class TDCCPEstimator(BaseEstimator):
         # Steps 3-5: Estimate h, g and optimize theta
         # With cross-fitting (Algorithm 2) if enabled.
         # -----------------------------------------------------------------
+        paper_inference = None
         if cfg.cross_fitting:
-            params_opt, ll_opt, total_nit, total_nfev, opt_msg, opt_success, h_table, g_table, loss_hists = \
+            params_opt, ll_opt, total_nit, total_nfev, opt_msg, opt_success, h_table, g_table, loss_hists, paper_inference = \
                 self._estimate_with_cross_fitting(
                     panel, utility, problem, transitions, ccps,
                     actions, states, next_actions, next_states,
@@ -1609,7 +1942,15 @@ class TDCCPEstimator(BaseEstimator):
                 actions, states, next_actions, next_states,
                 feature_matrix, np.array(ccps), problem, gamma, key,
             )
-            params_opt, ll_opt, total_nit, total_nfev, opt_msg, opt_success = self._partial_mle(
+            (
+                params_opt,
+                ll_opt,
+                total_nit,
+                total_nfev,
+                opt_msg,
+                opt_success,
+                _plugin_diagnostics,
+            ) = self._partial_mle(
                 panel, utility, problem, h_table, g_table, initial_params,
             )
 
@@ -1640,7 +1981,15 @@ class TDCCPEstimator(BaseEstimator):
                 actions, states, next_actions, next_states,
                 feature_matrix, np.array(ccps), problem, gamma, iter_key,
             )
-            params_opt, ll_opt, nit, nfev, opt_msg, iter_success = self._partial_mle(
+            (
+                params_opt,
+                ll_opt,
+                nit,
+                nfev,
+                opt_msg,
+                iter_success,
+                _plugin_diagnostics,
+            ) = self._partial_mle(
                 panel, utility, problem, h_table, g_table,
                 np.array(params_opt),
             )
@@ -1664,36 +2013,37 @@ class TDCCPEstimator(BaseEstimator):
         if cfg.compute_se:
             self._last_h_table = h_table
             self._last_g_table = g_table
-            all_states_np = np.array(panel.get_all_states())
-            all_actions_np = np.array(panel.get_all_actions())
-
-            def ll_fn(p):
-                return jnp.array(self._pseudo_log_likelihood_jax(
-                    np.array(p), h_table, g_table, feature_matrix,
-                    all_states_np, all_actions_np, problem.scale_parameter,
-                ))
-
-            H = compute_numerical_hessian(jnp.array(params_opt), ll_fn)
-
-            if cfg.robust_se and cfg.cross_fitting:
-                # With correct cross-fitting (individual-level fold split), each
-                # theta_k's pseudo-LL scores are independent of the h,g used in that
-                # fold (Neyman orthogonality, Theorem 5). Standard MLE Hessian is valid.
-                self._log("Using numerical Hessian for cross-fitted SE (Neyman orthogonality)")
-                hessian = H
-            elif cfg.robust_se:
-                # Without cross-fitting, use clustered MLE sandwich: Var = H^{-1} B H^{-1}
-                # This captures panel clustering but not first-stage h/g error.
-                self._log("Computing clustered sandwich standard errors (no cross-fitting)")
-                hessian = self._compute_clustered_se(
-                    params_opt, h_table, g_table, feature_matrix,
-                    all_states_np, all_actions_np, panel,
-                    problem.scale_parameter, np.array(H),
+            if paper_inference is not None and paper_inference.get("sample_covariance") is not None:
+                self._log("Using Algorithm 2 locally robust TD-CCP covariance")
+                hessian, sample_covariance_pd = self._hessian_from_covariance(
+                    paper_inference["sample_covariance"]
                 )
+                paper_inference["sample_covariance_pd"] = sample_covariance_pd
+            else:
+                all_states_np = np.array(panel.get_all_states())
+                all_actions_np = np.array(panel.get_all_actions())
 
-            if hessian is None:
-                self._log("Using naive numerical Hessian (no clustering)")
-                hessian = H
+                def ll_fn(p):
+                    return jnp.array(self._pseudo_log_likelihood_jax(
+                        np.array(p), h_table, g_table, feature_matrix,
+                        all_states_np, all_actions_np, problem.scale_parameter,
+                    ))
+
+                H = compute_numerical_hessian(jnp.array(params_opt), ll_fn)
+                if cfg.robust_se:
+                    # Without cross-fitting, use clustered MLE sandwich:
+                    # Var = H^{-1} B H^{-1}. This captures panel clustering
+                    # but not first-stage h/g error.
+                    self._log("Computing clustered sandwich standard errors (no cross-fitting)")
+                    hessian = self._compute_clustered_se(
+                        params_opt, h_table, g_table, feature_matrix,
+                        all_states_np, all_actions_np, panel,
+                        problem.scale_parameter, np.array(H),
+                    )
+
+                if hessian is None:
+                    self._log("Using naive numerical Hessian (no clustering)")
+                    hessian = H
 
         optimization_time = time.time() - start_time
 
@@ -1727,10 +2077,19 @@ class TDCCPEstimator(BaseEstimator):
                 "basis_ridge": cfg.basis_ridge,
                 "basis_pinv_rcond": cfg.basis_pinv_rcond,
                 "ccp_method": cfg.ccp_method,
+                "ccp_poly_degree": cfg.ccp_poly_degree,
                 "ccp_smoothing": cfg.ccp_smoothing,
                 "theta_l2_penalty": cfg.theta_l2_penalty,
                 "cross_fitting": cfg.cross_fitting,
+                "split_unit": cfg.split_unit,
                 "robust_se": cfg.robust_se,
+                "compute_se": cfg.compute_se,
+                "paper_inference": paper_inference,
+                "se_method_detail": (
+                    "tdccp_algorithm2_locally_robust"
+                    if paper_inference is not None
+                    else ("clustered_plugin" if cfg.robust_se else "plugin_hessian")
+                ),
                 "reward_matrix": reward_matrix,
                 "h_table": h_table,
                 "g_table": g_table,
@@ -1776,10 +2135,11 @@ class TDCCPEstimator(BaseEstimator):
     ):
         """2-fold cross-fitting (Algorithm 2 of the paper).
 
-        Split INDIVIDUALS into two folds. For each fold k:
-        1. Estimate h, g using fold k's transitions.
-        2. Estimate theta on fold -k's panel using h, g from fold k.
-        3. Average the two theta estimates.
+        Split INDIVIDUALS into two folds. With ``robust_se=True`` this
+        follows Algorithm 2: fold-specific h/g/eta, plug-in theta, lambda,
+        held-out zeta solve, and fold sandwich covariance. With
+        ``robust_se=False`` it preserves the historical cross-fitted plug-in
+        estimator.
 
         Splitting by individual (not by transition) ensures that all T
         transitions from individual i land in the same fold, so h,g
@@ -1793,6 +2153,8 @@ class TDCCPEstimator(BaseEstimator):
 
         individual_ids = self._extract_individual_ids(panel)
         n_ind = len(panel.trajectories)
+        if n_ind < 2:
+            raise ValueError("TD-CCP cross-fitting requires at least two individuals")
 
         if split_unit == "individual":
             # Individual-level split: all transitions from individual i go to
@@ -1811,6 +2173,11 @@ class TDCCPEstimator(BaseEstimator):
             fold2_trans_mask = ~fold1_trans_mask
 
         elif split_unit == "row":
+            if self._config.robust_se:
+                raise ValueError(
+                    "TD-CCP locally robust Algorithm 2 inference requires "
+                    "split_unit='individual'; row split is diagnostic only."
+                )
             # Transition-level split: each (s, a, s') row is randomly assigned
             # to a fold. Provided for ablations only; this breaks the
             # independence required for the orthogonality result, since
@@ -1837,35 +2204,324 @@ class TDCCPEstimator(BaseEstimator):
                 f"split_unit must be 'individual' or 'row', got {split_unit!r}"
             )
 
-        # -----------------------------------------------------------------
-        # Fold 1: estimate h,g from fold 1 transitions
-        # -----------------------------------------------------------------
+        if not np.any(fold1_trans_mask) or not np.any(fold2_trans_mask):
+            raise ValueError("TD-CCP cross-fitting produced an empty fold")
+
+        ccps1 = self._estimate_ccps(fold1_panel, problem.num_states, problem.num_actions)
+        ccps2 = self._estimate_ccps(fold2_panel, problem.num_states, problem.num_actions)
+
         key, k1 = jax.random.split(key)
         h1, g1, losses1 = self._estimate_h_g(
             actions[fold1_trans_mask], states[fold1_trans_mask],
             next_actions[fold1_trans_mask], next_states[fold1_trans_mask],
-            feature_matrix, np.array(ccps), problem, gamma, k1,
+            feature_matrix, np.array(ccps1), problem, gamma, k1,
         )
 
-        # -----------------------------------------------------------------
-        # Fold 2: estimate h,g from fold 2 transitions
-        # -----------------------------------------------------------------
         key, k2 = jax.random.split(key)
         h2, g2, losses2 = self._estimate_h_g(
             actions[fold2_trans_mask], states[fold2_trans_mask],
             next_actions[fold2_trans_mask], next_states[fold2_trans_mask],
-            feature_matrix, np.array(ccps), problem, gamma, k2,
+            feature_matrix, np.array(ccps2), problem, gamma, k2,
         )
 
-        # -----------------------------------------------------------------
-        # Cross-estimation: theta_k on fold k panel using h,g from fold -k.
-        # Each theta_k's pseudo-LL scores are independent of the h,g used,
-        # because h,g were estimated on the complementary fold's data.
-        # -----------------------------------------------------------------
-        params1, ll1, nit1, nfev1, msg1, success1 = self._partial_mle(
+        (
+            tilde1,
+            ll_tilde1,
+            nit_tilde1,
+            nfev_tilde1,
+            msg_tilde1,
+            success_tilde1,
+            diag_tilde1,
+        ) = self._partial_mle(
+            fold1_panel, utility, problem, h1, g1, initial_params,
+        )
+        (
+            tilde2,
+            ll_tilde2,
+            nit_tilde2,
+            nfev_tilde2,
+            msg_tilde2,
+            success_tilde2,
+            diag_tilde2,
+        ) = self._partial_mle(
+            fold2_panel, utility, problem, h2, g2,
+            initial_params,
+        )
+
+        if self._config.robust_se:
+            lambda1 = self._compute_backward_value(
+                tilde1,
+                h1,
+                g1,
+                feature_matrix,
+                actions[fold1_trans_mask],
+                states[fold1_trans_mask],
+                next_actions[fold1_trans_mask],
+                next_states[fold1_trans_mask],
+                problem,
+                gamma,
+            )
+            lambda2 = self._compute_backward_value(
+                tilde2,
+                h2,
+                g2,
+                feature_matrix,
+                actions[fold2_trans_mask],
+                states[fold2_trans_mask],
+                next_actions[fold2_trans_mask],
+                next_states[fold2_trans_mask],
+                problem,
+                gamma,
+            )
+
+            theta1, ll1, nit1, nfev1, msg1, success1, moment_norm1, diag1 = (
+                self._solve_locally_robust_theta(
+                    fold1_panel,
+                    utility,
+                    problem,
+                    h2,
+                    g2,
+                    lambda2,
+                    tilde2,
+                    feature_matrix,
+                    actions[fold1_trans_mask],
+                    states[fold1_trans_mask],
+                    next_actions[fold1_trans_mask],
+                    next_states[fold1_trans_mask],
+                    np.array(ccps2),
+                    gamma,
+                )
+            )
+            theta2, ll2, nit2, nfev2, msg2, success2, moment_norm2, diag2 = (
+                self._solve_locally_robust_theta(
+                    fold2_panel,
+                    utility,
+                    problem,
+                    h1,
+                    g1,
+                    lambda1,
+                    tilde1,
+                    feature_matrix,
+                    actions[fold2_trans_mask],
+                    states[fold2_trans_mask],
+                    next_actions[fold2_trans_mask],
+                    next_states[fold2_trans_mask],
+                    np.array(ccps1),
+                    gamma,
+                )
+            )
+
+            cov1 = self._paper_fold_covariance(
+                theta1,
+                h2,
+                g2,
+                lambda2,
+                tilde2,
+                feature_matrix,
+                actions[fold1_trans_mask],
+                states[fold1_trans_mask],
+                next_actions[fold1_trans_mask],
+                next_states[fold1_trans_mask],
+                np.array(ccps2),
+                problem,
+                gamma,
+                individual_ids=individual_ids[fold1_trans_mask],
+            )
+            cov2 = self._paper_fold_covariance(
+                theta2,
+                h1,
+                g1,
+                lambda1,
+                tilde1,
+                feature_matrix,
+                actions[fold2_trans_mask],
+                states[fold2_trans_mask],
+                next_actions[fold2_trans_mask],
+                next_states[fold2_trans_mask],
+                np.array(ccps1),
+                problem,
+                gamma,
+                individual_ids=individual_ids[fold2_trans_mask],
+            )
+
+            params_avg = (np.asarray(theta1) + np.asarray(theta2)) / 2.0
+            ll_total = ll1 + ll2
+            asymptotic_covariance = 0.5 * (
+                cov1["V_asymptotic"] + cov2["V_asymptotic"]
+            )
+            sample_covariance = 0.25 * (
+                cov1["V_asymptotic"] / cov1["n_effective_units"]
+                + cov2["V_asymptotic"] / cov2["n_effective_units"]
+            )
+
+            losses = {
+                **{f"fold1_{k}": v for k, v in losses1.items()},
+                **{f"fold2_{k}": v for k, v in losses2.items()},
+            }
+            h_avg = (h1 + h2) / 2.0
+            g_avg = (g1 + g2) / 2.0
+            preliminary_stationarity_tol = max(1e-5, self._config.outer_tol * 100.0)
+            preliminary_stationary = [
+                bool(
+                    diag.get("success")
+                    or (
+                        diag.get("projected_gradient_norm") is not None
+                        and float(diag["projected_gradient_norm"])
+                        <= preliminary_stationarity_tol
+                    )
+                )
+                for diag in (diag_tilde1, diag_tilde2)
+            ]
+            robust_stationarity_tol = max(1e-6, self._config.outer_tol * 100.0)
+            robust_stationary = [
+                bool(
+                    diag.get("success")
+                    or (
+                        diag.get("projected_gradient_norm") is not None
+                        and float(diag["projected_gradient_norm"])
+                        <= robust_stationarity_tol
+                    )
+                )
+                for diag in (diag1, diag2)
+            ]
+
+            paper_inference = {
+                "method": "tdccp_algorithm2_locally_robust",
+                "split_unit": split_unit,
+                "preliminary_stationarity_tol": preliminary_stationarity_tol,
+                "robust_stationarity_tol": robust_stationarity_tol,
+                "preliminary_optimizer_success": [
+                    bool(success_tilde1),
+                    bool(success_tilde2),
+                ],
+                "preliminary_optimizer_messages": [msg_tilde1, msg_tilde2],
+                "preliminary_optimizer_diagnostics": [diag_tilde1, diag_tilde2],
+                "preliminary_optimizer_stationary": preliminary_stationary,
+                "robust_optimizer_success": [
+                    bool(success1),
+                    bool(success2),
+                ],
+                "robust_optimizer_messages": [msg1, msg2],
+                "robust_optimizer_diagnostics": [diag1, diag2],
+                "robust_optimizer_stationary": robust_stationary,
+                "folds": [
+                    {
+                        "name": "fold1",
+                        "source_fold": "fold2",
+                        "n_observations": cov1["n_observations"],
+                        "n_effective_units": cov1["n_effective_units"],
+                        "covariance_unit": cov1["covariance_unit"],
+                        "tilde_theta": tilde1,
+                        "source_tilde_theta": tilde2,
+                        "theta": theta1,
+                        "lambda": lambda2,
+                        "zeta_mean": cov1["zeta_mean"],
+                        "zeta_norm": cov1["zeta_norm"],
+                        "lambda_fixed_point_residual_norm": cov1[
+                            "lambda_fixed_point_residual_norm"
+                        ],
+                        "lambda_fixed_point_residual_rms": cov1[
+                            "lambda_fixed_point_residual_rms"
+                        ],
+                        "lambda_fixed_point_residual_max_abs": cov1[
+                            "lambda_fixed_point_residual_max_abs"
+                        ],
+                        "G": cov1["G"],
+                        "Omega": cov1["Omega"],
+                        "V_asymptotic": cov1["V_asymptotic"],
+                        "moment_norm": moment_norm1,
+                    },
+                    {
+                        "name": "fold2",
+                        "source_fold": "fold1",
+                        "n_observations": cov2["n_observations"],
+                        "n_effective_units": cov2["n_effective_units"],
+                        "covariance_unit": cov2["covariance_unit"],
+                        "tilde_theta": tilde2,
+                        "source_tilde_theta": tilde1,
+                        "theta": theta2,
+                        "lambda": lambda1,
+                        "zeta_mean": cov2["zeta_mean"],
+                        "zeta_norm": cov2["zeta_norm"],
+                        "lambda_fixed_point_residual_norm": cov2[
+                            "lambda_fixed_point_residual_norm"
+                        ],
+                        "lambda_fixed_point_residual_rms": cov2[
+                            "lambda_fixed_point_residual_rms"
+                        ],
+                        "lambda_fixed_point_residual_max_abs": cov2[
+                            "lambda_fixed_point_residual_max_abs"
+                        ],
+                        "G": cov2["G"],
+                        "Omega": cov2["Omega"],
+                        "V_asymptotic": cov2["V_asymptotic"],
+                        "moment_norm": moment_norm2,
+                    },
+                ],
+                "theta": params_avg,
+                "fold_thetas": [theta1, theta2],
+                "fold_tilde_thetas": [tilde1, tilde2],
+                "moment_norm_max": max(moment_norm1, moment_norm2),
+                "preliminary_projected_gradient_norm_max": max(
+                    float(diag_tilde1["projected_gradient_norm"]),
+                    float(diag_tilde2["projected_gradient_norm"]),
+                ),
+                "robust_projected_gradient_norm_max": max(
+                    float(diag1["projected_gradient_norm"]),
+                    float(diag2["projected_gradient_norm"]),
+                ),
+                "lambda_fixed_point_residual_norm_max": max(
+                    cov1["lambda_fixed_point_residual_norm"],
+                    cov2["lambda_fixed_point_residual_norm"],
+                ),
+                "lambda_fixed_point_residual_rms_max": max(
+                    cov1["lambda_fixed_point_residual_rms"],
+                    cov2["lambda_fixed_point_residual_rms"],
+                ),
+                "lambda_fixed_point_residual_max_abs": max(
+                    cov1["lambda_fixed_point_residual_max_abs"],
+                    cov2["lambda_fixed_point_residual_max_abs"],
+                ),
+                "covariance_unit": cov1["covariance_unit"]
+                if cov1["covariance_unit"] == cov2["covariance_unit"]
+                else "mixed",
+                "asymptotic_covariance": asymptotic_covariance,
+                "sample_covariance": sample_covariance,
+                "standard_errors": np.sqrt(
+                    np.maximum(np.diag(sample_covariance), 0.0)
+                ),
+            }
+            preliminary_ok = bool(
+                np.all(np.isfinite(tilde1))
+                and np.all(np.isfinite(tilde2))
+                and np.isfinite(ll_tilde1)
+                and np.isfinite(ll_tilde2)
+                and all(preliminary_stationary)
+            )
+
+            return (
+                params_avg,
+                ll_total,
+                nit_tilde1 + nit_tilde2 + nit1 + nit2,
+                nfev_tilde1 + nfev_tilde2 + nfev1 + nfev2,
+                (
+                    "algorithm2 locally robust: "
+                    f"{msg_tilde1}; {msg_tilde2}; {msg1}; {msg2}"
+                ),
+                bool(preliminary_ok and all(robust_stationary) and success1 and success2),
+                h_avg,
+                g_avg,
+                losses,
+                paper_inference,
+            )
+
+        # Historical cross-estimation: theta_k on fold k panel using h,g from
+        # fold -k. This is a plug-in estimator only; it is not the paper's
+        # locally robust inference path.
+        params1, ll1, nit1, nfev1, msg1, success1, _diag1 = self._partial_mle(
             fold1_panel, utility, problem, h2, g2, initial_params,
         )
-        params2, ll2, nit2, nfev2, msg2, success2 = self._partial_mle(
+        params2, ll2, nit2, nfev2, msg2, success2, _diag2 = self._partial_mle(
             fold2_panel, utility, problem, h1, g1,
             np.array(params1) if initial_params is None else initial_params,
         )
@@ -1887,6 +2543,7 @@ class TDCCPEstimator(BaseEstimator):
             f"cross-fitted: {msg1}; {msg2}",
             bool(success1 and success2),
             h_avg, g_avg, losses,
+            None,
         )
 
     @staticmethod

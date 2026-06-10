@@ -25,8 +25,9 @@ from econirl.estimation.td_ccp import (
     _EVComponentNetwork,
     make_state_action_tabular_utility,
 )
+from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.linear import LinearUtility
-from econirl.simulation.synthetic import simulate_panel
+from econirl.simulation.synthetic import simulate_panel, simulate_panel_from_policy
 from papers.econirl_package.primers.tdccp.tdccp_run import (
     build_paper_hard_case_dgp,
     evaluate_hard_case_summary,
@@ -329,9 +330,276 @@ class TestSemigradientSolve:
 
 
 class TestTDCCPHardCaseComponents:
-    """Component tests for the shapeshifter neural/neural hard-case runner."""
+    """Component tests for the TD-CCP hard-case runner."""
 
-    def test_paper_hard_case_has_finite_theta_neural_feature_utility(self):
+    def test_backward_lambda_solves_reversed_td_fixed_point(self):
+        """Algorithm 5 lambda should solve the reversed TD recursion."""
+        problem = DDCProblem(
+            num_states=1,
+            num_actions=2,
+            discount_factor=0.4,
+            scale_parameter=1.0,
+        )
+        estimator = TDCCPEstimator(
+            config=TDCCPConfig(
+                method="semigradient",
+                basis_type="tabular",
+                basis_ridge=0.0,
+            )
+        )
+        params = np.array([0.7], dtype=np.float64)
+        h_table = np.array([[[0.0], [1.0]]], dtype=np.float64)
+        g_table = np.zeros((1, 2), dtype=np.float64)
+        feature_matrix = h_table.copy()
+        actions = np.array([0, 1], dtype=np.int32)
+        states = np.array([0, 0], dtype=np.int32)
+        next_actions = np.array([0, 1], dtype=np.int32)
+        next_states = np.array([0, 0], dtype=np.int32)
+
+        lambda_table = estimator._compute_backward_value(
+            params,
+            h_table,
+            g_table,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            problem,
+            problem.discount_factor,
+        )
+
+        psi_table = -estimator._score_table(
+            params,
+            h_table,
+            g_table,
+            problem.scale_parameter,
+        )
+        expected = psi_table / (1.0 - problem.discount_factor)
+        np.testing.assert_allclose(lambda_table, expected, atol=1e-12)
+
+    def test_zeta_moment_matches_score_plus_lambda_residual_formula(self):
+        """Equation (4.6) zeta should equal score plus lambda times residual."""
+        problem = DDCProblem(
+            num_states=1,
+            num_actions=2,
+            discount_factor=0.5,
+            scale_parameter=1.0,
+        )
+        estimator = TDCCPEstimator(
+            config=TDCCPConfig(
+                method="semigradient",
+                basis_type="tabular",
+                basis_ridge=0.0,
+            )
+        )
+        params = np.array([0.4], dtype=np.float64)
+        tilde_params = np.array([0.35], dtype=np.float64)
+        h_table = np.array([[[1.0], [0.2]]], dtype=np.float64)
+        g_table = np.array([[0.0, 0.1]], dtype=np.float64)
+        feature_matrix = np.array([[[0.0], [1.0]]], dtype=np.float64)
+        lambda_table = np.array([[[0.3], [-0.2]]], dtype=np.float64)
+        ccps = np.array([[0.6, 0.4]], dtype=np.float64)
+        actions = np.array([0, 1], dtype=np.int32)
+        states = np.array([0, 0], dtype=np.int32)
+        next_actions = np.array([1, 0], dtype=np.int32)
+        next_states = np.array([0, 0], dtype=np.int32)
+
+        zeta = estimator._locally_robust_moments(
+            params,
+            h_table,
+            g_table,
+            lambda_table,
+            tilde_params,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            ccps,
+            problem,
+            problem.discount_factor,
+        )
+
+        policy = estimator._policy_from_h_g(
+            params,
+            h_table,
+            g_table,
+            problem.scale_parameter,
+        )
+        expected_h = np.einsum("sa,sak->sk", policy, h_table)
+        score_table = (h_table - expected_h[:, None, :]) / problem.scale_parameter
+        v_tilde = np.einsum("sak,k->sa", h_table, tilde_params) + g_table
+        euler = 0.5772156649015329
+        residual = (
+            np.einsum("nk,k->n", feature_matrix[states, actions], tilde_params)
+            + problem.discount_factor
+            * (euler - np.log(ccps[next_states, next_actions]))
+            + problem.discount_factor * v_tilde[next_states, next_actions]
+            - v_tilde[states, actions]
+        )
+        expected = score_table[states, actions] + lambda_table[states, actions] * residual[:, None]
+        np.testing.assert_allclose(zeta, expected, atol=1e-12)
+
+    def test_locally_robust_moment_is_less_sensitive_to_h_perturbation(self):
+        """The zeta correction should damp first-order h errors."""
+        problem = DDCProblem(
+            num_states=1,
+            num_actions=2,
+            discount_factor=0.0,
+            scale_parameter=1.0,
+        )
+        estimator = TDCCPEstimator(
+            config=TDCCPConfig(
+                method="semigradient",
+                basis_type="tabular",
+                basis_ridge=0.0,
+            )
+        )
+        params = np.array([1.0], dtype=np.float64)
+        h_table = np.array([[[0.0], [1.0]]], dtype=np.float64)
+        g_table = np.zeros((1, 2), dtype=np.float64)
+        feature_matrix = h_table.copy()
+        ccps = estimator._policy_from_h_g(
+            params,
+            h_table,
+            g_table,
+            problem.scale_parameter,
+        )
+        n_obs = 10_000
+        n_action_1 = int(round(n_obs * ccps[0, 1]))
+        actions = np.array([0] * (n_obs - n_action_1) + [1] * n_action_1, dtype=np.int32)
+        states = np.zeros(n_obs, dtype=np.int32)
+        next_actions = actions.copy()
+        next_states = states.copy()
+        lambda_table = estimator._compute_backward_value(
+            params,
+            h_table,
+            g_table,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            problem,
+            problem.discount_factor,
+        )
+
+        base_score = estimator._score_moments(
+            params,
+            h_table,
+            g_table,
+            states,
+            actions,
+            problem.scale_parameter,
+        )
+        base_zeta = estimator._locally_robust_moments(
+            params,
+            h_table,
+            g_table,
+            lambda_table,
+            params,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            ccps,
+            problem,
+            problem.discount_factor,
+        )
+        perturbed_h = h_table.copy()
+        perturbed_h[0, 1, 0] += 1e-3
+        perturbed_score = estimator._score_moments(
+            params,
+            perturbed_h,
+            g_table,
+            states,
+            actions,
+            problem.scale_parameter,
+        )
+        perturbed_zeta = estimator._locally_robust_moments(
+            params,
+            perturbed_h,
+            g_table,
+            lambda_table,
+            params,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            ccps,
+            problem,
+            problem.discount_factor,
+        )
+
+        naive_move = float(np.linalg.norm(perturbed_score.mean(axis=0) - base_score.mean(axis=0)))
+        robust_move = float(np.linalg.norm(perturbed_zeta.mean(axis=0) - base_zeta.mean(axis=0)))
+        assert naive_move > 1e-5
+        assert robust_move < naive_move * 1e-2
+
+    def test_algorithm2_fold_covariance_clusters_by_individual_formula(self):
+        """Fold covariance should use individual cluster sums, not row meat."""
+        problem = DDCProblem(
+            num_states=1,
+            num_actions=2,
+            discount_factor=0.0,
+            scale_parameter=1.0,
+        )
+        estimator = TDCCPEstimator(
+            config=TDCCPConfig(
+                method="semigradient",
+                basis_type="tabular",
+                basis_ridge=0.0,
+            )
+        )
+        params = np.array([0.0], dtype=np.float64)
+        h_table = np.array([[[0.0], [1.0]]], dtype=np.float64)
+        g_table = np.zeros((1, 2), dtype=np.float64)
+        lambda_table = np.zeros((1, 2, 1), dtype=np.float64)
+        feature_matrix = h_table.copy()
+        actions = np.array([0, 1, 1, 0, 1], dtype=np.int32)
+        states = np.zeros(len(actions), dtype=np.int32)
+        next_actions = actions.copy()
+        next_states = states.copy()
+        individual_ids = np.array([0, 0, 1, 1, 1], dtype=np.int32)
+        ccps = np.array([[0.5, 0.5]], dtype=np.float64)
+
+        covariance = estimator._paper_fold_covariance(
+            params,
+            h_table,
+            g_table,
+            lambda_table,
+            params,
+            feature_matrix,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            ccps,
+            problem,
+            problem.discount_factor,
+            individual_ids=individual_ids,
+        )
+
+        zeta = covariance["zeta"]
+        cluster_sums = np.array(
+            [
+                zeta[individual_ids == 0].sum(axis=0),
+                zeta[individual_ids == 1].sum(axis=0),
+            ]
+        )
+        cluster_moments = cluster_sums / (len(actions) / 2)
+        expected_omega = (cluster_moments.T @ cluster_moments) / 2
+        row_omega = (zeta.T @ zeta) / len(actions)
+
+        assert covariance["covariance_unit"] == "individual"
+        assert covariance["n_effective_units"] == 2
+        np.testing.assert_allclose(covariance["Omega"], expected_omega, atol=1e-12)
+        assert not np.allclose(covariance["Omega"], row_omega)
+
+    def test_paper_hard_case_has_finite_theta_encoded_state_utility(self):
         """Paper hard case should have finite theta and exact linear rewards."""
         dgp = build_paper_hard_case_dgp(seed=11)
         utility = dgp["utility"]
@@ -344,7 +612,10 @@ class TestTDCCPHardCaseComponents:
             np.asarray(true_reward),
             atol=1e-10,
         )
-        assert utility.num_parameters == 8
+        assert utility.num_parameters == 6
+        assert dgp["env"].problem_spec.state_dim == 2
+        assert dgp["env"].problem_spec.num_states == 81
+        assert dgp["basis_metadata"]["basis_source"] == "encoded state polynomial features"
         assert dgp["basis_metadata"]["action_normalization"] == (
             "action 0 reward features fixed to zero"
         )
@@ -369,9 +640,15 @@ class TestTDCCPHardCaseComponents:
         )
         summary = SimpleNamespace(
             parameters=true_params,
+            standard_errors=jnp.full_like(true_params, 0.01),
+            variance_covariance=jnp.eye(len(true_params), dtype=jnp.float64) * 1e-4,
             policy=truth.policy,
             value_function=truth.V,
             converged=True,
+            metadata={
+                "se_method_detail": "tdccp_algorithm2_locally_robust",
+                "paper_inference": {"moment_norm_max": 0.0},
+            },
         )
 
         metrics = evaluate_paper_hard_case_summary(
@@ -390,6 +667,109 @@ class TestTDCCPHardCaseComponents:
         assert "parameter_cosine" in gate_names
         assert "parameter_relative_rmse" in gate_names
         assert all(gate.passed for gate in gates)
+
+    def test_algorithm2_locally_robust_se_path_stores_paper_artifacts(self):
+        """Robust cross-fitting should run zeta/lambda/covariance path."""
+        env = ShapeshifterEnvironment(
+            ShapeshifterConfig(
+                num_states=8,
+                num_actions=2,
+                num_features=2,
+                reward_type="linear",
+                feature_type="linear",
+                action_dependent=True,
+                stochastic_transitions=True,
+                stochastic_rewards=False,
+                num_periods=None,
+                discount_factor=0.9,
+                seed=17,
+            )
+        )
+        utility = ActionDependentReward(
+            env.feature_matrix,
+            ["theta_0", "theta_1"],
+        )
+        true_params = jnp.array([0.5, -0.3], dtype=jnp.float64)
+        true_reward = utility.compute(true_params)
+        truth = value_iteration(
+            SoftBellmanOperator(env.problem_spec, env.transition_matrices),
+            true_reward,
+            tol=1e-8,
+            max_iter=1_000,
+        )
+        panel = simulate_panel_from_policy(
+            env.problem_spec,
+            env.transition_matrices,
+            truth.policy,
+            jnp.asarray(env._get_initial_state_distribution()),
+            n_individuals=30,
+            n_periods=15,
+            seed=19,
+        )
+        estimator = TDCCPEstimator(
+            config=TDCCPConfig(
+                method="semigradient",
+                basis_type="tabular",
+                ccp_method="frequency",
+                cross_fitting=True,
+                robust_se=True,
+                compute_se=True,
+                outer_max_iter=60,
+                outer_tol=1e-5,
+            ),
+            seed=23,
+        )
+
+        summary = estimator.estimate(
+            panel,
+            utility,
+            env.problem_spec,
+            env.transition_matrices,
+        )
+        paper_inference = summary.metadata["paper_inference"]
+
+        assert summary.metadata["se_method_detail"] == "tdccp_algorithm2_locally_robust"
+        assert paper_inference["method"] == "tdccp_algorithm2_locally_robust"
+        assert paper_inference["covariance_unit"] == "individual"
+        assert len(paper_inference["folds"]) == 2
+        assert paper_inference["moment_norm_max"] < 1e-3
+        assert np.isfinite(paper_inference["lambda_fixed_point_residual_norm_max"])
+        assert np.isfinite(paper_inference["lambda_fixed_point_residual_rms_max"])
+        assert np.isfinite(paper_inference["lambda_fixed_point_residual_max_abs"])
+        assert len(paper_inference["preliminary_optimizer_success"]) == 2
+        assert len(paper_inference["preliminary_optimizer_stationary"]) == 2
+        assert all(paper_inference["preliminary_optimizer_stationary"])
+        assert np.isfinite(paper_inference["preliminary_projected_gradient_norm_max"])
+        assert len(paper_inference["robust_optimizer_success"]) == 2
+        assert all(paper_inference["robust_optimizer_stationary"])
+        assert np.all(np.isfinite(np.asarray(summary.standard_errors)))
+        assert np.all(np.asarray(summary.standard_errors) > 0)
+        assert np.asarray(summary.variance_covariance).shape == (2, 2)
+        for fold in paper_inference["folds"]:
+            assert {
+                "tilde_theta",
+                "theta",
+                "lambda",
+                "zeta_mean",
+                "G",
+                "Omega",
+                "V_asymptotic",
+                "n_effective_units",
+                "covariance_unit",
+                "lambda_fixed_point_residual_norm",
+                "lambda_fixed_point_residual_rms",
+                "lambda_fixed_point_residual_max_abs",
+            } <= set(fold)
+            assert fold["covariance_unit"] == "individual"
+            assert fold["n_effective_units"] > 0
+            assert np.isfinite(fold["lambda_fixed_point_residual_norm"])
+            assert np.isfinite(fold["lambda_fixed_point_residual_rms"])
+            assert np.isfinite(fold["lambda_fixed_point_residual_max_abs"])
+            assert fold["lambda"].shape == (
+                env.num_states,
+                env.num_actions,
+                utility.num_parameters,
+            )
 
     def test_tabular_reward_utility_reconstructs_reward_matrix(self):
         """One-hot state-action utility should reconstruct any reward matrix."""
@@ -685,6 +1065,8 @@ class TestParameterRecovery:
             learning_rate=1e-3,
             batch_size=8192,
             ccp_smoothing=0.01,
+            cross_fitting=False,
+            robust_se=False,
             outer_max_iter=200,
             compute_se=True,
             verbose=False,
