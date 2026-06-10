@@ -1,6 +1,301 @@
 {
   "estimator": "NNES",
+  "paper_target": "Neural value-function approximation for structural dynamic discrete choice, validated on the high-dimensional known-truth DGP.",
   "primary_cell_id": "canonical_high_action",
+  "release_status": "Certified with caveat",
+  "result": {
+    "cell_id": "canonical_high_action",
+    "compatibility": {
+      "compatible": true,
+      "errors": [],
+      "estimator": "NNES",
+      "warnings": []
+    },
+    "diagnostics": {
+      "action_shares": [
+        0.33325625,
+        0.38551875,
+        0.281225
+      ],
+      "anchor_valid": true,
+      "condition_number": 1.376810450603823,
+      "errors": [],
+      "feature_rank": 32,
+      "is_action_dependent": true,
+      "max_transition_row_error": 2.421438694000244e-08,
+      "min_action_share": 0.281225,
+      "min_positive_ccp": 0.0005754843660080568,
+      "num_features": 32,
+      "num_states": 81,
+      "observed_states": 81,
+      "single_action_states": 0,
+      "state_action_coverage": 0.9588477366255144,
+      "warnings": []
+    },
+    "estimator": "NNES",
+    "gates": [
+      {
+        "name": "npl_outer_iterations",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 3.0,
+        "value": 3.0
+      },
+      {
+        "name": "final_v_loss",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.029931686287506906
+      },
+      {
+        "name": "parameter_cosine",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.95,
+        "value": 0.991203784942627
+      },
+      {
+        "name": "parameter_relative_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.3,
+        "value": 0.13511048257350922
+      },
+      {
+        "name": "reward_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.08,
+        "value": 0.0640120804309845
+      },
+      {
+        "name": "policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.023834346317619222
+      },
+      {
+        "name": "value_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.2,
+        "value": 0.11562010299193262
+      },
+      {
+        "name": "q_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.2,
+        "value": 0.13714528932947226
+      },
+      {
+        "name": "type_a_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.004865025745682183
+      },
+      {
+        "name": "type_b_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.005558862016315504
+      },
+      {
+        "name": "type_c_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.0013139353505658108
+      }
+    ],
+    "metrics": {
+      "anchor_projected_reward_normalized_rmse": 0.12284250700109567,
+      "anchor_projected_reward_rmse": 0.07888694213041474,
+      "counterfactuals": {
+        "type_a": {
+          "policy": {
+            "kl": 0.002164775197570524,
+            "l1": 0.043156398496676227,
+            "linf": 0.17204603923520725,
+            "tv": 0.021578199248338113
+          },
+          "regret": 0.004865025745682183,
+          "value_rmse": 0.007880289240002442
+        },
+        "type_b": {
+          "policy": {
+            "kl": 0.002127544711268736,
+            "l1": 0.04330291967297398,
+            "linf": 0.16853771589643662,
+            "tv": 0.02165145983648699
+          },
+          "regret": 0.005558862016315504,
+          "value_rmse": 0.007915808573388163
+        },
+        "type_c": {
+          "policy": {
+            "kl": 0.0009200449561966989,
+            "l1": 0.026105682309918877,
+            "linf": 0.10886798541818185,
+            "tv": 0.013052841154959438
+          },
+          "regret": 0.0013139353505658108,
+          "value_rmse": 0.002325101665972622
+        }
+      },
+      "parameters": {
+        "cosine_similarity": 0.991203784942627,
+        "max_abs_error": 0.03015984036028385,
+        "relative_rmse": 0.13511048257350922,
+        "rmse": 0.01414113026112318
+      },
+      "policy": {
+        "kl": 0.002693513289699444,
+        "l1": 0.047668692635238444,
+        "linf": 0.19582445084863445,
+        "tv": 0.023834346317619222
+      },
+      "projected_reward_normalized_rmse": 0.12284250700109567,
+      "projected_reward_rmse": 0.0640120804309845,
+      "q_normalized_rmse": 0.050623545094986004,
+      "q_rmse": 0.13714528932947226,
+      "raw_bellman_reward_normalized_rmse": null,
+      "raw_bellman_reward_rmse": null,
+      "reward_normalized_rmse": 0.12284250700109567,
+      "reward_rmse": 0.0640120804309845,
+      "value_normalized_rmse": 0.03738656723474895,
+      "value_rmse": 0.11562010299193262
+    },
+    "simulation": {
+      "n_individuals": 2000,
+      "n_periods": 80,
+      "seed": 44,
+      "show_progress": false
+    },
+    "summary": {
+      "converged": true,
+      "convergence_message": "NNES-NPL (3 outer iters): Converged",
+      "estimation_time": 36.4615421295166,
+      "log_likelihood": -160272.88031279508,
+      "metadata": {
+        "n_outer_iterations": 3,
+        "profile_mode": "exact_finite_state_npl",
+        "v_loss_per_outer": [
+          0.07703442409462971,
+          0.026875673523760663,
+          0.029931686287506906
+        ]
+      },
+      "num_iterations": 29,
+      "num_observations": 160000,
+      "parameter_names": [
+        "theta_0",
+        "theta_1",
+        "theta_2",
+        "theta_3",
+        "theta_4",
+        "theta_5",
+        "theta_6",
+        "theta_7",
+        "theta_8",
+        "theta_9",
+        "theta_10",
+        "theta_11",
+        "theta_12",
+        "theta_13",
+        "theta_14",
+        "theta_15",
+        "theta_16",
+        "theta_17",
+        "theta_18",
+        "theta_19",
+        "theta_20",
+        "theta_21",
+        "theta_22",
+        "theta_23",
+        "theta_24",
+        "theta_25",
+        "theta_26",
+        "theta_27",
+        "theta_28",
+        "theta_29",
+        "theta_30",
+        "theta_31"
+      ],
+      "parameters": [
+        -0.07085006684064865,
+        0.19796594977378845,
+        -0.08269629627466202,
+        -0.16242191195487976,
+        -0.23445570468902588,
+        -0.14305554330348969,
+        -0.08450841903686523,
+        -0.2664544880390167,
+        0.19158689677715302,
+        -0.214387446641922,
+        0.058989349752664566,
+        -0.01788976974785328,
+        -0.027416983619332314,
+        -0.08771311491727829,
+        0.00564927700906992,
+        0.014381516724824905,
+        0.03325624391436577,
+        0.005278361961245537,
+        -0.00852133333683014,
+        -0.004320680163800716,
+        -0.0387263260781765,
+        0.05032089352607727,
+        0.06299719959497452,
+        0.042670443654060364,
+        -0.08766024559736252,
+        -0.05354776978492737,
+        -0.04706356301903725,
+        0.023714376613497734,
+        -0.0830015316605568,
+        -0.03630545735359192,
+        -0.0016001348849385977,
+        -0.06942977011203766
+      ],
+      "standard_errors": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
   "results": [
     {
       "cell_id": "canonical_low_action",
@@ -112,6 +407,8 @@
         }
       ],
       "metrics": {
+        "anchor_projected_reward_normalized_rmse": 0.017800287621414813,
+        "anchor_projected_reward_rmse": 0.012812905090660907,
         "counterfactuals": {
           "type_a": {
             "policy": {
@@ -156,8 +453,15 @@
           "linf": 0.02021358444444077,
           "tv": 0.00564560820338359
         },
+        "projected_reward_normalized_rmse": 0.017800287621414813,
+        "projected_reward_rmse": 0.010209567844867706,
+        "q_normalized_rmse": 0.0511694800179824,
         "q_rmse": 0.0233699468610916,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 0.017800287621414813,
         "reward_rmse": 0.010209567844867706,
+        "value_normalized_rmse": 0.010003561178718805,
         "value_rmse": 0.019845455486253175
       },
       "simulation": {
@@ -169,7 +473,7 @@
       "summary": {
         "converged": true,
         "convergence_message": "NNES-NPL (3 outer iters): Converged",
-        "estimation_time": 36.96871280670166,
+        "estimation_time": 37.12138319015503,
         "log_likelihood": -174875.80929267284,
         "metadata": {
           "n_outer_iterations": 3,
@@ -312,6 +616,8 @@
         }
       ],
       "metrics": {
+        "anchor_projected_reward_normalized_rmse": 0.12284250700109567,
+        "anchor_projected_reward_rmse": 0.07888694213041474,
         "counterfactuals": {
           "type_a": {
             "policy": {
@@ -356,8 +662,15 @@
           "linf": 0.19582445084863445,
           "tv": 0.023834346317619222
         },
+        "projected_reward_normalized_rmse": 0.12284250700109567,
+        "projected_reward_rmse": 0.0640120804309845,
+        "q_normalized_rmse": 0.050623545094986004,
         "q_rmse": 0.13714528932947226,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 0.12284250700109567,
         "reward_rmse": 0.0640120804309845,
+        "value_normalized_rmse": 0.03738656723474895,
         "value_rmse": 0.11562010299193262
       },
       "simulation": {
@@ -369,7 +682,7 @@
       "summary": {
         "converged": true,
         "convergence_message": "NNES-NPL (3 outer iters): Converged",
-        "estimation_time": 37.06153607368469,
+        "estimation_time": 36.4615421295166,
         "log_likelihood": -160272.88031279508,
         "metadata": {
           "n_outer_iterations": 3,

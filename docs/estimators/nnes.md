@@ -1,33 +1,31 @@
 # NNES
 
-## Overview
-
 NNES estimates structural dynamic discrete choice models with a neural
 value-function approximation inside an NPL-style policy iteration. It keeps the
 reward finite-dimensional while using a flexible value approximation to avoid
 exact dynamic programming in larger state spaces.
 
-## When to Use
+Use NNES when the reward is still structural and finite-dimensional, but the
+state representation is large enough that repeated exact Bellman solves are no
+longer the best default.
 
-Use NNES when:
+## Quick Decision
 
-- choices are discrete and forward-looking;
-- rewards are parametric and structural;
-- transitions are known or estimated up front;
-- the state space is large enough that exact value iteration is unattractive;
-- you still need reward, policy, value, and counterfactual recovery.
+| Use NNES when | Prefer another estimator when |
+| --- | --- |
+| Choices are discrete and forward-looking. | The state-action space is small enough for NFXP or CCP. |
+| Transitions are known or can be estimated first. | Transition estimation is the main modeling problem. |
+| Rewards are parametric and structural. | The reward itself must be a black-box neural function. |
+| The value function needs a flexible approximation. | You need a fully exact tabular likelihood reference. |
+| Counterfactual policy analysis is central. | You only need fitted choice probabilities. |
 
-Avoid NNES when the reward itself is nonparametric, or when the state-action
-space is small enough that NFXP or CCP gives a simpler benchmark.
-
-## Basic Usage
+## Minimal Fit
 
 ```python
-import pandas as pd
+from econirl.datasets import load_rust_bus
+from econirl import NNES
 
-from econirl.estimators import NNES
-
-data = pd.read_csv("zurcher_bus.csv")
+df = load_rust_bus()
 
 model = NNES(
     n_states=90,
@@ -35,25 +33,52 @@ model = NNES(
     discount=0.9999,
     utility="linear_cost",
     bellman="npl",
+    hidden_dim=32,
+    num_layers=2,
+    v_epochs=500,
+    n_outer_iterations=3,
 )
-model.fit(data, state="mileage_bin", action="replaced", id="bus_id")
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
-print(model.summary())
+print(model.policy_.shape)
+print(model.v_network_.shape)
 ```
 
-Use `econirl.estimation.NNESEstimator` for the lower-level NPL implementation.
+Set `bellman="npl"` for the certified NNES path. Set `bellman="nfxp"` for the
+neural soft-Bellman diagnostic variant, which does not carry the same
+orthogonality claim.
 
-## Evidence
+## What Is Certified
 
-The reported known-truth evidence covers both the low-dimensional structural
-DGP and the high-dimensional structural DGP. The high-dimensional cell
-exercises encoded state features and a larger reward-feature basis.
+NNES is reported on low-dimensional and high-dimensional action-dependent
+known-truth DGPs. The high-dimensional cell is the primary validation because
+it uses encoded states and a richer reward-feature basis.
 
-The low-dimensional cell is the compact finite-state action-dependent benchmark.
-The high-dimensional cell keeps known reward, policy, value, and counterfactual
-truth while testing the neural value path on encoded states.
+| Evidence | Current state |
+| --- | --- |
+| Evidence scope | Known-truth low- and high-dimensional structural DDC cells. |
+| Primary cell | `canonical_high_action`. |
+| Machine-readable artifact | [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json). |
+| Release status | Certified with caveat. |
+| Counterfactual gates | Type A, Type B, and Type C are reported in the artifact. |
+| Public example | Uses `NNES` with `utility="linear_cost"` and `bellman="npl"`. |
 
-## Further Reading
+The caveat is the approximation boundary. The validation certifies recovery
+within the known-truth gates for the finite-dimensional structural reward and
+the NNES value-approximation path; it is not a claim that arbitrary neural
+reward models are identified.
 
-- Machine-readable artifact: [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json)
+## NNES Guide
+
+```{toctree}
+:maxdepth: 2
+
+nnes/context
+nnes/quick_start
+nnes/under_the_hood
+nnes/pre_estimation
+nnes/validation
+nnes/counterfactuals
+nnes/rust_bus
+```
