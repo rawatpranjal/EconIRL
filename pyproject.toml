@@ -77,7 +77,6 @@ include = [
     "pyproject.toml",
     "README.md",
     "LICENSE",
-    "CLAUDE.md",
 ]
 
 [tool.pytest.ini_options]

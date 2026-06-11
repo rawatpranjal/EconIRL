@@ -2269,7 +2269,7 @@ class EstimatorContract:
 
     name: str
     code_path: str
-    paper_paths: tuple[str, ...]
+    documentation_paths: tuple[str, ...]
     required_reward_modes: tuple[str, ...]
     required_state_modes: tuple[str, ...]
     requires_transitions: bool
@@ -2285,9 +2285,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "NFXP": EstimatorContract(
         name="NFXP",
         code_path="src/econirl/estimation/nfxp.py",
-        paper_paths=(
-            "internal_docs/estimators/nfxp.md",
-        ),
+        documentation_paths=("docs/estimators/nfxp.md",),
         required_reward_modes=("action_dependent",),
         required_state_modes=("low_dim",),
         requires_transitions=True,
@@ -2300,9 +2298,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "CCP": EstimatorContract(
         name="CCP",
         code_path="src/econirl/estimation/ccp.py",
-        paper_paths=(
-            "internal_docs/estimators/ccp.md",
-        ),
+        documentation_paths=("docs/estimators/ccp.md",),
         required_reward_modes=("action_dependent",),
         required_state_modes=("low_dim",),
         requires_transitions=True,
@@ -2315,9 +2311,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "MPEC": EstimatorContract(
         name="MPEC",
         code_path="src/econirl/estimation/mpec.py",
-        paper_paths=(
-            "internal_docs/estimators/mpec.md",
-        ),
+        documentation_paths=("docs/estimators/mpec.md",),
         required_reward_modes=("action_dependent",),
         required_state_modes=("low_dim",),
         requires_transitions=True,
@@ -2329,7 +2323,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "MCE-IRL": EstimatorContract(
         name="MCE-IRL",
         code_path="src/econirl/estimation/mce_irl.py",
-        paper_paths=("internal_docs/estimators/mce_irl.md",),
+        documentation_paths=("docs/estimators/mce_irl.md",),
         required_reward_modes=("action_dependent",),
         required_state_modes=("low_dim",),
         requires_transitions=True,
@@ -2342,9 +2336,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "MCE-IRL Deep": EstimatorContract(
         name="MCE-IRL Deep",
         code_path="src/econirl/estimators/mceirl_neural.py",
-        paper_paths=(
-            "internal_docs/estimators/deep_mce_irl.md",
-        ),
+        documentation_paths=("docs/estimators/deep_mce_irl.md",),
         required_reward_modes=("state_only", "action_dependent", "neural"),
         required_state_modes=("low_dim",),
         requires_transitions=True,
@@ -2362,7 +2354,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "TD-CCP": EstimatorContract(
         name="TD-CCP",
         code_path="src/econirl/estimation/td_ccp.py",
-        paper_paths=("internal_docs/estimators/tdccp.md",),
+        documentation_paths=("docs/estimators/tdccp.md",),
         required_reward_modes=("action_dependent",),
         required_state_modes=("low_dim", "high_dim"),
         requires_transitions=False,
@@ -2375,7 +2367,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "NNES": EstimatorContract(
         name="NNES",
         code_path="src/econirl/estimation/nnes.py",
-        paper_paths=("internal_docs/estimators/nnes.md",),
+        documentation_paths=("docs/estimators/nnes.md",),
         required_reward_modes=("action_dependent",),
         required_state_modes=("low_dim", "high_dim"),
         requires_transitions=True,
@@ -2388,7 +2380,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "SEES": EstimatorContract(
         name="SEES",
         code_path="src/econirl/estimation/sees.py",
-        paper_paths=("internal_docs/estimators/sees.md",),
+        documentation_paths=("docs/estimators/sees.md",),
         required_reward_modes=("action_dependent",),
         required_state_modes=("low_dim", "high_dim"),
         requires_transitions=True,
@@ -2400,7 +2392,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "GLADIUS": EstimatorContract(
         name="GLADIUS",
         code_path="src/econirl/estimation/gladius.py",
-        paper_paths=("internal_docs/estimators/gladius.md",),
+        documentation_paths=("docs/estimators/gladius.md",),
         required_reward_modes=("action_dependent", "state_only"),
         required_state_modes=("high_dim",),
         requires_transitions=True,
@@ -2418,7 +2410,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "IQ-Learn": EstimatorContract(
         name="IQ-Learn",
         code_path="src/econirl/estimation/iq_learn.py",
-        paper_paths=("internal_docs/estimators/iq_learn.md",),
+        documentation_paths=("docs/estimators/iq_learn.md",),
         required_reward_modes=("action_dependent", "state_only"),
         required_state_modes=("low_dim", "high_dim"),
         requires_transitions=True,
@@ -2431,7 +2423,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "AIRL": EstimatorContract(
         name="AIRL",
         code_path="src/econirl/estimation/adversarial/airl.py",
-        paper_paths=("internal_docs/estimators/airl.md",),
+        documentation_paths=("docs/estimators/airl.md",),
         required_reward_modes=("state_only", "action_dependent"),
         required_state_modes=("low_dim", "high_dim"),
         requires_transitions=False,
@@ -2448,9 +2440,9 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "AIRL-Het": EstimatorContract(
         name="AIRL-Het",
         code_path="src/econirl/estimation/adversarial/airl_het.py",
-        paper_paths=(
-            "internal_docs/estimators/airl.md",
-            "internal_docs/estimators/airl_het.md",
+        documentation_paths=(
+            "docs/estimators/airl.md",
+            "docs/estimators/airl_het.md",
         ),
         required_reward_modes=("state_only", "action_dependent"),
         required_state_modes=("low_dim", "high_dim"),
@@ -2465,7 +2457,7 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
     "f-IRL": EstimatorContract(
         name="f-IRL",
         code_path="src/econirl/estimation/f_irl.py",
-        paper_paths=("src/econirl/estimation/f_irl.py",),
+        documentation_paths=("docs/estimators/f_irl.md",),
         required_reward_modes=("action_dependent", "state_only"),
         required_state_modes=("low_dim",),
         requires_transitions=True,

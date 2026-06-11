@@ -419,7 +419,7 @@ def test_gladius_rust_bus():
     assert rmse < 1.0, f"GLADIUS Rust bus RMSE={rmse:.4f} exceeds tolerance 1.0"
 
     # Known limitation: GLADIUS in IRL setting overestimates operating cost
-    # by ~40% due to Q-identification-up-to-state-dependent-constant (see CLAUDE.md).
+    # by ~40% because Q is identified only up to a state-dependent constant.
     # But the policy direction should still be correct.
     low_mile_replace = float(result.policy[:10, 1].mean())
     high_mile_replace = float(result.policy[-10:, 1].mean())

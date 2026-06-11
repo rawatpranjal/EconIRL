@@ -42,6 +42,12 @@ docs/_build/
 # Local assistant/tool state
 .claude/
 .serena/
+CLAUDE.md
+AGENTS.md
+**/CLAUDE.md
+**/AGENTS.md
+/internal_docs/
+/roadmap.md
 
 # Secrets and local environment
 .env

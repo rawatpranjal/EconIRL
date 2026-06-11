@@ -49,7 +49,7 @@ def make_stochastic_transitions(transitions, noise=0.2):
 
 
 def run_diagnostics(panel, problem, utility):
-    """Print pre-estimation diagnostics per CLAUDE.md."""
+    """Print pre-estimation diagnostics for this showcase."""
     features = np.array(utility.feature_matrix)
     n_states = problem.num_states
     n_actions = problem.num_actions

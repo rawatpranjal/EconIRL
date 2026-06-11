@@ -154,7 +154,7 @@ def test_action_dependent_neural_reward_anchors_action_zero() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Identification diagnostics (per CLAUDE.md "Pre-Estimation Diagnostics")
+# Identification diagnostics
 # ---------------------------------------------------------------------------
 
 

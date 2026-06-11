@@ -242,7 +242,7 @@ def test_estimator_contract_registry_has_required_estimators():
     for name in REQUIRED_ESTIMATORS:
         contract = ESTIMATOR_CONTRACTS[name]
         assert contract.code_path
-        assert contract.paper_paths
+        assert contract.documentation_paths
         assert contract.recovers
 
 
