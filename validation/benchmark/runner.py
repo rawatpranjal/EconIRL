@@ -53,6 +53,31 @@ class EstimatorSpec:
     run: Callable[[DDCEnvironment, object], object]
 
 
+def _spec_names(env) -> list[str]:
+    """Parameter names for a linear spec built from the environment.
+
+    Uses the environment's own names when it has a finite-dimensional theta.
+    When it does not (e.g. a nonlinear-reward DGP whose ``parameter_names`` is
+    empty), fall back to one name per feature column so a linear-utility
+    estimator can still fit a misspecified linear approximation. Such cells
+    carry ``has_finite_theta=False``, so the runner reports only behavioral
+    metrics for them and never a (meaningless) parameter bias.
+    """
+    names = list(env.parameter_names)
+    if names:
+        return names
+    K = int(np.asarray(env.feature_matrix).shape[2])
+    return [f"theta_{i}" for i in range(K)]
+
+
+def _linear_utility(env) -> LinearUtility:
+    return LinearUtility(feature_matrix=env.feature_matrix, parameter_names=_spec_names(env))
+
+
+def _action_reward(env) -> ActionDependentReward:
+    return ActionDependentReward(env.feature_matrix, _spec_names(env))
+
+
 def _run_nfxp(env, panel):
     from econirl.estimation import NFXPEstimator
 
@@ -60,7 +85,7 @@ def _run_nfxp(env, panel):
         inner_solver="hybrid", inner_tol=1e-10, inner_max_iter=100000,
         compute_hessian=True, verbose=False,
     )
-    return est.estimate(panel, LinearUtility.from_environment(env),
+    return est.estimate(panel, _linear_utility(env),
                         env.problem_spec, env.transition_matrices)
 
 
@@ -68,7 +93,7 @@ def _run_ccp(env, panel):
     from econirl.estimation import CCPEstimator
 
     est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
-    return est.estimate(panel, LinearUtility.from_environment(env),
+    return est.estimate(panel, _linear_utility(env),
                         env.problem_spec, env.transition_matrices)
 
 
@@ -79,7 +104,7 @@ def _run_mpec(env, panel):
         config=MPECConfig(solver="slsqp", max_iter=200, constraint_tol=1e-6),
         compute_hessian=True, verbose=False,
     )
-    return est.estimate(panel, LinearUtility.from_environment(env),
+    return est.estimate(panel, _linear_utility(env),
                         env.problem_spec, env.transition_matrices)
 
 
@@ -90,8 +115,8 @@ def _run_mce_irl(env, panel):
         config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,
                             inner_max_iter=2000, compute_se=False, verbose=False)
     )
-    reward = ActionDependentReward(env.feature_matrix, env.parameter_names)
-    return est.estimate(panel, reward, env.problem_spec, env.transition_matrices)
+    return est.estimate(panel, _action_reward(env),
+                        env.problem_spec, env.transition_matrices)
 
 
 DEFAULT_ESTIMATORS: tuple[EstimatorSpec, ...] = (

@@ -34,12 +34,14 @@ exclude_patterns = [
     "archive/**",
     "estimators/sees.md",
     "estimators/sees/**",
+    # Auto-generated partials are pulled in via {include}, not built as pages.
+    "_generated/**",
 ]
 
 # -- Options for HTML output -------------------------------------------------
 
 html_theme = "sphinx_rtd_theme"
-html_static_path = []
+html_static_path = ["_static"]
 
 html_theme_options = {
     "collapse_navigation": False,
