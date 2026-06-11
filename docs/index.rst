@@ -62,5 +62,4 @@ Output
    estimators
    user_guide/api_design
    references
-   user_guide/validation
    simulation_studies/index

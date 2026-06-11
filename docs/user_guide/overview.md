@@ -57,7 +57,7 @@ Output
 | I need a tabular DDC baseline. | Use [NFXP](../estimators/nfxp.md). |
 | I need to compare methods. | Use the [estimator map](../estimators.md). |
 | I need to understand the API shape. | Read [API design](api_design.md). |
-| I need to understand simulation-study evidence. | Read [simulation studies](validation.md). |
+| I need to understand simulation-study evidence. | Read [simulation studies](../simulation_studies/index.md). |
 
 ## Latest Updates
 

@@ -30,5 +30,4 @@ taxi_gridworld
 abstract_mdp_1_sanity
 abstract_mdp_2_harder
 abstract_mdp_3_highdim
-cross_estimator_ladder
 ```
