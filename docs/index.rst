@@ -61,4 +61,5 @@ Output
    user_guide/overview
    estimators
    user_guide/api_design
+   references
    user_guide/validation

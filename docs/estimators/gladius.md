@@ -7,6 +7,11 @@ reward back onto structural features. The reported evidence uses a stable
 anchor-moment Q loss for synthetic cells. The literal bi-conjugate minimax
 mode remains available for method research.
 
+## Source Papers
+
+This page draws on {ref}`Kang, Yoganarasimhan, and Jain (2025) <kang-2025>`
+for the GLADIUS/offline IRL-DDC objective.
+
 ## When to Use
 
 Use GLADIUS when:

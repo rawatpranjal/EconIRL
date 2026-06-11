@@ -9,6 +9,12 @@ action-dependent rewards and an EM loop to recover segment membership.
 The current evidence is tied to a serialized-content DGP with repeated
 observations per user, not to a generic one-trajectory-per-agent IRL problem.
 
+## Source Papers
+
+This page draws on {ref}`Fu, Luo, and Levine (2018) <fu-2018>` for AIRL and
+{ref}`Lee, Sudhir, and Wang (2026) <lee-sudhir-wang-2026>` for the
+serialized-content dynamic choice setting.
+
 ## When to Use
 
 Use AIRL-Het when:

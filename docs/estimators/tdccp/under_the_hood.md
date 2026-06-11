@@ -22,21 +22,6 @@ and `g`, the future choice-shock recursion. The preliminary estimator solves a
 CCP pseudo likelihood. The reported inference path then solves the
 cross-fitted locally robust moment equation and averages fold estimates.
 
-## Pseudocode
-
-```text
-Given panel, reward features, discount, basis functions, and fold splits
-Estimate first-stage CCPs from observed actions
-For each fold:
-    Learn h(a, x) by projected TD on reward features
-    Learn g(a, x) by projected TD on log-CCP shock corrections
-    Solve the preliminary CCP pseudo likelihood for theta
-    Learn the correction recursion for first-stage error
-    Solve the held-out locally robust moment equation
-Average fold estimates and compute clustered standard errors
-Return theta, standard errors, continuation diagnostics, and policy objects
-```
-
 ## Model Objects
 
 The observed panel supplies current and next state-action tuples.
@@ -80,6 +65,21 @@ g(a, x) =
 \beta E[e(a', x') + g(a', x') \mid a, x],
 \quad e(a, x) = \gamma_E - \log P(a \mid x)
 $$
+
+## Pseudocode
+
+```text
+Input: panel, reward features, discount, basis functions, and fold splits
+Estimate first-stage CCPs from observed actions
+for each fold:
+    learn h(a, x) by projected TD on reward features
+    learn g(a, x) by projected TD on log-CCP shock corrections
+    solve the preliminary CCP pseudo likelihood for theta
+    learn the correction recursion for first-stage error
+    solve the held-out locally robust moment equation
+Average fold estimates and compute clustered standard errors
+return theta, standard errors, continuation diagnostics, and policy objects
+```
 
 ## Estimation Flow
 

@@ -15,6 +15,12 @@ reported study is narrower and more precise: a finite reward parameter vector
 is recovered in a synthetic data simulation with the locally robust, cross-fitted
 estimator described in the TD-CCP paper.
 
+## Source Papers
+
+This page draws on {ref}`Adusumilli and Eckardt (2025)
+<adusumilli-eckardt-2025>` for TD-CCP and on {ref}`Hotz and Miller (1993)
+<hotz-miller-1993>` for the CCP foundation.
+
 ## When To Use It
 
 Use TD-CCP when choices are discrete, agents are forward-looking, and you have

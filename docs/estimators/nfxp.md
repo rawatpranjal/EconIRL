@@ -8,6 +8,13 @@ Start here for a small or moderate tabular dynamic discrete choice problem.
 The page tree below replaces the old primer document as the public
 documentation surface.
 
+## Source Papers
+
+This page draws on {ref}`Rust (1987) <rust-1987>` for the canonical dynamic
+replacement model and nested fixed-point estimation, and on
+{ref}`Iskhakov et al. (2016) <iskhakov-2016>` for the computational comparison
+with constrained optimization.
+
 ## Quick Decision
 
 | Use NFXP when | Prefer another estimator when |

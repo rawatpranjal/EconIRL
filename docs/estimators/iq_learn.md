@@ -9,6 +9,11 @@ imitation quality and Q-based diagnostics.
 Use the structural estimators when the project requires reported
 counterfactual policy evidence.
 
+## Source Papers
+
+This page draws on {ref}`Garg et al. (2021) <garg-2021>` for IQ-Learn and
+inverse soft-Q learning.
+
 ## When to Use
 
 Use IQ-Learn when:

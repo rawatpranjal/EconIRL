@@ -10,6 +10,11 @@ first, and the value function can be represented well by a sieve. It is the
 deterministic-basis counterpart to MPEC and the nearest stepping stone before
 NNES.
 
+## Source Papers
+
+This page draws on {ref}`Luo and Sang (2024) <luo-sang-2024>` for sieve-based
+structural estimation.
+
 ## Quick Decision
 
 | Use SEES when | Prefer another estimator when |

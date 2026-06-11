@@ -8,6 +8,12 @@ action-dependent reward features supplied by the user.
 Use this page for finite-dimensional tabular IRL. Use Deep MCE-IRL when the
 target is a neural reward map instead of a fixed feature vector.
 
+## Source Papers
+
+This page draws on {ref}`Ziebart et al. (2008) <ziebart-2008>` for
+maximum-entropy IRL and {ref}`Ziebart (2010) <ziebart-2010>` for the maximum
+causal entropy formulation.
+
 ## Quick Decision
 
 | Use MCE-IRL when | Prefer another estimator when |

@@ -9,6 +9,11 @@ state-only reward.
 Action-dependent DDC examples are comparison exercises in the current package.
 The supported structural target is state-marginal reward recovery.
 
+## Source Papers
+
+This page draws on {ref}`Ni et al. (2020) <ni-2020>` for f-IRL and
+state-marginal matching.
+
 ## When to Use
 
 Use f-IRL when:

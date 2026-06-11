@@ -169,12 +169,63 @@ def test_estimator_navigation_is_owned_by_estimators_page() -> None:
     assert "Structural Econometrics" not in estimator_overview
     assert "Inverse Reinforcement Learning" not in estimator_overview
     assert "```{toctree}" in estimator_overview
+    assert "   references\n" in index
     assert api_design.startswith("# API Design\n")
     assert "Problem Setup and API Design" not in api_design
 
 
-def test_under_the_hood_pages_start_with_optimization_and_pseudocode() -> None:
-    """Keep estimator internals pages algorithm-first."""
+def test_estimator_pages_name_source_papers_up_front() -> None:
+    """Keep estimator pages explicit about the papers they draw from."""
+
+    pages = [
+        page
+        for page in sorted((DOCS / "estimators").glob("*.md"))
+        if not _is_excluded_from_rtd(page)
+    ]
+    assert pages
+
+    first_content_markers = [
+        "## Quick Decision",
+        "## When to Use",
+        "## When To Use It",
+        "## Basic Usage",
+        "## Questions NNES Answers",
+        "## Simulation Study",
+        "## Evidence",
+    ]
+
+    offenders = []
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        source_pos = text.find("## Source Papers")
+        if source_pos == -1:
+            offenders.append(f"{page.relative_to(ROOT)}: missing Source Papers")
+            continue
+
+        first_marker_pos = min(
+            (
+                pos
+                for marker in first_content_markers
+                if (pos := text.find(marker)) != -1
+            ),
+            default=-1,
+        )
+        if first_marker_pos != -1 and source_pos > first_marker_pos:
+            offenders.append(
+                f"{page.relative_to(ROOT)}: Source Papers must be near the top"
+            )
+
+        source_section = _section_body(text, source_pos)
+        if "{ref}`" not in source_section:
+            offenders.append(
+                f"{page.relative_to(ROOT)}: Source Papers must link to references"
+            )
+
+    assert offenders == []
+
+
+def test_under_the_hood_pages_order_model_before_pseudocode() -> None:
+    """Keep internals pages in setup, model, pseudocode order."""
 
     pages = sorted((DOCS / "estimators").glob("*/under_the_hood.md"))
     assert pages
@@ -186,25 +237,72 @@ def test_under_the_hood_pages_start_with_optimization_and_pseudocode() -> None:
     for page in pages:
         text = page.read_text(encoding="utf-8")
         setup_pos = text.find("## Optimization Setup")
+        model_match = re.search(
+            r"^## Model(?: Objects)?\s*$", text, flags=re.MULTILINE
+        )
+        model_pos = model_match.start() if model_match else -1
         pseudocode_pos = text.find("## Pseudocode")
         if setup_pos == -1:
             offenders.append(f"{page.relative_to(ROOT)}: missing Optimization Setup")
             continue
+        if model_pos == -1:
+            offenders.append(f"{page.relative_to(ROOT)}: missing Model section")
+            continue
         if pseudocode_pos == -1:
             offenders.append(f"{page.relative_to(ROOT)}: missing Pseudocode")
             continue
-        if setup_pos > pseudocode_pos:
-            offenders.append(f"{page.relative_to(ROOT)}: setup must precede pseudocode")
+        if not setup_pos < model_pos < pseudocode_pos:
+            offenders.append(
+                f"{page.relative_to(ROOT)}: expected setup, model, pseudocode order"
+            )
         if not pseudocode_block.search(text):
             offenders.append(f"{page.relative_to(ROOT)}: missing text pseudocode block")
 
     assert offenders == []
 
 
+def test_references_page_is_in_public_navigation() -> None:
+    """Keep source-paper citations reachable from RTD."""
+
+    index = (DOCS / "index.rst").read_text(encoding="utf-8")
+    references = (DOCS / "references.md").read_text(encoding="utf-8")
+    expected_ids = [
+        "rust-1987",
+        "hotz-miller-1993",
+        "aguirregabiria-mira-2002",
+        "su-judd-2012",
+        "iskhakov-2016",
+        "luo-sang-2024",
+        "nguyen-2025",
+        "adusumilli-eckardt-2025",
+        "ziebart-2008",
+        "ziebart-2010",
+        "wulfmeier-2015",
+        "fu-2018",
+        "lee-sudhir-wang-2026",
+        "ni-2020",
+        "garg-2021",
+        "kang-2025",
+        "kim-2021",
+        "cao-2021",
+    ]
+
+    missing_ids = [
+        reference_id
+        for reference_id in expected_ids
+        if f"({reference_id})=" not in references
+    ]
+
+    assert "   references\n" in index
+    assert references.startswith("# References\n")
+    assert missing_ids == []
+
+
 def _public_doc_sources() -> list[Path]:
     roots = [
         DOCS / "index.rst",
         DOCS / "estimators.md",
+        DOCS / "references.md",
         DOCS / "estimators",
         DOCS / "user_guide",
     ]
@@ -270,3 +368,13 @@ def _intro_before_first_subheading(page: Path) -> str:
         if saw_title:
             intro.append(line)
     return "\n".join(intro)
+
+
+def _section_body(text: str, heading_pos: int) -> str:
+    body_start = text.find("\n", heading_pos)
+    if body_start == -1:
+        return ""
+    next_heading = text.find("\n## ", body_start + 1)
+    if next_heading == -1:
+        return text[body_start:]
+    return text[body_start:next_heading]

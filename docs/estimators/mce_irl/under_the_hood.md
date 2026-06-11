@@ -15,22 +15,6 @@ policy and occupancy measure, and compares model feature expectations with
 demonstrated feature expectations. The public simulation path solves the root
 feature-matching equation.
 
-## Pseudocode
-
-```text
-Input: demonstrations, reward features, transitions, discount beta, sigma
-Compute demonstrated feature expectations mu_E
-Choose an initial reward parameter vector theta
-while the feature residual is not small:
-    form r_theta(s, a) = phi(s, a)' theta
-    solve the soft Bellman equation for V_theta
-    compute pi_theta(a | s) from the soft choice-specific values
-    compute the occupancy measure induced by pi_theta
-    compute model feature expectations mu_theta
-    update theta to reduce mu_theta - mu_E
-return theta, reward table, pi_theta, V_theta, and diagnostics
-```
-
 ## Model
 
 The observed data are state, action, and next-state trajectories.
@@ -82,6 +66,22 @@ The simulation path solves:
 $$
 \mu_\theta - \mu_E = 0.
 $$
+
+## Pseudocode
+
+```text
+Input: demonstrations, reward features, transitions, discount beta, sigma
+Compute demonstrated feature expectations mu_E
+Choose an initial reward parameter vector theta
+while the feature residual is not small:
+    form r_theta(s, a) = phi(s, a)' theta
+    solve the soft Bellman equation for V_theta
+    compute pi_theta(a | s) from the soft choice-specific values
+    compute the occupancy measure induced by pi_theta
+    compute model feature expectations mu_theta
+    update theta to reduce mu_theta - mu_E
+return theta, reward table, pi_theta, V_theta, and diagnostics
+```
 
 ## Implementation Notes
 

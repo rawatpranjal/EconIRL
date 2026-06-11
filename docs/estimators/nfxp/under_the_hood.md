@@ -19,21 +19,6 @@ conditional log likelihood of the observed actions. The public simulation path
 uses the hybrid Bellman solver inside the likelihood and the configured outer
 optimizer for `theta`.
 
-## Pseudocode
-
-```text
-Input: panel, reward features, transitions, discount beta, shock scale sigma
-Choose an initial reward parameter vector theta
-while the outer optimizer has not stopped:
-    form u_theta(s, a) = phi(s, a)' theta
-    solve the soft Bellman fixed point V_theta = T_theta(V_theta)
-    compute Q_theta(s, a) from u_theta, transitions, beta, and V_theta
-    compute pi_theta(a | s) by the soft-max rule
-    evaluate sum_{i,t} log pi_theta(a_it | s_it)
-    pass the likelihood value and derivatives to the optimizer
-return theta, pi_theta, V_theta, standard errors, and diagnostics
-```
-
 ## Model
 
 The observed data are state, action, and next-state trajectories.
@@ -90,6 +75,21 @@ $$
 \hat{\theta}
 = \arg\max_\theta \sum_{i,t} \log \pi_\theta(a_{it} \mid s_{it})
 $$
+
+## Pseudocode
+
+```text
+Input: panel, reward features, transitions, discount beta, shock scale sigma
+Choose an initial reward parameter vector theta
+while the outer optimizer has not stopped:
+    form u_theta(s, a) = phi(s, a)' theta
+    solve the soft Bellman fixed point V_theta = T_theta(V_theta)
+    compute Q_theta(s, a) from u_theta, transitions, beta, and V_theta
+    compute pi_theta(a | s) by the soft-max rule
+    evaluate sum_{i,t} log pi_theta(a_it | s_it)
+    pass the likelihood value and derivatives to the optimizer
+return theta, pi_theta, V_theta, standard errors, and diagnostics
+```
 
 ## Implementation Notes
 

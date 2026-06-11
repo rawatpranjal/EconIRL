@@ -18,21 +18,6 @@ the observed actions. The Bellman equation is imposed as an equality
 constraint rather than solved inside each likelihood evaluation. The public
 simulation path uses the constrained SQP likelihood formulation.
 
-## Pseudocode
-
-```text
-Input: panel, reward features, transitions, discount beta, shock scale sigma
-Choose initial reward parameters theta and value vector V
-Define the equality constraint g(theta, V) = V - T_theta(V)
-while the constrained optimizer has not stopped:
-    compute Q_{theta,V}(s, a) from theta, transitions, beta, and V
-    compute pi_{theta,V}(a | s) by the soft-max rule
-    evaluate the log likelihood of observed actions
-    evaluate g(theta, V) and its derivatives
-    update theta and V with the constrained optimizer
-return theta, V, pi, standard errors, and constraint diagnostics
-```
-
 ## Model
 
 The observed data are state, action, and next-state trajectories.
@@ -99,6 +84,21 @@ $$
 \quad \text{s.t.} \quad
 V = T_\theta(V)
 $$
+
+## Pseudocode
+
+```text
+Input: panel, reward features, transitions, discount beta, shock scale sigma
+Choose initial reward parameters theta and value vector V
+Define the equality constraint g(theta, V) = V - T_theta(V)
+while the constrained optimizer has not stopped:
+    compute Q_{theta,V}(s, a) from theta, transitions, beta, and V
+    compute pi_{theta,V}(a | s) by the soft-max rule
+    evaluate the log likelihood of observed actions
+    evaluate g(theta, V) and its derivatives
+    update theta and V with the constrained optimizer
+return theta, V, pi, standard errors, and constraint diagnostics
+```
 
 ## Implementation Notes
 

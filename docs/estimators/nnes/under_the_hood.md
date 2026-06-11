@@ -18,38 +18,6 @@ likelihood, and the value network is trained against the same continuation
 target. The network supports the approximation path; the structural estimate
 remains `theta`.
 
-## Pseudocode
-
-```text
-Given panel, reward features, transitions, state encoder, and value network
-Initialize theta, CCPs, and value-network parameters
-Repeat for the configured outer NPL iterations:
-    Solve or profile the continuation terms for the current CCPs
-    Train the value network on the profiled value target
-    Build Q_theta(s, a) from reward and continuation terms
-    Maximize the structural likelihood over theta
-    Update CCPs from the implied policy
-Return theta, policy, value approximation, standard errors, and diagnostics
-```
-
-## Operational Loop
-
-1. Supply panel trajectories and either estimate or provide the transition
-   law.
-2. Keep the reward finite-dimensional, initialize structural parameters, and
-   initialize the value network.
-3. Use the value network to form continuation values and choice-specific
-   values for each state-action pair.
-4. Update choice probabilities and fit the structural likelihood along the
-   NPL Bellman path.
-5. Repeat the outer loop, then report reward parameters, standard errors,
-   policy, value, Q, likelihood, and value-network diagnostics.
-
-The important operational difference from NFXP is where the computation sits.
-NFXP solves the exact Bellman fixed point inside each likelihood evaluation.
-NNES trains a neural nuisance value object and uses that approximation inside
-the policy-iteration likelihood path.
-
 ## Model
 
 The observed data are state, action, and next-state trajectories.
@@ -94,6 +62,38 @@ iterations.
 The value network is an approximation target, not the structural reward. The
 structural object remains `theta`; the network parameters are nuisance
 parameters used to represent the continuation value.
+
+## Pseudocode
+
+```text
+Input: panel, reward features, transitions, state encoder, and value network
+Initialize theta, CCPs, and value-network parameters
+for each configured outer NPL iteration:
+    solve or profile the continuation terms for the current CCPs
+    train the value network on the profiled value target
+    build Q_theta(s, a) from reward and continuation terms
+    maximize the structural likelihood over theta
+    update CCPs from the implied policy
+return theta, policy, value approximation, standard errors, and diagnostics
+```
+
+## Operational Loop
+
+1. Supply panel trajectories and either estimate or provide the transition
+   law.
+2. Keep the reward finite-dimensional, initialize structural parameters, and
+   initialize the value network.
+3. Use the value network to form continuation values and choice-specific
+   values for each state-action pair.
+4. Update choice probabilities and fit the structural likelihood along the
+   NPL Bellman path.
+5. Repeat the outer loop, then report reward parameters, standard errors,
+   policy, value, Q, likelihood, and value-network diagnostics.
+
+The important operational difference from NFXP is where the computation sits.
+NFXP solves the exact Bellman fixed point inside each likelihood evaluation.
+NNES trains a neural nuisance value object and uses that approximation inside
+the policy-iteration likelihood path.
 
 ## Finite-State Profiled Path
 

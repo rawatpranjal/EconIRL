@@ -10,6 +10,12 @@ estimated first, and empirical action support is strong. Use NFXP when you need
 the most direct likelihood reference or when the first-stage policy is too
 sparse for stable inversion.
 
+## Source Papers
+
+This page draws on {ref}`Hotz and Miller (1993) <hotz-miller-1993>` for CCP
+inversion and {ref}`Aguirregabiria and Mira (2002)
+<aguirregabiria-mira-2002>` for nested pseudo-likelihood iteration.
+
 ## Quick Decision
 
 | Use CCP when | Prefer another estimator when |

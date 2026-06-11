@@ -19,21 +19,6 @@ penalty keeps the approximated dynamic object close to a Bellman-consistent
 solution. The public simulation path uses the `value` mode unless another
 mode is explicitly selected for diagnostics.
 
-## Pseudocode
-
-```text
-Given panel, reward features, transitions, basis functions, and penalty weight
-Initialize theta and sieve coefficients
-Optionally build deterministic theta starts
-For each start:
-    Compute the approximated value or Q object from the basis
-    Compute choice probabilities and the log likelihood
-    Compute the Bellman residual penalty
-    Optimize theta and sieve coefficients jointly
-Select the best penalized objective
-Return theta, sieve object, policy, value function, standard errors, and diagnostics
-```
-
 ## Model
 
 The observed data are state, action, and next-state trajectories.
@@ -88,6 +73,21 @@ multistart before the joint theta-alpha optimization. Set
 `num_theta_starts > 1` to include the supplied start, a static-logit start,
 and neutral variants; the selected fit is the one with the best penalized
 criterion.
+
+## Pseudocode
+
+```text
+Input: panel, reward features, transitions, basis functions, and penalty weight
+Initialize theta and sieve coefficients
+Optionally build deterministic theta starts
+for each start:
+    compute the approximated value or Q object from the basis
+    compute choice probabilities and the log likelihood
+    compute the Bellman residual penalty
+    optimize theta and sieve coefficients jointly
+Select the best penalized objective
+return theta, sieve object, policy, value function, standard errors, and diagnostics
+```
 
 ## Solution Modes
 

@@ -9,6 +9,12 @@ reward-map recovery over supplied state encodings and known transitions.
 The study evaluates the recovered reward matrix, not the raw neural network
 weights.
 
+## Source Papers
+
+This page draws on {ref}`Ziebart (2010) <ziebart-2010>` for maximum causal
+entropy IRL and {ref}`Wulfmeier, Ondruska, and Posner (2015)
+<wulfmeier-2015>` for neural maximum-entropy reward learning.
+
 ## When to Use
 
 Use Deep MCE-IRL when:

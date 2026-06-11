@@ -9,6 +9,11 @@ state-only AIRL identification setting.
 Use AIRL-Het, not plain AIRL, for the anchored heterogeneous action-dependent
 surface.
 
+## Source Papers
+
+This page draws on {ref}`Fu, Luo, and Levine (2018) <fu-2018>` for adversarial
+inverse reinforcement learning.
+
 ## When to Use
 
 Use AIRL when:

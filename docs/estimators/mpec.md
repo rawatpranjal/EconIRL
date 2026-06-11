@@ -10,6 +10,12 @@ space is moderate and you want to inspect Bellman constraint violations
 directly. It targets the same tabular structural object as NFXP and CCP, but
 uses a different numerical representation of the fixed point.
 
+## Source Papers
+
+This page draws on {ref}`Su and Judd (2012) <su-judd-2012>` for the MPEC
+formulation and {ref}`Iskhakov et al. (2016) <iskhakov-2016>` for the
+computational comparison with NFXP.
+
 ## Quick Decision
 
 | Use MPEC when | Prefer another estimator when |

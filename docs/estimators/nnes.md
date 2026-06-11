@@ -9,6 +9,12 @@ Use NNES when the reward is still structural and finite-dimensional, but the
 state representation is large, encoded, smooth, or multi-dimensional enough
 that repeated exact Bellman solves are no longer the best default.
 
+## Source Papers
+
+This page draws on {ref}`Nguyen (2025) <nguyen-2025>` for NNES and uses the
+CCP/NPL logic of {ref}`Hotz and Miller (1993) <hotz-miller-1993>` and
+{ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>`.
+
 ## Questions NNES Answers
 
 **What can NNES do that NFXP cannot do comfortably?** NFXP is the exact

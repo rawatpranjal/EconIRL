@@ -18,20 +18,6 @@ optimizes a multinomial logit pseudo likelihood in `theta`. In NPL mode, the
 estimated `theta` implies a new policy, and the continuation terms are rebuilt
 for the next iteration.
 
-## Pseudocode
-
-```text
-Input: panel, reward features, transitions, discount beta, shock scale sigma
-Estimate empirical CCPs pi_hat(a | s) from observed state-action counts
-for each configured NPL iteration:
-    build F_pi(s, s_next) = sum_a pi(a | s) P_a(s, s_next)
-    solve Hotz-Miller continuation terms W_phi and W_e
-    build augmented logit features from phi, W_phi, and W_e
-    maximize the pseudo likelihood over theta
-    compute Q_tilde(s, a) and update pi(a | s)
-return theta, pi, value function, standard errors, and diagnostics
-```
-
 ## Model
 
 The observed data are state, action, and next-state trajectories.
@@ -86,6 +72,20 @@ Q_tilde(s, a) = phi(s, a) theta
 NPL repeats two steps. Given a policy, estimate parameters by logit
 pseudo-likelihood. Given parameters, update the policy from the implied
 choice-specific values.
+
+## Pseudocode
+
+```text
+Input: panel, reward features, transitions, discount beta, shock scale sigma
+Estimate empirical CCPs pi_hat(a | s) from observed state-action counts
+for each configured NPL iteration:
+    build F_pi(s, s_next) = sum_a pi(a | s) P_a(s, s_next)
+    solve Hotz-Miller continuation terms W_phi and W_e
+    build augmented logit features from phi, W_phi, and W_e
+    maximize the pseudo likelihood over theta
+    compute Q_tilde(s, a) and update pi(a | s)
+return theta, pi, value function, standard errors, and diagnostics
+```
 
 ## Implementation Notes
 
