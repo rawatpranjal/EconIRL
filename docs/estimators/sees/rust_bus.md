@@ -19,19 +19,12 @@ model = SEES(
     utility="linear_cost",
     basis_type="fourier",
     basis_dim=8,
-    penalty_weight=0.01,
+    penalty_weight=10.0,
 )
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
 print(model.policy_[[0, 20, 40, 60, 80], 1])
-```
-
-Output
-
-```text
-{'theta_c': -0.006116096477516279, 'RC': 3.1677777161163605}
-[0.04039647 0.05791052 0.07768549 0.07905037 0.05619696]
 ```
 
 ## Interpretation
@@ -61,7 +54,7 @@ print(summary.parameters)
 print(summary.metadata["bellman_violation"])
 ```
 
-Output from the low-dimensional validation objects:
+Output from the low-dimensional simulation-study objects:
 
 ```text
 [ 0.084825  0.526234 -0.011571 -0.203976]
@@ -71,6 +64,6 @@ Output from the low-dimensional validation objects:
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The reported validation evidence is the known-truth artifact,
+replication. The reported simulation-study evidence is the simulation results file,
 which has known reward, policy, value, Q, and counterfactual oracle objects.
-See [Validation](validation.md) for that evidence path.
+See [Simulation Study](validation.md) for that evidence path.

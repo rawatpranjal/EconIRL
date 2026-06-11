@@ -50,10 +50,16 @@ separate from imitation accuracy.
 IQ-Learn is available as a research preview. The current evidence is strongest
 for imitation and Q diagnostics rather than full structural reward recovery.
 
-The low- and high-dimensional action-dependent DGPs are known-truth dynamic
+The low- and high-dimensional action-dependent DGPs are synthetic dynamic
 choice benchmarks with action-specific rewards; the high-dimensional version
 uses encoded states. The state-only diagnostic removes action-varying rewards.
+The machine-readable results file records expert state and state-action coverage as
+hard gates. Treat recovered rewards and counterfactuals as diagnostics unless
+`summary.metadata["expert_state_coverage"] == 1.0` and
+`summary.metadata["expert_state_action_coverage"] >= 0.95`, and all structural
+recovery gates pass. Sparse support is a warning, not evidence for structural
+counterfactual validity.
 
 ## Further Reading
 
-- Machine-readable artifact: [iq_learn_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/iq_learn/iq_learn_results.json)
+- Machine-readable results file: [iq_learn_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/iq_learn/iq_learn_results.json)

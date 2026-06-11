@@ -58,4 +58,4 @@ AIRL-Het in the current documentation.
 
 ## Further Reading
 
-- Machine-readable artifact: [airl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/airl/airl_results.json)
+- Machine-readable results file: [airl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/airl/airl_results.json)

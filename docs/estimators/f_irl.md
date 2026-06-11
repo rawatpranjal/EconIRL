@@ -14,7 +14,7 @@ The supported structural target is state-marginal reward recovery.
 Use f-IRL when:
 
 - the reward target is state-only;
-- state marginal matching is the right validation surface;
+- state marginal matching is the study question;
 - transitions are available for policy evaluation;
 - you want an f-divergence IRL baseline rather than a likelihood-based DDC
   estimator.
@@ -47,7 +47,7 @@ state-action comparison exercise.
 
 ## Evidence
 
-The current validation target is the paper-faithful state-marginal f-IRL DGP.
+The current simulation study uses the paper-faithful state-marginal f-IRL DGP.
 That is the structural scope reported by this page.
 
 The state-marginal f-IRL DGP uses state-only rewards and state-marginal
@@ -55,4 +55,4 @@ matching.
 
 ## Further Reading
 
-- Machine-readable artifact: [f_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/f_irl/f_irl_results.json)
+- Machine-readable results file: [f_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/f_irl/f_irl_results.json)

@@ -5,7 +5,7 @@ future-utility terms that enter the CCP likelihood. Then it estimates the
 reward parameters using those learned terms.
 
 The important boundary is that known transition tensors are not used to
-estimate `theta`. They may be used later for artifact checks, policy
+estimate `theta`. They may be used later for results file checks, policy
 evaluation, or counterfactual analysis.
 
 ## Model Objects
@@ -66,7 +66,7 @@ The reported EconIRL path follows the semigradient version of the paper.
 
 The correction recursion is the paper's `lambda` object. The held-out moment
 equation is the paper's `zeta` moment. EconIRL records both diagnostics in the
-simulation artifact, but the user-facing interpretation is simple: they correct
+simulation results file, but the user-facing interpretation is simple: they correct
 for first-stage estimation error and support valid standard errors.
 
 ## Semigradient and AVI

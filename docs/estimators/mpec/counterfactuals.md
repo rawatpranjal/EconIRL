@@ -3,7 +3,7 @@
 MPEC estimates structural reward parameters and a value function, but it does
 not currently expose the same one-call dataframe wrapper `counterfactual`
 method as NFXP and CCP. Counterfactual evidence therefore comes from the
-known-truth simulation harness.
+simulation harness.
 
 The harness re-solves the structural model under intervention-specific oracle
 objects and compares MPEC's recovered structural object to those oracle
@@ -11,7 +11,7 @@ solutions.
 
 ## Counterfactual Families
 
-The known-truth simulation harness evaluates three broader counterfactual
+The simulation harness evaluates three broader counterfactual
 families against oracle solutions.
 
 | Type | Intervention | Purpose |
@@ -22,7 +22,7 @@ families against oracle solutions.
 
 ## Reported Results
 
-These rows come from the same known-truth artifact used on the
+These rows come from the same simulation results file used on the
 [simulation study page](validation.md).
 
 | Counterfactual | Policy TV | Policy KL | Value RMSE | Regret |

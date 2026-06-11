@@ -17,7 +17,7 @@ model = SEES(
     solution="value",
     basis_type="fourier",
     basis_dim=8,
-    penalty_weight=0.01,
+    penalty_weight=10.0,
     num_theta_starts=1,
     max_iter=500,
 )
@@ -29,22 +29,15 @@ print(model.policy_.shape)
 print(model.alpha_.shape)
 ```
 
-Output
-
-```text
-{'theta_c': -0.006116096477516279, 'RC': 3.1677777161163605}
-{'theta_c': 0.0034203120881012004, 'RC': 0.13696627998075603}
-(90, 2)
-(8,)
-```
-
 The fitted wrapper exposes the structural parameter estimates, standard
 errors, estimated policy, value function, transition estimate, and sieve
 coefficients. The default `solution="value"` is V-SEES. The wrapper also
 accepts `solution="q"`, `solution="ev"`, `solution="policy"`, and
 `solution="collocation"` for alternative Bellman-SEES formulations.
 Use `num_theta_starts > 1` when the finite-sample objective is sensitive to
-the initial structural parameters.
+the initial structural parameters. Treat this wrapper example as a smoke path;
+the simulation-study page reports the synthetic cells with explicit
+finite-state penalty weights.
 
 | Attribute | Meaning |
 | --- | --- |
@@ -58,7 +51,7 @@ the initial structural parameters.
 ## Lower-Level Control
 
 Use `econirl.estimation.sees.SEESEstimator` when the model already has
-package-native objects or when the validation surface needs exact control over
+package-native objects or when the simulation study needs exact control over
 the basis and penalty.
 
 ```python
@@ -79,12 +72,12 @@ print(summary.parameters)
 print(summary.metadata["bellman_violation"])
 ```
 
-Output from the low-dimensional validation objects:
+Output from the low-dimensional simulation-study objects:
 
 ```text
 [ 0.084825  0.526234 -0.011571 -0.203976]
 5.826541219988712e-05
 ```
 
-The known-truth validation uses the lower-level API because it supplies the
+The synthetic data simulation uses the lower-level API because it supplies the
 true DDC problem, transition tensor, and reward specification directly.

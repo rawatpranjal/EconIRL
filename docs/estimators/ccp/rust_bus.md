@@ -49,6 +49,6 @@ states relative to a lower replacement-cost counterfactual.
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The reported simulation study uses a known-truth cell, where
+replication. The reported simulation study uses a synthetic cell, where
 reward, policy, value, Q, and counterfactual oracle objects are available for
 comparison.

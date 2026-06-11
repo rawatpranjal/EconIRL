@@ -1,6 +1,6 @@
 # Simulation Study
 
-The TD-CCP simulation study is built around one known-truth case:
+The TD-CCP simulation study is built around one synthetic case:
 `shapeshifter_encoded_state_locally_robust`. The case uses encoded state
 features and a finite linear reward, so the true reward parameters are known.
 The simulation asks whether the cross-fitted, locally robust semigradient path
@@ -9,11 +9,18 @@ behavior, and usable standard errors. Real data cannot answer that question
 because the true reward, policy, value function, Q function, counterfactual
 oracles, and repeated-seed coverage behavior are not observed.
 
+The simulation harness generates a finite panel of state, action, next-state,
+and encoded-state-feature observations before estimation. The estimator sees
+those generated tuples and the finite reward basis, not the transition law or
+the oracle reward, policy, value function, Q function, counterfactual outcomes,
+or repeated-seed coverage behavior. Those truth objects are held back for
+evaluation.
+
 The result generator is
 [`tdccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_run.py).
 It writes the rendered table source
 [`tdccp_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.tex)
-and the machine-readable artifact
+and the machine-readable results file
 [`tdccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_results.json).
 
 To rerun the generator from the repository root:
@@ -24,11 +31,11 @@ PYTHONPATH=src:. python papers/econirl_package/primers/tdccp/tdccp_run.py --quie
 
 ## How To Read This Page
 
-The design table describes the known-truth problem. The fit summary describes
+The design table describes the synthetic data-generating process. The fit summary describes
 whether the estimator and inference path ran correctly. Recovery metrics
 compare estimated objects with oracle objects. The Monte Carlo section checks
 whether the reported standard errors behave reasonably across repeated seeds.
-Threshold checks are the numerical cutoffs recorded by the artifact.
+Numerical checks are the numerical cutoffs recorded by the results file.
 
 ## Design
 
@@ -115,7 +122,7 @@ Carlo precision.
 
 ## Recovery Metrics
 
-These metrics compare the fitted structural objects with the known truth. They
+These metrics compare the fitted structural objects with the true simulated values. They
 are the main evidence that the estimator recovers the finite reward target and
 the implied dynamic decisions in this design.
 
@@ -140,7 +147,7 @@ counterfactual decisions as the oracle reward.
 | Type B | 0.004840 | 0.001867 | 0.001864 |
 | Type C | 0.006953 | 0.003208 | 0.003200 |
 
-## Threshold Checks
+## Numerical Checks
 
 | Check | Threshold | Value | Status |
 | --- | --- | ---: | --- |

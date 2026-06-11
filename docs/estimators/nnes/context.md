@@ -56,7 +56,7 @@ The source target is Nguyen's neural network estimation of structural dynamic
 models. In EconIRL, the reported path keeps a parametric structural reward and
 uses the neural network for value approximation. The simulation study is
 therefore about recovering reward, policy, value, Q, and counterfactual
-objects from a known-truth structural DGP, not about identifying an
+objects from a synthetic structural data-generating process, not about identifying an
 unrestricted neural reward.
 
 The identification requirements match the other structural estimators. Reward

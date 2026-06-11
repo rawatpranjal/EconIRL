@@ -53,16 +53,16 @@ wrapper no longer treats `feature_matrix=None` as a structural default.
 
 ## Simulation Study
 
-The simulation uses two action-dependent known-truth cells. The primary cell
+The simulation uses two action-dependent synthetic cells. The primary cell
 has 25 states, 3 actions, 8 reward features, known transitions, known rewards,
 known policies, known value and Q functions, and Type A, Type B, and Type C
 counterfactual oracles.
 
 | Item | Current state |
 | --- | --- |
-| Question | Recover reward and counterfactual behavior in a known-truth MCE DGP. |
+| Question | Recover reward and counterfactual behavior in a synthetic MCE data-generating process. |
 | Primary cell | `mce_low_high_reward`. |
-| Machine-readable artifact | [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json). |
+| Machine-readable results file | [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json). |
 | Recovery outputs | Reward, policy, value, Q, feature-moment, and counterfactual metrics. |
 | Public example | Uses `MCEIRL` with explicit action-dependent features. |
 

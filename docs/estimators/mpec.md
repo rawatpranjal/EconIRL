@@ -50,18 +50,18 @@ matrices.
 
 ## Evidence
 
-MPEC is reported on the low-dimensional action-dependent known-truth DGP. The
+MPEC is reported on the low-dimensional action-dependent synthetic data-generating process. The
 simulation cell has known rewards, transitions, policies, values, Q functions,
 and Type A, Type B, and Type C counterfactual oracles. The machine-readable
-artifact and generated primer results record the reported results.
+results file and generated primer results record the reported results.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Known-truth constrained-likelihood counterpart. |
+| Evidence scope | Synthetic constrained-likelihood simulation. |
 | Primary cell | `canonical_low_action`. |
-| Machine-readable artifact | [mpec_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json). |
+| Machine-readable results file | [mpec_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json). |
 | Bellman constraint check | Reported final violation `7.72e-12`. |
-| Counterfactual checks | Type A, Type B, and Type C are reported in the artifact. |
+| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `MPECEstimator` with the tabular DDC lower-level API. |
 
 ## MPEC Guide

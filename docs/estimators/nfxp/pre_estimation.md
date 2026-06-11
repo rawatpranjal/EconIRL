@@ -15,9 +15,9 @@ starts. Run these checks before treating a result as structural evidence.
 
 ## Canonical Simulation Checks
 
-The known-truth NFXP artifact records these pre-estimation checks.
+The NFXP results file records these pre-estimation checks.
 See the [simulation study page](validation.md) for the generator script,
-rendered table source, and JSON artifact.
+rendered table source, and JSON results file.
 
 | Check | Value | Status |
 | --- | ---: | --- |

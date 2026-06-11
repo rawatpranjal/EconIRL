@@ -60,7 +60,7 @@ $$
 $$
 
 The NPL path alternates value-network training with structural likelihood
-updates. In the public artifact, both known-truth cells run three outer NPL
+updates. In the public results file, both synthetic cells run three outer NPL
 iterations.
 
 The value network is an approximation target, not the structural reward. The
@@ -78,7 +78,7 @@ W_\theta[P] = W_z(P)\theta + W_e(P).
 $$
 
 EconIRL solves the profiled components `W_z(P)` and `W_e(P)` exactly on the
-finite known-truth cells, then optimizes the structural likelihood through the
+finite synthetic cells, then optimizes the structural likelihood through the
 choice-specific values implied by those components. The value network is
 trained on the same profiled target and reported through metadata such as
 `v_loss_per_outer`; in the current finite-state study, it is also a
@@ -96,7 +96,7 @@ counterfactual recovery directly against known oracle objects.
 | `bellman="nfxp"` | Neural soft-Bellman approximation. | Diagnostic variant. |
 
 The NPL path is the reported path because it is the path used by the
-known-truth threshold checks and the artifact. The NFXP variant is useful for
+numerical checks and the results file. The NFXP variant is useful for
 experiments but does not carry the same orthogonality interpretation.
 
 ## Anchoring
@@ -115,7 +115,7 @@ and structural reward parameters unchanged.
 
 The wrapper builds a one-dimensional normalized state encoder for tabular bus
 data. The lower-level simulation path can use richer encoded-state objects
-from the known-truth DGP. The high-dimensional primary cell has 81 states, a
+from the synthetic data-generating process. The high-dimensional primary cell has 81 states, a
 16-dimensional encoded state, and 32 reward parameters.
 
 ## Inference

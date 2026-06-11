@@ -1,12 +1,12 @@
 # Counterfactuals
 
 SEES estimates structural reward parameters and a value approximation. The
-counterfactual evidence comes from the known-truth validation harness,
+counterfactual evidence comes from the simulation harness,
 which re-solves oracle counterfactuals and compares them with policies implied
 by the recovered SEES structural object.
 
-See [Validation](validation.md) for the generator, artifact links, and hard
-gate definitions.
+See [Simulation Study](validation.md) for the generator, links to results files, and
+hard gate definitions.
 
 ## Counterfactual Families
 

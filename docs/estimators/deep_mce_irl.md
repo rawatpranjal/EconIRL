@@ -3,10 +3,10 @@
 ## Overview
 
 Deep MCE-IRL uses the maximum causal entropy occupancy-matching objective with
-a neural reward map. The current evidence target is nonlinear reward-map
-recovery over supplied state encodings and known transitions.
+a neural reward map. The current simulation-study scope is nonlinear
+reward-map recovery over supplied state encodings and known transitions.
 
-The validation is about the recovered reward matrix, not the raw neural network
+The study evaluates the recovered reward matrix, not the raw neural network
 weights.
 
 ## When to Use
@@ -22,7 +22,7 @@ Use Deep MCE-IRL when:
 
 Avoid Deep MCE-IRL when you need identified finite structural parameters, or
 when the input is raw spatial data that would require a convolutional reward
-network not used by the current validation.
+network outside the current simulation-study scope.
 
 ## Basic Usage
 
@@ -58,7 +58,7 @@ reward map onto supplied reward features.
 
 ## Evidence
 
-The reported known-truth evidence covers the anchored neural reward-map
+The reported simulation evidence covers the anchored neural reward-map
 Shapeshifter cell. Finite-theta projections are reported only when the
 projection basis is numerically identified.
 
@@ -68,4 +68,4 @@ policy, value, reward-table, and counterfactual truth.
 
 ## Further Reading
 
-- Machine-readable artifact: [deep_mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/deep_mce_irl/deep_mce_irl_results.json)
+- Machine-readable results file: [deep_mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/deep_mce_irl/deep_mce_irl_results.json)

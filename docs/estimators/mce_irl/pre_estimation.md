@@ -16,9 +16,9 @@ fit as reward recovery.
 
 ## Primary Simulation Checks
 
-The primary `mce_low_high_reward` artifact records these checks. The
+The primary `mce_low_high_reward` results file records these checks. The
 [simulation study page](validation.md) links the generator script, rendered table
-source, and JSON artifact.
+source, and JSON results file.
 
 | Check | Value | Status |
 | --- | ---: | --- |

@@ -32,7 +32,7 @@ parameters, standard errors, policies, values, and recovery metadata.
 
 | Contract | Meaning |
 | --- | --- |
-| Simulation path | Use `bellman="npl"`. This is the NNES path tied to the paper's NPL orthogonality argument and the known-truth artifact. |
+| Simulation path | Use `bellman="npl"`. This is the NNES path tied to the paper's NPL orthogonality argument and the simulation results file. |
 | Diagnostic path | `bellman="nfxp"` trains a neural soft-Bellman approximation, but it does not carry the same zero-Jacobian or standard-error claim. |
 | Transition model | NNES is model-based. Transitions must be known or estimated before policy evaluation. |
 | Neural object | The neural network approximates the value or continuation object. The structural reward remains finite-dimensional. |
@@ -89,20 +89,20 @@ orthogonality claim.
 ## Simulation Study
 
 NNES is reported on low-dimensional and high-dimensional action-dependent
-known-truth DGPs. The high-dimensional cell is the primary study because
+synthetic data-generating processes. The high-dimensional cell is the primary study because
 it uses encoded states and a richer reward-feature basis.
 
 | Item | Current state |
 | --- | --- |
 | Question | Recover finite-dimensional structural reward and counterfactual behavior with a neural value approximation. |
-| Study scope | Known-truth low- and high-dimensional structural DDC cells. |
+| Study scope | Synthetic low- and high-dimensional structural DDC simulations. |
 | Primary cell | `canonical_high_action`. |
-| Machine-readable artifact | [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json). |
-| Counterfactual checks | Type A, Type B, and Type C are reported in the artifact. |
+| Machine-readable results file | [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json). |
+| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `NNES` with `utility="linear_cost"` and `bellman="npl"`. |
 
 The caveat is the approximation boundary. The study reports recovery within
-the known-truth threshold checks for the finite-dimensional structural reward
+the numerical checks for the finite-dimensional structural reward
 and the NNES value-approximation path. It is paper-consistent evidence for the
 neural value route, not a claim that arbitrary neural reward models are
 identified or that the EconIRL harness literally replicates Nguyen's Monte

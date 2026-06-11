@@ -57,12 +57,12 @@ Output
 | I need a tabular DDC baseline. | Use [NFXP](../estimators/nfxp.md). |
 | I need to compare methods. | Use the [estimator map](../estimators.md). |
 | I need to understand the API shape. | Read [API design](api_design.md). |
-| I need to understand validation evidence. | Read [validation](validation.md). |
+| I need to understand simulation-study evidence. | Read [simulation studies](validation.md). |
 
 ## Latest Updates
 
-The documentation separates available methods from validation evidence. Each
-estimator page states the target, the reported evidence, and the conditions
-under which the method should be used.
+The documentation separates available methods from simulation-study evidence.
+Each estimator page states the target, the reported evidence, and the
+conditions under which the method should be used.
 
 NFXP is the reference structural estimator for tabular dynamic discrete choice.

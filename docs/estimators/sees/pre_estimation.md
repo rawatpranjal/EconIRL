@@ -14,11 +14,11 @@ these checks before treating a SEES result as structural evidence.
 | Basis rank | The sieve must have enough rank to represent the value function. |
 | Bellman residual | A small likelihood improvement is not enough if the Bellman penalty is loose. |
 
-## Artifact Checks
+## Results Checks
 
-These rows come from the generated SEES artifact. See
-[Validation](validation.md) for the generator script, rendered table source,
-and machine-readable JSON.
+These rows come from the generated SEES results file. See
+[Simulation Study](validation.md) for the generator script, rendered table
+source, and machine-readable JSON.
 
 | Check | Low-dimensional | High-dimensional primary |
 | --- | ---: | ---: |

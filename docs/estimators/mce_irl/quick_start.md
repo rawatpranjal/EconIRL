@@ -53,7 +53,7 @@ diagnostics.
 
 ## Simulation Rerun
 
-To reproduce the simulation, run the lower-level known-truth harness:
+To reproduce the simulation, run the lower-level simulation harness:
 
 ```bash
 PYTHONPATH=src:. python papers/econirl_package/primers/mce_irl/mce_irl_run.py --quiet-progress --enforce-gates

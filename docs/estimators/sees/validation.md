@@ -1,20 +1,25 @@
-# Validation
+# Simulation Study
 
-SEES is reported on the `canonical_high_action` known-truth cell. The
-low-dimensional `canonical_low_action` cell remains in the artifact as a
-sanity check for the historical state-index basis. The primary cell uses
-encoded states and a richer reward-feature basis.
+The SEES simulation study uses the `canonical_high_action` synthetic cell.
+The low-dimensional `canonical_low_action` cell remains in the results file as a
+sanity check for the historical state-index basis. The simulation asks whether
+a deterministic sieve value approximation can recover structural reward and
+counterfactual behavior when the state representation is encoded and richer
+than a small tabular state index. Real data cannot answer that question because
+the true reward, policy, value function, Q function, and counterfactual oracles
+are not observed.
 
-These results are not hand-entered examples. They come from the known-truth
-validation harness, where the reward, transition law, optimal policy, value
-function, Q function, and counterfactual oracle objects are all known before
-estimation starts.
+These results are not hand-entered examples. They come from the simulation
+harness. The harness fixes the reward, transition law, optimal policy, value
+function, Q function, and counterfactual oracle objects before generating the
+finite panel. The estimator sees the generated panel, the transition law, and
+the encoded reward basis, not the oracle dynamic objects.
 
 The full result generator is
 [`sees_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_run.py).
 It writes the rendered table source
 [`sees_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.tex)
-and the machine-readable artifact
+and the machine-readable results file
 [`sees_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json).
 To rerun it from the repository root:
 
@@ -22,33 +27,18 @@ To rerun it from the repository root:
 PYTHONPATH=src:. python papers/econirl_package/primers/sees/sees_run.py --quiet-progress
 ```
 
-The core harness flow is:
-
-```python
-from experiments.known_truth import (
-    build_known_truth_dgp,
-    get_cell,
-    run_estimator,
-    simulate_known_truth_panel,
-)
-
-cell = get_cell("canonical_high_action")
-dgp = build_known_truth_dgp(cell.dgp_config)
-panel = simulate_known_truth_panel(dgp, cell.simulation_config)
-run = run_estimator("SEES", dgp, panel, smoke=False, enforce_gates=True)
-```
-
 ## Read the Tables
 
-Read the tables as a sequence. The design rows state which known-truth cells
+Read the tables as a sequence. The design rows state which synthetic cells
 were run. The fit summary reports the optimizer flag, Bellman residuals,
 likelihood, and run time. Recovery metrics compare the estimated structural
-object to oracle reward, policy, value, and Q objects. Hard gates are the
-reported thresholds.
+object to oracle reward, policy, value, and Q objects. Numerical checks are
+the reported thresholds.
 
-The optimizer flag is reported exactly as returned by L-BFGS-B. The SEES
-evidence does not rely on the optimizer flag alone; it also uses the Bellman residual,
-finite standard errors, known-truth recovery, and counterfactual regret.
+The optimizer flag is reported exactly as returned by L-BFGS-B. The reported
+scope does not rely on the optimizer flag alone; it also uses the Bellman
+residual, finite standard errors, recovery against true simulated values, and counterfactual
+regret.
 
 ## Design
 
@@ -90,7 +80,7 @@ The primary high-dimensional cell ran in 6.01 seconds.
 | Value RMSE | at most 0.10 | 0.017591 | 0.037836 |
 | Q RMSE | at most 0.10 | 0.020514 | 0.031480 |
 
-## Hard Gates
+## Numerical Checks
 
 | Gate | Threshold | Primary value | Status |
 | --- | --- | ---: | --- |
@@ -116,7 +106,7 @@ The primary high-dimensional cell ran in 6.01 seconds.
 
 The estimates are not exactly equal to truth because the panel is finite. The
 reported scope is recovery within the listed tolerances in the frozen
-known-truth cells.
+synthetic cells.
 
 ## Exact Rust Bus Oracle Check
 
@@ -127,12 +117,7 @@ full B-spline basis. At the true Rust parameters, `solution="value"`,
 Q function with Bellman residual below `1e-8`.
 
 That is an oracle representability and equilibrium-residual check, not evidence
-that a finite stochastic panel produces bit-for-bit parameter equality. Run it
-with:
-
-```bash
-pytest tests/test_sees_known_truth_components.py
-```
+that a finite stochastic panel produces bit-for-bit parameter equality.
 
 ## Random-Start Rust Bus Recovery
 
@@ -149,7 +134,7 @@ not make the sample MLE exactly equal to the DGP parameters.
 pytest tests/benchmarks/test_parameter_recovery.py::test_sees_rust_bus_solution_variants
 ```
 
-Generated artifacts:
+Generated results files:
 
 - [`sees_rust_random_start_results.md`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_rust_random_start_results.md)
 - [`sees_rust_random_start_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_rust_random_start_results.json)

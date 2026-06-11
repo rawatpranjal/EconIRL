@@ -77,6 +77,6 @@ No fixed output is shown for the lower-level snippet because `panel`,
 
 This page is a package smoke example, not the full historical Rust
 replication and not the full Nguyen Monte Carlo. The reported simulation study
-uses a known-truth artifact, where reward, policy, value, Q, and
+uses a simulation results file, where reward, policy, value, Q, and
 counterfactual oracle objects are available for comparison. See
 [Simulation Study](validation.md) for that path.

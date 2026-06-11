@@ -58,12 +58,12 @@ a value function, a likelihood, and constrained-optimizer diagnostics.
 
 MPEC does not currently expose the same one-call dataframe wrapper
 `counterfactual` method as NFXP and CCP. The counterfactual evidence is
-therefore produced through the known-truth simulation harness, which re-solves
+therefore produced through the simulation harness, which re-solves
 oracle Type A, Type B, and Type C counterfactuals against the recovered
 structural object.
 
 See [Counterfactuals](counterfactuals.md) for the reported counterfactual
-families and [Simulation Study](validation.md) for the generator and artifact
+cases and [Simulation Study](validation.md) for the generator and results file
 links.
 
 ## Lower-Level Control

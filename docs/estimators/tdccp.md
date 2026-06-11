@@ -12,7 +12,7 @@ step.
 
 TD-CCP is not a general neural reward-recovery method. In EconIRL, the
 reported study is narrower and more precise: a finite reward parameter vector
-is recovered in a known-truth simulation with the locally robust, cross-fitted
+is recovered in a synthetic data simulation with the locally robust, cross-fitted
 estimator described in the TD-CCP paper.
 
 ## When To Use It
@@ -56,7 +56,7 @@ standard errors, or supplied transition tensors, use
 ## Simulation Study
 
 The current simulation study is the
-`shapeshifter_encoded_state_locally_robust` known-truth cell. It uses 81
+`shapeshifter_encoded_state_locally_robust` synthetic cell. It uses 81
 states, 3 actions, two encoded state coordinates, and 6 reward parameters.
 Action 0 is the baseline action, so its reward is normalized to zero.
 
@@ -70,7 +70,7 @@ The reported estimator uses:
 | Covariance unit | Individual |
 | Monte Carlo check | 25 repeated-seed replications |
 
-The artifact records the locally robust moment equation, the
+The results file records the locally robust moment equation, the
 correction recursion, the covariance, optimizer stationarity, and standard
 error coverage. The raw neural reward case is retained as a diagnostic only;
 it has no finite true reward parameter vector and is not part of the primary

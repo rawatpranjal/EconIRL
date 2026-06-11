@@ -17,9 +17,9 @@ Run these checks before treating a NNES result as structural evidence.
 | Value anchoring | High-discount problems need the value-level normalization to avoid drift. |
 | Value-network loss | A high final loss can contaminate recovered policy and value objects. |
 
-## Artifact Checks
+## Results Checks
 
-These rows come from the generated NNES artifact. See
+These rows come from the generated NNES results file. See
 [Simulation Study](validation.md) for the generator script, rendered table
 source, and machine-readable JSON.
 

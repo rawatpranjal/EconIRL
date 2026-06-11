@@ -38,7 +38,7 @@ print(model.predict_proba(states))
 
 ## Boundary
 
-This page is a usage example, not the known-truth simulation study. The
+This page is a usage example, not the simulation study. The
 simulation study uses a case where the true reward, policy, value function,
 Q function, and counterfactual decisions are available for comparison.
 

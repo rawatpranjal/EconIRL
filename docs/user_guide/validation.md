@@ -1,15 +1,15 @@
-# Known-Truth Simulation Studies
+# Simulation Studies
 
-EconIRL simulation-study pages use known-truth synthetic environments. The
+EconIRL simulation-study pages use synthetic environments. The
 harness fixes the reward, transition law, policy, value function, Q function,
 and counterfactual oracle before fitting the estimator.
 
 The tables report more than imports or numeric outputs. They state which
 objects are checked for each estimator target.
 
-## Threshold Check Families
+## Numerical Checks
 
-| Check family | What it checks |
+| Numerical check | What it checks |
 | --- | --- |
 | Parameter recovery | Structural parameter direction and scale where identified. |
 | Reward recovery | The fitted reward surface after the estimator normalization. |
@@ -19,13 +19,13 @@ objects are checked for each estimator target.
 | Type B counterfactual | A transition intervention with rewards held fixed. |
 | Type C counterfactual | An action-set intervention. |
 
-## How to Read Scope Labels
+## How to Read the Results
 
 | Status | Meaning |
 | --- | --- |
-| Results reported | The page reports the simulation design, artifact, and threshold checks. |
+| Results reported | The page reports the simulation design, results file, and numerical checks. |
 | Results with scope | The reported results are tied to stated simulation conditions. |
 | Research preview | The implementation is available for experiments; current results are narrower than the target. |
 
-Estimator pages link to artifacts when machine-readable results are available.
+Estimator pages link to results files when machine-readable results are available.
 When the results are scoped, the page states the current use clearly.

@@ -51,15 +51,15 @@ belong to the same individual.
 
 ## Evidence
 
-The reported known-truth evidence uses the serialized-content heterogeneous
+The reported simulation evidence uses the serialized-content heterogeneous
 DGP. The cell has two latent segments, repeated books per user,
 pay/wait/exit actions, an exit-action reward anchor, an absorbing terminal
 state, an 18-dimensional state encoding, and 20 finite reward features.
 
-Serialized-content heterogeneous DGP means a known-truth dynamic choice problem
+Serialized-content heterogeneous DGP means a synthetic dynamic choice problem
 with repeated observations per user and segment-level reward, policy, value,
 and counterfactual truth.
 
 ## Further Reading
 
-- Machine-readable artifact: [aairl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/aairl/aairl_results.json)
+- Machine-readable results file: [aairl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/aairl/aairl_results.json)

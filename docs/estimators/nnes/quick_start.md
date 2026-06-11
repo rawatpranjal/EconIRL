@@ -3,7 +3,7 @@
 The public wrapper accepts dataframe-style panel data. This quick start is the
 package smoke path: create a model, call `fit`, and read the fitted
 sklearn-style attributes. The full NNES simulation study lives in the
-known-truth artifact linked from [Simulation Study](validation.md).
+simulation results file linked from [Simulation Study](validation.md).
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -83,7 +83,7 @@ print(summary.metadata["v_loss_per_outer"][-1])
 No fixed output is shown for the lower-level snippet because `panel`,
 `utility`, `problem`, and `transitions` are caller-supplied objects.
 
-The known-truth simulation uses the lower-level API because it supplies the
+The synthetic data simulation uses the lower-level API because it supplies the
 true DDC problem, transition tensor, and reward specification directly. That is
 also the route to use when reproducing paper-style designs with custom state
 encodings or supplied transition laws.

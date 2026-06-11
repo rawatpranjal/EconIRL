@@ -1,6 +1,6 @@
 # Simulation Study
 
-We run MPEC on the `canonical_low_action` known-truth cell, the same
+We run MPEC on the `canonical_low_action` synthetic cell, the same
 low-dimensional action-dependent structural benchmark used for NFXP and CCP.
 The simulation asks whether the constrained-likelihood formulation can recover
 the structural reward and counterfactual behavior while satisfying the Bellman
@@ -8,17 +8,18 @@ equality constraint. Real bus data cannot answer that question because the
 true reward, policy, value function, Q function, and counterfactual oracles are
 not observed.
 
-These results are not hand-entered examples. They come from the known-truth
-simulation harness. The harness fixes the transition law, action-dependent
+These results are not hand-entered examples. They come from the simulation harness. The harness fixes the transition law, action-dependent
 reward features, and reward weights before generating the finite panel. Those
 objects define the true reward, policy, value function, Q function, and
-counterfactual oracles that are held back for evaluation.
+counterfactual oracles that are held back for evaluation. The estimator sees
+the generated panel, the transition law, and the action-dependent reward
+features, not the oracle dynamic objects.
 
 The full result generator is
 [`mpec_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_run.py).
 It writes the rendered table source
 [`mpec_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.tex)
-and the machine-readable artifact
+and the machine-readable results file
 [`mpec_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json).
 To rerun it from the repository root:
 
@@ -26,26 +27,11 @@ To rerun it from the repository root:
 PYTHONPATH=src:. python papers/econirl_package/primers/mpec/mpec_run.py
 ```
 
-The core harness flow is:
-
-```python
-from pathlib import Path
-
-from experiments.known_truth import run_cell_estimator
-
-run_cell_estimator(
-    "canonical_low_action",
-    "MPEC",
-    Path("/tmp/econirl_mpec_primer_known_truth"),
-    smoke=False,
-)
-```
-
-Read the tables as a sequence. The design table states the known-truth cell.
+Read the tables as a sequence. The design table states the synthetic cell.
 The fit summary reports convergence, constrained-optimizer iterations, and the
 final Bellman constraint violation. Parameter recovery compares estimated
 reward parameters to truth. Recovery metrics compare the recovered reward,
-value, Q function, and policy to oracle objects. Threshold checks are the
+value, Q function, and policy to oracle objects. Numerical checks are the
 numerical cutoffs recorded by the harness.
 
 ## Design
@@ -106,7 +92,7 @@ the constraint diagnostic alone.
 | Policy total variation | 0.005697 |
 | Policy max state L1 | 0.018905 |
 
-## Threshold Checks
+## Numerical Checks
 
 | Check | Threshold | Value | Status |
 | --- | --- | ---: | --- |
@@ -123,7 +109,7 @@ the constraint diagnostic alone.
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-study reports recovery within the listed tolerances in the frozen known-truth
+study reports recovery within the listed tolerances in the frozen synthetic
 cell.
 
 ## Counterfactual Recovery

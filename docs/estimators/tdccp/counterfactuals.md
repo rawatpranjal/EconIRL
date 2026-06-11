@@ -11,7 +11,7 @@ counterfactuals directly after fitting the lower-level estimator.
 
 ## Counterfactual Families
 
-The known-truth simulation harness checks three common counterfactual types.
+The simulation harness checks three common counterfactual types.
 
 | Type | Intervention | What it tests |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ The known-truth simulation harness checks three common counterfactual types.
 
 ## Reported Results
 
-These rows come from the known-truth artifact.
+These rows come from the simulation results file.
 
 | Counterfactual | Policy TV | Value RMSE | Regret |
 | --- | ---: | ---: | ---: |

@@ -1,7 +1,7 @@
 # Simulation Study
 
-We run NNES on the `canonical_high_action` known-truth cell. The
-low-dimensional `canonical_low_action` cell remains in the artifact as a
+We run NNES on the `canonical_high_action` synthetic cell. The
+low-dimensional `canonical_low_action` cell remains in the results file as a
 sanity check. The simulation asks whether the NPL-profiled neural value path
 can recover a finite-dimensional structural reward and counterfactual behavior
 when the state representation is encoded and richer than the small tabular
@@ -9,11 +9,12 @@ reference. Real data cannot answer that question because the true reward,
 policy, value function, Q function, and counterfactual oracles are not
 observed.
 
-These results are not hand-entered examples. They come from the known-truth
-simulation harness. The harness fixes the transition law, reward features, and
+These results are not hand-entered examples. They come from the simulation harness. The harness fixes the transition law, reward features, and
 reward weights before generating the finite panel. Those objects define the
 true reward, policy, value function, Q function, and counterfactual oracles
-that are held back for evaluation.
+that are held back for evaluation. The estimator sees the generated panel, the
+transition law, encoded state features, and reward features, not the oracle
+dynamic objects.
 
 ## Paper Simulation vs EconIRL Study
 
@@ -30,11 +31,11 @@ The paper simulation uses continuous mileage states, joint replacement actions,
 and 100 replications in the two-module baseline. It also reports a
 four-dimensional extension and high-discount anchoring checks.
 
-The EconIRL artifact is not a literal replication of that Monte Carlo. It is a
+The EconIRL results file is not a literal replication of that Monte Carlo. It is a
 package simulation study: the DGP is frozen, the oracle objects are known
 before estimation, the high-dimensional primary cell has encoded states and 32
 reward parameters, and every reported result is tied to machine-readable
-threshold checks.
+numerical checks.
 
 ## Older Plans and Current Status
 
@@ -43,20 +44,20 @@ claims. The alignment audit at
 `papers/econirl_package_jss/plans/alignment/12_nnes.md` records an earlier
 diagnostic failure where NNES fit policy surfaces but did not yet pass the
 structural recovery checks. That failure is stale: the current NPL-profiled,
-anchored path is the reported path, and the live artifact passes both the
+anchored path is the reported path, and the live results file passes both the
 low-dimensional sanity cell and the high-dimensional primary cell.
 
 Other older plans, including `plan_rust_big.md` and the Keane-Wolpin JSS
 example plan, are planning or paper-example surfaces. They should not be read
 as current RTD simulation-study claims. In particular, the docs should not claim that
-NFXP or CCP fail on a Rust-big extension until a measured artifact supports
+NFXP or CCP fail on a Rust-big extension until a measured results file supports
 that result.
 
 The full result generator is
 [`nnes_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_run.py).
 It writes the rendered table source
 [`nnes_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.tex)
-and the machine-readable artifact
+and the machine-readable results file
 [`nnes_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json).
 To rerun it from the repository root:
 
@@ -64,32 +65,16 @@ To rerun it from the repository root:
 PYTHONPATH=src:. python papers/econirl_package/primers/nnes/nnes_run.py --quiet-progress
 ```
 
-The core harness flow is:
-
-```python
-from experiments.known_truth import (
-    build_known_truth_dgp,
-    get_cell,
-    run_estimator,
-    simulate_known_truth_panel,
-)
-
-cell = get_cell("canonical_high_action")
-dgp = build_known_truth_dgp(cell.dgp_config)
-panel = simulate_known_truth_panel(dgp, cell.simulation_config)
-run = run_estimator("NNES", dgp, panel, smoke=False, enforce_gates=True)
-```
-
 ## Read the Tables
 
-Read the tables as a sequence. The design rows state which known-truth cells
+Read the tables as a sequence. The design rows state which synthetic cells
 were run. The fit summary reports convergence, L-BFGS-B iterations, final
 value-network loss, likelihood, and run time. Recovery metrics compare the
 estimated structural object to oracle reward, policy, value, and Q objects.
-Threshold checks are the numerical cutoffs recorded by the harness.
+Numerical checks are the numerical cutoffs recorded by the harness.
 
 The simulation result does not rely on optimizer convergence alone. It also
-uses value-network loss, known-truth recovery, and counterfactual regret.
+uses value-network loss, recovery against true simulated values, and counterfactual regret.
 
 ## Design
 
@@ -129,7 +114,7 @@ The primary high-dimensional cell ran in 36.46 seconds.
 | Value RMSE | at most 0.20 | 0.019845 | 0.115620 |
 | Q RMSE | at most 0.20 | 0.023370 | 0.137145 |
 
-## Threshold Checks
+## Numerical Checks
 
 | Check | Threshold | Primary value | Status |
 | --- | --- | ---: | --- |
@@ -155,4 +140,4 @@ The primary high-dimensional cell ran in 36.46 seconds.
 
 The estimates are not exactly equal to truth because the panel is finite and
 the value function is approximated. The study reports recovery within the
-listed tolerances in the frozen known-truth cells.
+listed tolerances in the frozen synthetic cells.

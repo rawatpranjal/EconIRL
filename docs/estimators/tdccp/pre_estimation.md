@@ -26,7 +26,7 @@ likelihood optimizer appears to run.
 For locally robust inference, split folds by individual rather than by row.
 This keeps the held-out moment evaluation separate from the quantities learned
 on the other fold and matches the covariance unit used in the simulation
-artifact.
+results file.
 
 ## After Fitting
 
@@ -44,7 +44,7 @@ The simulation study uses two encoded state coordinates and a finite linear
 reward. Action 0 is fixed as the baseline action, leaving six reward
 parameters for the two non-baseline actions.
 
-| Check | Current artifact |
+| Check | Current results file |
 | --- | --- |
 | States and actions | 81 states, 3 actions |
 | Reward target | 6 finite reward parameters |
@@ -57,5 +57,5 @@ parameters for the two non-baseline actions.
 | Max correction residual norm | 0.002610 |
 | Optimizer status | Preliminary and final robust folds converged |
 
-See the [simulation study page](validation.md) for the full artifact,
-threshold checks, and Monte Carlo standard-error check.
+See the [simulation study page](validation.md) for the full results file,
+numerical checks, and Monte Carlo standard-error check.

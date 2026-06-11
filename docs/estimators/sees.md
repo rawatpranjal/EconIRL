@@ -34,7 +34,7 @@ model = SEES(
     utility="linear_cost",
     basis_type="fourier",
     basis_dim=8,
-    penalty_weight=0.01,
+    penalty_weight=10.0,
 )
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
@@ -42,18 +42,8 @@ print(model.params_)
 print(model.summary())
 ```
 
-Output
-
-```text
-{'theta_c': -0.006116096477516279, 'RC': 3.1677777161163605}
-
-Method:                    SEES (fourier, Luo & Sang 2024)
-No. Observations:          9,410
-Log-Likelihood:            -1,899.51
-theta_c                 -0.0061     0.0034    -1.79    0.074
-RC                       3.1678     0.1370    23.13    0.000
-Prediction Accuracy:         94.9%
-```
+The dataframe wrapper is a package smoke path. The simulation-study evidence below
+uses the lower-level estimator with explicit finite-state penalty weights.
 
 Use `econirl.estimation.sees.SEESEstimator` when you need direct control over
 the `Panel`, utility object, `DDCProblem`, transition tensor, basis choice, or
@@ -61,7 +51,7 @@ Bellman penalty.
 
 ## Evidence
 
-SEES is reported on the high-dimensional action-dependent known-truth DGP.
+SEES is reported on the high-dimensional action-dependent synthetic data-generating process.
 The low-dimensional cell is retained as a sanity check, while the primary
 cell uses encoded states and a richer reward-feature basis. Both cells have
 known rewards, transitions, policies, values, Q functions, and Type A, Type B,
@@ -69,12 +59,12 @@ and Type C counterfactual oracles.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Known-truth encoded-state cell. |
+| Evidence scope | Synthetic encoded-state simulation. |
 | Primary cell | `canonical_high_action`. |
-| Machine-readable artifact | [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json). |
+| Machine-readable results file | [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json). |
 | Primary Bellman gate | Reported violation `3.08e-6`. |
-| Primary recovery gates | Parameter, reward, policy, value, Q, and counterfactual gates are reported in the artifact. |
-| Public example | Uses `SEES` with `utility="linear_cost"`; validation uses `SEESEstimator`. |
+| Primary recovery gates | Parameter, reward, policy, value, Q, and counterfactual gates are reported in the results file. |
+| Public example | Uses `SEES` with `utility="linear_cost"` and the package default penalty; the simulation study uses `SEESEstimator` with explicit finite-state penalties. |
 
 ## SEES Guide
 

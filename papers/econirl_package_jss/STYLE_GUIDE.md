@@ -1,6 +1,6 @@
-# Style guide for the econirl JSS paper
+# Style guide for the econirl JSS paper and RTD evidence prose
 
-A loose collection of conventions we are following. Treat it as taste, not law. The four exemplar papers do not agree on everything, and neither do we.
+A loose collection of conventions we are following. Treat it as taste, not law. The four exemplar papers do not agree on everything, and neither do we. The paper is the primary target, but the simulation-study and evidence-scoping rules also apply to public RTD pages.
 
 ## What we are imitating
 
@@ -45,7 +45,13 @@ replacement_cost        3.0722     0.0747    41.11    0.000
 
 **Interpret, do not summarize.** A table caption tells the reader what the table is. The paragraph that follows says what is interesting about the numbers in it. If the prose just restates the column headers, cut it.
 
-**Write simulation studies as studies, not release claims.** When ground truth is needed, call the section "Simulation Study" and walk the reader through the design. Start with the question the simulation answers. Explain why real data cannot answer it. Describe the data-generating process, the generated panel, what the estimator sees, and which truth objects are held back for evaluation. Then show recovery and counterfactual results. Do not advertise the result with language like "release claim," "certified," or "validation target." If thresholds or gates are useful, keep them as an audit trail, not as the main prose. Let the numbers show whether the estimator works.
+**Write simulation studies as studies, not release claims.** When true simulated objects are needed, call the section "Simulation Study" and walk the reader through the design. Start with the question the simulation answers. Explain why real data cannot answer it. Describe the data-generating process, the generated panel, what the estimator sees, and which true objects are held back for evaluation. Then show recovery and counterfactual results. Do not advertise the result with language like "release claim," "certified," or "validation target." If numerical tolerances are useful, keep them as an audit trail, not as the main prose. Let the numbers show whether the estimator works.
+
+**Use plain RTD evidence language.** Public docs should say "simulation,"
+"synthetic data," "data-generating process," "generated panel," "true
+simulated objects," "recovery metrics," "numerical checks," and "results
+file." Avoid internal labels such as "known-truth," "known_truth," "threshold
+check families," "scope labels," and reader-facing "artifact" language.
 
 ## Section register, by section
 
@@ -56,7 +62,7 @@ replacement_cost        3.0722     0.0747    41.11    0.000
 | Models and methods | Math heavy. | Unified notation up front. Per-estimator objectives are the spine. Pseudocode only where the outer structure is non-trivial. |
 | Related software | Prose plus comparison table. | Pulled out of the introduction so the reader can judge the comparison after reading the methods. |
 | Software design | Prose, code-font heavy. | API contract, inference layer, JAX backbone. Listings are short. |
-| Illustrations | Inline-session listings interleaved with interpretive prose. | Three worked examples on real datasets, then a benchmark table. |
+| Illustrations | Inline-session listings interleaved with interpretive prose. | Worked examples and script-backed tables. Pending results must be labeled pending. |
 | Computational details | Terse, factual. | Versions, hardware, OS. |
 | Summary | Prose. | Roadmap and the two or three things we did not get to. |
 | Appendix | Tables and pointers. | Reproducibility map. |
@@ -91,7 +97,7 @@ These are common mistakes, not absolute prohibitions.
 A short pass, not an audit.
 
 - The abstract opens with the substantive problem and closes with `pip install econirl` plus the docs URL.
-- Every estimator named in the paper appears in both the taxonomy table and the benchmark table.
+- Every estimator named in a benchmark claim appears in the machine-written output that supports that claim.
 - Every numbered figure and table caption names the script that produces it.
 - Every numerical claim traces to a script in the appendix table.
 - The paper compiles with no undefined references.

@@ -1,19 +1,26 @@
 # Simulation Study
 
-We run MCE-IRL on two known-truth cells. The primary cell is
+We run MCE-IRL on two synthetic cells. The primary cell is
 `mce_low_high_reward`, a compact state-space problem with eight
 action-dependent reward features. The sanity cell is `canonical_low_action`.
+The simulation asks whether the feature-matching MCE-IRL route can recover
+reward and counterfactual behavior when the transition law and reward-feature
+basis are supplied. Real data cannot answer that question because the true
+reward, policy, value function, Q function, occupancy measure, and
+counterfactual oracles are not observed.
 
-The numbers come from the known-truth simulation harness. In that harness, we
+The numbers come from the simulation harness. In that harness, we
 choose the transition law, reward features, and reward weights before generating
-the panel. Those objects define the true reward, policy, value function, Q
-function, occupancy measure, and counterfactual oracles.
+the panel. The estimator sees the generated demonstrations, the transition
+law, and the supplied reward features. The true reward, policy, value function,
+Q function, occupancy measure, and counterfactual oracles are held back for
+evaluation.
 
 The full result generator is
 [`mce_irl_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_run.py).
 It writes the rendered table source
 [`mce_irl_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.tex)
-and the machine-readable artifact
+and the machine-readable results file
 [`mce_irl_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json).
 To rerun it from the repository root:
 
@@ -21,20 +28,10 @@ To rerun it from the repository root:
 PYTHONPATH=src:. python papers/econirl_package/primers/mce_irl/mce_irl_run.py --quiet-progress --enforce-gates
 ```
 
-The compact harness flow is:
-
-```python
-from experiments.known_truth import build_known_truth_dgp, run_estimator
-
-dgp = build_known_truth_dgp(cell.dgp_config)
-panel = simulate_panel(dgp, cell.simulation_config)
-result = run_estimator("MCE-IRL", dgp, panel, smoke=False)
-```
-
-Read the tables in order. The design table states the known-truth cells. The
+Read the tables in order. The design table states the synthetic cells. The
 fit summary reports the primary run. Recovery metrics compare the recovered
 reward, value, Q function, policy, and feature moments with oracle objects.
-Threshold checks list the numerical cutoffs recorded by the harness.
+Numerical checks list the numerical cutoffs recorded by the harness.
 
 ## Design
 
@@ -93,7 +90,7 @@ compare the recovered-reward policy with the oracle policy.
 | Type B | 0.006284 | 0.000142 | 0.000523 | 0.000410 |
 | Type C | 0.004211 | 5.98e-5 | 0.000145 | 0.000094 |
 
-## Threshold Checks
+## Numerical Checks
 
 | Check | Threshold | Value | Status |
 | --- | --- | ---: | --- |
@@ -109,4 +106,4 @@ compare the recovered-reward policy with the oracle policy.
 | Type C regret | at most 0.05 | 0.000094 | pass |
 
 The same set of checks is also recorded for the sanity cell in the JSON
-artifact.
+results file.

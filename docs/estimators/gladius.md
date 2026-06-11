@@ -4,7 +4,7 @@
 
 GLADIUS learns Q and continuation-value approximations and projects the implied
 reward back onto structural features. The reported evidence uses a stable
-anchor-moment Q loss for known-truth cells. The literal bi-conjugate minimax
+anchor-moment Q loss for synthetic cells. The literal bi-conjugate minimax
 mode remains available for method research.
 
 ## When to Use
@@ -53,9 +53,13 @@ paper-side high-dimensional-state cell and its scaled variant.
 
 The high-dimensional-state GLADIUS DGP uses encoded state features,
 low-dimensional reward features, known transitions, and an anchor action so the
-projected structural reward can be checked against known truth.
+projected structural reward can be checked against true simulated values.
+The current results files still fail the raw Bellman reward and value-function
+recovery gates. Passing projected-reward and counterfactual-regret checks is
+therefore reported as a diagnostic result, not as full structural
+counterfactual validity.
 
 ## Further Reading
 
-- Machine-readable artifact: [gladius_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/gladius/gladius_results.json)
-- Scaled-cell artifact: [gladius_scaled_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/gladius/gladius_scaled_results.json)
+- Machine-readable results file: [gladius_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/gladius/gladius_results.json)
+- Scaled-cell results file: [gladius_scaled_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/gladius/gladius_scaled_results.json)

@@ -79,7 +79,7 @@ numerical experiments in DDC/IRL problems.
 
 For compact tabular problems, the implementation can build a basis over state
 indices. For encoded-state problems, it can build an encoded-state basis from
-the `DDCProblem` state encoder. The high-dimensional SEES validation
+the `DDCProblem` state encoder. The high-dimensional SEES simulation study
 uses the encoded-state path with 81 basis functions and numerical rank 81.
 
 ## Inference

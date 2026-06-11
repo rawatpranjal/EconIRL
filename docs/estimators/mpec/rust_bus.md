@@ -51,12 +51,12 @@ print(summary.policy[states, 1])
 MPEC's lower-level estimator does not currently provide the one-call
 dataframe-wrapper `counterfactual` method used by NFXP and CCP. For simulation
 evidence, counterfactual replacement-cost and transition interventions are
-tested through the known-truth simulation harness and reported on the
+tested through the simulation harness and reported on the
 [counterfactuals page](counterfactuals.md).
 
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The reported simulation study uses a known-truth cell, where
+replication. The reported simulation study uses a synthetic cell, where
 reward, policy, value, Q, and counterfactual oracle objects are available for
 comparison.

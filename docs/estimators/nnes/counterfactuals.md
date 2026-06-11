@@ -1,12 +1,12 @@
 # Counterfactuals
 
 NNES estimates structural reward parameters and a neural value approximation.
-The counterfactual evidence comes from the known-truth simulation harness,
+The counterfactual evidence comes from the simulation harness,
 which re-solves oracle counterfactuals and compares them with policies implied
 by the recovered NNES structural object.
 
-See the [Simulation Study](validation.md) for the generator, artifact links,
-and threshold checks.
+See the [Simulation Study](validation.md) for the generator, links to results files,
+and numerical checks.
 
 ## Counterfactual Families
 

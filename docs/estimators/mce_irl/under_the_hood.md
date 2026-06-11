@@ -65,7 +65,7 @@ demonstrated feature counts.
 
 The primer simulation uses the root feature-matching optimizer with standard
 errors disabled. The public wrapper defaults are configurable, but the
-known-truth artifact is generated from the root path above.
+simulation results file is generated from the root path above.
 
 ## Identification Boundary
 

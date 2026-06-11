@@ -1,7 +1,7 @@
 # Rust Bus Engine Example
 
 The Rust bus-engine replacement problem is a useful smoke example for MCE-IRL,
-but it is not the known-truth simulation. The wrapper needs an explicit reward
+but it is not the simulation study. The wrapper needs an explicit reward
 feature matrix for multi-action recovery.
 
 ```python
@@ -47,5 +47,5 @@ gives replacement probabilities by mileage state.
 ## Simulation Boundary
 
 This page is not a historical Rust replication. The simulation study uses the
-known-truth MCE cell, where reward, transition, policy, value, Q, and
+synthetic MCE cell, where reward, transition, policy, value, Q, and
 counterfactual oracle objects are all known.
