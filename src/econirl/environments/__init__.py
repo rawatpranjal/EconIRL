@@ -1,5 +1,6 @@
 """Economic environments with Gymnasium compatibility."""
 
+from econirl.environments.array_mdp import ArrayMDP
 from econirl.environments.base import DDCEnvironment
 from econirl.environments.binaryworld import BinaryworldEnvironment
 from econirl.environments.citibike_route import CitibikeRouteEnvironment
@@ -11,6 +12,7 @@ from econirl.environments.icu_sepsis import ICUSepsisEnvironment
 from econirl.environments.instacart import InstacartEnvironment
 from econirl.environments.multi_component_bus import MultiComponentBusEnvironment
 from econirl.environments.objectworld import ObjectworldEnvironment
+from econirl.environments.random_mdp import random_mdp
 from econirl.environments.rdw_scrappage import RDWScrapageEnvironment
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.environments.scania import ScaniaComponentEnvironment
@@ -21,6 +23,7 @@ from econirl.environments.shapeshifter import (
 from econirl.environments.supermarket import SupermarketEnvironment
 
 __all__ = [
+    "ArrayMDP",
     "BinaryworldEnvironment",
     "CitibikeRouteEnvironment",
     "CitibikeUsageEnvironment",
@@ -38,4 +41,5 @@ __all__ = [
     "ShapeshifterConfig",
     "ShapeshifterEnvironment",
     "SupermarketEnvironment",
+    "random_mdp",
 ]
