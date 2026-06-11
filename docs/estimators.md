@@ -3,6 +3,8 @@
 Use this page to choose an estimator for your data and decision problem. The
 evidence column states the current public scope.
 
+For a side-by-side decision table, see [Comparing Estimators](estimators/comparison.md).
+
 | Estimator | Best for | Evidence scope |
 | --- | --- | --- |
 | [NFXP](estimators/nfxp.md) | Exact tabular dynamic discrete choice. | Synthetic tabular simulation. |
@@ -24,6 +26,7 @@ for exploration, benchmarking, and method development.
 ```{toctree}
 :maxdepth: 1
 
+estimators/comparison
 estimators/nfxp
 estimators/ccp
 estimators/mpec
