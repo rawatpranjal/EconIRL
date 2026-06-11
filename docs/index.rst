@@ -15,30 +15,21 @@ Install
 Estimators
 ----------
 
-.. raw:: html
+Start with the estimator map, then open the method page that matches your
+decision problem.
 
-   <details open>
-     <summary><strong>Structural Econometrics</strong></summary>
-     <ul>
-       <li><a href="estimators/nfxp.html">NFXP</a></li>
-       <li><a href="estimators/ccp.html">CCP and NPL</a></li>
-       <li><a href="estimators/mpec.html">MPEC</a></li>
-       <li><a href="estimators/nnes.html">NNES</a></li>
-       <li><a href="estimators/tdccp.html">TD-CCP</a></li>
-     </ul>
-   </details>
-   <details>
-     <summary><strong>Inverse Reinforcement Learning</strong></summary>
-     <ul>
-       <li><a href="estimators/mce_irl.html">MCE-IRL</a></li>
-       <li><a href="estimators/deep_mce_irl.html">Deep MCE-IRL</a></li>
-       <li><a href="estimators/airl.html">AIRL</a></li>
-       <li><a href="estimators/airl_het.html">AIRL-Het</a></li>
-       <li><a href="estimators/f_irl.html">f-IRL</a></li>
-       <li><a href="estimators/gladius.html">GLADIUS</a></li>
-       <li><a href="estimators/iq_learn.html">IQ-Learn</a></li>
-     </ul>
-   </details>
+`NFXP <estimators/nfxp.html>`__ ·
+`CCP <estimators/ccp.html>`__ ·
+`MPEC <estimators/mpec.html>`__ ·
+`NNES <estimators/nnes.html>`__ ·
+`TD-CCP <estimators/tdccp.html>`__ ·
+`MCE-IRL <estimators/mce_irl.html>`__ ·
+`Deep MCE-IRL <estimators/deep_mce_irl.html>`__ ·
+`AIRL <estimators/airl.html>`__ ·
+`AIRL-Het <estimators/airl_het.html>`__ ·
+`f-IRL <estimators/f_irl.html>`__ ·
+`GLADIUS <estimators/gladius.html>`__ ·
+`IQ-Learn <estimators/iq_learn.html>`__
 
 Example
 -------
@@ -68,12 +59,7 @@ Output
    :hidden:
    :maxdepth: 2
 
-   estimators
-
-.. toctree::
-   :hidden:
-   :maxdepth: 2
-
    user_guide/overview
+   estimators
    user_guide/api_design
    user_guide/validation

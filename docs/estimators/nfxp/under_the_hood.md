@@ -5,6 +5,34 @@ problem solves the Bellman fixed point for a candidate reward parameter. The
 outer problem chooses the reward parameter that maximizes observed choice
 likelihood.
 
+## Optimization Setup
+
+The observed panel supplies state, action, and next-state records. The
+transition law is estimated from the panel or supplied directly. Reward
+features, the discount factor, and the logit shock scale are fixed before
+optimization.
+
+NFXP optimizes the structural reward parameter vector `theta`. For each
+candidate `theta`, the estimator solves the soft Bellman fixed point, forms the
+choice-specific values, computes the implied logit policy, and evaluates the
+conditional log likelihood of the observed actions. The public simulation path
+uses the hybrid Bellman solver inside the likelihood and the configured outer
+optimizer for `theta`.
+
+## Pseudocode
+
+```text
+Given panel, reward features, transitions, discount, and shock scale
+Initialize theta
+Repeat until the outer optimizer stops:
+    Build reward u_theta(s, a)
+    Solve V_theta = T_theta(V_theta)
+    Compute Q_theta(s, a) and pi_theta(a | s)
+    Evaluate the conditional log likelihood
+    Update theta using the likelihood gradient or optimizer step
+Return theta, policy, value function, standard errors, and diagnostics
+```
+
 ## Model
 
 The observed data are state, action, and next-state trajectories.

@@ -5,6 +5,32 @@ estimator starts from empirical conditional choice probabilities, converts
 them into continuation-value terms, and maximizes a pseudo likelihood over
 augmented features.
 
+## Optimization Setup
+
+The observed panel supplies state, action, and next-state records. The
+transition law is estimated from the panel or supplied directly. Reward
+features, the discount factor, the logit shock scale, and the NPL iteration
+limit are fixed before optimization.
+
+CCP first estimates a policy from empirical conditional choice probabilities.
+Given that policy, it constructs Hotz-Miller continuation terms and then
+optimizes a multinomial logit pseudo likelihood in `theta`. In NPL mode, the
+estimated `theta` implies a new policy, and the continuation terms are rebuilt
+for the next iteration.
+
+## Pseudocode
+
+```text
+Given panel, reward features, transitions, discount, and shock scale
+Estimate empirical CCPs pi_hat(a | s)
+Repeat for the configured NPL iterations:
+    Build the policy-weighted transition matrix F_pi
+    Compute Hotz-Miller continuation terms W_phi and W_e
+    Maximize the augmented-feature pseudo likelihood over theta
+    Compute Q_tilde(s, a) and update pi(a | s)
+Return theta, policy, value function, standard errors, and diagnostics
+```
+
 ## Model
 
 The observed data are state, action, and next-state trajectories.

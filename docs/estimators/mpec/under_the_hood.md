@@ -5,6 +5,33 @@ the value function as part of the optimizer state. The estimator chooses reward
 parameters and value variables jointly, subject to the Bellman fixed-point
 constraint.
 
+## Optimization Setup
+
+The observed panel supplies state, action, and next-state records. The
+transition law is estimated from the panel or supplied directly. Reward
+features, the discount factor, and the logit shock scale are fixed before
+optimization.
+
+MPEC optimizes the structural reward parameters `theta` and the integrated
+value vector `V` together. The objective is the conditional log likelihood of
+the observed actions. The Bellman equation is imposed as an equality
+constraint rather than solved inside each likelihood evaluation. The public
+simulation path uses the constrained SQP likelihood formulation.
+
+## Pseudocode
+
+```text
+Given panel, reward features, transitions, discount, and shock scale
+Initialize theta and V
+Build the Bellman equality constraint V - T_theta(V) = 0
+Repeat until the constrained optimizer stops:
+    Compute Q_theta,V(s, a) from theta and V
+    Compute pi_theta,V(a | s)
+    Evaluate the log likelihood and Bellman constraint
+    Update theta and V with the constrained optimizer
+Return theta, V, policy, standard errors, and constraint diagnostics
+```
+
 ## Model
 
 The observed data are state, action, and next-state trajectories.

@@ -130,6 +130,34 @@ def test_estimator_docs_use_simulation_study_links_and_terms() -> None:
     assert offenders == []
 
 
+def test_under_the_hood_pages_start_with_optimization_and_pseudocode() -> None:
+    """Keep estimator internals pages algorithm-first."""
+
+    pages = sorted((DOCS / "estimators").glob("*/under_the_hood.md"))
+    assert pages
+
+    offenders = []
+    pseudocode_block = re.compile(
+        r"## Pseudocode\s+```text\s+[\s\S]+?\s+```", flags=re.IGNORECASE
+    )
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        setup_pos = text.find("## Optimization Setup")
+        pseudocode_pos = text.find("## Pseudocode")
+        if setup_pos == -1:
+            offenders.append(f"{page.relative_to(ROOT)}: missing Optimization Setup")
+            continue
+        if pseudocode_pos == -1:
+            offenders.append(f"{page.relative_to(ROOT)}: missing Pseudocode")
+            continue
+        if setup_pos > pseudocode_pos:
+            offenders.append(f"{page.relative_to(ROOT)}: setup must precede pseudocode")
+        if not pseudocode_block.search(text):
+            offenders.append(f"{page.relative_to(ROOT)}: missing text pseudocode block")
+
+    assert offenders == []
+
+
 def _public_doc_sources() -> list[Path]:
     roots = [
         DOCS / "index.rst",

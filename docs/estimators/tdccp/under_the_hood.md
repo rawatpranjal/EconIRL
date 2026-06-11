@@ -8,6 +8,35 @@ The important boundary is that known transition tensors are not used to
 estimate `theta`. They may be used later for results file checks, policy
 evaluation, or counterfactual analysis.
 
+## Optimization Setup
+
+The observed panel supplies current actions, current states, next actions, and
+next states. Reward features, discounting, CCP basis functions, continuation
+basis functions, cross-fitting splits, and robust standard-error settings are
+fixed before optimization. Transition tensors are not used to estimate
+`theta`.
+
+TD-CCP optimizes `theta` through learned continuation objects. The first stage
+estimates CCPs. The TD stages learn `h`, the future reward-feature recursion,
+and `g`, the future choice-shock recursion. The preliminary estimator solves a
+CCP pseudo likelihood. The reported inference path then solves the
+cross-fitted locally robust moment equation and averages fold estimates.
+
+## Pseudocode
+
+```text
+Given panel, reward features, discount, basis functions, and fold splits
+Estimate first-stage CCPs from observed actions
+For each fold:
+    Learn h(a, x) by projected TD on reward features
+    Learn g(a, x) by projected TD on log-CCP shock corrections
+    Solve the preliminary CCP pseudo likelihood for theta
+    Learn the correction recursion for first-stage error
+    Solve the held-out locally robust moment equation
+Average fold estimates and compute clustered standard errors
+Return theta, standard errors, continuation diagnostics, and policy objects
+```
+
 ## Model Objects
 
 The observed panel supplies current and next state-action tuples.

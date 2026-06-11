@@ -4,6 +4,36 @@ SEES estimates a structural dynamic discrete choice likelihood while replacing
 the full Bellman solution object with a sieve approximation. The default path
 is V-SEES, which approximates the value function.
 
+## Optimization Setup
+
+The observed panel supplies state, action, and next-state records. The
+transition law is estimated from the panel or supplied directly. Reward
+features, basis functions, the discount factor, the logit shock scale, the
+Bellman-residual penalty weight, and the solution mode are fixed before
+optimization.
+
+SEES optimizes the structural reward parameters `theta` and sieve
+coefficients jointly. The objective is a penalized conditional log likelihood:
+the log likelihood rewards fit to observed actions, while the Bellman residual
+penalty keeps the approximated dynamic object close to a Bellman-consistent
+solution. The public simulation path uses the `value` mode unless another
+mode is explicitly selected for diagnostics.
+
+## Pseudocode
+
+```text
+Given panel, reward features, transitions, basis functions, and penalty weight
+Initialize theta and sieve coefficients
+Optionally build deterministic theta starts
+For each start:
+    Compute the approximated value or Q object from the basis
+    Compute choice probabilities and the log likelihood
+    Compute the Bellman residual penalty
+    Optimize theta and sieve coefficients jointly
+Select the best penalized objective
+Return theta, sieve object, policy, value function, standard errors, and diagnostics
+```
+
 ## Model
 
 The observed data are state, action, and next-state trajectories.

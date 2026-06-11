@@ -4,6 +4,34 @@ NNES estimates a structural dynamic discrete choice likelihood while learning
 a neural approximation to the integrated value function. The reported path is
 the NPL Bellman path.
 
+## Optimization Setup
+
+The observed panel supplies state, action, and next-state records. The
+transition law is estimated from the panel or supplied directly. Reward
+features, the discount factor, the logit shock scale, the value-network
+architecture, and the NPL iteration count are fixed before optimization.
+
+NNES optimizes the finite-dimensional structural reward parameters `theta`
+while using a value approximation as a nuisance object. In the reported NPL
+path, the finite-state profiled continuation terms define the structural
+likelihood, and the value network is trained against the same continuation
+target. The network supports the approximation path; the structural estimate
+remains `theta`.
+
+## Pseudocode
+
+```text
+Given panel, reward features, transitions, state encoder, and value network
+Initialize theta, CCPs, and value-network parameters
+Repeat for the configured outer NPL iterations:
+    Solve or profile the continuation terms for the current CCPs
+    Train the value network on the profiled value target
+    Build Q_theta(s, a) from reward and continuation terms
+    Maximize the structural likelihood over theta
+    Update CCPs from the implied policy
+Return theta, policy, value approximation, standard errors, and diagnostics
+```
+
 ## Operational Loop
 
 1. Supply panel trajectories and either estimate or provide the transition

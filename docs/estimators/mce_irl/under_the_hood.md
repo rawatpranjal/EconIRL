@@ -3,6 +3,33 @@
 MCE-IRL chooses reward parameters so the induced soft optimal policy matches
 demonstrated feature expectations.
 
+## Optimization Setup
+
+The observed demonstrations supply state, action, and next-state records.
+Transitions, reward features, the discount factor, the logit shock scale, and
+the initial state distribution are fixed before optimization.
+
+MCE-IRL optimizes the reward parameter vector `theta`. For each candidate
+`theta`, the estimator solves the soft Bellman equation, computes the induced
+policy and occupancy measure, and compares model feature expectations with
+demonstrated feature expectations. The public simulation path solves the root
+feature-matching equation.
+
+## Pseudocode
+
+```text
+Given demonstrations, reward features, transitions, discount, and shock scale
+Compute demonstrated feature expectations mu_E
+Initialize theta
+Repeat until feature residuals are small:
+    Build reward r_theta(s, a)
+    Solve the soft Bellman equation
+    Compute pi_theta(a | s) and the induced occupancy measure
+    Compute model feature expectations mu_theta
+    Update theta to reduce mu_theta - mu_E
+Return theta, reward table, policy, value function, and diagnostics
+```
+
 ## Model
 
 The observed data are state, action, and next-state trajectories.
