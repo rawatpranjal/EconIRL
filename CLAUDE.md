@@ -180,6 +180,28 @@ After making documentation changes, commit and push, then trigger an RTD build w
 
 Keep `docs/conf.py` release version in sync with `pyproject.toml` and `src/econirl/__init__.py`.
 
+## RTD Documentation Style and Navigation
+
+Public RTD pages should read as scientific software documentation. Do not let release-management language, audit labels, internal checklist names, or implementation nicknames leak into reader-facing prose.
+
+Use plain scientific phrasing. Say that a study uses a simulation or synthetic data. Do not use "known truth," "threshold check families," "threshold checks," "scope labels," "artifact," "certified as," "release claim," "validation target," or "algorithm sketch" on public RTD pages.
+
+Keep the documentation lean and linear. Put overview material before details. Put model math before pseudocode. Put pseudocode below the exact optimization setup and model equations. Use real pseudocode, not a sketch.
+
+Estimator navigation must stay flat. The root `docs/estimators.md` page owns the estimator toctree. Do not add "Estimator Map," "Structural Econometrics," "Inverse Reinforcement Learning," SE tabs, IRL tabs, or any other category layer above the estimator links. Estimator names should be visible directly after clicking Estimators.
+
+Do not let estimator guide pages expand the RTD sidebar. Per-estimator guide toctrees in estimator landing pages must be hidden with `:hidden:`. Add normal in-page links for Context, Quick Start, Under the Hood, Pre-Estimation Checks, Simulation Study, Counterfactuals, and examples. The sidebar should not move when the reader clicks an estimator or an estimator subpage.
+
+The estimator page order should be logical for a technical reader. Start with the estimator purpose. Then state the source papers up front. Then give the decision table or use case. Then give usage, evidence, and guide links. Each estimator landing page should link to the paper or papers it draws from. Keep those references centralized on `docs/references.md`.
+
+The top-level docs navigation should keep Overview before Estimators. Use "API Design" as the API page title. Keep References available from the root navigation.
+
+Under the Hood pages must lead to the exact optimization setup and then the model. The section order should be Optimization Setup, then Model or Model Objects, then Pseudocode. The pseudocode block should be a concrete algorithm.
+
+Simulation designs should use MDP names in code and docs. Prefer "MDP A," "MDP B," "MDP C," and so on over DGP names. Add a section explaining each MDP in ordinary terms. The explanation should state the states, actions, transitions, rewards, horizon or stopping rule, and what the simulation is meant to test.
+
+For RTD presentation work, the public RTD page is the authority. Local source checks are not enough. After changes, run the relevant tests, commit, push, ensure RTD builds, and verify the live cache-busted page. If working on a branch, merge and push the merged result before treating the task as complete.
+
 ## Key References
 
 - Rust (1987): Optimal Replacement of GMC Bus Engines
