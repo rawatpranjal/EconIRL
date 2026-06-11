@@ -1,6 +1,8 @@
-# Simulation Studies
+# Cross-estimator ladder
 
-Simulation studies run estimators on synthetic data where the reward,
+This study runs the structural and IRL estimators across a ladder of synthetic
+problems, from a canonical recoverable case to regimes designed to separate them.
+It runs estimators on synthetic data where the reward,
 transitions, and true-parameter policy are all known. Because the data-generating
 process is set by hand, we can measure exactly how well each estimator recovers
 what produced the data. This page compares estimators across a ladder of
@@ -80,23 +82,23 @@ confidence intervals are available and cover, and on cost. Read the recovery
 figure for the shared behavioral story, then the other three for where the
 methods diverge.
 
-```{figure} _static/simulation_studies/recovery_vs_complexity.png
+```{figure} ../_static/simulation_studies/recovery_vs_complexity.png
 Behavioral recovery, measured by policy total-variation distance, for each
 estimator across the difficulty ladder. Lower is better. Recovery stays tight
 across the ladder, which is the point: behavior is the robust part.
 ```
 
-```{figure} _static/simulation_studies/coverage.png
+```{figure} ../_static/simulation_studies/coverage.png
 Coverage of nominal 95% confidence intervals for the structural family. The
 dashed line marks 0.95; bars carry Monte Carlo error.
 ```
 
-```{figure} _static/simulation_studies/bias_variance.png
+```{figure} ../_static/simulation_studies/bias_variance.png
 Bias against empirical standard error for the structural family. Points toward
 the origin recover the parameters tightly and with little spread.
 ```
 
-```{figure} _static/simulation_studies/runtime.png
+```{figure} ../_static/simulation_studies/runtime.png
 Mean fit time per replication across the ladder, on a log scale. This is where
 the methods separate on cost.
 ```
@@ -104,7 +106,7 @@ the methods separate on cost.
 The tables below report the full per-cell numbers and a map of which
 data-generating condition strains which estimator.
 
-```{include} _generated/simulation_studies_results.md
+```{include} ../_generated/simulation_studies_results.md
 ```
 
 ## Reproduce
