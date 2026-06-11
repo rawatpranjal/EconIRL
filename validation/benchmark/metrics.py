@@ -139,6 +139,11 @@ def parameter_summary(
         "rmse": rmse.tolist(),
     }
 
+    # Fraction of replications where every parameter got a finite SE. A low
+    # rate means the estimator routinely fails to deliver usable inference,
+    # which a bland "n/a" coverage would otherwise hide.
+    out["se_available_rate"] = float(np.isfinite(standard_errors).all(axis=1).mean())
+
     # Coverage only where SEs are finite for every rep of that parameter.
     finite_se = np.isfinite(standard_errors).all(axis=0)
     if finite_se.any():

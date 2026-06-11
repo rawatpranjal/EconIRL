@@ -191,10 +191,16 @@ CELLS: tuple[BenchmarkCell, ...] = (
     ),
     BenchmarkCell(
         cell_id="large_sparse",
-        label="Large sparse",
+        label="Larger state space",
         difficulty=4,
-        stresses="large state count (dense transition ceiling, runtime)",
-        description="400-state abstract MDP; a scaling and runtime stress test.",
+        stresses="larger state space (checks the methods stay cheap at scale)",
+        description=(
+            "400-state abstract MDP. The dense (num_actions, num_states, "
+            "num_states) transition tensor that tabular estimators consume is "
+            "the real ceiling; it bites in the low thousands of states, not at "
+            "400. This cell checks that the structural methods stay cheap here, "
+            "not that they break."
+        ),
         builder=_large_sparse,
         n_individuals=400,
         n_periods=60,

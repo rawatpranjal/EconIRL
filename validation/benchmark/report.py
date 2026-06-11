@@ -61,7 +61,11 @@ def render_cell(cell: dict) -> str:
             mean_abs_bias = _fmt(float(np.mean(np.abs(p["bias"]))), 4)
             cov = _mean_skip_none(p["coverage_95"])
             cov_se = _mean_skip_none(p["coverage_95_mc_se"])
-            cov_s = _pm(cov, cov_se, 2) if cov is not None else "n/a"
+            if cov is not None:
+                cov_s = _pm(cov, cov_se, 2)
+            else:
+                rate = p.get("se_available_rate")
+                cov_s = f"no SE ({rate:.0%} reps)" if rate is not None else "no SE"
         else:
             mean_abs_bias = "n/a"
             cov_s = "n/a"
@@ -99,11 +103,12 @@ def render_failure_map(
     lines.append(
         "Where each estimator struggles, and the data-generating condition "
         "responsible. An estimator is flagged when it crashed, when its policy "
-        f"total-variation distance exceeded {tv_threshold:.2f}, or when coverage "
-        "fell below 0.80. On a cell whose design is rank-deficient or "
-        "ill-conditioned, structural estimators are also flagged with their "
-        "parameter bias, because there the parameters are not identified even "
-        "though behavior and coverage stay healthy.\n"
+        f"total-variation distance exceeded {tv_threshold:.2f}, when coverage "
+        "fell below 0.80, or when it failed to deliver usable standard errors. "
+        "On a cell whose design is rank-deficient or ill-conditioned, structural "
+        "estimators are also flagged with their parameter bias, because there "
+        "the parameters are not identified even though behavior and coverage "
+        "stay healthy.\n"
     )
     lines.append("| Cell | Stressed condition | Estimators that struggled |")
     lines.append("|---|---|---|")
@@ -133,6 +138,12 @@ def render_failure_map(
                     cov = _mean_skip_none(p["coverage_95"])
                     if cov is not None and cov < 0.80:
                         reasons.append(f"cov {cov:.2f}")
+                else:
+                    rate = p.get("se_available_rate")
+                    if rate is not None:
+                        reasons.append(f"no usable SEs ({rate:.0%} of reps)")
+                    else:
+                        reasons.append("no usable SEs")
                 if ill_identified:
                     reasons.append(f"params unidentified (|bias| {_mean_abs_bias(p):.2f})")
             if reasons:

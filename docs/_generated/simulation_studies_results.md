@@ -24,7 +24,7 @@ States 30, actions 2, discount 0.950. Stresses: stochastic transitions, moderate
 | Estimator | Family | Policy TV | Value RMSE | Mean \|bias\| | Coverage 95% | Runtime (s) | Converged | Crashed |
 |---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 0.003 ± 0.000 | 0.071 ± 0.013 | 0.0266 | 0.95 ± 0.05 | 4.02 | 1.00 | 0 |
-| CCP | structural | 0.003 ± 0.000 | 0.071 ± 0.013 | 0.0270 | n/a | 1.94 | 1.00 | 0 |
+| CCP | structural | 0.003 ± 0.000 | 0.071 ± 0.013 | 0.0270 | no SE | 1.94 | 1.00 | 0 |
 | MPEC | structural | 0.003 ± 0.000 | 0.073 ± 0.013 | 0.0262 | 0.95 ± 0.05 | 6.06 | 1.00 | 0 |
 | MCE-IRL | behavioral | 0.003 ± 0.000 | 0.071 ± 0.013 | n/a | n/a | 5.20 | 0.00 | 0 |
 
@@ -37,7 +37,7 @@ States 20, actions 2, discount 0.990. Stresses: discount near 1 (continuation-va
 | Estimator | Family | Policy TV | Value RMSE | Mean \|bias\| | Coverage 95% | Runtime (s) | Converged | Crashed |
 |---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 0.003 ± 0.000 | 0.343 ± 0.048 | 0.0195 | 0.93 ± 0.05 | 3.90 | 1.00 | 0 |
-| CCP | structural | 0.003 ± 0.000 | 0.343 ± 0.048 | 0.0197 | n/a | 2.22 | 1.00 | 0 |
+| CCP | structural | 0.003 ± 0.000 | 0.343 ± 0.048 | 0.0197 | no SE | 2.22 | 1.00 | 0 |
 | MPEC | structural | 0.003 ± 0.000 | 0.355 ± 0.044 | 0.0200 | 0.93 ± 0.05 | 6.30 | 1.00 | 0 |
 | MCE-IRL | behavioral | 0.003 ± 0.000 | 0.343 ± 0.048 | n/a | n/a | 6.50 | 0.00 | 0 |
 
@@ -54,16 +54,16 @@ States 24, actions 3, discount 0.950. Stresses: nonlinear reward (linear-utility
 | MPEC | structural | 0.005 ± 0.000 | 0.136 ± 0.026 | n/a | n/a | 6.00 | 1.00 | 0 |
 | MCE-IRL | behavioral | 0.005 ± 0.000 | 0.137 ± 0.025 | n/a | n/a | 7.40 | 0.00 | 0 |
 
-### Large sparse
+### Larger state space
 
-400-state abstract MDP; a scaling and runtime stress test.
+400-state abstract MDP. The dense (num_actions, num_states, num_states) transition tensor that tabular estimators consume is the real ceiling; it bites in the low thousands of states, not at 400. This cell checks that the structural methods stay cheap here, not that they break.
 
-States 400, actions 2, discount 0.950. Stresses: large state count (dense transition ceiling, runtime). Feature rank 3 of 3, condition number 38.8.
+States 400, actions 2, discount 0.950. Stresses: larger state space (checks the methods stay cheap at scale). Feature rank 3 of 3, condition number 38.8.
 
 | Estimator | Family | Policy TV | Value RMSE | Mean \|bias\| | Coverage 95% | Runtime (s) | Converged | Crashed |
 |---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 0.004 ± 0.000 | 0.095 ± 0.015 | 0.0236 | 0.97 ± 0.03 | 3.40 | 1.00 | 0 |
-| CCP | structural | 0.005 ± 0.000 | 0.097 ± 0.015 | 0.0231 | n/a | 2.44 | 1.00 | 0 |
+| CCP | structural | 0.005 ± 0.000 | 0.097 ± 0.015 | 0.0231 | no SE | 2.44 | 1.00 | 0 |
 | MPEC | structural | 0.004 ± 0.000 | 0.094 ± 0.014 | 0.0234 | 0.97 ± 0.03 | 6.27 | 1.00 | 0 |
 | MCE-IRL | behavioral | 0.004 ± 0.000 | 0.095 ± 0.015 | n/a | n/a | 3.97 | 0.00 | 0 |
 
@@ -76,19 +76,19 @@ States 24, actions 2, discount 0.950. Stresses: collinear features (rank-deficie
 | Estimator | Family | Policy TV | Value RMSE | Mean \|bias\| | Coverage 95% | Runtime (s) | Converged | Crashed |
 |---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 0.003 ± 0.000 | 0.117 ± 0.021 | 0.5240 | 0.98 ± 0.02 | 4.07 | 1.00 | 0 |
-| CCP | structural | 0.003 ± 0.000 | 0.116 ± 0.021 | 0.3384 | n/a | 2.05 | 1.00 | 0 |
+| CCP | structural | 0.003 ± 0.000 | 0.116 ± 0.021 | 0.3384 | no SE | 2.05 | 1.00 | 0 |
 | MPEC | structural | 0.003 ± 0.000 | 0.117 ± 0.020 | 0.5240 | 0.98 ± 0.02 | 6.07 | 1.00 | 0 |
 | MCE-IRL | behavioral | 0.003 ± 0.000 | 0.117 ± 0.021 | n/a | n/a | 3.08 | 0.00 | 0 |
 
 ### Failure-mode map
 
-Where each estimator struggles, and the data-generating condition responsible. An estimator is flagged when it crashed, when its policy total-variation distance exceeded 0.10, or when coverage fell below 0.80. On a cell whose design is rank-deficient or ill-conditioned, structural estimators are also flagged with their parameter bias, because there the parameters are not identified even though behavior and coverage stay healthy.
+Where each estimator struggles, and the data-generating condition responsible. An estimator is flagged when it crashed, when its policy total-variation distance exceeded 0.10, when coverage fell below 0.80, or when it failed to deliver usable standard errors. On a cell whose design is rank-deficient or ill-conditioned, structural estimators are also flagged with their parameter bias, because there the parameters are not identified even though behavior and coverage stay healthy.
 
 | Cell | Stressed condition | Estimators that struggled |
 |---|---|---|
 | Simple binary (Rust bus) | none (canonical recoverable) | none |
-| Stochastic mid-size | stochastic transitions, moderate state count | none |
-| Near-unit discount | discount near 1 (continuation-value sensitivity, CI coverage) | none |
+| Stochastic mid-size | stochastic transitions, moderate state count | CCP (no usable SEs) |
+| Near-unit discount | discount near 1 (continuation-value sensitivity, CI coverage) | CCP (no usable SEs) |
 | Nonlinear reward | nonlinear reward (linear-utility misspecification) | none |
-| Large sparse | large state count (dense transition ceiling, runtime) | none |
-| Rank-deficient features | collinear features (rank-deficient design matrix) (design rank 2/3, condition 3e+16: parameters not identified) | NFXP (params unidentified (|bias| 0.52)), CCP (params unidentified (|bias| 0.34)), MPEC (params unidentified (|bias| 0.52)) |
+| Larger state space | larger state space (checks the methods stay cheap at scale) | CCP (no usable SEs) |
+| Rank-deficient features | collinear features (rank-deficient design matrix) (design rank 2/3, condition 3e+16: parameters not identified) | NFXP (params unidentified (|bias| 0.52)), CCP (no usable SEs, params unidentified (|bias| 0.34)), MPEC (params unidentified (|bias| 0.52)) |

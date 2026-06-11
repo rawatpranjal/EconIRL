@@ -39,7 +39,7 @@ Each cell isolates one source of difficulty.
 | Stochastic mid-size | genuinely stochastic transitions, moderate state count |
 | Near-unit discount | discount near 1, where continuation values dominate |
 | Nonlinear reward | a reward that linear-utility estimators cannot represent |
-| Large sparse | a large state count, a runtime and scaling stress |
+| Larger state space | a larger state space; checks the methods stay cheap (the dense transition ceiling sits higher, in the low thousands of states) |
 | Rank-deficient features | collinear features that break parameter identification |
 
 ## How to read the metrics
@@ -62,6 +62,13 @@ place one on a method that cannot support it.
 Coverage uses a normal-approximation interval. Every reported mean carries a Monte
 Carlo standard error, so the uncertainty from a finite number of replications is
 visible rather than hidden.
+
+Two honesty notes. First, not every estimator returns usable standard errors on
+every problem; where an estimator fails to, coverage is reported as not available
+rather than guessed, and the failure-mode map flags it. Second, an estimator's own
+convergence flag and its behavioral recovery can disagree: MCE-IRL reports its
+inner objective as not converged on these cells, yet its recovered policy tracks
+the truth closely. Both are reported as they are.
 
 ## Results
 
