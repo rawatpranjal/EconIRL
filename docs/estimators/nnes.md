@@ -15,7 +15,7 @@ that repeated exact Bellman solves are no longer the best default.
 tabular reference when the state space is manageable. NNES keeps the same
 structural target but replaces the full tabular value object with a trained
 neural approximation, which makes larger or encoded state representations a
-natural validation target.
+natural simulation-study target.
 
 **What is a concrete example?** In the Nguyen paper, the Monte Carlo design is
 a Rust-style replacement model with multiple bus modules. The true value
@@ -32,7 +32,7 @@ parameters, standard errors, policies, values, and recovery metadata.
 
 | Contract | Meaning |
 | --- | --- |
-| Validated path | Use `bellman="npl"`. This is the NNES path tied to the paper's NPL orthogonality argument and the known-truth artifact. |
+| Simulation path | Use `bellman="npl"`. This is the NNES path tied to the paper's NPL orthogonality argument and the known-truth artifact. |
 | Diagnostic path | `bellman="nfxp"` trains a neural soft-Bellman approximation, but it does not carry the same zero-Jacobian or standard-error claim. |
 | Transition model | NNES is model-based. Transitions must be known or estimated before policy evaluation. |
 | Neural object | The neural network approximates the value or continuation object. The structural reward remains finite-dimensional. |
@@ -82,28 +82,28 @@ Output from the package smoke run:
 (90,)
 ```
 
-Set `bellman="npl"` for the certified NNES path. Set `bellman="nfxp"` for the
+Set `bellman="npl"` for the reported NNES path. Set `bellman="nfxp"` for the
 neural soft-Bellman diagnostic variant, which does not carry the same
 orthogonality claim.
 
-## What Is Certified
+## Simulation Study
 
 NNES is reported on low-dimensional and high-dimensional action-dependent
-known-truth DGPs. The high-dimensional cell is the primary validation because
+known-truth DGPs. The high-dimensional cell is the primary study because
 it uses encoded states and a richer reward-feature basis.
 
-| Evidence | Current state |
+| Item | Current state |
 | --- | --- |
-| Evidence scope | Known-truth low- and high-dimensional structural DDC cells. |
+| Question | Recover finite-dimensional structural reward and counterfactual behavior with a neural value approximation. |
+| Study scope | Known-truth low- and high-dimensional structural DDC cells. |
 | Primary cell | `canonical_high_action`. |
 | Machine-readable artifact | [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json). |
-| Release status | Certified with caveat. |
-| Counterfactual gates | Type A, Type B, and Type C are reported in the artifact. |
+| Counterfactual checks | Type A, Type B, and Type C are reported in the artifact. |
 | Public example | Uses `NNES` with `utility="linear_cost"` and `bellman="npl"`. |
 
-The caveat is the approximation boundary. The validation certifies recovery
-within the known-truth gates for the finite-dimensional structural reward and
-the NNES value-approximation path. It is paper-consistent evidence for the
+The caveat is the approximation boundary. The study reports recovery within
+the known-truth threshold checks for the finite-dimensional structural reward
+and the NNES value-approximation path. It is paper-consistent evidence for the
 neural value route, not a claim that arbitrary neural reward models are
 identified or that the EconIRL harness literally replicates Nguyen's Monte
 Carlo design.

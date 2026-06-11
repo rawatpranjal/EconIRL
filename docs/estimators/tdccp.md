@@ -11,9 +11,9 @@ counterfactuals, you still need a transition environment for that evaluation
 step.
 
 TD-CCP is not a general neural reward-recovery method. In EconIRL, the
-validated claim is narrower and more precise: a finite reward parameter vector
-is recovered with the locally robust, cross-fitted estimator described in the
-TD-CCP paper.
+reported study is narrower and more precise: a finite reward parameter vector
+is recovered in a known-truth simulation with the locally robust, cross-fitted
+estimator described in the TD-CCP paper.
 
 ## When To Use It
 
@@ -53,14 +53,14 @@ custom reward features, panel objects, basis settings, cross-fitting, robust
 standard errors, or supplied transition tensors, use
 `econirl.estimation.TDCCPEstimator`.
 
-## What Is Validated
+## Simulation Study
 
-The current release evidence is the
-`shapeshifter_encoded_state_locally_robust` validation cell. It uses 81 states,
-3 actions, two encoded state coordinates, and 6 reward parameters. Action 0 is
-the baseline action, so its reward is normalized to zero.
+The current simulation study is the
+`shapeshifter_encoded_state_locally_robust` known-truth cell. It uses 81
+states, 3 actions, two encoded state coordinates, and 6 reward parameters.
+Action 0 is the baseline action, so its reward is normalized to zero.
 
-The validated estimator uses:
+The reported estimator uses:
 
 | Component | Current setting |
 | --- | --- |
@@ -70,11 +70,11 @@ The validated estimator uses:
 | Covariance unit | Individual |
 | Monte Carlo check | 25 repeated-seed replications |
 
-The validation artifact records the locally robust moment equation, the
+The artifact records the locally robust moment equation, the
 correction recursion, the covariance, optimizer stationarity, and standard
 error coverage. The raw neural reward case is retained as a diagnostic only;
-it has no finite true reward parameter vector and is not part of the certified
-claim.
+it has no finite true reward parameter vector and is not part of the primary
+finite-parameter study.
 
 ## Reading Guide
 

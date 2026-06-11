@@ -17,7 +17,7 @@ disabling actions.
 
 ## Counterfactual Families
 
-The known-truth validation harness evaluates three broader counterfactual
+The known-truth simulation harness evaluates three broader counterfactual
 families against oracle solutions.
 
 | Type | Intervention | Purpose |
@@ -29,7 +29,7 @@ families against oracle solutions.
 ## Reported Results
 
 These rows come from the same known-truth artifact used on the
-[validation page](validation.md).
+[simulation study page](validation.md).
 
 | Counterfactual | Policy TV | Policy KL | Value RMSE | Regret |
 | --- | ---: | ---: | ---: | ---: |

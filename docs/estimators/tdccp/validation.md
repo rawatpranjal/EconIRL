@@ -1,10 +1,13 @@
-# Validation
+# Simulation Study
 
-The TD-CCP release evidence is built around one certified known-truth case:
+The TD-CCP simulation study is built around one known-truth case:
 `shapeshifter_encoded_state_locally_robust`. The case uses encoded state
 features and a finite linear reward, so the true reward parameters are known.
-That makes it possible to check parameter recovery, reward recovery, policies,
-values, Q functions, counterfactuals, and standard errors.
+The simulation asks whether the cross-fitted, locally robust semigradient path
+recovers those parameters, the implied dynamic objects, counterfactual
+behavior, and usable standard errors. Real data cannot answer that question
+because the true reward, policy, value function, Q function, counterfactual
+oracles, and repeated-seed coverage behavior are not observed.
 
 The result generator is
 [`tdccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/tdccp/tdccp_run.py).
@@ -25,7 +28,7 @@ The design table describes the known-truth problem. The fit summary describes
 whether the estimator and inference path ran correctly. Recovery metrics
 compare estimated objects with oracle objects. The Monte Carlo section checks
 whether the reported standard errors behave reasonably across repeated seeds.
-The hard gates are the exact thresholds used by the release artifact.
+Threshold checks are the numerical cutoffs recorded by the artifact.
 
 ## Design
 
@@ -49,7 +52,7 @@ test with encoded state features and stochastic transitions.
 
 The estimator converged on both preliminary folds and both final robust folds.
 Known transition tensors were not used to estimate `theta`; they were supplied
-after fitting so the validation harness could compare recovered policies,
+after fitting so the simulation harness could compare recovered policies,
 values, Q functions, and counterfactual decisions with oracle solutions.
 
 | Quantity | Value |
@@ -81,8 +84,8 @@ with 300 individuals and 35 periods per replication. Each replication uses the
 same cross-fitted, locally robust TD-CCP settings and individual-clustered
 covariances.
 
-The 25-replication run is the current RTD evidence because it is small enough
-to regenerate routinely. A paper-final audit should rerun the same command
+The 25-replication run is the current RTD simulation receipt because it is
+small enough to regenerate routinely. A paper-final audit should rerun the same command
 with `--mc-replications 100` under a CPU budget before claiming final Monte
 Carlo precision.
 
@@ -91,7 +94,7 @@ Carlo precision.
 | Replications completed | 25/25 |
 | Overall 95% CI coverage | 0.900 |
 | Mean parameter relative RMSE | 0.125000 |
-| Strict gate-passing replications | 15/25 |
+| Strict threshold-passing replications | 15/25 |
 | Final robust optimizer success | 25/25 |
 | Preliminary optimizer success | 25/25 |
 | Preliminary optimizer stationarity | 25/25 |
@@ -137,9 +140,9 @@ counterfactual decisions as the oracle reward.
 | Type B | 0.004840 | 0.001867 | 0.001864 |
 | Type C | 0.006953 | 0.003208 | 0.003200 |
 
-## Hard Gates
+## Threshold Checks
 
-| Gate | Threshold | Value | Status |
+| Check | Threshold | Value | Status |
 | --- | --- | ---: | --- |
 | Converged | true | true | pass |
 | Locally robust path | true | true | pass |
@@ -159,7 +162,7 @@ counterfactual decisions as the oracle reward.
 ## Diagnostic Records
 
 The `canonical_low_action` cell remains a simple sanity check and passes 10/10
-gates. The `canonical_high_action` cell remains a diagnostic stress test and
-currently fails 10/10 gates. The raw neural-reward diagnostic passes 5/8 gates
+checks. The `canonical_high_action` cell remains a diagnostic stress test and
+currently fails 10/10 checks. The raw neural-reward diagnostic passes 5/8 checks
 and fails reward, value, and Q recovery. It has no finite true reward
-parameter vector, so it is not part of the certified claim.
+parameter vector, so it is not part of the primary finite-parameter study.

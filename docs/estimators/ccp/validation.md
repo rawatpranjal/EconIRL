@@ -1,13 +1,17 @@
-# Validation
+# Simulation Study
 
-CCP is reported on the `canonical_low_action` known-truth cell. This is the
-same low-dimensional action-dependent structural benchmark used for NFXP.
+We run CCP on the `canonical_low_action` known-truth cell, the same
+low-dimensional action-dependent structural benchmark used for NFXP. The
+simulation asks whether the CCP/NPL route can recover the same structural
+objects from a finite panel when empirical choice support is strong. Real bus
+data cannot answer that question because the true reward, policy, value
+function, and counterfactual oracles are not observed.
 
 These results are not hand-entered examples. They come from the known-truth
-validation harness, where the reward, transition law, optimal policy, value
-function, Q function, and counterfactual oracle objects are all known before
-estimation starts. The CCP page checks whether the estimator can recover those
-known objects from a finite simulated panel.
+simulation harness. The harness fixes the transition law, action-dependent
+reward features, and reward weights before generating the finite panel. Those
+objects define the true reward, policy, value function, Q function, and
+counterfactual oracles that are held back for evaluation.
 
 The full result generator is
 [`ccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_run.py).
@@ -40,8 +44,8 @@ main_run = run_estimator("CCP", dgp, panel, smoke=False)
 Read the tables as a sequence. The design table states the known-truth cell.
 The fit summary reports how the estimator ran. Parameter recovery compares
 estimated reward parameters to truth. Recovery metrics compare the recovered
-reward, value, Q function, and policy to oracle objects. Hard gates are the
-reported thresholds.
+reward, value, Q function, and policy to oracle objects. Threshold checks are
+the numerical cutoffs recorded by the harness.
 
 ## Design
 
@@ -58,7 +62,7 @@ reported thresholds.
 | Periods per individual | 80 |
 | Observations | 160,000 |
 
-The validation DGP has action-dependent reward features and an exit action
+The simulation DGP has action-dependent reward features and an exit action
 that anchors the reward level.
 
 ## Fit Summary
@@ -72,8 +76,8 @@ that anchors the reward level.
 | Standard errors finite | true |
 
 The fitted run met the NPL delta criterion before the maximum of ten policy
-updates. The hard gate checks that at least five NPL iterations completed and
-that recovery metrics pass.
+updates. The threshold checks record that at least five NPL iterations
+completed and that recovery metrics pass.
 
 ## Parameter Recovery
 
@@ -103,9 +107,9 @@ because empirical CCP support is strong. The reported CCP evidence uses the
 NPL run with a ten-iteration cap because it is the structural CCP counterpart
 to the NFXP fixed point.
 
-## Hard Gates
+## Threshold Checks
 
-| Gate | Threshold | Value | Status |
+| Check | Threshold | Value | Status |
 | --- | --- | ---: | --- |
 | NPL iterations | at least 5 | 8 | pass |
 | Standard errors finite | true | true | pass |
@@ -119,5 +123,5 @@ to the NFXP fixed point.
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-reported scope is recovery within the listed tolerances in the frozen
-known-truth cell.
+study reports recovery within the listed tolerances in the frozen known-truth
+cell.

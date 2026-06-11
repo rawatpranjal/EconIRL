@@ -38,10 +38,9 @@ print(model.predict_proba(states))
 
 ## Boundary
 
-This page is a usage example, not the release certification. The certified
-evidence is the known-truth validation case, where the true reward, policy,
-value function, Q function, and counterfactual decisions are available for
-comparison.
+This page is a usage example, not the known-truth simulation study. The
+simulation study uses a case where the true reward, policy, value function,
+Q function, and counterfactual decisions are available for comparison.
 
 The wrapper may estimate transitions from the panel for fitted policy and
 value outputs. The structural parameter step remains separate from

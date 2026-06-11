@@ -43,10 +43,10 @@ encoded = TDCCP(method="semigradient", basis_type="encoded")
 neural = TDCCP(method="neural", avi_iterations=20)
 ```
 
-Use the semigradient path for the current validated workflow. Use the encoded
+Use the semigradient path for the current reported workflow. Use the encoded
 basis when states already have meaningful numeric encoders. The neural AVI path
-is available for flexible approximation, but it is not the current release
-certification.
+is available for flexible approximation, but it is not the current
+simulation-study target.
 
 ## Lower-Level Control
 

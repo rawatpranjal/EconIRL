@@ -1,15 +1,15 @@
-# Validation
+# Known-Truth Simulation Studies
 
-EconIRL validation pages use known-truth synthetic environments. The harness
-knows the reward, transition law, policy, value function, Q function, and
-counterfactual oracle before fitting the estimator.
+EconIRL simulation-study pages use known-truth synthetic environments. The
+harness fixes the reward, transition law, policy, value function, Q function,
+and counterfactual oracle before fitting the estimator.
 
 The tables report more than imports or numeric outputs. They state which
 objects are checked for each estimator target.
 
-## Gate Families
+## Threshold Check Families
 
-| Gate family | What it checks |
+| Check family | What it checks |
 | --- | --- |
 | Parameter recovery | Structural parameter direction and scale where identified. |
 | Reward recovery | The fitted reward surface after the estimator normalization. |
@@ -19,13 +19,13 @@ objects are checked for each estimator target.
 | Type B counterfactual | A transition intervention with rewards held fixed. |
 | Type C counterfactual | An action-set intervention. |
 
-## How to Read Status Labels
+## How to Read Scope Labels
 
 | Status | Meaning |
 | --- | --- |
-| Evidence reported | The page reports gates for the stated target. |
-| Evidence with scope | The reported gates are tied to stated conditions. |
-| Research preview | The implementation is available for experiments; current evidence is narrower than the target. |
+| Results reported | The page reports the simulation design, artifact, and threshold checks. |
+| Results with scope | The reported results are tied to stated simulation conditions. |
+| Research preview | The implementation is available for experiments; current results are narrower than the target. |
 
-Estimator pages link to artifacts when machine-readable evidence is available.
-When the evidence is scoped, the page states the current use clearly.
+Estimator pages link to artifacts when machine-readable results are available.
+When the results are scoped, the page states the current use clearly.

@@ -14,11 +14,11 @@ starts. Run these checks before treating a result as structural evidence.
 | Bellman constraint size | Too many value variables can make the constrained problem impractical. |
 | Transition orientation | MPEC expects action, state, next-state transition tensors internally. |
 
-## Canonical Validation Checks
+## Canonical Simulation Checks
 
 The known-truth MPEC artifact records these pre-estimation checks.
-See the [validation page](validation.md) for the generator script, rendered
-table source, and JSON artifact.
+See the [simulation study page](validation.md) for the generator script,
+rendered table source, and JSON artifact.
 
 | Check | Value | Status |
 | --- | ---: | --- |

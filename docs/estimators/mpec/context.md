@@ -33,5 +33,5 @@ likelihood cross-check when NFXP is the reference and when Bellman constraint
 diagnostics are important.
 
 CCP is usually faster when first-stage choice probabilities are well
-supported. NNES, SEES, and TD-CCP become attractive when the value-function
-constraint is too large for exact tabular constrained optimization.
+supported. NNES and TD-CCP become attractive when the value-function constraint
+is too large for exact tabular constrained optimization.

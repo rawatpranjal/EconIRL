@@ -6,12 +6,12 @@ step. Once `theta` is estimated, policy and value evaluation still need a
 transition environment for the counterfactual being studied.
 
 The public wrapper does not yet expose the same one-call parameter
-counterfactual interface as NFXP and CCP. The validation harness evaluates
+counterfactual interface as NFXP and CCP. The simulation harness evaluates
 counterfactuals directly after fitting the lower-level estimator.
 
 ## Counterfactual Families
 
-The known-truth validation harness checks three common counterfactual types.
+The known-truth simulation harness checks three common counterfactual types.
 
 | Type | Intervention | What it tests |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ The known-truth validation harness checks three common counterfactual types.
 
 ## Reported Results
 
-These rows come from the certified validation artifact.
+These rows come from the known-truth artifact.
 
 | Counterfactual | Policy TV | Value RMSE | Regret |
 | --- | ---: | ---: | ---: |

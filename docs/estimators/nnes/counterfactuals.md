@@ -1,12 +1,12 @@
 # Counterfactuals
 
 NNES estimates structural reward parameters and a neural value approximation.
-The counterfactual evidence comes from the known-truth validation harness,
+The counterfactual evidence comes from the known-truth simulation harness,
 which re-solves oracle counterfactuals and compares them with policies implied
 by the recovered NNES structural object.
 
-See [Validation](validation.md) for the generator, artifact links, and hard
-gate definitions.
+See the [Simulation Study](validation.md) for the generator, artifact links,
+and threshold checks.
 
 ## Counterfactual Families
 
@@ -27,7 +27,7 @@ These rows are the high-dimensional primary-cell results from
 | Type B | 0.021651 | 0.002128 | 0.007916 | 0.005559 |
 | Type C | 0.013053 | 0.000920 | 0.002325 | 0.001314 |
 
-All three regrets are below the 0.05 reported gate. The table compares
+All three regrets are below the 0.05 recorded threshold. The table compares
 intervened policies from the recovered NNES object with oracle counterfactual
 policies.
 

@@ -32,6 +32,8 @@ exclude_patterns = [
     ".DS_Store",
     "**.ipynb_checkpoints",
     "archive/**",
+    "estimators/sees.md",
+    "estimators/sees/**",
 ]
 
 # -- Options for HTML output -------------------------------------------------

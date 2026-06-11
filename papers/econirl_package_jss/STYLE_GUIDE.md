@@ -45,6 +45,8 @@ replacement_cost        3.0722     0.0747    41.11    0.000
 
 **Interpret, do not summarize.** A table caption tells the reader what the table is. The paragraph that follows says what is interesting about the numbers in it. If the prose just restates the column headers, cut it.
 
+**Write simulation studies as studies, not release claims.** When ground truth is needed, call the section "Simulation Study" and walk the reader through the design. Start with the question the simulation answers. Explain why real data cannot answer it. Describe the data-generating process, the generated panel, what the estimator sees, and which truth objects are held back for evaluation. Then show recovery and counterfactual results. Do not advertise the result with language like "release claim," "certified," or "validation target." If thresholds or gates are useful, keep them as an audit trail, not as the main prose. Let the numbers show whether the estimator works.
+
 ## Section register, by section
 
 | Section | Register | Notes |

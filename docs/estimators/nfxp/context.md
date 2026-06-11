@@ -26,5 +26,5 @@ need enough action variation to identify structural parameters.
 
 NFXP is the reference estimator for tabular structural estimation. CCP and
 MPEC are useful comparisons because they target the same structural object with
-different computational strategies. NNES, SEES, and TD-CCP become attractive
-when exact nested Bellman solves are too expensive.
+different computational strategies. NNES and TD-CCP become attractive when
+exact nested Bellman solves are too expensive.

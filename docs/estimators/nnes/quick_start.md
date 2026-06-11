@@ -2,8 +2,8 @@
 
 The public wrapper accepts dataframe-style panel data. This quick start is the
 package smoke path: create a model, call `fit`, and read the fitted
-sklearn-style attributes. The full NNES validation evidence lives in the
-known-truth artifact linked from [Validation](validation.md).
+sklearn-style attributes. The full NNES simulation study lives in the
+known-truth artifact linked from [Simulation Study](validation.md).
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -52,13 +52,13 @@ and the trained value-network predictions over states.
 | `v_network_` | Neural value-network predictions by state. |
 | `transitions_` | First-stage transition matrix used by the wrapper. |
 
-Use `bellman="npl"` for the certified NNES path. The wrapper also accepts
+Use `bellman="npl"` for the reported NNES path. The wrapper also accepts
 `bellman="nfxp"` as a neural soft-Bellman diagnostic variant.
 
 ## Lower-Level Control
 
 Use `econirl.estimation.nnes.NNESEstimator` when the model already has
-package-native objects or when the validation surface needs exact control over
+package-native objects or when the simulation study needs exact control over
 the DDC problem, transition tensor, reward specification, and NNES training
 configuration.
 
@@ -83,7 +83,7 @@ print(summary.metadata["v_loss_per_outer"][-1])
 No fixed output is shown for the lower-level snippet because `panel`,
 `utility`, `problem`, and `transitions` are caller-supplied objects.
 
-The known-truth validation uses the lower-level API because it supplies the
+The known-truth simulation uses the lower-level API because it supplies the
 true DDC problem, transition tensor, and reward specification directly. That is
 also the route to use when reproducing paper-style designs with custom state
 encodings or supplied transition laws.

@@ -76,7 +76,7 @@ No fixed output is shown for the lower-level snippet because `panel`,
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication and not the full Nguyen Monte Carlo. The reported validation
-evidence is the known-truth artifact, which has known reward, policy, value,
-Q, and counterfactual oracle objects. See [Validation](validation.md) for that
-evidence path.
+replication and not the full Nguyen Monte Carlo. The reported simulation study
+uses a known-truth artifact, where reward, policy, value, Q, and
+counterfactual oracle objects are available for comparison. See
+[Simulation Study](validation.md) for that path.

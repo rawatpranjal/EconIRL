@@ -13,11 +13,11 @@ starts. Run these checks before treating a result as structural evidence.
 | Reward normalization | Reward level and scale need a valid anchor. |
 | Transition orientation | NFXP expects action, state, next-state transition tensors internally. |
 
-## Canonical Validation Checks
+## Canonical Simulation Checks
 
 The known-truth NFXP artifact records these pre-estimation checks.
-See the [validation page](validation.md) for the generator script, rendered
-table source, and JSON artifact.
+See the [simulation study page](validation.md) for the generator script,
+rendered table source, and JSON artifact.
 
 | Check | Value | Status |
 | --- | ---: | --- |

@@ -23,7 +23,6 @@ Estimators
        <li><a href="estimators/nfxp.html">NFXP</a></li>
        <li><a href="estimators/ccp.html">CCP and NPL</a></li>
        <li><a href="estimators/mpec.html">MPEC</a></li>
-       <li><a href="estimators/sees.html">SEES</a></li>
        <li><a href="estimators/nnes.html">NNES</a></li>
        <li><a href="estimators/tdccp.html">TD-CCP</a></li>
      </ul>

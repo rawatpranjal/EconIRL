@@ -71,9 +71,9 @@ probabilities and the likelihood, and updates the parameters until the outer
 optimizer converges. The fitted object returns structural parameters, standard
 errors, policy, value function, and diagnostics.
 
-EconIRL uses a hybrid inner solver in validation. It uses safe successive
-approximation far from the fixed point and Newton-Kantorovich style updates
-near the solution.
+EconIRL uses a hybrid inner solver in the simulation study. It uses safe
+successive approximation far from the fixed point and Newton-Kantorovich style
+updates near the solution.
 
 ## Score Calculation
 

@@ -36,16 +36,16 @@ print(model.summary())
 ## Evidence
 
 NFXP is reported on the low-dimensional action-dependent known-truth DGP. The
-validation cell has known rewards, transitions, policies, values, Q functions,
+simulation cell has known rewards, transitions, policies, values, Q functions,
 and Type A, Type B, and Type C counterfactual oracles. The machine-readable
-artifact records the reported evidence.
+artifact records the reported results.
 
 | Evidence | Current state |
 | --- | --- |
 | Evidence scope | Known-truth tabular cell. |
 | Primary cell | `canonical_low_action`. |
 | Machine-readable artifact | [nfxp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_results.json). |
-| Counterfactual gates | Type A, Type B, and Type C are reported in the artifact. |
+| Counterfactual checks | Type A, Type B, and Type C are reported in the artifact. |
 | Public example | Uses `NFXP` with `utility="linear_cost"`. |
 
 ## NFXP Guide

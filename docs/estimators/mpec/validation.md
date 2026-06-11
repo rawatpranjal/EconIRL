@@ -1,15 +1,18 @@
-# Validation
+# Simulation Study
 
-MPEC is reported on the `canonical_low_action` known-truth cell. This is the
-same low-dimensional action-dependent structural benchmark used for NFXP and
-CCP, but MPEC exposes an additional Bellman equality constraint diagnostic.
+We run MPEC on the `canonical_low_action` known-truth cell, the same
+low-dimensional action-dependent structural benchmark used for NFXP and CCP.
+The simulation asks whether the constrained-likelihood formulation can recover
+the structural reward and counterfactual behavior while satisfying the Bellman
+equality constraint. Real bus data cannot answer that question because the
+true reward, policy, value function, Q function, and counterfactual oracles are
+not observed.
 
 These results are not hand-entered examples. They come from the known-truth
-validation harness, where the reward, transition law, optimal policy, value
-function, Q function, and counterfactual oracle objects are all known before
-estimation starts. The MPEC page checks whether the constrained likelihood
-estimator can recover those known objects from a finite simulated panel while
-satisfying the Bellman constraint.
+simulation harness. The harness fixes the transition law, action-dependent
+reward features, and reward weights before generating the finite panel. Those
+objects define the true reward, policy, value function, Q function, and
+counterfactual oracles that are held back for evaluation.
 
 The full result generator is
 [`mpec_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_run.py).
@@ -42,8 +45,8 @@ Read the tables as a sequence. The design table states the known-truth cell.
 The fit summary reports convergence, constrained-optimizer iterations, and the
 final Bellman constraint violation. Parameter recovery compares estimated
 reward parameters to truth. Recovery metrics compare the recovered reward,
-value, Q function, and policy to oracle objects. Hard gates are the pass/fail
-reported thresholds.
+value, Q function, and policy to oracle objects. Threshold checks are the
+numerical cutoffs recorded by the harness.
 
 ## Design
 
@@ -60,7 +63,7 @@ reported thresholds.
 | Periods per individual | 80 |
 | Observations | 160,000 |
 
-The validation DGP has action-dependent reward features and an exit action
+The simulation DGP has action-dependent reward features and an exit action
 that anchors the reward level.
 
 ## Fit Summary
@@ -76,9 +79,9 @@ that anchors the reward level.
 | Final Bellman constraint violation | 7.72e-12 |
 | Standard errors finite | true |
 
-The constrained optimizer satisfies the Bellman equality gate by several orders
-of magnitude. The reported evidence still depends on recovery gates, not on the
-constraint diagnostic alone.
+The constrained optimizer satisfies the Bellman equality threshold by several orders
+of magnitude. The simulation result still depends on recovery checks, not on
+the constraint diagnostic alone.
 
 ## Parameter Recovery
 
@@ -103,9 +106,9 @@ constraint diagnostic alone.
 | Policy total variation | 0.005697 |
 | Policy max state L1 | 0.018905 |
 
-## Hard Gates
+## Threshold Checks
 
-| Gate | Threshold | Value | Status |
+| Check | Threshold | Value | Status |
 | --- | --- | ---: | --- |
 | converged | true | true | pass |
 | Bellman constraint violation | at most 0.000001 | 0.000000 | pass |
@@ -120,8 +123,8 @@ constraint diagnostic alone.
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-reported scope is recovery within the listed tolerances in the frozen
-known-truth cell.
+study reports recovery within the listed tolerances in the frozen known-truth
+cell.
 
 ## Counterfactual Recovery
 

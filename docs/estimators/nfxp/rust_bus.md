@@ -44,5 +44,5 @@ states relative to a lower replacement-cost counterfactual.
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust replication.
-The reported validation evidence is the known-truth cell, which has known
-reward, policy, value, Q, and counterfactual oracle objects.
+The reported simulation study uses a known-truth cell, where reward, policy,
+value, Q, and counterfactual oracle objects are available for comparison.

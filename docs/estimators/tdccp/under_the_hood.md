@@ -5,8 +5,8 @@ future-utility terms that enter the CCP likelihood. Then it estimates the
 reward parameters using those learned terms.
 
 The important boundary is that known transition tensors are not used to
-estimate `theta`. They may be used later for validation, policy evaluation, or
-counterfactual analysis.
+estimate `theta`. They may be used later for artifact checks, policy
+evaluation, or counterfactual analysis.
 
 ## Model Objects
 
@@ -54,7 +54,7 @@ $$
 
 ## Estimation Flow
 
-The certified EconIRL path follows the semigradient version of the paper.
+The reported EconIRL path follows the semigradient version of the paper.
 
 1. Estimate conditional choice probabilities from observed actions.
 2. Build observed current and successor tuples from the panel.
@@ -66,7 +66,7 @@ The certified EconIRL path follows the semigradient version of the paper.
 
 The correction recursion is the paper's `lambda` object. The held-out moment
 equation is the paper's `zeta` moment. EconIRL records both diagnostics in the
-validation artifact, but the user-facing interpretation is simple: they correct
+simulation artifact, but the user-facing interpretation is simple: they correct
 for first-stage estimation error and support valid standard errors.
 
 ## Semigradient and AVI
@@ -77,7 +77,7 @@ problem over a fitted transition density.
 
 The AVI path is more flexible. It repeatedly solves prediction problems for
 the continuation terms and can use machine-learning learners. EconIRL exposes
-this path, but the current release evidence is tied to the semigradient,
+this path, but the current simulation study is tied to the semigradient,
 locally robust path.
 
 ## Paper Alignment
@@ -92,7 +92,7 @@ locally robust path.
 | Locally robust moment | Held-out fold solve using quantities learned on the other fold |
 | Standard errors | Fold covariance averaged and clustered by individual |
 
-## Certified Settings
+## Reported Settings
 
 | Setting | Value |
 | --- | --- |

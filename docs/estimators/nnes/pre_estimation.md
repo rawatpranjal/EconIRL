@@ -10,7 +10,7 @@ Run these checks before treating a NNES result as structural evidence.
 | Transition model | NNES is model-based, so transition probabilities must be known or estimated before policy evaluation. |
 | Transition row sums | NNES needs valid transition probabilities for continuation values. |
 | Logit DDC primitives | The paper's orthogonality result is for additive Type-I extreme-value shocks and separated transition dynamics. |
-| State coverage | Unobserved states weaken value-network training and validation. |
+| State coverage | Unobserved states weaken value-network training and recovery checks. |
 | State-action coverage | Sparse action support weakens the likelihood and counterfactual fit. |
 | Initial CCP support | The NPL path starts from empirical or first-stage CCPs; weak support makes that start noisy. |
 | Reward normalization | Reward level and scale need a valid anchor. |
@@ -20,8 +20,8 @@ Run these checks before treating a NNES result as structural evidence.
 ## Artifact Checks
 
 These rows come from the generated NNES artifact. See
-[Validation](validation.md) for the generator script, rendered table source,
-and machine-readable JSON.
+[Simulation Study](validation.md) for the generator script, rendered table
+source, and machine-readable JSON.
 
 | Check | Low-dimensional | High-dimensional primary |
 | --- | ---: | ---: |
@@ -48,5 +48,5 @@ produce valid-looking arrays and wrong continuation values.
 An unanchored value network can drift in high-discount problems because the
 absolute value level is weakly identified by choice data. A neural value
 network with poor fit can pass data likelihood checks while failing value, Q,
-or counterfactual recovery gates. These risks are why the validation table
+or counterfactual recovery checks. These risks are why the simulation table
 reports both structural recovery and final value-network loss.

@@ -2,7 +2,7 @@
 
 Most MCE-IRL failures are visible before optimization starts. Check feature
 variation, support, transition validity, and normalization before treating a
-fit as reward evidence.
+fit as reward recovery.
 
 | Check | Why it matters |
 | --- | --- |
@@ -14,10 +14,10 @@ fit as reward evidence.
 | Action support | Rare actions make action-specific rewards weakly pinned down. |
 | Reward anchor | MCE rewards need a normalization for level and scale. |
 
-## Primary Validation Checks
+## Primary Simulation Checks
 
 The primary `mce_low_high_reward` artifact records these checks. The
-[validation page](validation.md) links the generator script, rendered table
+[simulation study page](validation.md) links the generator script, rendered table
 source, and JSON artifact.
 
 | Check | Value | Status |

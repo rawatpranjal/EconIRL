@@ -2,7 +2,7 @@
 
 TD-CCP is most reliable when the reward features, observed choices, and panel
 transitions support the structural parameter target. These checks are meant to
-catch problems before a result is treated as evidence.
+catch problems before a result is treated as recovery.
 
 ## Before Fitting
 
@@ -25,7 +25,7 @@ likelihood optimizer appears to run.
 
 For locally robust inference, split folds by individual rather than by row.
 This keeps the held-out moment evaluation separate from the quantities learned
-on the other fold and matches the covariance unit used in the validation
+on the other fold and matches the covariance unit used in the simulation
 artifact.
 
 ## After Fitting
@@ -38,9 +38,9 @@ Also keep estimation and evaluation separate. The parameter-estimation step
 should not silently use a transition tensor. Transition tensors may enter later
 for policy values, Q functions, or counterfactual evaluation.
 
-## Current Certified Case
+## Current Simulation Case
 
-The release validation uses two encoded state coordinates and a finite linear
+The simulation study uses two encoded state coordinates and a finite linear
 reward. Action 0 is fixed as the baseline action, leaving six reward
 parameters for the two non-baseline actions.
 
@@ -57,5 +57,5 @@ parameters for the two non-baseline actions.
 | Max correction residual norm | 0.002610 |
 | Optimizer status | Preliminary and final robust folds converged |
 
-See the [validation page](validation.md) for the full artifact, hard gates, and
-Monte Carlo standard-error check.
+See the [simulation study page](validation.md) for the full artifact,
+threshold checks, and Monte Carlo standard-error check.

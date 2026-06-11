@@ -1,12 +1,13 @@
-# Validation
+# Simulation Study
 
-MCE-IRL is checked on two known-truth cells. The primary cell is
+We run MCE-IRL on two known-truth cells. The primary cell is
 `mce_low_high_reward`, a compact state-space problem with eight
 action-dependent reward features. The sanity cell is `canonical_low_action`.
 
-The numbers come from the known-truth validation harness. In that harness,
-rewards, transitions, policies, value functions, Q functions, and
-counterfactual oracle objects are known before estimation starts.
+The numbers come from the known-truth simulation harness. In that harness, we
+choose the transition law, reward features, and reward weights before generating
+the panel. Those objects define the true reward, policy, value function, Q
+function, occupancy measure, and counterfactual oracles.
 
 The full result generator is
 [`mce_irl_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_run.py).
@@ -33,7 +34,7 @@ result = run_estimator("MCE-IRL", dgp, panel, smoke=False)
 Read the tables in order. The design table states the known-truth cells. The
 fit summary reports the primary run. Recovery metrics compare the recovered
 reward, value, Q function, policy, and feature moments with oracle objects.
-Hard gates list the thresholds used for the release artifact.
+Threshold checks list the numerical cutoffs recorded by the harness.
 
 ## Design
 
@@ -59,16 +60,16 @@ feature-matching optimizer and standard-error computation disabled.
 | Converged | true |
 | Outer iterations | 25 |
 | Log likelihood | -329244.2754 |
-| Estimation time | 2.83 seconds |
+| Estimation time | 2.69 seconds |
 | Optimizer | `root` |
 | Feature residual | 1.89e-12 |
 | Occupancy moment residual | 0.001060 |
 | Parameter cosine similarity | 0.995950 |
 | Parameter relative RMSE | 0.091725 |
 
-Raw parameter cosine is reported, but it is not a hard gate for MCE-IRL. The
-release checks focus on feature matching, occupancy moments, recovered
-reward/value/Q objects, policy distance, and counterfactual regret.
+Raw parameter cosine is reported for reference. The recovery table focuses on
+feature matching, occupancy moments, recovered reward/value/Q objects, policy
+distance, and counterfactual regret.
 
 ## Recovery Metrics
 
@@ -92,9 +93,9 @@ compare the recovered-reward policy with the oracle policy.
 | Type B | 0.006284 | 0.000142 | 0.000523 | 0.000410 |
 | Type C | 0.004211 | 5.98e-5 | 0.000145 | 0.000094 |
 
-## Hard Gates
+## Threshold Checks
 
-| Gate | Threshold | Value | Status |
+| Check | Threshold | Value | Status |
 | --- | --- | ---: | --- |
 | Converged | true | true | pass |
 | Feature residual | at most 0.02 | 1.89e-12 | pass |
@@ -107,4 +108,5 @@ compare the recovered-reward policy with the oracle policy.
 | Type B regret | at most 0.05 | 0.000410 | pass |
 | Type C regret | at most 0.05 | 0.000094 | pass |
 
-The sanity and primary cells together pass 20 of 20 hard gates.
+The same set of checks is also recorded for the sanity cell in the JSON
+artifact.

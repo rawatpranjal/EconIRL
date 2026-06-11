@@ -2,7 +2,7 @@
 
 Maximum causal entropy IRL estimates reward parameters by matching the feature
 counts in demonstrations to the feature counts implied by a soft dynamic
-policy. In EconIRL, the tabular evidence path uses known transitions and
+policy. In EconIRL, the tabular simulation uses known transitions and
 action-dependent reward features supplied by the user.
 
 Use this page for finite-dimensional tabular IRL. Use Deep MCE-IRL when the
@@ -49,23 +49,21 @@ print(model.policy_.shape)
 
 Multi-action MCE-IRL needs an explicit reward specification. Pass a
 `RewardSpec` to `fit()` or provide `feature_matrix` at construction time. The
-wrapper no longer treats `feature_matrix=None` as an evidence-backed structural
-default.
+wrapper no longer treats `feature_matrix=None` as a structural default.
 
-## What Is Certified
+## Simulation Study
 
-The release artifact reports two action-dependent known-truth cells. The
-primary cell has 25 states, 3 actions, 8 reward features, known transitions,
-known rewards, known policies, known value and Q functions, and Type A, Type B,
-and Type C counterfactual oracles.
+The simulation uses two action-dependent known-truth cells. The primary cell
+has 25 states, 3 actions, 8 reward features, known transitions, known rewards,
+known policies, known value and Q functions, and Type A, Type B, and Type C
+counterfactual oracles.
 
-| Evidence | Current state |
+| Item | Current state |
 | --- | --- |
-| Evidence scope | Tabular maximum causal entropy feature matching. |
+| Question | Recover reward and counterfactual behavior in a known-truth MCE DGP. |
 | Primary cell | `mce_low_high_reward`. |
 | Machine-readable artifact | [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json). |
-| Release status | Certified with caveat. |
-| Hard gates | 20 pass, 0 fail across the sanity and primary cells. |
+| Recovery outputs | Reward, policy, value, Q, feature-moment, and counterfactual metrics. |
 | Public example | Uses `MCEIRL` with explicit action-dependent features. |
 
 ## MCE-IRL Guide

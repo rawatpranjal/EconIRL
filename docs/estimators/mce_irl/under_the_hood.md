@@ -49,7 +49,7 @@ $$
 = \sum_s D_{\pi_\theta}(s)\sum_a \pi_\theta(a\mid s)\phi(s, a).
 $$
 
-The root validation path solves:
+The simulation path solves:
 
 $$
 \mu_\theta - \mu_E = 0.
@@ -63,13 +63,13 @@ computes the reward matrix, solves the soft Bellman equation, computes the
 policy-induced occupancy measure, and compares model feature counts with
 demonstrated feature counts.
 
-The primer evidence uses the root feature-matching optimizer with standard
-errors disabled. The public wrapper defaults are configurable, but the release
-claim is tied to the known-truth root path in the artifact.
+The primer simulation uses the root feature-matching optimizer with standard
+errors disabled. The public wrapper defaults are configurable, but the
+known-truth artifact is generated from the root path above.
 
 ## Identification Boundary
 
-Action-dependent features are required for the multi-action reward claim.
+Action-dependent features are required for multi-action reward recovery.
 State-only features broadcast across actions can leave action-specific payoff
 differences unidentified. MCE-IRL rewards are interpreted with the
 normalization encoded by the supplied feature basis and anchor.

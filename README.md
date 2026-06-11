@@ -48,7 +48,6 @@ where a machine-readable artifact is available.
 | [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact nested fixed-point MLE | Validated reference estimator |
 | [CCP / NPL](https://econirl.readthedocs.io/en/latest/estimators/ccp.html) | Hotz-Miller inversion with NPL updates | Validated with stated support conditions |
 | [MPEC](https://econirl.readthedocs.io/en/latest/estimators/mpec.html) | Constrained likelihood formulation | Validated as an NFXP counterpart |
-| [SEES](https://econirl.readthedocs.io/en/latest/estimators/sees.html) | Sieve value approximation | Validated with optimizer-scope notes |
 | [NNES](https://econirl.readthedocs.io/en/latest/estimators/nnes.html) | Neural NPL value approximation | Validated on low- and high-dimensional cells |
 | [MCE-IRL](https://econirl.readthedocs.io/en/latest/estimators/mce_irl.html) | Maximum causal entropy feature matching | Validated for supplied reward features |
 
@@ -59,7 +58,7 @@ a common workflow.
 
 | Family | Estimators |
 | --- | --- |
-| Structural econometrics | NFXP, CCP / NPL, MPEC, SEES, NNES, TD-CCP |
+| Structural econometrics | NFXP, CCP / NPL, MPEC, NNES, TD-CCP |
 | Entropy and feature-matching IRL | MCE-IRL, Deep MCE-IRL, MaxEnt IRL, Bayesian IRL |
 | Margin and distribution matching | Max Margin IRL, Max Margin Planning, f-IRL |
 | Neural / Q-based methods | GLADIUS, Neural GLADIUS, IQ-Learn |
@@ -74,7 +73,6 @@ The recommended public API is sklearn-style:
 from econirl import (
     NFXP,
     CCP,
-    SEES,
     NNES,
     TDCCP,
     MCEIRL,

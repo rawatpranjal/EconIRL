@@ -4,11 +4,11 @@ The public `MCEIRL` wrapper exposes the recovered policy, reward matrix, and
 value function. It does not yet provide a one-call `counterfactual` method like
 the structural likelihood wrappers.
 
-The counterfactual evidence comes from the known-truth validation harness. The
+The counterfactual results come from the known-truth simulation harness. The
 harness reruns the dynamic program under controlled changes and compares the
 recovered-reward policy with the oracle policy. See the
-[validation page](validation.md) for the generator script, table source, and
-JSON artifact.
+[simulation study page](validation.md) for the generator script, table source,
+and JSON artifact.
 
 ## Counterfactual Families
 

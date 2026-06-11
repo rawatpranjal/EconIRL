@@ -10,7 +10,6 @@ evidence column states the current public scope.
 | [NFXP](estimators/nfxp.md) | Exact tabular dynamic discrete choice. | Known-truth tabular cell. |
 | [CCP](estimators/ccp.md) | Hotz-Miller and NPL-style tabular DDC. | Known-truth tabular cell with support conditions. |
 | [MPEC](estimators/mpec.md) | Constrained-optimization check on the DDC likelihood. | Known-truth constrained-likelihood counterpart. |
-| [SEES](estimators/sees.md) | Sieve value-function structural estimation. | Known-truth encoded-state cell. |
 | [NNES](estimators/nnes.md) | Neural value approximation inside NPL. | Known-truth low- and high-dimensional cells. |
 | [TD-CCP](estimators/tdccp.md) | Transition-density-free CCP parameter estimation with TD recursion. | Encoded-state finite-theta hard case with Algorithm 2 locally robust SEs. |
 
@@ -38,7 +37,6 @@ for exploration, benchmarking, and method development.
 estimators/nfxp
 estimators/ccp
 estimators/mpec
-estimators/sees
 estimators/nnes
 estimators/tdccp
 ```

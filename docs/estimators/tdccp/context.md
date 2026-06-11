@@ -38,8 +38,8 @@ There are two paper paths:
 - Approximate value iteration repeatedly solves prediction problems and can
   use flexible learners.
 
-EconIRL currently certifies the semigradient path. The flexible AVI path is
-available, but it is not the current release claim.
+EconIRL currently reports the semigradient path. The flexible AVI path is
+available, but it is not the current simulation-study target.
 
 ## Where It Fits
 
