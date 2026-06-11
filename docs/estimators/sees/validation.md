@@ -16,15 +16,13 @@ finite panel. The estimator sees the generated panel, the transition law, and
 the encoded reward basis, not the oracle dynamic objects.
 
 The full result generator is
-[`sees_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_run.py).
-It writes the rendered table source
-[`sees_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.tex)
-and the machine-readable results file
-[`sees_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json).
+[`sees_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/sees/run.py).
+It writes the machine-readable results file
+[`sees_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/sees.json).
 To rerun it from the repository root:
 
 ```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/sees/sees_run.py --quiet-progress
+PYTHONPATH=src:. python validation/estimators/sees/run.py --quiet-progress
 ```
 
 ## Read the Tables
@@ -136,8 +134,7 @@ pytest tests/benchmarks/test_parameter_recovery.py::test_sees_rust_bus_solution_
 
 Generated results files:
 
-- [`sees_rust_random_start_results.md`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_rust_random_start_results.md)
-- [`sees_rust_random_start_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_rust_random_start_results.json)
+- - [`sees_rust_random_start.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/sees_rust_random_start.json)
 
 | Mode | Gate count | Max param RMSE | Max policy TV | Max value RMSE | Max Q RMSE | Max Bellman | Max grad norm | Optimizer flags |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

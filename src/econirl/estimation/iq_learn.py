@@ -200,6 +200,8 @@ class IQLearnEstimator(BaseEstimator):
         sigma: float,
         gamma: float,
         alpha: float,
+        expert_state_coverage: float,
+        expert_state_action_coverage: float,
         start_time: float,
     ) -> EstimationResult:
         """Neural Q-head variant.
@@ -298,12 +300,24 @@ class IQLearnEstimator(BaseEstimator):
         transitions_f32 = jnp.asarray(transitions, dtype=jnp.float32)
         EV = jnp.einsum("ast,t->as", transitions_f32, V).T
         reward_table = Q_table - gamma * EV
+        reward_params, projected_reward_matrix = self._project_reward_to_utility_basis(
+            utility,
+            n_states,
+            n_actions,
+            reward_table,
+        )
 
         log_probs = jax.nn.log_softmax(Q_table / sigma, axis=1)
         ll = float(log_probs[expert_states_jax, expert_actions_jax].sum())
+        final_objective = loss_history[-1] if loss_history else float("nan")
+        parameters = (
+            reward_params.astype(jnp.float32)
+            if reward_params is not None
+            else Q_table.flatten().astype(jnp.float32)
+        )
 
         return EstimationResult(
-            parameters=Q_table.flatten().astype(jnp.float32),
+            parameters=parameters,
             log_likelihood=ll,
             value_function=V,
             policy=policy,
@@ -318,10 +332,53 @@ class IQLearnEstimator(BaseEstimator):
                 "divergence": self.config.divergence,
                 "alpha": self.config.alpha,
                 "q_table": np.asarray(Q_table).tolist(),
+                "reward_matrix": np.asarray(reward_table).tolist(),
                 "reward_table": np.asarray(reward_table).tolist(),
+                "raw_bellman_reward_table": np.asarray(reward_table).tolist(),
+                "projected_reward_matrix": (
+                    np.asarray(projected_reward_matrix).tolist()
+                    if projected_reward_matrix is not None
+                    else None
+                ),
+                "reward_params": (
+                    np.asarray(reward_params).tolist()
+                    if reward_params is not None
+                    else None
+                ),
+                "counterfactual_reward_source": "raw_bellman_reward_table",
                 "loss_history": loss_history,
+                "final_objective": final_objective,
+                "expert_state_coverage": float(expert_state_coverage),
+                "expert_state_action_coverage": float(expert_state_action_coverage),
             },
         )
+
+    def _project_reward_to_utility_basis(
+        self,
+        utility: BaseUtilityFunction,
+        n_states: int,
+        n_actions: int,
+        reward_table: jnp.ndarray,
+    ) -> tuple[jnp.ndarray | None, jnp.ndarray | None]:
+        """Least-squares projection of a recovered reward table onto truth features."""
+
+        feat = None
+        if hasattr(utility, "feature_matrix"):
+            feat = jnp.asarray(utility.feature_matrix, dtype=jnp.float32)
+        elif isinstance(utility, LinearReward) and hasattr(utility, "state_features"):
+            sf = jnp.asarray(utility.state_features, dtype=jnp.float32)
+            feat = jnp.broadcast_to(sf[:, None, :], (n_states, n_actions, sf.shape[1]))
+
+        if feat is None:
+            return None, None
+
+        phi = feat.reshape(-1, feat.shape[2])
+        r_flat = reward_table.flatten()
+        phi_aug = jnp.concatenate([phi, jnp.ones((phi.shape[0], 1))], axis=1)
+        params_aug = jnp.linalg.lstsq(phi_aug, r_flat, rcond=None)[0]
+        reward_params = params_aug[:-1]
+        projected_reward_matrix = (phi @ reward_params).reshape(n_states, n_actions)
+        return reward_params, projected_reward_matrix
 
     def _compute_initial_distribution(
         self,
@@ -366,7 +423,6 @@ class IQLearnEstimator(BaseEstimator):
         # Extract expert (s, a, s') from panel
         expert_states = np.asarray(panel.get_all_states(), dtype=np.int64)
         expert_actions = np.asarray(panel.get_all_actions(), dtype=np.int64)
-        expert_next_states = np.asarray(panel.get_all_next_states(), dtype=np.int64)
 
         # Convert to JAX for use inside objective
         expert_states_jax = jnp.array(expert_states)
@@ -374,6 +430,10 @@ class IQLearnEstimator(BaseEstimator):
 
         # Initial state distribution (needed for simple divergence)
         initial_dist = self._compute_initial_distribution(panel, n_states)
+        expert_state_coverage = len(np.unique(expert_states)) / max(n_states, 1)
+        expert_state_action_coverage = len(
+            set(zip(expert_states.tolist(), expert_actions.tolist(), strict=False))
+        ) / max(n_states * n_actions, 1)
 
         # Transitions as float64 for numerical precision
         trans_f64 = jnp.asarray(transitions, dtype=jnp.float64)
@@ -384,7 +444,9 @@ class IQLearnEstimator(BaseEstimator):
                 panel, utility, problem, transitions,
                 expert_states_jax, expert_actions_jax,
                 trans_f64, initial_dist, n_states, n_actions,
-                sigma, gamma, alpha, start_time,
+                sigma, gamma, alpha,
+                expert_state_coverage, expert_state_action_coverage,
+                start_time,
             )
         if self.config.q_type == "linear":
             if isinstance(utility, ActionDependentReward):
@@ -532,22 +594,13 @@ class IQLearnEstimator(BaseEstimator):
         log_probs = jax.nn.log_softmax(Q_table / sigma, axis=1)
         ll = float(log_probs[expert_states_jax, expert_actions_jax].sum())
 
-        # Project reward onto feature space for structural parameters
-        reward_params = None
-        feat = None
-        if hasattr(utility, 'feature_matrix'):
-            feat = jnp.asarray(utility.feature_matrix, dtype=jnp.float32)
-        elif isinstance(utility, LinearReward) and hasattr(utility, 'state_features'):
-            sf = jnp.asarray(utility.state_features, dtype=jnp.float32)
-            feat = jnp.broadcast_to(sf[:, None, :], (n_states, n_actions, sf.shape[1]))
-
-        if feat is not None:
-            Phi = feat.reshape(-1, feat.shape[2])  # (S*A, K)
-            r_flat = reward_table.flatten()          # (S*A,)
-            # Add constant column to absorb additive offset from shaping
-            Phi_aug = jnp.concatenate([Phi, jnp.ones((Phi.shape[0], 1))], axis=1)
-            params_aug = jnp.linalg.lstsq(Phi_aug, r_flat, rcond=None)[0]
-            reward_params = params_aug[:-1]  # Drop constant term
+        # Project reward onto feature space for structural parameters.
+        reward_params, projected_reward_matrix = self._project_reward_to_utility_basis(
+            utility,
+            n_states,
+            n_actions,
+            reward_table,
+        )
 
         # Parameters to return
         if self.config.q_type == "linear":
@@ -575,8 +628,22 @@ class IQLearnEstimator(BaseEstimator):
                 "divergence": self.config.divergence,
                 "alpha": self.config.alpha,
                 "q_table": np.asarray(Q_table).tolist(),
+                "reward_matrix": np.asarray(reward_table).tolist(),
                 "reward_table": np.asarray(reward_table).tolist(),
-                "reward_params": np.asarray(reward_params).tolist() if reward_params is not None else None,
+                "raw_bellman_reward_table": np.asarray(reward_table).tolist(),
+                "projected_reward_matrix": (
+                    np.asarray(projected_reward_matrix).tolist()
+                    if projected_reward_matrix is not None
+                    else None
+                ),
+                "reward_params": (
+                    np.asarray(reward_params).tolist()
+                    if reward_params is not None
+                    else None
+                ),
+                "counterfactual_reward_source": "raw_bellman_reward_table",
                 "final_objective": final_obj,
+                "expert_state_coverage": float(expert_state_coverage),
+                "expert_state_action_coverage": float(expert_state_action_coverage),
             },
         )

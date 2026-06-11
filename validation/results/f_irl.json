@@ -1,0 +1,311 @@
+{
+  "estimator": "f-IRL",
+  "interpretation": "f-IRL passes strict structural gates on the paper-faithful state-marginal/state-only reward cell. The action-dependent DDC cell remains a diagnostic negative control rather than a structural recovery claim.",
+  "primary_cell_id": "f_irl_paper_state_marginal",
+  "results": [
+    {
+      "cell_id": "f_irl_paper_state_marginal",
+      "compatibility": {
+        "compatible": true,
+        "errors": [],
+        "estimator": "f-IRL",
+        "warnings": []
+      },
+      "diagnostics": {
+        "action_shares": [
+          0.32013,
+          0.34596,
+          0.33391
+        ],
+        "anchor_valid": true,
+        "condition_number": 18.470524278622623,
+        "errors": [],
+        "feature_rank": 3,
+        "is_action_dependent": false,
+        "max_transition_row_error": 0.0,
+        "min_action_share": 0.32013,
+        "min_positive_ccp": 0.1366304347826087,
+        "num_features": 3,
+        "num_states": 8,
+        "observed_states": 8,
+        "single_action_states": 0,
+        "state_action_coverage": 1.0,
+        "warnings": []
+      },
+      "estimator": "f-IRL",
+      "gates": [
+        {
+          "name": "converged",
+          "operator": "is",
+          "passed": true,
+          "threshold": true,
+          "value": true
+        },
+        {
+          "name": "state_marginal_l1",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.08,
+          "value": 0.0002602820802810532
+        },
+        {
+          "name": "reward_range",
+          "operator": ">=",
+          "passed": true,
+          "threshold": 0.001,
+          "value": 1.2915254437182164
+        },
+        {
+          "name": "reward_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.3,
+          "value": 0.1994251892280434
+        },
+        {
+          "name": "policy_tv",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.08,
+          "value": 0.01206961367416301
+        },
+        {
+          "name": "value_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.3,
+          "value": 0.13004684778400205
+        },
+        {
+          "name": "q_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.3,
+          "value": 0.10002153592072427
+        },
+        {
+          "name": "type_a_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.05,
+          "value": 0.007084621667197477
+        },
+        {
+          "name": "type_b_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.05,
+          "value": 0.01235939156075938
+        },
+        {
+          "name": "type_c_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.05,
+          "value": 0.0027272504850098522
+        }
+      ],
+      "metrics": {
+        "counterfactuals": {
+          "type_a": {
+            "policy": {
+              "kl": 0.000352606802229677,
+              "l1": 0.020483081301675032,
+              "linf": 0.046526743720419095,
+              "tv": 0.010241540650837516
+            },
+            "regret": 0.007084621667197477,
+            "value_rmse": 0.007100341831244735
+          },
+          "type_b": {
+            "policy": {
+              "kl": 0.0007624805401236275,
+              "l1": 0.030140998285815564,
+              "linf": 0.053858864204955975,
+              "tv": 0.015070499142907782
+            },
+            "regret": 0.01235939156075938,
+            "value_rmse": 0.012374139108512925
+          },
+          "type_c": {
+            "policy": {
+              "kl": 0.0002262401477879415,
+              "l1": 0.015397728251470288,
+              "linf": 0.03982132056694265,
+              "tv": 0.007698864125735144
+            },
+            "regret": 0.0027272504850098522,
+            "value_rmse": 0.0027738974584083044
+          }
+        },
+        "parameters": null,
+        "policy": {
+          "kl": 0.00046632929210735927,
+          "l1": 0.02413922734832602,
+          "linf": 0.04760245941175753,
+          "tv": 0.01206961367416301
+        },
+        "projected_reward_normalized_rmse": null,
+        "projected_reward_rmse": null,
+        "q_normalized_rmse": 0.10002153592072427,
+        "q_rmse": 13.446339799320166,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 0.1994251892280434,
+        "reward_rmse": 0.6632256826814672,
+        "value_normalized_rmse": 0.13004684778400205,
+        "value_rmse": 13.452396503194679
+      },
+      "simulation": {
+        "n_individuals": 1000,
+        "n_periods": 100,
+        "seed": 4401,
+        "show_progress": false
+      },
+      "summary": {
+        "converged": true,
+        "convergence_message": "f-IRL (fkl): 250 iterations",
+        "estimation_time": 27.64118003845215,
+        "log_likelihood": -103951.52850415047,
+        "metadata": {
+          "f_divergence": "fkl",
+          "marginal_space": "state",
+          "occupancy_l1": 0.0002602820802810532,
+          "reward_range": 1.2915254437182164,
+          "reward_scope": "state"
+        },
+        "num_iterations": 250,
+        "num_observations": 100000
+      }
+    },
+    {
+      "cell_id": "canonical_low_action",
+      "compatibility": {
+        "compatible": true,
+        "errors": [],
+        "estimator": "f-IRL",
+        "warnings": []
+      },
+      "diagnostics": {
+        "action_shares": [
+          0.3451625,
+          0.329925,
+          0.3249125
+        ],
+        "anchor_valid": true,
+        "condition_number": 4.512181117222974,
+        "errors": [],
+        "feature_rank": 4,
+        "is_action_dependent": true,
+        "max_transition_row_error": 2.421438694000244e-08,
+        "min_action_share": 0.3249125,
+        "min_positive_ccp": 0.15275590551181104,
+        "num_features": 4,
+        "num_states": 21,
+        "observed_states": 21,
+        "single_action_states": 0,
+        "state_action_coverage": 1.0,
+        "warnings": []
+      },
+      "estimator": "f-IRL",
+      "gates": [
+        {
+          "name": "converged",
+          "operator": "is",
+          "passed": true,
+          "threshold": true,
+          "value": true
+        },
+        {
+          "name": "occupancy_l1",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.4,
+          "value": 0.16089726393837478
+        },
+        {
+          "name": "reward_range",
+          "operator": ">=",
+          "passed": false,
+          "threshold": 0.001,
+          "value": 0.0
+        }
+      ],
+      "metrics": {
+        "anchor_projected_reward_normalized_rmse": 1.0,
+        "anchor_projected_reward_rmse": 0.28088496696016835,
+        "counterfactuals": {
+          "type_a": {
+            "policy": {
+              "kl": 0.03958403059060041,
+              "l1": 0.23458548790835138,
+              "linf": 0.41501473297236285,
+              "tv": 0.11729274395417569
+            },
+            "regret": 0.09046173037767849,
+            "value_rmse": 0.10176497178692648
+          },
+          "type_b": {
+            "policy": {
+              "kl": 0.06581348721870624,
+              "l1": 0.30308086232989195,
+              "linf": 0.5018353092984826,
+              "tv": 0.15154043116494598
+            },
+            "regret": 0.22277944929318838,
+            "value_rmse": 0.24798141871608217
+          },
+          "type_c": {
+            "policy": {
+              "kl": 0.055626665237763086,
+              "l1": 0.2913292133235478,
+              "linf": 0.5338886258979452,
+              "tv": 0.1456646066617739
+            },
+            "regret": 0.08965812371227588,
+            "value_rmse": 0.10877571073589275
+          }
+        },
+        "parameters": null,
+        "policy": {
+          "kl": 0.05841371973099472,
+          "l1": 0.28255408080965055,
+          "linf": 0.5012702506421971,
+          "tv": 0.14127704040482528
+        },
+        "projected_reward_normalized_rmse": null,
+        "projected_reward_rmse": null,
+        "q_normalized_rmse": 1.3528991802531556,
+        "q_rmse": 0.511459912751555,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 1.0,
+        "reward_rmse": 0.2238144989618261,
+        "value_normalized_rmse": 0.8324960668533122,
+        "value_rmse": 0.4542302857279513
+      },
+      "simulation": {
+        "n_individuals": 2000,
+        "n_periods": 80,
+        "seed": 42,
+        "show_progress": false
+      },
+      "summary": {
+        "converged": true,
+        "convergence_message": "f-IRL (fkl): 500 iterations",
+        "estimation_time": 73.48492479324341,
+        "log_likelihood": -175777.96566731425,
+        "metadata": {
+          "f_divergence": "fkl",
+          "marginal_space": "state_action",
+          "occupancy_l1": 0.16089726393837478,
+          "reward_range": 0.0,
+          "reward_scope": "state_action"
+        },
+        "num_iterations": 500,
+        "num_observations": 160000
+      }
+    }
+  ],
+  "status": "paper_state_marginal_pass_action_dependent_diagnostic"
+}

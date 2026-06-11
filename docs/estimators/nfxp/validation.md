@@ -14,15 +14,13 @@ the generated panel, the transition law, and the action-dependent reward
 features, not the oracle dynamic objects.
 
 The full result generator is
-[`nfxp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_run.py).
-It writes the rendered table source
-[`nfxp_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_results.tex)
-and the machine-readable results file
-[`nfxp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_results.json).
+[`nfxp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/run.py).
+It writes the machine-readable results file
+[`nfxp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp.json).
 To rerun it from the repository root:
 
 ```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/nfxp/nfxp_run.py
+PYTHONPATH=src:. python validation/estimators/nfxp/run.py
 ```
 
 Read the tables as a sequence. The design table states the synthetic cell.

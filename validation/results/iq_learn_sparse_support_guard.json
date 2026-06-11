@@ -1,0 +1,181 @@
+{
+  "artifact_name": "iq_learn_sparse_support_guard",
+  "artifact_type": "local_sparse_support_guard",
+  "counterfactual_valid_certified": false,
+  "does_not_replace": "full_known_truth_sparse_state_iq_learn_artifact",
+  "estimator": "IQ-Learn",
+  "gates": [
+    {
+      "name": "converged",
+      "operator": "is",
+      "passed": true,
+      "threshold": true,
+      "value": true
+    },
+    {
+      "name": "expert_state_coverage",
+      "operator": ">=",
+      "passed": false,
+      "threshold": 1.0,
+      "value": 0.3333333333333333
+    },
+    {
+      "name": "expert_state_action_coverage",
+      "operator": ">=",
+      "passed": false,
+      "threshold": 0.95,
+      "value": 0.16666666666666666
+    },
+    {
+      "name": "policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.01
+    },
+    {
+      "name": "raw_bellman_reward_normalized_rmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.01
+    },
+    {
+      "name": "projected_reward_normalized_rmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.01
+    },
+    {
+      "name": "value_normalized_rmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.01
+    },
+    {
+      "name": "q_normalized_rmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.01
+    },
+    {
+      "name": "type_a_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.01
+    },
+    {
+      "name": "type_b_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.01
+    },
+    {
+      "name": "type_c_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.01
+    }
+  ],
+  "generated_by": "validation/estimators/iq_learn/sparse_support_guard.py",
+  "metric_fixture": {
+    "purpose": "Passing control values isolate the support gates; they are not measured structural recovery metrics for this tiny cell.",
+    "values": {
+      "policy_tv": 0.01,
+      "projected_reward_normalized_rmse": 0.01,
+      "q_normalized_rmse": 0.01,
+      "raw_bellman_reward_normalized_rmse": 0.01,
+      "type_a_regret": 0.01,
+      "type_b_regret": 0.01,
+      "type_c_regret": 0.01,
+      "value_normalized_rmse": 0.01
+    }
+  },
+  "observed_support": {
+    "state_action_pairs": [
+      [
+        0,
+        0
+      ]
+    ],
+    "states": [
+      0
+    ],
+    "total_state_action_pairs": 6,
+    "total_states": 3
+  },
+  "panel_config": {
+    "n_individuals": 20,
+    "n_periods": 5,
+    "observed_state_actions": [
+      [
+        0,
+        0
+      ]
+    ],
+    "observed_states": [
+      0
+    ],
+    "seed": 0
+  },
+  "problem_config": {
+    "discount_factor": 0.9,
+    "num_actions": 2,
+    "num_states": 3,
+    "scale_parameter": 1.0
+  },
+  "purpose": "Run IQ-Learn on a tiny sparse expert panel and evaluate the non-smoke support gates with otherwise passing diagnostic controls, so sparse support cannot be described as counterfactual-valid evidence.",
+  "release_status": "local_support_guard_not_counterfactual_release_evidence",
+  "result": {
+    "converged": true,
+    "convergence_message": "Converged",
+    "counterfactual_valid_certified": false,
+    "estimation_time": 4.501662015914917,
+    "failed_gates": [
+      "expert_state_coverage",
+      "expert_state_action_coverage"
+    ],
+    "failed_support_gates": [
+      "expert_state_coverage",
+      "expert_state_action_coverage"
+    ],
+    "metadata": {
+      "alpha": 1.0,
+      "divergence": "chi2",
+      "expert_state_action_coverage": 0.16666666666666666,
+      "expert_state_coverage": 0.3333333333333333,
+      "final_objective": 1.1744447170745923e-08,
+      "q_type": "tabular"
+    },
+    "non_support_gates_passed": true,
+    "num_individuals": 20,
+    "num_iterations": 27,
+    "num_observations": 100,
+    "num_periods": 5,
+    "parameters": [
+      1.8903605937957764,
+      -4.1966071128845215
+    ],
+    "support_gate_passed": false,
+    "support_gates_passed": false,
+    "treated_as_counterfactual_valid": false,
+    "wall_time_seconds": 4.501775741577148
+  },
+  "solver_config": {
+    "divergence": "chi2",
+    "max_iter": 50,
+    "optimizer": "L-BFGS-B",
+    "q_type": "tabular",
+    "verbose": false
+  },
+  "thresholds": {
+    "expert_state_action_coverage_min": 0.95,
+    "expert_state_coverage_min": 1.0
+  }
+}

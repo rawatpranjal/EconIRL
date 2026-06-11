@@ -208,7 +208,9 @@ def _compute_transfer_pct_optimal(
     )
 
     # Baseline: uniform random policy under transfer transitions
-    uniform_policy = jnp.ones(problem.num_states, problem.num_actions) / problem.num_actions
+    uniform_policy = (
+        jnp.ones((problem.num_states, problem.num_actions)) / problem.num_actions
+    )
     v_random = _policy_evaluation_matrix(
         true_utility, uniform_policy, transfer_transitions,
         beta=problem.discount_factor,
@@ -456,8 +458,10 @@ def run_single(
         if spec.can_recover_params and summary.parameters is not None:
             est_params = summary.parameters
             if len(est_params) == len(true_params):
-                param_rmse = (
-                    ((est_params - true_params) ** 2).astype(jnp.float32).mean().sqrt().item()
+                param_rmse = float(
+                    jnp.sqrt(
+                        ((est_params - true_params) ** 2).astype(jnp.float32).mean()
+                    ).item()
                 )
                 for i, name in enumerate(env.parameter_names):
                     estimates[name] = est_params[i].item()
@@ -465,8 +469,10 @@ def run_single(
         # Policy RMSE
         policy_rmse = float("nan")
         if summary.policy is not None:
-            policy_rmse = (
-                ((summary.policy - true_policy) ** 2).astype(jnp.float32).mean().sqrt().item()
+            policy_rmse = float(
+                jnp.sqrt(
+                    ((summary.policy - true_policy) ** 2).astype(jnp.float32).mean()
+                ).item()
             )
 
         # % of optimal value (works for all estimators with a policy)

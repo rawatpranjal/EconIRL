@@ -19,6 +19,7 @@ import pytest
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import Panel, TrajectoryPanel
+from econirl.estimation.sees import SEESConfig, SEESEstimator
 from econirl.estimators.sees import SEES
 
 
@@ -128,6 +129,13 @@ class TestBasicFit:
     def test_default_solution_is_value(self):
         model = SEES(n_states=_N_STATES_FAST, verbose=False)
         assert model.solution == "value"
+
+    def test_default_penalty_matches_package_native_default(self):
+        model = SEES(n_states=_N_STATES_FAST, verbose=False)
+        native = SEESEstimator()
+
+        assert model.penalty_weight == SEESConfig().penalty_weight
+        assert model.penalty_weight == native.config.penalty_weight
 
     def test_invalid_solution_raises(self):
         with pytest.raises(ValueError, match="solution must be one of"):

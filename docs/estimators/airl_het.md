@@ -68,4 +68,4 @@ and counterfactual truth.
 
 ## Further Reading
 
-- Machine-readable results file: [aairl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/aairl/aairl_results.json)
+- Machine-readable results file: [aairl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/aairl.json)

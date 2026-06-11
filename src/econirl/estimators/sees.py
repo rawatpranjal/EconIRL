@@ -81,7 +81,7 @@ class SEES:
         Number of basis functions for the value function approximation.
     solution : {"value", "q", "ev", "policy", "collocation"}, default="value"
         Bellman solution object approximated by the sieve.
-    penalty_weight : float, default=0.01
+    penalty_weight : float, default=10.0
         Weight on the Bellman equilibrium penalty (Luo and Sang 2024).
     max_iter : int, default=500
         Maximum L-BFGS-B iterations.
@@ -129,7 +129,7 @@ class SEES:
         basis_type: str = "fourier",
         basis_dim: int = 8,
         solution: SEESSolution = "value",
-        penalty_weight: float = 0.01,
+        penalty_weight: float = 10.0,
         num_theta_starts: int = 1,
         max_iter: int = 500,
         verbose: bool = False,

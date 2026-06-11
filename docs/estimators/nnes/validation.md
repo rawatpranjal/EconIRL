@@ -40,12 +40,11 @@ numerical checks.
 ## Older Plans and Current Status
 
 Older NNES planning files are useful for provenance but are not all current
-claims. The alignment audit at
-`papers/econirl_package_jss/plans/alignment/12_nnes.md` records an earlier
-diagnostic failure where NNES fit policy surfaces but did not yet pass the
-structural recovery checks. That failure is stale: the current NPL-profiled,
-anchored path is the reported path, and the live results file passes both the
-low-dimensional sanity cell and the high-dimensional primary cell.
+claims. A retired alignment note recorded an earlier diagnostic failure where
+NNES fit policy surfaces but did not yet pass the structural recovery checks.
+That failure is stale: the current NPL-profiled, anchored path is the reported
+path, and the live results file passes both the low-dimensional sanity cell and
+the high-dimensional primary cell.
 
 Other older plans, including `plan_rust_big.md` and the Keane-Wolpin JSS
 example plan, are planning or paper-example surfaces. They should not be read
@@ -54,15 +53,13 @@ NFXP or CCP fail on a Rust-big extension until a measured results file supports
 that result.
 
 The full result generator is
-[`nnes_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_run.py).
-It writes the rendered table source
-[`nnes_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.tex)
-and the machine-readable results file
-[`nnes_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json).
+[`nnes_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nnes/run.py).
+It writes the machine-readable results file
+[`nnes_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nnes.json).
 To rerun it from the repository root:
 
 ```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/nnes/nnes_run.py --quiet-progress
+PYTHONPATH=src:. python validation/estimators/nnes/run.py --quiet-progress
 ```
 
 ## Read the Tables

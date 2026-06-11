@@ -9,16 +9,15 @@ with 2 segments. Verifies:
 5. Segment posteriors are valid probability distributions
 """
 
-import pytest
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.adversarial.airl_het import AIRLHetEstimator, AIRLHetConfig
+from econirl.estimation.adversarial.airl_het import AIRLHetConfig, AIRLHetEstimator
 from econirl.preferences.action_reward import ActionDependentReward
-
 
 # --- Test environment (small, 6 states) ---
 

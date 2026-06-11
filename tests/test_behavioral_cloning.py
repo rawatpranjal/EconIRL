@@ -3,6 +3,7 @@ import numpy as np
 import jax.numpy as jnp
 import pytest
 
+from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator
 from econirl.preferences.linear import LinearUtility
@@ -92,3 +93,30 @@ def test_bc_matches_frequencies(small_bc_setup):
         empirical_policy[visited_states],
         atol=0.05,
     )
+
+
+def test_bc_warns_on_unvisited_states_without_smoothing():
+    """BC should warn when pure MLE leaves unvisited state rows degenerate."""
+    problem = DDCProblem(num_states=3, num_actions=2, discount_factor=0.9)
+    panel = Panel(
+        trajectories=[
+            Trajectory(
+                states=jnp.array([0, 0, 1], dtype=jnp.int32),
+                actions=jnp.array([0, 1, 1], dtype=jnp.int32),
+                next_states=jnp.array([0, 1, 1], dtype=jnp.int32),
+            )
+        ]
+    )
+    utility = LinearUtility(jnp.ones((3, 2, 1)))
+    transitions = jnp.zeros((2, 3, 3))
+
+    estimator = BehavioralCloningEstimator(smoothing=0.0, verbose=False)
+    with pytest.warns(UserWarning, match="unvisited state"):
+        result = estimator.estimate(
+            panel=panel,
+            utility=utility,
+            problem=problem,
+            transitions=transitions,
+        )
+
+    np.testing.assert_allclose(result.policy[2], jnp.array([0.0, 0.0]))

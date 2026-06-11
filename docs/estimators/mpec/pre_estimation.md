@@ -18,7 +18,7 @@ starts. Run these checks before treating a result as structural evidence.
 
 The MPEC results file records these pre-estimation checks.
 See the [simulation study page](validation.md) for the generator script,
-rendered table source, and JSON results file.
+machine-readable JSON results file.
 
 | Check | Value | Status |
 | --- | ---: | --- |

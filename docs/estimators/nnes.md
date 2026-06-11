@@ -103,7 +103,7 @@ it uses encoded states and a richer reward-feature basis.
 | Question | Recover finite-dimensional structural reward and counterfactual behavior with a neural value approximation. |
 | Study scope | Synthetic low- and high-dimensional structural DDC simulations. |
 | Primary cell | `canonical_high_action`. |
-| Machine-readable results file | [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nnes/nnes_results.json). |
+| Machine-readable results file | [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nnes.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `NNES` with `utility="linear_cost"` and `bellman="npl"`. |
 

@@ -1,20 +1,7 @@
-.PHONY: population plots finite-sample tests docs-test
-
-population:
-	python experiments/identification/run_population_only.py
-	python experiments/identification/plot_results.py
-
-plots:
-	python experiments/identification/plot_results.py
-
-finite-sample:
-	python experiments/identification/run_full_simulation.py
-
-nfxp:
-	python -u -c "import sys; sys.path.append('experiments'); import identification.run_nfxp_only as r; r.main()"
+.PHONY: tests docs docs-test distclean build publish-test publish
 
 tests:
-	pytest -q tests/test_appendix_metrics.py
+	pytest -q
 
 docs:
 	python -m sphinx -b html docs docs/_build/html

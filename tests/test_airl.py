@@ -1,11 +1,11 @@
 """Tests for AIRL estimator."""
 
-import pytest
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.adversarial.airl import AIRLEstimator, AIRLConfig
+from econirl.estimation.adversarial.airl import AIRLConfig, AIRLEstimator
 from econirl.preferences.action_reward import ActionDependentReward
 
 
@@ -81,6 +81,39 @@ class TestAIRLEstimator:
         estimator = AIRLEstimator(config=config)
         assert estimator.config.max_rounds == 50
         assert estimator.config.reward_lr == 0.05
+
+    def test_anchor_action_normalizes_state_action_reward(self):
+        """State-action AIRL pins the anchor action and absorbing row."""
+        estimator = AIRLEstimator(
+            AIRLConfig(
+                reward_arg="state_action",
+                anchor_action=1,
+                absorbing_state=2,
+                compute_se=False,
+            )
+        )
+        reward = jnp.arange(12, dtype=jnp.float32).reshape(4, 3)
+
+        anchored = estimator._enforce_anchor_reward(reward)
+
+        assert jnp.allclose(anchored[:, 1], 0.0)
+        assert jnp.allclose(anchored[2, :], 0.0)
+        assert anchored[0, 0] == reward[0, 0]
+        assert anchored[3, 2] == reward[3, 2]
+
+    def test_anchor_action_rejected_for_state_only_reward(self):
+        """Anchors are only meaningful for state-action AIRL."""
+        estimator = AIRLEstimator(
+            AIRLConfig(
+                reward_arg="state",
+                anchor_action=1,
+                compute_se=False,
+            )
+        )
+        reward = jnp.ones((4, 3))
+
+        with pytest.raises(ValueError, match="state_action"):
+            estimator._enforce_anchor_reward(reward)
 
     def test_airl_estimate_returns_result(
         self, simple_problem, simple_transitions, simple_reward_fn, expert_panel

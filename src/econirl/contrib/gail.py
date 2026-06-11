@@ -105,7 +105,7 @@ class GAILEstimator(BaseEstimator):
 
     Examples
     --------
-    >>> from econirl.estimation.adversarial import GAILEstimator, GAILConfig
+    >>> from econirl.contrib.gail import GAILEstimator, GAILConfig
     >>> config = GAILConfig(max_rounds=100, verbose=True)
     >>> estimator = GAILEstimator(config=config)
     >>> result = estimator.estimate(panel, reward_fn, problem, transitions)

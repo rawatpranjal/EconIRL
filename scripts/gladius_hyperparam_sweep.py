@@ -45,7 +45,7 @@ def default_output_path(args: argparse.Namespace) -> Path:
         f"gladius_hyperparam_sweep_"
         f"n{args.n_individuals}_t{args.n_periods}_s{args.seed}.json"
     )
-    return Path("experiments/identification/results") / filename
+    return Path("validation/results") / filename
 
 
 def build_configs() -> list[tuple[str, dict]]:

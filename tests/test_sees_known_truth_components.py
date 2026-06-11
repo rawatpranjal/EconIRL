@@ -12,7 +12,7 @@ from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.preferences.linear import LinearUtility
-from experiments.known_truth import (
+from validation.known_truth import (
     KnownTruthDGP,
     KnownTruthDGPConfig,
     build_known_truth_dgp,

@@ -56,7 +56,7 @@ diagnostics.
 To reproduce the simulation, run the lower-level simulation harness:
 
 ```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/mce_irl/mce_irl_run.py --quiet-progress --enforce-gates
+PYTHONPATH=src:. python validation/estimators/mce_irl/run.py --quiet-progress --enforce-gates
 ```
 
 Output

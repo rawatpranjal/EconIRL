@@ -375,7 +375,7 @@ def build_trivago_features(
         Feature matrix of shape (n_states, n_actions, 4).
     """
     n_features = 4
-    features = jnp.zeros(n_states, n_actions, n_features)
+    features = np.zeros((n_states, n_actions, n_features), dtype=np.float32)
 
     n_non_absorbing = n_states - 1
 
@@ -398,7 +398,7 @@ def build_trivago_features(
 
     # Absorbing state: all zeros for all actions (already initialized)
 
-    return features
+    return jnp.array(features)
 
 
 def build_trivago_transitions(
@@ -428,13 +428,13 @@ def build_trivago_transitions(
     absorbing = n_states - 1
 
     # Count transitions
-    counts = jnp.zeros(n_actions, n_states, n_states)
+    counts = np.zeros((n_actions, n_states, n_states), dtype=np.float32)
     for s, a, ns in zip(
         mdp_dict["all_states"],
         mdp_dict["all_actions"],
         mdp_dict["all_next_states"],
     ):
-        counts[a, s, ns] += 1.0
+        counts[int(a), int(s), int(ns)] += 1.0
 
     # Force terminal actions to absorbing state
     for a in [ACTION_CLICKOUT, ACTION_ABANDON]:
@@ -447,7 +447,7 @@ def build_trivago_transitions(
         counts[a, absorbing, absorbing] = 1.0
 
     # Normalize rows; add smoothing for unobserved (s, a) pairs
-    transitions = jnp.zeros_like(counts)
+    transitions = np.zeros_like(counts)
     for a in range(n_actions):
         for s in range(n_states):
             row_sum = counts[a, s].sum()
@@ -455,9 +455,9 @@ def build_trivago_transitions(
                 transitions[a, s] = counts[a, s] / row_sum
             else:
                 # Unobserved (s, a): uniform distribution with smoothing
-                transitions[a, s] = jnp.ones(n_states) / n_states
+                transitions[a, s] = np.ones(n_states, dtype=np.float32) / n_states
 
-    return transitions
+    return jnp.array(transitions)
 
 
 def load_trivago_search(

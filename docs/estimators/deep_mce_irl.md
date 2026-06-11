@@ -74,4 +74,4 @@ policy, value, reward-table, and counterfactual truth.
 
 ## Further Reading
 
-- Machine-readable results file: [deep_mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/deep_mce_irl/deep_mce_irl_results.json)
+- Machine-readable results file: [deep_mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json)

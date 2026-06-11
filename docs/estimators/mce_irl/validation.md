@@ -17,15 +17,13 @@ Q function, occupancy measure, and counterfactual oracles are held back for
 evaluation.
 
 The full result generator is
-[`mce_irl_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_run.py).
-It writes the rendered table source
-[`mce_irl_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.tex)
-and the machine-readable results file
-[`mce_irl_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json).
+[`mce_irl_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/run.py).
+It writes the machine-readable results file
+[`mce_irl_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json).
 To rerun it from the repository root:
 
 ```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/mce_irl/mce_irl_run.py --quiet-progress --enforce-gates
+PYTHONPATH=src:. python validation/estimators/mce_irl/run.py --quiet-progress --enforce-gates
 ```
 
 Read the tables in order. The design table states the synthetic cells. The

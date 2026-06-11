@@ -16,12 +16,12 @@ where T is the soft Bellman operator.
 Two solvers are provided:
 
   "sqp" (default):  Sequential Quadratic Programming. At each outer
-      iteration, linearise the Bellman constraint and solve the
-      resulting equality-constrained QP via the full KKT system
-      (JAX-native, jnp.linalg.solve).  A damped BFGS Hessian
-      approximation is maintained.  An L1 merit function drives
-      backtracking line search.  This is the JAX-ecosystem alternative
-      to KNITRO's interior-point engine used in Su & Judd (2012).
+      iteration, scipy SLSQP solves the Bellman equality-constrained
+      problem. JAX supplies the objective gradient and Bellman
+      constraint Jacobian. This is the current recommended path.
+
+  "sqp_jax":  Experimental reduced-space SQP using a JAX-native KKT
+      solve and damped BFGS updates.
 
   "augmented_lagrangian" (legacy): Penalty-based AL with jaxopt
       L-BFGS-B inner solves.  Kept for backward compatibility but
@@ -67,10 +67,11 @@ class MPECConfig:
     """Configuration for the MPEC estimator.
 
     Attributes:
-        solver: "sqp" (default, recommended) uses Sequential Quadratic
-            Programming with a JAX-native KKT solver and damped BFGS
-            Hessian.  "augmented_lagrangian" / "slsqp" are legacy aliases
-            for the penalty-based AL solver (less reliable at high beta).
+        solver: "sqp" (default, recommended) uses scipy SLSQP with
+            JAX-provided objective gradients and Bellman constraint
+            Jacobians. "sqp_jax" is an experimental JAX-native KKT solver.
+            "augmented_lagrangian" / "slsqp" are legacy aliases for the
+            penalty-based AL solver (less reliable at high beta).
         outer_max_iter: Maximum SQP / AL outer iterations.
         tol: KKT stationarity tolerance (SQP) or inner L-BFGS-B tol (AL).
         constraint_tol: Maximum Bellman constraint violation at convergence.
@@ -104,12 +105,10 @@ class MPECEstimator(BaseEstimator):
     """MPEC estimator for dynamic discrete choice models.
 
     Avoids nested fixed-point solving by treating V as decision variables
-    alongside theta (Su and Judd 2012). The Bellman equality constraint
-    V = T(V; theta) is enforced via augmented Lagrangian: a sequence of
-    unconstrained jaxopt L-BFGS-B inner subproblems with increasing
-    penalty on the constraint violation. Both "slsqp" and
-    "augmented_lagrangian" config values route to this path. No scipy
-    dependency is required.
+    alongside theta (Su and Judd 2012). The default solver enforces the
+    Bellman equality constraint with scipy SLSQP using JAX gradients and
+    constraint Jacobians. Legacy augmented-Lagrangian and experimental
+    JAX-native SQP paths are also available through ``MPECConfig``.
 
     Example:
         >>> estimator = MPECEstimator(verbose=True)

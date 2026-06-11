@@ -1,7 +1,7 @@
 """Sklearn-style Max Margin IRL estimator.
 
 This module provides a MaxMarginIRL class with a scikit-learn style API that wraps
-the underlying MaxMarginIRLEstimator from econirl.estimation.max_margin_irl. It
+the underlying MaxMarginIRLEstimator from econirl.contrib.max_margin_irl. It
 implements the Abbeel & Ng (2004) apprenticeship learning algorithm.
 
 Example:

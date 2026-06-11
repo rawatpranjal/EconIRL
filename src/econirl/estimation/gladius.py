@@ -1,29 +1,26 @@
 """GLADIUS Estimator: Neural Network-based IRL for Dynamic Discrete Choice.
 
-This module implements the GLADIUS estimator from Kang et al. (2025),
+This module implements the package's GLADIUS-style neural estimator,
 which uses neural networks to parameterize Q-functions and expected
 future value functions for inverse reinforcement learning in dynamic
 discrete choice models.
 
 Algorithm (IRL setting, no observed rewards):
     1. Parameterize Q(s,a) and zeta(s,a) = E[V(s')|s,a] with MLPs.
-    2. Train via alternating mini-batch SGD (Algorithm 1, Kang 2025):
+    2. Train via alternating mini-batch SGD:
        - Even batches: update zeta via MSE(zeta(s,a), V_Q(s')), Q frozen.
-       - Odd batches: update Q via NLL of observed actions, zeta frozen.
-       Q receives NO Bellman gradients in the IRL setting. Passing
-       gradients through V_Q(s') = logsumexp(Q) causes Q-value explosion
-       because no observed reward anchors the absolute scale.
+       - Odd batches: update Q via NLL of observed actions plus the
+         anchor-action Bellman loss when known anchor rewards are supplied.
     3. Extract structural parameters via action-difference projection:
        dr(s) = r(s,a) - r(s,0), dphi(s) = phi(s,a) - phi(s,0), then
        least-squares. This eliminates the unidentified additive constant
        (Kim et al. 2021, Cao & Cohen 2021).
 
-Known limitation: NLL-only training identifies Q up to a state-dependent
-constant c(s) that leaks into implied rewards through asymmetric
-transitions. On tabular problems (Rust bus, beta=0.95), this produces
-~40% bias on the operating cost parameter regardless of network size or
-data volume. NFXP recovers both parameters within 5%. Use GLADIUS for
-continuous-state environments or when rewards are observed.
+Known limitation: if known anchor rewards are not supplied, this falls
+back to an NLL-only Q path. That path identifies Q only up to a
+state-dependent constant c(s), which leaks into implied rewards through
+asymmetric transitions. Structural validation should therefore check
+reward, value, Q, and counterfactual recovery, not just policy fit.
 
 Reference:
     Kang, E. H., et al. (2025). Offline Inverse RL and Dynamic Discrete
@@ -65,9 +62,12 @@ class GLADIUSConfig:
         weight_decay: L2 regularization weight.
         gradient_clip: Maximum gradient norm for clipping.
         patience: Early stopping patience (epochs without improvement).
-        alternating_updates: Use alternating zeta/Q optimization from
-            Algorithm 1 in Kang et al. (2025). When False, both networks
-            are updated jointly in each step (legacy behavior).
+        alternating_updates: Use alternating zeta/Q optimization. This
+            follows the update schedule of Algorithm 1 in Kang et al.
+            (2025), but the package IRL path does not include the
+            anchor-reward Q-side Bellman gradient from the paper. When
+            False, both networks are updated jointly in each step
+            (legacy behavior).
         lr_decay_rate: Learning rate decay rate. The effective learning
             rate decays as lr_0 / (1 + decay_rate * step). Set to 0.0
             for constant learning rate.
@@ -80,6 +80,14 @@ class GLADIUSConfig:
             transitions where a equals this action index. Per the paper
             (Assumption 3), this restricts the Bellman constraint to the
             anchor action for identification.
+        anchor_rewards: Known reward for ``anchor_action`` in each state.
+            Supplying this vector enables the paper's identifying Q-side
+            anchor Bellman loss.
+        anchor_bellman_loss: Whether to add an anchor Bellman term to the Q
+            objective when ``anchor_rewards`` are available.
+        anchor_bellman_mode: ``anchor_moment`` pins Q to the learned
+            continuation moment. ``paper_minimax`` uses the literal
+            bi-conjugate minimax term and is retained for diagnostics.
         compute_se: Whether to compute standard errors via bootstrap.
         n_bootstrap: Number of bootstrap replications for SE computation.
         verbose: Whether to print progress messages.
@@ -100,13 +108,16 @@ class GLADIUSConfig:
     alternating_updates: bool = True
     mode: Literal["dual", "q_only"] = "dual"
     """Network configuration. ``dual`` (default) trains separate Q_eta and
-    V_zeta networks per Kang et al. (2025) Algorithm 1. ``q_only`` drops
+    V_zeta networks in the GLADIUS-style architecture. ``q_only`` drops
     the V_zeta network and replaces V_zeta with the soft maximum of
     Q_eta, i.e. V(s) = sigma * logsumexp(Q(s, :) / sigma)."""
     lr_decay_rate: float = 0.001
     tikhonov_annealing: bool = False
     tikhonov_initial_weight: float = 100.0
     anchor_action: int | None = None
+    anchor_rewards: tuple[float, ...] | None = None
+    anchor_bellman_loss: bool = True
+    anchor_bellman_mode: Literal["anchor_moment", "paper_minimax"] = "anchor_moment"
     value_scale: float | None = None  # Output scale for Q/EV networks.
     # When None (default), auto-set to 1/(1-beta) so networks predict
     # in per-period utility units. With beta=0.9999, Q-values are order
@@ -274,7 +285,8 @@ class GLADIUSEstimator(BaseEstimator):
 
     References
     ----------
-    Kang, M., et al. (2025). DDC IRL with neural networks.
+    Kang, E. H., Yoganarasimhan, H., and Jain, L. (2025).
+    Offline Inverse RL and Dynamic Discrete Choice Models.
     """
 
     def __init__(self, config: GLADIUSConfig | None = None, **kwargs):
@@ -453,15 +465,17 @@ class GLADIUSEstimator(BaseEstimator):
     ) -> EstimationResult:
         """Core GLADIUS optimization routine.
 
-        Implements Algorithm 1 from Kang et al. (2025). When alternating
+        Uses the GLADIUS neural Q/zeta architecture. When alternating
         updates are enabled (default), even-numbered batches update the
         zeta network (value approximator) and odd-numbered batches update
-        the Q network (action-value function). This alternating scheme
-        stabilizes training by giving each network a stable target.
+        the Q network (action-value function). The paper's Algorithm 1
+        also passes Q-side gradients through an anchor-action Bellman
+        term with a known anchor reward; this implementation enables that
+        term when ``anchor_rewards`` are supplied.
 
         The zeta network approximates E[V(s')|s,a]. The Q network is
-        trained via negative log-likelihood of observed actions, with a
-        Bellman consistency penalty that pushes V_Q(s') toward zeta(s,a).
+        trained via negative log-likelihood of observed actions and, when
+        possible, the anchor-action Bellman term that pins the Q level.
         After training, implied rewards r(s,a) = Q(s,a) - beta*zeta(s,a)
         are projected onto the feature matrix to recover structural
         parameters.
@@ -544,6 +558,20 @@ class GLADIUSEstimator(BaseEstimator):
 
         bellman_weight = self.config.bellman_penalty_weight
         anchor_action = self.config.anchor_action
+        anchor_rewards = None
+        if self.config.anchor_rewards is not None:
+            anchor_rewards = jnp.asarray(self.config.anchor_rewards, dtype=jnp.float32)
+            if anchor_rewards.shape != (n_states,):
+                raise ValueError(
+                    "anchor_rewards must contain one known reward per state; "
+                    f"expected shape ({n_states},), got {anchor_rewards.shape}"
+                )
+        use_anchor_bellman = (
+            self.config.anchor_bellman_loss
+            and anchor_action is not None
+            and anchor_rewards is not None
+        )
+        anchor_bellman_mode = self.config.anchor_bellman_mode
 
         # --- Define alternating training steps ---
 
@@ -576,7 +604,7 @@ class GLADIUSEstimator(BaseEstimator):
 
         @eqx.filter_jit
         def q_step(q_net, zeta_net, q_opt_state, s_feat, a_batch, sp_feat,
-                   ce_weight):
+                   anchor_r_batch, ce_weight):
             """Update Q to fit observed choices with Bellman consistency.
 
             Loss = ce_weight * NLL + bellman_weight * Bellman_penalty
@@ -584,9 +612,9 @@ class GLADIUSEstimator(BaseEstimator):
             NLL: negative log-likelihood of observed actions under the
             softmax policy derived from Q.
 
-            Bellman penalty: pushes V_Q(s') toward zeta(s,a), propagating
-            Bellman consistency through the Q network at the next state.
-            Zeta is frozen (no gradient).
+            Bellman penalty: when known anchor rewards are supplied, this pins
+            Q with the anchor Bellman equation. Otherwise it is only a
+            diagnostic and Q is trained by NLL.
             """
 
             def q_loss_fn(q_net_inner):
@@ -601,42 +629,41 @@ class GLADIUSEstimator(BaseEstimator):
                 )
                 nll = -log_probs[jnp.arange(len(a_batch)), a_batch].mean()
 
-                # IRL setting: Q trained by NLL only. Bellman consistency
-                # is enforced by the zeta step (MSE on V(s')).
-                #
-                # DO NOT pass Bellman gradients to Q here. Without observed
-                # rewards to anchor absolute Q-levels, gradients through
-                # V_Q(s') = logsumexp(Q) cause Q-value explosion (Q grows
-                # from [-1.5, 1.5] to [4548, 6782], destroying reward
-                # recovery). See commit d19469da for the fix.
-                #
-                # This means Q is effectively behavioral cloning, and the
-                # implied rewards r = Q - beta*zeta inherit a state-dependent
-                # bias from the unidentified constant in Q. The bias is
-                # ~40% on Rust bus OC with beta=0.95. Structural estimators
-                # (NFXP, CCP) do not have this limitation.
-                #
-                # Bellman loss is computed for logging only (both sides
-                # stop-gradiented).
-                zeta_sa = jax.lax.stop_gradient(
-                    zeta_net.forward(s_feat, a_onehot)
-                )
-                q_sp_all = jax.lax.stop_gradient(
-                    q_net_inner.forward_all_actions(sp_feat)
-                )
+                zeta_sa = jax.lax.stop_gradient(zeta_net.forward(s_feat, a_onehot))
+                q_sp_all = q_net_inner.forward_all_actions(sp_feat)
                 v_sp = sigma * jax.scipy.special.logsumexp(
                     q_sp_all / sigma, axis=1
                 )
 
-                if anchor_action is not None:
+                if use_anchor_bellman:
+                    q_sa = jnp.sum(q_all * a_onehot, axis=1)
                     mask = (a_batch == anchor_action).astype(jnp.float32)
-                    bellman_loss = jnp.sum(
-                        mask * (v_sp - zeta_sa) ** 2
-                    ) / jnp.maximum(mask.sum(), 1.0)
+                    if anchor_bellman_mode == "paper_minimax":
+                        anchor_td = anchor_r_batch + beta * v_sp - q_sa
+                        zeta_residual = v_sp - zeta_sa
+                        bellman_terms = (
+                            anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
+                        )
+                    else:
+                        anchor_td = anchor_r_batch + beta * zeta_sa - q_sa
+                        bellman_terms = anchor_td ** 2
+                    bellman_loss = jnp.sum(mask * bellman_terms) / jnp.maximum(
+                        mask.sum(), 1.0
+                    )
+                    total_loss = ce_weight * nll + bellman_weight * bellman_loss
                 else:
-                    bellman_loss = jnp.mean((v_sp - zeta_sa) ** 2)
-
-                total_loss = ce_weight * nll
+                    # Without known anchor rewards, this quantity is only a
+                    # diagnostic for zeta consistency; it must not identify Q.
+                    q_sp_all = jax.lax.stop_gradient(q_sp_all)
+                    v_sp = jax.lax.stop_gradient(v_sp)
+                    if anchor_action is not None:
+                        mask = (a_batch == anchor_action).astype(jnp.float32)
+                        bellman_loss = jnp.sum(
+                            mask * (v_sp - zeta_sa) ** 2
+                        ) / jnp.maximum(mask.sum(), 1.0)
+                    else:
+                        bellman_loss = jnp.mean((v_sp - zeta_sa) ** 2)
+                    total_loss = ce_weight * nll
                 return total_loss, (nll, bellman_loss)
 
             (loss, aux), grads = eqx.filter_value_and_grad(
@@ -653,7 +680,7 @@ class GLADIUSEstimator(BaseEstimator):
         # alternating_updates=False.
         @eqx.filter_jit
         def joint_step(q_net, zeta_net, q_opt_state, zeta_opt_state,
-                       s_feat, a_batch, sp_feat, ce_weight):
+                       s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight):
             """Joint update of both networks in one step (legacy mode)."""
 
             def loss_fn(nets):
@@ -670,10 +697,28 @@ class GLADIUSEstimator(BaseEstimator):
                 v_sp = sigma * jax.scipy.special.logsumexp(
                     q_sp_all / sigma, axis=1
                 )
-                td_error = beta * (
-                    zeta_sa - jax.lax.stop_gradient(v_sp)
+                zeta_loss = jnp.mean(
+                    (zeta_sa - jax.lax.stop_gradient(v_sp)) ** 2
                 )
-                bellman_loss = jnp.mean(td_error ** 2)
+
+                if use_anchor_bellman:
+                    q_sa = jnp.sum(q_all * a_onehot, axis=1)
+                    mask = (a_batch == anchor_action).astype(jnp.float32)
+                    if anchor_bellman_mode == "paper_minimax":
+                        anchor_td = anchor_r_batch + beta * v_sp - q_sa
+                        zeta_residual = v_sp - zeta_sa
+                        anchor_terms = (
+                            anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
+                        )
+                    else:
+                        anchor_td = anchor_r_batch + beta * zeta_sa - q_sa
+                        anchor_terms = anchor_td ** 2
+                    anchor_loss = jnp.sum(mask * anchor_terms) / jnp.maximum(
+                        mask.sum(), 1.0
+                    )
+                    bellman_loss = zeta_loss + anchor_loss
+                else:
+                    bellman_loss = zeta_loss
 
                 total_loss = ce_weight * nll + bellman_weight * bellman_loss
                 return total_loss, (nll, bellman_loss)
@@ -706,8 +751,8 @@ class GLADIUSEstimator(BaseEstimator):
         if q_only_mode:
             # Q-only training step: V_zeta is replaced by sigma*logsumexp(Q)
             # so the network has no separate zeta head. Q is trained on NLL
-            # alone (the Bellman penalty has no anchor without observed rewards
-            # in the IRL setting).
+            # alone. The paper-faithful anchor-action Bellman loss is not
+            # available in q_only mode.
             @eqx.filter_jit
             def q_only_step(q_net, q_opt_state, s_feat, a_batch, ce_weight):
                 def q_only_loss_fn(q_net_inner):
@@ -759,6 +804,10 @@ class GLADIUSEstimator(BaseEstimator):
                 s_batch = all_states[idx]
                 a_batch = all_actions[idx]
                 sp_batch = all_next_states[idx]
+                if anchor_rewards is None:
+                    anchor_r_batch = jnp.zeros_like(s_batch, dtype=jnp.float32)
+                else:
+                    anchor_r_batch = anchor_rewards[s_batch]
 
                 s_feat = self._build_state_features(s_batch, problem)
                 sp_feat = self._build_state_features(sp_batch, problem)
@@ -780,14 +829,14 @@ class GLADIUSEstimator(BaseEstimator):
                         # Odd batch: update Q only
                         q_net, q_opt_state, loss, _aux = q_step(
                             q_net, zeta_net, q_opt_state,
-                            s_feat, a_batch, sp_feat, ce_weight,
+                            s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight,
                         )
                         epoch_nll = float(_aux[0])
                 else:
                     q_net, zeta_net, q_opt_state, zeta_opt_state, loss, _aux = (
                         joint_step(
                             q_net, zeta_net, q_opt_state, zeta_opt_state,
-                            s_feat, a_batch, sp_feat, ce_weight,
+                            s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight,
                         )
                     )
                     epoch_nll = float(_aux[0])
@@ -895,6 +944,13 @@ class GLADIUSEstimator(BaseEstimator):
                 "q_table": np.asarray(q_table).tolist(),
                 "ev_table": np.asarray(ev_table).tolist(),
                 "loss_history": loss_history,
+                "anchor_action": self.config.anchor_action,
+                "anchor_bellman_loss": bool(use_anchor_bellman),
+                "anchor_bellman_mode": anchor_bellman_mode,
+                "anchor_rewards": (
+                    np.asarray(anchor_rewards).tolist()
+                    if anchor_rewards is not None else None
+                ),
                 "final_loss": (
                     loss_history[-1] if loss_history else float("nan")
                 ),

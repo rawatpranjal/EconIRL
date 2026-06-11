@@ -246,6 +246,20 @@ class ShapeshifterEnvironment(DDCEnvironment):
         """
         return self._reward_matrix
 
+    def compute_utility_matrix(
+        self,
+        parameters: jnp.ndarray | None = None,
+    ) -> jnp.ndarray:
+        """Return the flow utility matrix for the current DGP.
+
+        Neural-reward cells have no finite theta. In that case the
+        environment's frozen reward matrix is the source of truth used
+        to simulate expert panels.
+        """
+        if parameters is None and self._config.reward_type == "neural":
+            return self._reward_matrix
+        return super().compute_utility_matrix(parameters)
+
     @property
     def problem_spec(self) -> DDCProblem:
         return DDCProblem(

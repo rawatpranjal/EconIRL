@@ -1,7 +1,7 @@
 """Sklearn-style MaxEnt IRL estimator for inverse reinforcement learning.
 
 This module provides a MaxEntIRL class with a scikit-learn style API that wraps
-the underlying MaxEntIRLEstimator from econirl.estimation.maxent_irl. It accepts
+the underlying MaxEntIRLEstimator from econirl.contrib.maxent_irl. It accepts
 pandas DataFrames with column names instead of the low-level Panel API.
 
 Example:

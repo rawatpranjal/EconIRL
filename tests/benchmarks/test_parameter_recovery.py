@@ -36,8 +36,8 @@ from econirl.estimation.sees import SEESEstimator
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel
-from experiments.sees_linear_value_spline import run_benchmark as run_linear_value_spline_benchmark
-from experiments.sees_rust_random_start import run_benchmark as run_rust_random_start_benchmark
+from validation.estimators.sees.linear_value_spline import run_benchmark as run_linear_value_spline_benchmark
+from validation.estimators.sees.rust_random_start import run_benchmark as run_rust_random_start_benchmark
 
 # ---------------------------------------------------------------------------
 # Helpers

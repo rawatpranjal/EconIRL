@@ -13,6 +13,7 @@ from the MDP structure.
 from __future__ import annotations
 
 import time
+import warnings
 
 import jax
 import jax.numpy as jnp
@@ -97,6 +98,18 @@ class BehavioralCloningEstimator(BaseEstimator):
         all_actions = panel.get_all_actions()
         counts = jnp.zeros((n_states, n_actions), dtype=jnp.float32)
         counts = counts.at[all_states, all_actions].add(1.0)
+
+        raw_row_sums = counts.sum(axis=1)
+        if self._smoothing == 0.0 and bool(jnp.any(raw_row_sums == 0)):
+            num_unvisited = int(jnp.sum(raw_row_sums == 0))
+            warnings.warn(
+                "BehavioralCloningEstimator encountered "
+                f"{num_unvisited} unvisited state(s) with smoothing=0.0; "
+                "their policy rows remain all zeros. Set smoothing > 0 "
+                "to assign fallback action probabilities.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         # Laplace smoothing
         counts = counts + self._smoothing

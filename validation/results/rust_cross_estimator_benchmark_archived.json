@@ -1,0 +1,176 @@
+{
+  "artifact_name": "rust_cross_estimator_benchmark_archived",
+  "columns": [
+    "estimator",
+    "time_seconds",
+    "converged",
+    "operating_cost",
+    "replacement_cost",
+    "log_likelihood",
+    "cosine_similarity",
+    "max_policy_diff",
+    "status"
+  ],
+  "created_for": "retired JSS comparison table",
+  "release_status": "archived_non_release_evidence",
+  "rows": [
+    {
+      "converged": "True",
+      "cosine_similarity": "1.000000",
+      "estimator": "NFXP-NK",
+      "log_likelihood": "-4263.20",
+      "max_policy_diff": "0.015503",
+      "operating_cost": "0.001231",
+      "replacement_cost": "3.011476",
+      "status": "OK",
+      "time_seconds": "0.1"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "1.000000",
+      "estimator": "CCP-NPL",
+      "log_likelihood": "-4263.20",
+      "max_policy_diff": "0.015558",
+      "operating_cost": "0.001230",
+      "replacement_cost": "3.011268",
+      "status": "OK",
+      "time_seconds": "0.1"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "1.000000",
+      "estimator": "MCE-IRL",
+      "log_likelihood": "-4263.20",
+      "max_policy_diff": "0.015503",
+      "operating_cost": "0.001231",
+      "replacement_cost": "3.011475",
+      "status": "OK",
+      "time_seconds": "0.1"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "0.060911",
+      "estimator": "MaxEnt IRL",
+      "log_likelihood": "-13862.95",
+      "max_policy_diff": "0.452574",
+      "operating_cost": "-0.000000",
+      "replacement_cost": "0.000000",
+      "status": "OK",
+      "time_seconds": "133.8"
+    },
+    {
+      "converged": "False",
+      "cosine_similarity": "0.999997",
+      "estimator": "AIRL",
+      "log_likelihood": "-4467.10",
+      "max_policy_diff": "0.446703",
+      "operating_cost": "0.010326",
+      "replacement_cost": "3.897008",
+      "status": "OK",
+      "time_seconds": "607.7"
+    },
+    {
+      "converged": "False",
+      "cosine_similarity": "0.564357",
+      "estimator": "GAIL",
+      "log_likelihood": "-17826.94",
+      "max_policy_diff": "0.641724",
+      "operating_cost": "0.476417",
+      "replacement_cost": "0.325459",
+      "status": "OK",
+      "time_seconds": "209.1"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "0.999301",
+      "estimator": "IQ-Learn",
+      "log_likelihood": "-4678.13",
+      "max_policy_diff": "0.118768",
+      "operating_cost": "-0.066029",
+      "replacement_cost": "1.780892",
+      "status": "OK",
+      "time_seconds": "0.0"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "1.000000",
+      "estimator": "GLADIUS",
+      "log_likelihood": "-4264.45",
+      "max_policy_diff": "0.031614",
+      "operating_cost": "0.001480",
+      "replacement_cost": "2.367482",
+      "status": "OK",
+      "time_seconds": "10.4"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "1.000000",
+      "estimator": "TD-CCP",
+      "log_likelihood": "-4264.97",
+      "max_policy_diff": "0.008725",
+      "operating_cost": "0.001084",
+      "replacement_cost": "2.943000",
+      "status": "OK",
+      "time_seconds": "129.6"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "0.999951",
+      "estimator": "NNES",
+      "log_likelihood": "-4264.00",
+      "max_policy_diff": "0.033376",
+      "operating_cost": "0.031470",
+      "replacement_cost": "3.072744",
+      "status": "OK",
+      "time_seconds": "16.0"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "0.999996",
+      "estimator": "SEES",
+      "log_likelihood": "-4268.31",
+      "max_policy_diff": "0.355142",
+      "operating_cost": "0.009546",
+      "replacement_cost": "2.929479",
+      "status": "OK",
+      "time_seconds": "1.5"
+    },
+    {
+      "converged": "False",
+      "cosine_similarity": "0.999989",
+      "estimator": "Max Margin",
+      "log_likelihood": "-19502.31",
+      "max_policy_diff": "0.119240",
+      "operating_cost": "-0.012094",
+      "replacement_cost": "2.825354",
+      "status": "OK",
+      "time_seconds": "29585.0"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "-0.983439",
+      "estimator": "Bayesian IRL",
+      "log_likelihood": "-12305.15",
+      "max_policy_diff": "0.464291",
+      "operating_cost": "-0.008630",
+      "replacement_cost": "-0.046740",
+      "status": "OK",
+      "time_seconds": "768.6"
+    },
+    {
+      "converged": "True",
+      "cosine_similarity": "",
+      "estimator": "BC (baseline)",
+      "log_likelihood": "-4238.07",
+      "max_policy_diff": "0.902656",
+      "operating_cost": "",
+      "replacement_cost": "",
+      "status": "OK",
+      "time_seconds": "0.0"
+    }
+  ],
+  "source_csv": "examples/rust-bus-engine/benchmark_results.csv",
+  "source_script": "examples/rust-bus-engine/benchmark_all_estimators.py",
+  "source_sha256": "264b32ed88de7e1ae2cfc7cde652a3cfa855b23da0dc8321405a89ee38841ba4",
+  "warning": "Rows come from the archived Rust benchmark CSV. Use this artifact for historical paper context only. Do not use it as release certification until all rows are regenerated from one current frozen runner."
+}

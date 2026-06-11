@@ -67,4 +67,4 @@ counterfactual validity.
 
 ## Further Reading
 
-- Machine-readable results file: [iq_learn_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/iq_learn/iq_learn_results.json)
+- Machine-readable results file: [iq_learn_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/iq_learn.json)

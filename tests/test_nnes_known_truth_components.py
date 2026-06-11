@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from econirl.estimation.nnes import NNESEstimator
-from experiments.known_truth import (
+from validation.known_truth import (
     KnownTruthDGP,
     KnownTruthDGPConfig,
     build_known_truth_dgp,

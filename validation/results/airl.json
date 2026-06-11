@@ -1,0 +1,346 @@
+{
+  "estimator": "AIRL",
+  "interpretation": "AIRL is validated on the no-anchor deterministic state-only cell matching the original identification conditions. The anchored action-dependent cell remains a failed diagnostic.",
+  "primary_cell_id": "airl_paper_identification",
+  "results": [
+    {
+      "cell_id": "airl_paper_identification",
+      "compatibility": {
+        "compatible": true,
+        "errors": [],
+        "estimator": "AIRL",
+        "warnings": []
+      },
+      "diagnostics": {
+        "action_shares": [
+          0.24220833333333333,
+          0.2512916666666667,
+          0.24879166666666666,
+          0.2577083333333333
+        ],
+        "anchor_valid": true,
+        "condition_number": 62.575441458050534,
+        "errors": [],
+        "feature_rank": 4,
+        "is_action_dependent": false,
+        "max_transition_row_error": 0.0,
+        "min_action_share": 0.24220833333333333,
+        "min_positive_ccp": 0.17857142857142858,
+        "num_features": 4,
+        "num_states": 16,
+        "observed_states": 16,
+        "single_action_states": 0,
+        "state_action_coverage": 1.0,
+        "warnings": []
+      },
+      "estimator": "AIRL",
+      "gates": [
+        {
+          "name": "converged",
+          "operator": "is",
+          "passed": true,
+          "threshold": true,
+          "value": true
+        },
+        {
+          "name": "reward_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.15,
+          "value": 0.09983960542669762
+        },
+        {
+          "name": "policy_tv",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.05,
+          "value": 0.0059632601440437905
+        },
+        {
+          "name": "value_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.15,
+          "value": 0.1098768084013869
+        },
+        {
+          "name": "q_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.15,
+          "value": 0.12011332947519038
+        },
+        {
+          "name": "type_a_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.08,
+          "value": 0.0029174596637651096
+        },
+        {
+          "name": "type_b_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.08,
+          "value": 0.003811977966976965
+        },
+        {
+          "name": "type_c_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.08,
+          "value": 0.004961050688731206
+        }
+      ],
+      "metrics": {
+        "counterfactuals": {
+          "type_a": {
+            "policy": {
+              "kl": 0.00014156206390444247,
+              "l1": 0.012476300540111805,
+              "linf": 0.023589186591737005,
+              "tv": 0.006238150270055903
+            },
+            "regret": 0.0029174596637651096,
+            "value_rmse": 0.002921882365219581
+          },
+          "type_b": {
+            "policy": {
+              "kl": 0.00018008513873994143,
+              "l1": 0.015156144579260202,
+              "linf": 0.02774806661989218,
+              "tv": 0.007578072289630101
+            },
+            "regret": 0.003811977966976965,
+            "value_rmse": 0.003814651865409455
+          },
+          "type_c": {
+            "policy": {
+              "kl": 0.00019084252154341256,
+              "l1": 0.015052660869048183,
+              "linf": 0.034981005538859966,
+              "tv": 0.0075263304345240915
+            },
+            "regret": 0.004961050688731206,
+            "value_rmse": 0.004967366634071806
+          }
+        },
+        "parameters": {
+          "cosine_similarity": 0.4333062271513766,
+          "max_abs_error": 1.2350660041075323,
+          "relative_rmse": 1.765823839768328,
+          "rmse": 0.6534420824643282
+        },
+        "policy": {
+          "kl": 0.00012963393670931855,
+          "l1": 0.011926520288087581,
+          "linf": 0.0224652099816105,
+          "tv": 0.0059632601440437905
+        },
+        "projected_reward_normalized_rmse": 0.09983960542669762,
+        "projected_reward_rmse": 1.270376677595212,
+        "q_normalized_rmse": 0.12011332947519038,
+        "q_rmse": 25.39540452536396,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 0.09983960542669762,
+        "reward_rmse": 1.270376677595212,
+        "value_normalized_rmse": 0.1098768084013869,
+        "value_rmse": 25.396333532364405
+      },
+      "simulation": {
+        "n_individuals": 300,
+        "n_periods": 80,
+        "seed": 1711,
+        "show_progress": false
+      },
+      "summary": {
+        "converged": true,
+        "convergence_message": "Converged",
+        "estimation_time": 56.53186106681824,
+        "log_likelihood": -33173.07031063727,
+        "metadata": {
+          "absorbing_state": null,
+          "anchor_action": null,
+          "final_disc_loss": 1.3862245731732619,
+          "generator_reward": "f",
+          "learned_shaping": true,
+          "min_rounds": 150,
+          "reward_arg": "state",
+          "reward_type": "linear",
+          "use_shaping": true
+        },
+        "num_iterations": 150,
+        "num_observations": 24000
+      }
+    },
+    {
+      "cell_id": "airl_anchor_action_dependent",
+      "compatibility": {
+        "compatible": true,
+        "errors": [],
+        "estimator": "AIRL",
+        "warnings": []
+      },
+      "diagnostics": {
+        "action_shares": [
+          0.342875,
+          0.32745833333333335,
+          0.32966666666666666
+        ],
+        "anchor_valid": true,
+        "condition_number": 4.512181117222974,
+        "errors": [],
+        "feature_rank": 4,
+        "is_action_dependent": true,
+        "max_transition_row_error": 0.0,
+        "min_action_share": 0.32745833333333335,
+        "min_positive_ccp": 0.11,
+        "num_features": 4,
+        "num_states": 21,
+        "observed_states": 21,
+        "single_action_states": 0,
+        "state_action_coverage": 1.0,
+        "warnings": []
+      },
+      "estimator": "AIRL",
+      "gates": [
+        {
+          "name": "converged",
+          "operator": "is",
+          "passed": false,
+          "threshold": true,
+          "value": false
+        },
+        {
+          "name": "reward_normalized_rmse",
+          "operator": "<=",
+          "passed": false,
+          "threshold": 0.15,
+          "value": 1.160606479743822
+        },
+        {
+          "name": "policy_tv",
+          "operator": "<=",
+          "passed": false,
+          "threshold": 0.05,
+          "value": 0.4029553147266911
+        },
+        {
+          "name": "value_normalized_rmse",
+          "operator": "<=",
+          "passed": false,
+          "threshold": 0.15,
+          "value": 1.995409599347707
+        },
+        {
+          "name": "q_normalized_rmse",
+          "operator": "<=",
+          "passed": false,
+          "threshold": 0.15,
+          "value": 1.2601124128396213
+        },
+        {
+          "name": "type_a_regret",
+          "operator": "<=",
+          "passed": false,
+          "threshold": 0.08,
+          "value": 10.5004366652337
+        },
+        {
+          "name": "type_b_regret",
+          "operator": "<=",
+          "passed": false,
+          "threshold": 0.08,
+          "value": 13.97295699181427
+        },
+        {
+          "name": "type_c_regret",
+          "operator": "<=",
+          "passed": false,
+          "threshold": 0.08,
+          "value": 4.405347478709732
+        }
+      ],
+      "metrics": {
+        "anchor_projected_reward_normalized_rmse": 1.160606479743822,
+        "anchor_projected_reward_rmse": 2.07230227396574,
+        "counterfactuals": {
+          "type_a": {
+            "policy": {
+              "kl": 4.951179208947591,
+              "l1": 0.8793474817320773,
+              "linf": 1.2193488738506961,
+              "tv": 0.43967374086603866
+            },
+            "regret": 10.5004366652337,
+            "value_rmse": 10.786020033027004
+          },
+          "type_b": {
+            "policy": {
+              "kl": 4.066511455272205,
+              "l1": 1.0415734946839532,
+              "linf": 1.3582571448678105,
+              "tv": 0.5207867473419766
+            },
+            "regret": 13.97295699181427,
+            "value_rmse": 14.601999594151057
+          },
+          "type_c": {
+            "policy": {
+              "kl": 4.71588322145638,
+              "l1": 0.9121088228174136,
+              "linf": 1.2252667983064858,
+              "tv": 0.4560544114087068
+            },
+            "regret": 4.405347478709732,
+            "value_rmse": 5.100827711908391
+          }
+        },
+        "parameters": null,
+        "policy": {
+          "kl": 4.291962233457029,
+          "l1": 0.8059106294533822,
+          "linf": 1.2664767626924154,
+          "tv": 0.4029553147266911
+        },
+        "projected_reward_normalized_rmse": null,
+        "projected_reward_rmse": null,
+        "q_normalized_rmse": 1.2601124128396213,
+        "q_rmse": 18.649660019673604,
+        "raw_bellman_reward_normalized_rmse": null,
+        "raw_bellman_reward_rmse": null,
+        "reward_normalized_rmse": 1.160606479743822,
+        "reward_rmse": 1.651249976688382,
+        "value_normalized_rmse": 1.995409599347707,
+        "value_rmse": 22.698985638487738
+      },
+      "simulation": {
+        "n_individuals": 300,
+        "n_periods": 80,
+        "seed": 744,
+        "show_progress": false
+      },
+      "summary": {
+        "converged": false,
+        "convergence_message": "Max rounds reached",
+        "estimation_time": 83.24936008453369,
+        "log_likelihood": -31246.277528151593,
+        "metadata": {
+          "absorbing_state": 20,
+          "anchor_action": 2,
+          "final_disc_loss": 1.397036746492424,
+          "generator_reward": "recovered",
+          "learned_shaping": true,
+          "min_rounds": 20,
+          "reward_arg": "state_action",
+          "reward_type": "tabular",
+          "use_shaping": true
+        },
+        "num_iterations": 200,
+        "num_observations": 24000
+      }
+    }
+  ],
+  "status": "partial"
+}

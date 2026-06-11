@@ -68,7 +68,7 @@ counterfactual oracles.
 | --- | --- |
 | Question | Recover reward and counterfactual behavior in a synthetic MCE data-generating process. |
 | Primary cell | `mce_low_high_reward`. |
-| Machine-readable results file | [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mce_irl/mce_irl_results.json). |
+| Machine-readable results file | [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json). |
 | Recovery outputs | Reward, policy, value, Q, feature-moment, and counterfactual metrics. |
 | Public example | Uses `MCEIRL` with explicit action-dependent features. |
 

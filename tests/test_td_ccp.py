@@ -28,7 +28,7 @@ from econirl.estimation.td_ccp import (
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel, simulate_panel_from_policy
-from papers.econirl_package.primers.tdccp.tdccp_run import (
+from validation.estimators.tdccp.run import (
     build_paper_hard_case_dgp,
     evaluate_hard_case_summary,
     evaluate_paper_hard_case_summary,
@@ -668,8 +668,8 @@ class TestTDCCPHardCaseComponents:
         assert "parameter_relative_rmse" in gate_names
         assert all(gate.passed for gate in gates)
 
-    def test_algorithm2_locally_robust_se_path_stores_paper_artifacts(self):
-        """Robust cross-fitting should run zeta/lambda/covariance path."""
+    def test_algorithm2_locally_robust_se_path_stores_validation_evidence(self):
+        """Robust cross-fitting should run zeta/lambda/covariance path for validation evidence."""
         env = ShapeshifterEnvironment(
             ShapeshifterConfig(
                 num_states=8,

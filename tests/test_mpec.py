@@ -28,11 +28,9 @@ def test_mpec_primer_json_artifact_has_release_gates():
 
     artifact = (
         Path(__file__).resolve().parents[1]
-        / "papers"
-        / "econirl_package"
-        / "primers"
-        / "mpec"
-        / "mpec_results.json"
+        / "validation"
+        / "results"
+        / "mpec.json"
     )
 
     assert artifact.exists()
@@ -250,3 +248,41 @@ class TestMPECConfig:
     def test_estimator_name(self):
         estimator = MPECEstimator()
         assert "MPEC" in estimator.name
+
+
+class TestMPECHighBetaSmoke:
+    """Small high-discount check for the documented MPEC runtime caveat."""
+
+    def test_tiny_high_beta_sqp_satisfies_constraint_quickly(self):
+        env = RustBusEnvironment(
+            operating_cost=0.01,
+            replacement_cost=1.0,
+            num_mileage_bins=4,
+            discount_factor=0.9999,
+            seed=7,
+        )
+        panel = simulate_panel(env, n_individuals=6, n_periods=8, seed=8)
+        utility = LinearUtility.from_environment(env)
+        estimator = MPECEstimator(
+            config=MPECConfig(
+                solver="sqp",
+                outer_max_iter=80,
+                constraint_tol=1e-5,
+                tol=1e-6,
+            ),
+            compute_hessian=False,
+            verbose=False,
+        )
+
+        result = estimator.estimate(
+            panel=panel,
+            utility=utility,
+            problem=env.problem_spec,
+            transitions=env.transition_matrices,
+        )
+
+        assert result.converged
+        assert result.metadata["method"] == "slsqp"
+        assert result.metadata["final_constraint_violation"] < 1e-5
+        assert result.num_iterations <= 80
+        assert result.estimation_time < 15.0

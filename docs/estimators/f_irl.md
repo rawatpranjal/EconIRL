@@ -60,4 +60,4 @@ matching.
 
 ## Further Reading
 
-- Machine-readable results file: [f_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/f_irl/f_irl_results.json)
+- Machine-readable results file: [f_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/f_irl.json)

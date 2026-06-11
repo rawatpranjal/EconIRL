@@ -5,11 +5,11 @@ the policy to the expert's empirical state-marginal, using f-divergence
 minimization instead of feature expectation matching.
 
 Algorithm:
-    1. Compute expert state-action marginal from demonstrations
-    2. Initialize tabular reward R(s, a)
+    1. Compute expert state or state-action marginal from demonstrations
+    2. Initialize tabular reward R(s) or R(s, a)
     3. For each iteration:
        a. Solve MDP under current R to get policy pi
-       b. Compute policy state-action marginal via forward propagation
+       b. Compute policy marginal via forward propagation
        c. Compute f-divergence gradient between expert and policy marginals
        d. Update R in the divergence-gradient direction
     4. Return R and induced policy
@@ -36,7 +36,6 @@ from __future__ import annotations
 import time
 from typing import Literal
 
-import jax
 import jax.numpy as jnp
 
 from econirl.core.bellman import SoftBellmanOperator
@@ -44,8 +43,7 @@ from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
-from econirl.inference.standard_errors import SEMethod
-from econirl.preferences.base import BaseUtilityFunction, UtilityFunction
+from econirl.preferences.base import UtilityFunction
 
 
 class FIRLEstimator(BaseEstimator):
@@ -78,6 +76,9 @@ class FIRLEstimator(BaseEstimator):
         inner_max_iter: int = 5000,
         horizon: int = 100,
         reward_clip: float = 10.0,
+        marginal_space: Literal["state_action", "state"] = "state_action",
+        reward_scope: Literal["state_action", "state"] = "state_action",
+        selection_metric: Literal["log_likelihood", "occupancy_l1"] = "log_likelihood",
         compute_se: bool = False,
         verbose: bool = False,
     ):
@@ -94,6 +95,17 @@ class FIRLEstimator(BaseEstimator):
         self._inner_max_iter = inner_max_iter
         self._horizon = horizon
         self._reward_clip = reward_clip
+        if marginal_space not in {"state_action", "state"}:
+            raise ValueError("marginal_space must be 'state_action' or 'state'")
+        if reward_scope not in {"state_action", "state"}:
+            raise ValueError("reward_scope must be 'state_action' or 'state'")
+        if selection_metric not in {"log_likelihood", "occupancy_l1"}:
+            raise ValueError("selection_metric must be 'log_likelihood' or 'occupancy_l1'")
+        if reward_scope == "state" and marginal_space != "state":
+            raise ValueError("state reward_scope requires state marginal_space")
+        self._marginal_space = marginal_space
+        self._reward_scope = reward_scope
+        self._selection_metric = selection_metric
 
     @property
     def name(self) -> str:
@@ -105,32 +117,33 @@ class FIRLEstimator(BaseEstimator):
         n_states: int,
         n_actions: int,
     ) -> jnp.ndarray:
-        """Compute empirical state-action marginal from demonstrations.
+        """Compute empirical marginal from demonstrations.
 
         Returns:
-            State-action marginal, shape (n_states, n_actions), sums to 1.
+            State marginal, shape (n_states,), or state-action marginal,
+            shape (n_states, n_actions). The returned marginal sums to 1.
         """
         all_states = panel.get_all_states()
-        all_actions = panel.get_all_actions()
-        idx = (all_states * n_actions + all_actions).astype(jnp.int32)
-        counts = jnp.zeros(n_states * n_actions)
-        counts = counts.at[idx].add(1.0)
-        counts = counts.reshape(n_states, n_actions)
+        if self._marginal_space == "state":
+            counts = jnp.zeros(n_states)
+            counts = counts.at[all_states.astype(jnp.int32)].add(1.0)
+        else:
+            all_actions = panel.get_all_actions()
+            idx = (all_states * n_actions + all_actions).astype(jnp.int32)
+            counts = jnp.zeros(n_states * n_actions)
+            counts = counts.at[idx].add(1.0)
+            counts = counts.reshape(n_states, n_actions)
         total = counts.sum()
         return counts / jnp.maximum(total, 1.0)
 
-    def _compute_policy_marginal(
+    def _compute_state_visitation(
         self,
         policy: jnp.ndarray,
         transitions: jnp.ndarray,
         problem: DDCProblem,
         panel: Panel,
     ) -> jnp.ndarray:
-        """Compute state-action marginal under policy via forward propagation.
-
-        Returns:
-            State-action marginal, shape (n_states, n_actions), sums to 1.
-        """
+        """Compute discounted state visitation under a policy."""
         n_states = problem.num_states
         beta = problem.discount_factor
 
@@ -143,7 +156,6 @@ class FIRLEstimator(BaseEstimator):
         init_counts = init_counts.at[init_states].add(1.0)
         mu = init_counts / jnp.maximum(init_counts.sum(), 1.0)
 
-        # Forward propagation of state visitation
         state_vis = mu
         P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
@@ -151,11 +163,21 @@ class FIRLEstimator(BaseEstimator):
             mu = mu @ P_pi
             state_vis += (beta ** t) * mu
 
-        state_vis = state_vis / state_vis.sum()
+        return state_vis / state_vis.sum()
 
-        # State-action marginal: d(s) * pi(a|s)
-        sa_marginal = state_vis[:, None] * policy
-        return sa_marginal
+    def _compute_policy_marginal(
+        self,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
+        problem: DDCProblem,
+        panel: Panel,
+    ) -> jnp.ndarray:
+        """Compute model marginal under policy via forward propagation."""
+        n_states = problem.num_states
+        state_vis = self._compute_state_visitation(policy, transitions, problem, panel)
+        if self._marginal_space == "state":
+            return state_vis
+        return state_vis[:, None] * policy
 
     def _f_divergence_gradient(
         self,
@@ -198,6 +220,15 @@ class FIRLEstimator(BaseEstimator):
         else:
             raise ValueError(f"Unknown f-divergence: {self._f_divergence}")
 
+    def _reward_matrix_from_params(
+        self,
+        reward_params: jnp.ndarray,
+        n_actions: int,
+    ) -> jnp.ndarray:
+        if self._reward_scope == "state":
+            return jnp.repeat(reward_params[:, None], n_actions, axis=1)
+        return reward_params
+
     def _optimize(
         self,
         panel: Panel,
@@ -218,12 +249,19 @@ class FIRLEstimator(BaseEstimator):
         expert_marginal = self._compute_expert_marginal(panel, n_states, n_actions)
 
         # Initialize tabular reward
-        reward = jnp.zeros((n_states, n_actions))
+        if self._reward_scope == "state":
+            reward_params = jnp.zeros(n_states)
+        else:
+            reward_params = jnp.zeros((n_states, n_actions))
 
+        best_score = float("-inf")
         best_ll = float("-inf")
         best_policy = None
         best_V = None
-        best_reward = None
+        best_reward_params = None
+        best_reward_matrix = None
+        best_policy_marginal = None
+        best_occupancy_l1 = float("inf")
 
         self._log(f"f-IRL ({self._f_divergence}): {self._max_iter} iterations")
 
@@ -236,8 +274,9 @@ class FIRLEstimator(BaseEstimator):
         )
         for it in pbar:
             # Solve MDP under current reward
+            reward_matrix = self._reward_matrix_from_params(reward_params, n_actions)
             solver_result = value_iteration(
-                operator, reward,
+                operator, reward_matrix,
                 tol=self._inner_tol,
                 max_iter=self._inner_max_iter,
             )
@@ -248,27 +287,37 @@ class FIRLEstimator(BaseEstimator):
                 policy, transitions, problem, panel,
             )
 
-            # Compute divergence gradient and update reward
+            # Compute divergence gradient.
             grad = self._f_divergence_gradient(expert_marginal, policy_marginal)
-            reward = reward + self._lr * grad
-            reward = jnp.clip(reward, -self._reward_clip, self._reward_clip)
 
-            # Track best policy by log-likelihood
+            # Track the best policy/reward pair before taking the next update.
             log_probs = operator.compute_log_choice_probabilities(
-                reward, solver_result.V,
+                reward_matrix, solver_result.V,
             )
             all_states = panel.get_all_states()
             all_actions = panel.get_all_actions()
             ll = log_probs[all_states, all_actions].sum().item()
+            occupancy_l1 = float(jnp.abs(expert_marginal - policy_marginal).sum())
+            score = ll if self._selection_metric == "log_likelihood" else -occupancy_l1
 
-            if ll > best_ll:
+            if score > best_score:
+                best_score = score
                 best_ll = ll
                 best_policy = jnp.array(policy)
                 best_V = jnp.array(solver_result.V)
-                best_reward = jnp.array(reward)
+                best_reward_params = jnp.array(reward_params)
+                best_reward_matrix = jnp.array(
+                    self._reward_matrix_from_params(reward_params, n_actions)
+                )
+                best_policy_marginal = jnp.array(policy_marginal)
+                best_occupancy_l1 = occupancy_l1
 
-            div = jnp.abs(expert_marginal - policy_marginal).sum().item()
-            r_range = float(jnp.max(reward) - jnp.min(reward))
+            reward_params = reward_params + self._lr * grad
+            reward_params = jnp.clip(reward_params, -self._reward_clip, self._reward_clip)
+
+            div = occupancy_l1
+            current_reward = self._reward_matrix_from_params(reward_params, n_actions)
+            r_range = float(jnp.max(current_reward) - jnp.min(current_reward))
             pbar.set_postfix({
                 "LL": f"{ll:.2f}",
                 "best": f"{best_ll:.2f}",
@@ -279,7 +328,7 @@ class FIRLEstimator(BaseEstimator):
         elapsed = time.time() - start_time
 
         return EstimationResult(
-            parameters=best_reward.flatten(),
+            parameters=best_reward_params.flatten(),
             log_likelihood=best_ll,
             value_function=best_V,
             policy=best_policy,
@@ -289,9 +338,23 @@ class FIRLEstimator(BaseEstimator):
             message=f"f-IRL ({self._f_divergence}): {self._max_iter} iterations",
             optimization_time=elapsed,
             metadata={
-                "reward_matrix": best_reward,
+                "reward_matrix": best_reward_matrix,
+                "state_reward_vector": (
+                    best_reward_params if self._reward_scope == "state" else None
+                ),
                 "expert_marginal": expert_marginal,
+                "policy_marginal": best_policy_marginal,
+                "occupancy_l1": best_occupancy_l1,
+                "reward_range": float(
+                    jnp.max(best_reward_matrix) - jnp.min(best_reward_matrix)
+                ),
                 "f_divergence": self._f_divergence,
+                "marginal_space": self._marginal_space,
+                "reward_scope": self._reward_scope,
+                "selection_metric": self._selection_metric,
+                "counterfactual_reward_normalization": (
+                    "affine" if self._reward_scope == "state" else None
+                ),
             },
         )
 
@@ -318,7 +381,10 @@ class FIRLEstimator(BaseEstimator):
         )
 
         n_obs = panel.num_observations
-        n_params = problem.num_states * problem.num_actions
+        if self._reward_scope == "state":
+            n_params = problem.num_states
+        else:
+            n_params = problem.num_states * problem.num_actions
 
         goodness_of_fit = GoodnessOfFit(
             log_likelihood=result.log_likelihood,
@@ -332,11 +398,14 @@ class FIRLEstimator(BaseEstimator):
             ),
         )
 
-        param_names = [
-            f"R(s={s},a={a})"
-            for s in range(problem.num_states)
-            for a in range(problem.num_actions)
-        ]
+        if self._reward_scope == "state":
+            param_names = [f"R(s={s})" for s in range(problem.num_states)]
+        else:
+            param_names = [
+                f"R(s={s},a={a})"
+                for s in range(problem.num_states)
+                for a in range(problem.num_actions)
+            ]
 
         return EstimationSummary(
             parameters=result.parameters,

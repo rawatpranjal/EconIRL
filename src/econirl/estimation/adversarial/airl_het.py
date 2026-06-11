@@ -23,7 +23,7 @@ Reference:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import jax
@@ -33,13 +33,12 @@ import optax
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.solvers import value_iteration, hybrid_iteration
+from econirl.core.solvers import hybrid_iteration, value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.adversarial.base import AdversarialEstimatorBase
 from econirl.estimation.base import EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
 from econirl.preferences.base import BaseUtilityFunction
-
 
 _SENTINEL = object()
 
@@ -68,8 +67,22 @@ class AIRLHetConfig:
         consistency_weight: Interpolation weight for within-user
             segment consistency (0 = no consistency, 1 = full pooling).
         prior_smoothing: Dirichlet smoothing for segment prior updates.
+        initialization: Segment initialization scheme. "random" uses the
+            standard random start. "behavioral_anchor" clusters trajectories
+            by observed behavior and inverts anchored CCPs into a reward start.
+        initialization_smoothing: Pseudocount for behavioral CCP inversion.
+        initialization_l2_penalty: Ridge penalty for projecting the behavioral
+            anchor reward start onto a high-dimensional linear feature basis.
         use_shaping: Whether to use potential-based shaping in discriminator.
         shaping_coef: Shaping coefficient (defaults to discount_factor).
+        shaping_l2_penalty: Small L2 penalty on reward/shaping parameters.
+        generator_reward: Reward used by the generator update. "recovered"
+            solves the current recovered reward g. "log_odds" uses AIRL's
+            discriminator log-odds reward f - log pi. "f" uses the shaped
+            discriminator score.
+        policy_step_size: Conservative policy-iteration mixing weight.
+        min_airl_rounds: Minimum AIRL rounds per M-step before policy-change
+            convergence can stop the inner loop.
         verbose: Whether to print progress.
         seed: Random seed for initialization.
     """
@@ -102,10 +115,17 @@ class AIRLHetConfig:
     unit_normalize_reward: bool = False  # project linear reward onto unit sphere each round
     gradient_clip_norm: float = 0.0  # clip gradient norm (0 = disabled)
     antisymmetric_init: bool = False  # init K=2 segments with opposite rewards
+    initialization: Literal["random", "behavioral_anchor"] = "random"
+    initialization_smoothing: float = 1.0
+    initialization_l2_penalty: float = 0.0
 
     # Shaping
     use_shaping: bool = True
     shaping_coef: float | None = None
+    shaping_l2_penalty: float = 1e-8
+    generator_reward: Literal["recovered", "log_odds", "f"] = "recovered"
+    policy_step_size: float = 1.0
+    min_airl_rounds: int = 1
 
     # Misc
     verbose: bool = False
@@ -278,7 +298,7 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
 
         # Initialize segment-specific parameters
         key = jax.random.key(self.config.seed)
-        segment_rewards = []
+        segment_params = []
         segment_opt_states = []
         if self.config.reward_weight_decay > 0:
             base_optimizer = optax.adamw(
@@ -296,10 +316,40 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
         else:
             optimizer = base_optimizer
 
+        initial_by_segment = None
+        initial_posteriors = None
+        initial_priors = None
+        if initial_params is not None:
+            initial_array = jnp.asarray(initial_params, dtype=jnp.float32)
+            if self.config.reward_type == "linear":
+                initial_by_segment = initial_array.reshape((K, utility.num_parameters))
+            else:
+                initial_by_segment = initial_array.reshape((K, n_states, n_actions))
+        elif self.config.initialization == "behavioral_anchor":
+            (
+                initial_by_segment,
+                initial_posteriors,
+                initial_priors,
+            ) = self._behavioral_anchor_initialization(
+                traj_data=traj_data,
+                individual_groups=individual_groups,
+                utility=utility,
+                problem=problem,
+                transitions=transitions,
+                n_states=n_states,
+                n_actions=n_actions,
+                exit_action=exit_action,
+                absorbing=absorbing,
+            )
+
         base_rw = None
         for k in range(K):
             key, subkey = jax.random.split(key)
-            if self.config.reward_type == "tabular":
+            if initial_by_segment is not None:
+                rw = initial_by_segment[k]
+                if self.config.reward_type == "tabular":
+                    rw = self._enforce_anchor_reward(rw, exit_action, absorbing)
+            elif self.config.reward_type == "tabular":
                 if self.config.antisymmetric_init and K >= 2:
                     if k == 0:
                         base_rw = 1.5 * jax.random.normal(subkey, (n_states, n_actions))
@@ -325,15 +375,20 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
                         rw = 0.01 * jax.random.normal(subkey, (n_features,))
                 else:
                     rw = 0.01 * jax.random.normal(subkey, (n_features,))
-            segment_rewards.append(rw)
-            segment_opt_states.append(optimizer.init(rw))
+            params = {
+                "reward": rw,
+                "shaping": jnp.zeros(n_states, dtype=jnp.float32),
+            }
+            params = self._enforce_shaping_anchor(params, absorbing)
+            segment_params.append(params)
+            segment_opt_states.append(optimizer.init(params))
 
         # Initialize segment policies and values
         segment_policies = []
         segment_V = []
         for k in range(K):
             reward_matrix = self._get_reward_matrix(
-                segment_rewards[k], utility, n_states, n_actions
+                segment_params[k]["reward"], utility, n_states, n_actions
             )
             reward_matrix = self._enforce_anchor_reward(reward_matrix, exit_action, absorbing)
             policy, V = self._compute_policy_with_anchors(
@@ -342,11 +397,16 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
             segment_policies.append(policy)
             segment_V.append(V)
 
-        # Initialize segment priors (uniform)
-        segment_priors = jnp.ones(K) / K
+        # Initialize segment priors and posteriors
+        if initial_priors is None:
+            segment_priors = jnp.ones(K) / K
+        else:
+            segment_priors = jnp.asarray(initial_priors, dtype=jnp.float32)
 
-        # Initialize posteriors (uniform)
-        posteriors = jnp.ones((n_trajs, K)) / K
+        if initial_posteriors is None:
+            posteriors = jnp.ones((n_trajs, K)) / K
+        else:
+            posteriors = jnp.asarray(initial_posteriors, dtype=jnp.float32)
 
         # EM loop
         prev_ll = -float("inf")
@@ -372,7 +432,7 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
 
             # --- M-step ---
             for k in range(K):
-                segment_rewards[k], segment_opt_states[k] = self._m_step_segment(
+                segment_params[k], segment_opt_states[k] = self._m_step_segment(
                     k=k,
                     traj_data=traj_data,
                     posteriors=posteriors,
@@ -380,11 +440,10 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
                     problem=problem,
                     transitions=transitions,
                     operator=operator,
-                    reward_params=segment_rewards[k],
+                    segment_params=segment_params[k],
                     opt_state=segment_opt_states[k],
                     optimizer=optimizer,
                     policy=segment_policies[k],
-                    V=segment_V[k],
                     n_states=n_states,
                     n_actions=n_actions,
                     gamma=gamma,
@@ -396,7 +455,7 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
 
                 # Update policy and value from new reward
                 reward_matrix = self._get_reward_matrix(
-                    segment_rewards[k], utility, n_states, n_actions
+                    segment_params[k]["reward"], utility, n_states, n_actions
                 )
                 reward_matrix = self._enforce_anchor_reward(
                     reward_matrix, exit_action, absorbing
@@ -439,7 +498,7 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
 
         # Concatenate all segment parameters
         all_params = jnp.concatenate([
-            segment_rewards[k].flatten() for k in range(K)
+            segment_params[k]["reward"].flatten() for k in range(K)
         ])
 
         # Hard segment assignments
@@ -449,7 +508,7 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
         seg_reward_matrices = []
         for k in range(K):
             rm = self._get_reward_matrix(
-                segment_rewards[k], utility, n_states, n_actions
+                segment_params[k]["reward"], utility, n_states, n_actions
             )
             rm = self._enforce_anchor_reward(rm, exit_action, absorbing)
             seg_reward_matrices.append(rm.tolist())
@@ -479,6 +538,16 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
                 "segment_value_functions": [
                     np.asarray(segment_V[k]).tolist() for k in range(K)
                 ],
+                "segment_shaping_potentials": [
+                    np.asarray(segment_params[k]["shaping"]).tolist()
+                    for k in range(K)
+                ],
+                "learned_shaping": True,
+                "initialization": self.config.initialization,
+                "initialization_smoothing": self.config.initialization_smoothing,
+                "initialization_l2_penalty": self.config.initialization_l2_penalty,
+                "generator_reward": self.config.generator_reward,
+                "min_airl_rounds": self.config.min_airl_rounds,
                 "em_log_likelihoods": em_lls,
             },
         )
@@ -581,18 +650,17 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
         problem: DDCProblem,
         transitions: jnp.ndarray,
         operator: SoftBellmanOperator,
-        reward_params: jnp.ndarray,
+        segment_params: dict[str, jnp.ndarray],
         opt_state: optax.OptState,
         optimizer: optax.GradientTransformation,
         policy: jnp.ndarray,
-        V: jnp.ndarray,
         n_states: int,
         n_actions: int,
         gamma: float,
         exit_action: int,
         absorbing: int,
         key: jax.Array,
-    ) -> tuple[jnp.ndarray, optax.OptState]:
+    ) -> tuple[dict[str, jnp.ndarray], optax.OptState]:
         """Run AIRL inner loop for segment k.
 
         Expert transitions are weighted by posterior[i, k].
@@ -614,7 +682,7 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
             all_weights.append(jnp.full(len(td["states"]), w))
 
         if not all_states:
-            return reward_params, opt_state
+            return segment_params, opt_state
 
         exp_s = jnp.concatenate(all_states)
         exp_a = jnp.concatenate(all_actions)
@@ -630,20 +698,25 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
 
         use_shaping = self.config.use_shaping
         shaping_coef = self.config.shaping_coef
+        shaping_l2_penalty = self.config.shaping_l2_penalty
 
         def get_rm(params):
             rm = self._get_reward_matrix(params, utility, n_states, n_actions)
             return self._enforce_anchor_reward(rm, exit_action, absorbing)
 
-        def disc_loss_fn(rw_params, V_fixed, policy_fixed,
-                         es, ea, ens, ew, ps, pa, pns):
-            reward_matrix = get_rm(rw_params)
+        def disc_loss_fn(params, policy_fixed, es, ea, ens, ew, ps, pa, pns):
+            reward_matrix = get_rm(params["reward"])
+            shaping_potential = params["shaping"]
 
             def logits(states, actions, next_states):
                 r_sa = reward_matrix[states, actions]
                 if use_shaping:
-                    sc = shaping_coef if shaping_coef else gamma
-                    f = r_sa + sc * V_fixed[next_states] - V_fixed[states]
+                    sc = shaping_coef if shaping_coef is not None else gamma
+                    f = (
+                        r_sa
+                        + sc * shaping_potential[next_states]
+                        - shaping_potential[states]
+                    )
                 else:
                     f = r_sa
                 log_pi = jnp.log(policy_fixed[states, actions] + 1e-10)
@@ -655,7 +728,10 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
             # Weighted expert loss
             e_loss = jnp.sum(ew * jnp.logaddexp(0.0, -e_logits)) / jnp.sum(ew)
             p_loss = jnp.mean(jnp.logaddexp(0.0, p_logits))
-            return e_loss + p_loss
+            l2_penalty = shaping_l2_penalty * (
+                jnp.mean(reward_matrix**2) + jnp.mean(shaping_potential**2)
+            )
+            return e_loss + p_loss + l2_penalty
 
         disc_loss_and_grad = jax.value_and_grad(disc_loss_fn)
 
@@ -672,45 +748,229 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
             # Discriminator updates
             for _ in range(self.config.discriminator_steps):
                 loss, grads = disc_loss_and_grad(
-                    reward_params, V, policy,
-                    exp_s, exp_a, exp_ns, exp_w,
-                    pol_s, pol_a, pol_ns,
+                    segment_params,
+                    policy,
+                    exp_s,
+                    exp_a,
+                    exp_ns,
+                    exp_w,
+                    pol_s,
+                    pol_a,
+                    pol_ns,
                 )
                 updates, opt_state = optimizer.update(
-                    grads, opt_state, reward_params
+                    grads, opt_state, segment_params
                 )
-                reward_params = optax.apply_updates(reward_params, updates)
+                segment_params = optax.apply_updates(segment_params, updates)
+                segment_params = self._enforce_shaping_anchor(segment_params, absorbing)
 
             # Enforce anchor on reward params
             if self.config.reward_type == "tabular":
                 reward_params = self._enforce_anchor_reward(
-                    reward_params, exit_action, absorbing
+                    segment_params["reward"], exit_action, absorbing
                 )
                 if self.config.normalize_reward:
                     # Clip to [-5, 5] to prevent scale explosion while
                     # keeping reward values meaningful for value iteration
                     reward_params = jnp.clip(reward_params, -5.0, 5.0)
+                segment_params = {**segment_params, "reward": reward_params}
 
             # Unit-normalize linear reward to fix scale at 1 (reward can only
             # ROTATE, not SCALE). Prevents adversarial scale inflation from
             # causing the mixture LL to decrease indefinitely at the correct
             # segment assignment.
             if self.config.unit_normalize_reward and self.config.reward_type == "linear":
-                theta_norm = jnp.linalg.norm(reward_params)
-                reward_params = reward_params / (theta_norm + 1e-8)
+                theta_norm = jnp.linalg.norm(segment_params["reward"])
+                reward_params = segment_params["reward"] / (theta_norm + 1e-8)
+                segment_params = {**segment_params, "reward": reward_params}
 
             # Update policy
-            reward_matrix = get_rm(reward_params)
-            policy, V = self._compute_policy_with_anchors(
-                reward_matrix, operator, absorbing
+            reward_matrix = get_rm(segment_params["reward"])
+            generator_reward = self._compute_generator_reward(
+                reward_matrix,
+                segment_params["shaping"],
+                policy,
+                transitions,
+                gamma,
             )
+            new_policy, V = self._compute_policy_with_anchors(
+                generator_reward, operator, absorbing
+            )
+            alpha = self.config.policy_step_size
+            if alpha < 1.0:
+                policy = (1.0 - alpha) * old_policy + alpha * new_policy
+                policy = policy / policy.sum(axis=1, keepdims=True)
+            else:
+                policy = new_policy
 
             # Check convergence
             policy_change = float(jnp.abs(policy - old_policy).max())
-            if policy_change < self.config.airl_convergence_tol:
+            if (
+                round_idx + 1 >= self.config.min_airl_rounds
+                and policy_change < self.config.airl_convergence_tol
+            ):
                 break
 
-        return reward_params, opt_state
+        return segment_params, opt_state
+
+    # --- Initialization helpers ---
+
+    def _behavioral_anchor_initialization(
+        self,
+        traj_data: list[dict],
+        individual_groups: dict[Any, list[int]],
+        utility: BaseUtilityFunction,
+        problem: DDCProblem,
+        transitions: jnp.ndarray,
+        n_states: int,
+        n_actions: int,
+        exit_action: int,
+        absorbing: int,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+        """Initialize segments by clustering behavior and inverting anchors.
+
+        This uses only observed trajectories, the supplied transition kernel,
+        and the anchor normalization. It is deliberately an initialization
+        method, not an oracle: labels are formed from user-level action shares.
+        """
+
+        K = self.config.num_segments
+        if K < 2:
+            raise ValueError("behavioral_anchor initialization requires K >= 2")
+
+        user_scores: dict[Any, float] = {}
+        for individual_id, indices in individual_groups.items():
+            action_counts = np.zeros(n_actions, dtype=np.float64)
+            for idx in indices:
+                actions = np.asarray(traj_data[idx]["actions"], dtype=np.int64)
+                action_counts += np.bincount(actions, minlength=n_actions)
+            total = max(action_counts.sum(), 1.0)
+            read_share = action_counts[0] / total
+            wait_share = action_counts[1] / total if n_actions > 1 else 0.0
+            exit_share = action_counts[exit_action] / total
+            user_scores[individual_id] = float(read_share - wait_share - 0.25 * exit_share)
+
+        ordered_users = sorted(user_scores, key=user_scores.get)
+        user_to_segment: dict[Any, int] = {}
+        for segment, users in enumerate(np.array_split(ordered_users, K)):
+            for user_id in users:
+                user_to_segment[user_id] = int(segment)
+
+        posteriors = np.full(
+            (len(traj_data), K),
+            0.05 / max(K - 1, 1),
+            dtype=np.float64,
+        )
+        counts = np.full(
+            (K, n_states, n_actions),
+            float(self.config.initialization_smoothing),
+            dtype=np.float64,
+        )
+        real_counts = np.zeros((K, n_states, n_actions), dtype=np.float64)
+
+        for i, td in enumerate(traj_data):
+            segment = user_to_segment.get(td["individual_id"], i % K)
+            posteriors[i, :] = 0.05 / max(K - 1, 1)
+            posteriors[i, segment] = 0.95
+            states = np.asarray(td["states"], dtype=np.int64)
+            actions = np.asarray(td["actions"], dtype=np.int64)
+            for state, action in zip(states, actions):
+                counts[segment, state, action] += 1.0
+                real_counts[segment, state, action] += 1.0
+
+        # The content simulator stops when a trajectory reaches the absorbing
+        # state, so initialize that degenerate row to the entropy policy implied
+        # by zero rewards and self-loops.
+        counts[:, absorbing, :] = 1.0
+        policies = counts / counts.sum(axis=2, keepdims=True)
+
+        initial_params = []
+        for segment in range(K):
+            reward_matrix = self._anchored_reward_from_policy(
+                policies[segment],
+                transitions,
+                problem.discount_factor,
+                problem.scale_parameter,
+                exit_action,
+                absorbing,
+            )
+            if self.config.reward_type == "linear":
+                params = self._project_reward_to_linear_features(
+                    reward_matrix,
+                    real_counts[segment],
+                    utility,
+                    exit_action,
+                    absorbing,
+                )
+            else:
+                params = reward_matrix
+            initial_params.append(params)
+
+        priors = posteriors.mean(axis=0)
+        priors = priors / priors.sum()
+        return (
+            jnp.asarray(np.asarray(initial_params), dtype=jnp.float32),
+            jnp.asarray(posteriors, dtype=jnp.float32),
+            jnp.asarray(priors, dtype=jnp.float32),
+        )
+
+    def _anchored_reward_from_policy(
+        self,
+        policy: np.ndarray,
+        transitions: jnp.ndarray,
+        discount_factor: float,
+        scale_parameter: float,
+        exit_action: int,
+        absorbing: int,
+    ) -> np.ndarray:
+        """Invert an anchored soft policy into a state-action reward matrix."""
+
+        clipped_policy = np.clip(policy, 1e-8, 1.0)
+        transition_array = np.asarray(transitions, dtype=np.float64)
+        exit_transition = transition_array[exit_action]
+        lhs = np.eye(policy.shape[0]) - discount_factor * exit_transition
+        rhs = -scale_parameter * np.log(clipped_policy[:, exit_action])
+        value = np.linalg.solve(lhs, rhs)
+        expected_next_value = np.einsum("ast,t->sa", transition_array, value)
+        reward = (
+            scale_parameter * np.log(clipped_policy)
+            + value[:, None]
+            - discount_factor * expected_next_value
+        )
+        reward[:, exit_action] = 0.0
+        reward[absorbing, :] = 0.0
+        return reward
+
+    def _project_reward_to_linear_features(
+        self,
+        reward_matrix: np.ndarray,
+        real_counts: np.ndarray,
+        utility: BaseUtilityFunction,
+        exit_action: int,
+        absorbing: int,
+    ) -> np.ndarray:
+        """Project an initialized reward matrix onto the linear utility basis."""
+
+        feature_matrix = np.asarray(utility.feature_matrix, dtype=np.float64)
+        mask = np.ones(reward_matrix.shape, dtype=bool)
+        mask[:, exit_action] = False
+        mask[absorbing, :] = False
+        row_weights = np.sqrt(real_counts + 1.0)
+        x = feature_matrix[mask]
+        y = reward_matrix[mask]
+        w = row_weights[mask]
+        xw = x * w[:, None]
+        yw = y * w
+        l2_penalty = float(self.config.initialization_l2_penalty)
+        if l2_penalty > 0:
+            lhs = xw.T @ xw
+            penalty = l2_penalty * np.eye(lhs.shape[0], dtype=np.float64)
+            penalty[0, 0] = 0.0
+            rhs = xw.T @ yw
+            params = np.linalg.solve(lhs + penalty, rhs)
+        else:
+            params, *_ = np.linalg.lstsq(xw, yw, rcond=None)
+        return params.astype(np.float64)
 
     # --- Helper methods ---
 
@@ -781,11 +1041,53 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
         """
         if reward_matrix.ndim == 1:
             # Tabular params stored as flat vector
-            n_actions = 3  # Will be reshaped by caller
             return reward_matrix
         r = reward_matrix.at[:, exit_action].set(0.0)
         r = r.at[absorbing, :].set(0.0)
         return r
+
+    def _enforce_shaping_anchor(
+        self,
+        segment_params: dict[str, jnp.ndarray],
+        absorbing: int,
+    ) -> dict[str, jnp.ndarray]:
+        """Pin the absorbing-state shaping potential to zero."""
+        shaping = segment_params["shaping"].at[absorbing].set(0.0)
+        return {**segment_params, "shaping": shaping}
+
+    def _compute_generator_reward(
+        self,
+        reward_matrix: jnp.ndarray,
+        shaping_potential: jnp.ndarray,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
+        gamma: float,
+    ) -> jnp.ndarray:
+        """Compute the reward surface used for segment policy updates."""
+        if not self.config.use_shaping:
+            shaped_score = reward_matrix
+        else:
+            shaping_coef = (
+                self.config.shaping_coef
+                if self.config.shaping_coef is not None
+                else gamma
+            )
+            expected_next_potential = jnp.einsum(
+                "ast,t->sa", transitions, shaping_potential
+            )
+            shaped_score = (
+                reward_matrix
+                + shaping_coef * expected_next_potential
+                - shaping_potential[:, None]
+            )
+
+        if self.config.generator_reward == "recovered":
+            return reward_matrix
+        if self.config.generator_reward == "f":
+            return shaped_score
+        if self.config.generator_reward == "log_odds":
+            return shaped_score - jnp.log(policy + 1e-10)
+        raise ValueError(f"unknown generator_reward={self.config.generator_reward!r}")
 
     def _compute_policy_with_anchors(
         self,
@@ -793,11 +1095,7 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
         operator: SoftBellmanOperator,
         absorbing: int,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
-        """Compute policy via value iteration with V(absorbing) = 0 enforced.
-
-        After VI converges, we adjust the value function so that the
-        absorbing state has exactly zero continuation value.
-        """
+        """Compute policy via value iteration under the anchored reward matrix."""
         if self.config.generator_solver == "hybrid":
             result = hybrid_iteration(
                 operator, reward_matrix,

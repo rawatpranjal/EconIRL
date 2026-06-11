@@ -47,7 +47,7 @@ def default_output_path(args: argparse.Namespace) -> Path:
         f"neural_linear_rust_sample_sweep_"
         f"n{sample_label}_t{args.n_periods}_s{args.seed}.json"
     )
-    return Path("experiments/identification/results") / filename
+    return Path("validation/results") / filename
 
 
 def make_state_encoder(num_states: int):

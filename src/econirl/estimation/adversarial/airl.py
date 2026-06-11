@@ -5,13 +5,12 @@ AIRL recovers a reward function that is robust to changes in dynamics by using
 a specific discriminator structure that disentangles reward from shaping.
 
 Algorithm:
-    1. Initialize reward function r(s,a) and value function V(s)
+    1. Initialize reward function r(s,a), shaping potential h(s), and policy pi
     2. Repeat:
        a) Compute discriminator: D(s,a,s') = exp(f) / (exp(f) + pi(a|s))
-          where f(s,a,s') = r(s,a) + gamma*V(s') - V(s)
+          where f(s,a,s') = r(s,a) + gamma*h(s') - h(s)
        b) Update discriminator to classify expert vs policy
-       c) Update policy to maximize discriminator reward
-       d) Update value function estimate
+       c) Update policy using the configured generator reward
 
 Reference:
     Fu, J., Luo, K., & Levine, S. (2018). "Learning robust rewards with
@@ -29,10 +28,10 @@ import jax.numpy as jnp
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.solvers import hybrid_iteration, value_iteration, backward_induction
+from econirl.core.solvers import backward_induction, hybrid_iteration, value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.adversarial.base import AdversarialEstimatorBase
-from econirl.estimation.base import BaseEstimator, EstimationResult
+from econirl.estimation.base import EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.base import BaseUtilityFunction
@@ -45,14 +44,26 @@ class AIRLConfig:
 
     Attributes:
         reward_type: Parameterization of reward ("tabular" or "linear")
+        reward_arg: Whether reward is state-only or state-action.
+        anchor_action: Optional action whose reward is pinned to zero.
+            Only used for state-action rewards.
+        absorbing_state: Optional absorbing state whose reward row is pinned
+            to zero when an anchor action is used.
         reward_lr: Learning rate for reward updates
         discriminator_steps: Discriminator updates per round
         generator_solver: Inner solver for policy
         generator_tol: Tolerance for value iteration
         generator_max_iter: Max iterations for value iteration
         max_rounds: Maximum training rounds
-        use_shaping: Whether to use potential shaping f = r + gamma*V(s') - V(s)
+        use_shaping: Whether to use potential shaping f = r + gamma*h(s') - h(s)
         shaping_coef: Coefficient for shaping term (typically gamma)
+        shaping_l2_penalty: Small L2 penalty on shaping/reward parameters to
+            remove gauge drift during adversarial training.
+        generator_reward: Reward used by the policy update. "recovered" solves
+            the current recovered reward g. "log_odds" uses AIRL's discriminator
+            log-odds reward f - log pi. "f" uses the shaped discriminator score.
+        min_rounds: Minimum adversarial rounds before policy-change convergence
+            can stop training.
         convergence_tol: Tolerance for policy convergence
         compute_se: Whether to compute standard errors
         se_method: Method for standard errors
@@ -68,6 +79,8 @@ class AIRLConfig:
     g_theta(s, a) recover a shaped advantage and lose the transfer
     property. Default 'state' matches the original paper; 'state_action'
     is the legacy econirl behavior."""
+    anchor_action: int | None = None
+    absorbing_state: int | None = None
     reward_lr: float = 0.01
     reward_weight_decay: float = 0.0  # L2 regularization on reward params
     discriminator_steps: int = 5
@@ -81,6 +94,9 @@ class AIRLConfig:
     max_rounds: int = 200
     use_shaping: bool = True
     shaping_coef: float | None = None  # If None, uses discount_factor
+    shaping_l2_penalty: float = 1e-8
+    generator_reward: Literal["recovered", "log_odds", "f"] = "recovered"
+    min_rounds: int = 20
     convergence_tol: float = 1e-4
     compute_se: bool = True
     se_method: Literal["bootstrap", "asymptotic"] = "bootstrap"
@@ -96,10 +112,10 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
         D(s,a,s') = exp(f) / (exp(f) + pi(a|s))
 
-    where f(s,a,s') = r(s,a) + gamma*V(s') - V(s).
+    where f(s,a,s') = r(s,a) + gamma*h(s') - h(s).
 
     This structure allows recovery of the reward r(s,a) independent of
-    the shaping term V.
+    the shaping term h.
 
     Parameters
     ----------
@@ -336,6 +352,68 @@ class AIRLEstimator(AdversarialEstimatorBase):
             )
         return result.policy, result.V
 
+    def _compute_generator_reward(
+        self,
+        reward_matrix: jnp.ndarray,
+        shaping_potential: jnp.ndarray,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
+        gamma: float,
+    ) -> jnp.ndarray:
+        """Compute the state-action reward used by the generator update."""
+        if not self.config.use_shaping:
+            shaped_score = reward_matrix
+        else:
+            shaping_coef = (
+                self.config.shaping_coef
+                if self.config.shaping_coef is not None
+                else gamma
+            )
+            expected_next_potential = jnp.einsum(
+                "ast,t->sa", transitions, shaping_potential
+            )
+            shaped_score = (
+                reward_matrix
+                + shaping_coef * expected_next_potential
+                - shaping_potential[:, None]
+            )
+
+        if self.config.generator_reward == "recovered":
+            return reward_matrix
+        if self.config.generator_reward == "f":
+            return shaped_score
+        if self.config.generator_reward == "log_odds":
+            return shaped_score - jnp.log(policy + 1e-10)
+        raise ValueError(f"unknown generator_reward={self.config.generator_reward!r}")
+
+    def _enforce_anchor_reward(self, reward_matrix: jnp.ndarray) -> jnp.ndarray:
+        """Apply AIRL anchor normalization for state-action rewards.
+
+        This mirrors the AIRL-Het gauge: one action is pinned to zero reward,
+        and the absorbing state's reward row is pinned to zero when available.
+        The anchor is deliberately not applied to state-only AIRL because doing
+        so would turn a state reward into an action-dependent object.
+        """
+        if self.config.anchor_action is None:
+            return reward_matrix
+        if self.config.reward_arg != "state_action":
+            raise ValueError("anchor_action is only valid for state_action AIRL")
+
+        anchor_action = int(self.config.anchor_action)
+        if not 0 <= anchor_action < reward_matrix.shape[1]:
+            raise ValueError(
+                f"anchor_action={anchor_action} is outside the action space"
+            )
+        anchored = reward_matrix.at[:, anchor_action].set(0.0)
+        if self.config.absorbing_state is not None:
+            absorbing = int(self.config.absorbing_state)
+            if not 0 <= absorbing < reward_matrix.shape[0]:
+                raise ValueError(
+                    f"absorbing_state={absorbing} is outside the state space"
+                )
+            anchored = anchored.at[absorbing, :].set(0.0)
+        return anchored
+
     def _optimize(
         self,
         panel: Panel,
@@ -392,7 +470,6 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 )
             else:
                 optimizer = optax.adam(self.config.reward_lr)
-            opt_state = optimizer.init(reward_params)
 
             def get_reward_matrix(params):
                 return jnp.einsum("sak,k->sa", feature_matrix, params)
@@ -409,10 +486,15 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 )
             else:
                 optimizer = optax.adam(self.config.reward_lr)
-            opt_state = optimizer.init(reward_params)
 
             def get_reward_matrix(params):
                 return params
+
+        disc_params = {
+            "reward": reward_params,
+            "shaping": jnp.zeros(n_states, dtype=jnp.float32),
+        }
+        opt_state = optimizer.init(disc_params)
 
         # Initial state distribution
         initial_dist = self._compute_initial_distribution(panel, n_states)
@@ -425,28 +507,43 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
         # Initialize policy
         policy = jnp.ones((n_states, n_actions)) / n_actions
-        V = jnp.zeros(n_states)
 
-        # AIRL discriminator loss (differentiable w.r.t. reward_params)
+        # AIRL discriminator loss (differentiable w.r.t. reward and h params)
         use_shaping = self.config.use_shaping
         shaping_coef = self.config.shaping_coef
+        shaping_l2_penalty = self.config.shaping_l2_penalty
 
         reward_arg_state = self.config.reward_arg == "state"
 
-        def disc_loss_fn(rw_params, V_fixed, policy_fixed,
-                         exp_s, exp_a, exp_ns, pol_s, pol_a, pol_ns):
-            reward_matrix = get_reward_matrix(rw_params)
+        def disc_loss_fn(
+            params,
+            policy_fixed,
+            exp_s,
+            exp_a,
+            exp_ns,
+            pol_s,
+            pol_a,
+            pol_ns,
+        ):
+            reward_matrix = get_reward_matrix(params["reward"])
             if reward_arg_state:
                 reward_matrix = jnp.broadcast_to(
                     reward_matrix.mean(axis=1, keepdims=True),
                     reward_matrix.shape,
                 )
+            else:
+                reward_matrix = self._enforce_anchor_reward(reward_matrix)
+            shaping_potential = params["shaping"]
 
             def logits(states, actions, next_states):
                 r_sa = reward_matrix[states, actions]
                 if use_shaping:
-                    sc = shaping_coef if shaping_coef else gamma
-                    f = r_sa + sc * V_fixed[next_states] - V_fixed[states]
+                    sc = shaping_coef if shaping_coef is not None else gamma
+                    f = (
+                        r_sa
+                        + sc * shaping_potential[next_states]
+                        - shaping_potential[states]
+                    )
                 else:
                     f = r_sa
                 log_pi = jnp.log(policy_fixed[states, actions] + 1e-10)
@@ -457,7 +554,10 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
             e_loss = jnp.mean(jnp.logaddexp(0.0, -e_logits))
             p_loss = jnp.mean(jnp.logaddexp(0.0, p_logits))
-            return e_loss + p_loss
+            l2_penalty = shaping_l2_penalty * (
+                jnp.mean(reward_matrix**2) + jnp.mean(shaping_potential**2)
+            )
+            return e_loss + p_loss + l2_penalty
 
         disc_loss_and_grad = jax.value_and_grad(disc_loss_fn)
 
@@ -485,30 +585,46 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 )
             )
 
-            # Update reward via optax Adam with jax.value_and_grad
+            # Update reward and shaping potential via optax Adam.
             disc_loss = 0.0
             for _ in range(self.config.discriminator_steps):
                 loss, grads = disc_loss_and_grad(
-                    reward_params, V, policy,
+                    disc_params, policy,
                     expert_states, expert_actions, expert_next_states,
                     policy_states, policy_actions, policy_next_states,
                 )
                 updates, opt_state = optimizer.update(
-                    grads, opt_state, params=reward_params
+                    grads, opt_state, params=disc_params
                 )
-                reward_params = optax.apply_updates(reward_params, updates)
+                disc_params = optax.apply_updates(disc_params, updates)
                 disc_loss = float(loss)
 
             disc_losses.append(disc_loss)
 
-            # Update policy via soft value iteration
-            current_reward = get_reward_matrix(reward_params)
+            # Update policy via soft value iteration under the configured
+            # generator reward. The recovered reward g remains the object
+            # reported after training.
+            current_reward = get_reward_matrix(disc_params["reward"])
             if reward_arg_state:
                 current_reward = jnp.broadcast_to(
                     current_reward.mean(axis=1, keepdims=True),
                     current_reward.shape,
                 )
-            new_policy, V = self._compute_policy(current_reward, operator, problem.num_periods)
+            else:
+                current_reward = self._enforce_anchor_reward(current_reward)
+            shaping_potential = disc_params["shaping"]
+            generator_reward = self._compute_generator_reward(
+                current_reward,
+                shaping_potential,
+                policy,
+                transitions,
+                gamma,
+            )
+            new_policy, _ = self._compute_policy(
+                generator_reward,
+                operator,
+                problem.num_periods,
+            )
 
             # Conservative policy iteration: mix old and new policy
             alpha = self.config.policy_step_size
@@ -531,37 +647,48 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 "P(R|hi)": f"{float(policy[-10:, 1].mean()):.3f}",
             })
 
-            if policy_change < self.config.convergence_tol:
+            if (
+                round_idx + 1 >= self.config.min_rounds
+                and policy_change < self.config.convergence_tol
+            ):
                 converged = True
                 break
 
         pbar.close()
 
         # Final values
-        final_reward = get_reward_matrix(reward_params)
+        final_reward = get_reward_matrix(disc_params["reward"])
         if reward_arg_state:
             final_reward = jnp.broadcast_to(
                 final_reward.mean(axis=1, keepdims=True),
                 final_reward.shape,
             )
+        else:
+            final_reward = self._enforce_anchor_reward(final_reward)
+
+        final_policy, final_value = self._compute_policy(
+            final_reward,
+            operator,
+            problem.num_periods,
+        )
 
         # Compute log-likelihood
-        log_probs = operator.compute_log_choice_probabilities(final_reward, V)
+        log_probs = operator.compute_log_choice_probabilities(final_reward, final_value)
         ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
 
         # Extract parameters
         if self.config.reward_type == "linear":
-            parameters = jnp.array(reward_params)
+            parameters = jnp.array(disc_params["reward"])
         else:
-            parameters = reward_params.flatten()
+            parameters = disc_params["reward"].flatten()
 
         optimization_time = time.time() - start_time
 
         return EstimationResult(
             parameters=parameters,
             log_likelihood=ll,
-            value_function=V,
-            policy=policy,
+            value_function=final_value,
+            policy=final_policy,
             hessian=None,
             converged=converged,
             num_iterations=round_idx + 1,
@@ -570,10 +697,17 @@ class AIRLEstimator(AdversarialEstimatorBase):
             optimization_time=optimization_time,
             metadata={
                 "reward_type": self.config.reward_type,
+                "reward_arg": self.config.reward_arg,
+                "anchor_action": self.config.anchor_action,
+                "absorbing_state": self.config.absorbing_state,
                 "use_shaping": self.config.use_shaping,
+                "learned_shaping": True,
+                "generator_reward": self.config.generator_reward,
+                "min_rounds": self.config.min_rounds,
                 "final_disc_loss": disc_losses[-1] if disc_losses else None,
                 "disc_losses": disc_losses,
                 "policy_changes": policy_changes,
+                "shaping_potential": jnp.array(disc_params["shaping"]).tolist(),
                 "reward_matrix": jnp.array(final_reward).tolist(),
             },
         )

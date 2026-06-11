@@ -1,12 +1,11 @@
 """Tests for IQ-Learn estimator."""
 
-import numpy as np
-import pytest
 import jax
 import jax.numpy as jnp
+import pytest
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
+from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
 from econirl.preferences.action_reward import ActionDependentReward
 
 
@@ -186,8 +185,31 @@ class TestIQLearnEstimator:
         )
 
         assert "q_table" in result.metadata
+        assert "reward_matrix" in result.metadata
         assert "reward_table" in result.metadata
+        assert "raw_bellman_reward_table" in result.metadata
+        assert "projected_reward_matrix" in result.metadata
         assert "divergence" in result.metadata
+        assert result.metadata["counterfactual_reward_source"] == "raw_bellman_reward_table"
+        assert "expert_state_coverage" in result.metadata
+        assert "expert_state_action_coverage" in result.metadata
+
+    def test_sparse_expert_support_is_reported(
+        self, simple_problem, simple_transitions, simple_reward_fn, expert_panel
+    ):
+        """Sparse panels should surface support diagnostics in metadata."""
+        config = IQLearnConfig(max_iter=20, verbose=False)
+        estimator = IQLearnEstimator(config=config)
+
+        result = estimator.estimate(
+            panel=expert_panel,
+            utility=simple_reward_fn,
+            problem=simple_problem,
+            transitions=simple_transitions,
+        )
+
+        assert result.metadata["expert_state_coverage"] == pytest.approx(1 / 3)
+        assert result.metadata["expert_state_action_coverage"] == pytest.approx(1 / 6)
 
     def test_reward_recovery_bellman_consistency(
         self, simple_problem, simple_transitions, simple_reward_fn, expert_panel

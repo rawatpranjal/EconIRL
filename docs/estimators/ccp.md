@@ -60,7 +60,7 @@ results file and generated primer results record the reported results.
 | --- | --- |
 | Evidence scope | Synthetic tabular simulation with support conditions. |
 | Primary cell | `canonical_low_action`. |
-| Machine-readable results file | [ccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.json). |
+| Machine-readable results file | [ccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `CCP` with `utility="linear_cost"`. |
 

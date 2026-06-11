@@ -1,0 +1,223 @@
+{
+  "compatibility": {
+    "compatible": true,
+    "errors": [],
+    "estimator": "GLADIUS",
+    "warnings": []
+  },
+  "counterfactual_valid_certified": false,
+  "diagnostics": {
+    "action_shares": [
+      0.34236,
+      0.3306,
+      0.32704
+    ],
+    "anchor_valid": true,
+    "condition_number": 4.376423157498433,
+    "errors": [],
+    "feature_rank": 4,
+    "is_action_dependent": true,
+    "max_transition_row_error": 2.421438694000244e-08,
+    "min_action_share": 0.32704,
+    "min_positive_ccp": 0.13815789473684212,
+    "num_features": 4,
+    "num_states": 21,
+    "observed_states": 21,
+    "single_action_states": 0,
+    "state_action_coverage": 1.0,
+    "warnings": []
+  },
+  "estimator": "GLADIUS",
+  "failed_gates": [
+    "raw_bellman_reward_normalized_rmse",
+    "value_normalized_rmse"
+  ],
+  "gates": [
+    {
+      "name": "converged",
+      "operator": "is",
+      "passed": true,
+      "threshold": true,
+      "value": true
+    },
+    {
+      "name": "final_loss",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 2.0,
+      "value": 0.5469421708994533
+    },
+    {
+      "name": "parameter_cosine",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.9,
+      "value": 0.9857478206562387
+    },
+    {
+      "name": "parameter_relative_rmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.5,
+      "value": 0.23480167881760278
+    },
+    {
+      "name": "raw_bellman_reward_normalized_rmse",
+      "operator": "<=",
+      "passed": false,
+      "threshold": 0.3,
+      "value": 0.5896755913923086
+    },
+    {
+      "name": "projected_reward_normalized_rmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.3,
+      "value": 0.13442619238022713
+    },
+    {
+      "name": "policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.12,
+      "value": 0.03808471881698321
+    },
+    {
+      "name": "value_normalized_rmse",
+      "operator": "<=",
+      "passed": false,
+      "threshold": 0.3,
+      "value": 0.49450667466577136
+    },
+    {
+      "name": "q_normalized_rmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.3,
+      "value": 0.2218313598781607
+    },
+    {
+      "name": "type_a_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.12,
+      "value": 0.002737962374730594
+    },
+    {
+      "name": "type_b_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.12,
+      "value": 0.007421722566976499
+    },
+    {
+      "name": "type_c_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.12,
+      "value": 0.0004928684167914453
+    }
+  ],
+  "metric_groups": {
+    "counterfactual_recovery": {
+      "type_a": 0.002737962374730594,
+      "type_b": 0.007421722566976499,
+      "type_c": 0.0004928684167914453
+    },
+    "imitation_policy": {
+      "policy_kl": 0.005686767886998033,
+      "policy_tv": 0.03808471881698321
+    },
+    "projected_structural_parameters": {
+      "parameter_cosine": 0.9857478206562387,
+      "parameter_relative_rmse": 0.23480167881760278
+    },
+    "reward_table_recovery": {
+      "projected_reward_normalized_rmse": 0.13442619238022713,
+      "raw_bellman_reward_normalized_rmse": 0.5896755913923086
+    },
+    "value_q_recovery": {
+      "q_normalized_rmse": 0.2218313598781607,
+      "value_normalized_rmse": 0.49450667466577136
+    }
+  },
+  "metrics": {
+    "anchor_projected_reward_normalized_rmse": 0.13442619238022713,
+    "anchor_projected_reward_rmse": 0.04601153889534772,
+    "counterfactuals": {
+      "type_a": {
+        "policy": {
+          "kl": 0.0009003345200623294,
+          "l1": 0.03627498487202781,
+          "linf": 0.05809203563731208,
+          "tv": 0.018137492436013904
+        },
+        "regret": 0.002737962374730594,
+        "value_rmse": 0.0028218035349197347
+      },
+      "type_b": {
+        "policy": {
+          "kl": 0.0013856512986506605,
+          "l1": 0.03969425345101394,
+          "linf": 0.057781013906368195,
+          "tv": 0.01984712672550697
+        },
+        "regret": 0.007421722566976499,
+        "value_rmse": 0.007392062468039123
+      },
+      "type_c": {
+        "policy": {
+          "kl": 0.00020247957396159265,
+          "l1": 0.016970248507329894,
+          "linf": 0.03200947697258699,
+          "tv": 0.008485124253664947
+        },
+        "regret": 0.0004928684167914453,
+        "value_rmse": 0.0006341770705810067
+      }
+    },
+    "parameters": {
+      "cosine_similarity": 0.9857478206562387,
+      "max_abs_error": 0.08617384818705277,
+      "relative_rmse": 0.23480167881760278,
+      "rmse": 0.06430308342843549
+    },
+    "policy": {
+      "kl": 0.005686767886998033,
+      "l1": 0.07616943763396641,
+      "linf": 0.2602011734107267,
+      "tv": 0.03808471881698321
+    },
+    "projected_reward_normalized_rmse": 0.13442619238022713,
+    "projected_reward_rmse": 0.036662871764814545,
+    "q_normalized_rmse": 0.2218313598781607,
+    "q_rmse": 0.16378775642969667,
+    "raw_bellman_reward_normalized_rmse": 0.5896755913923086,
+    "raw_bellman_reward_rmse": 0.12930524328268114,
+    "reward_normalized_rmse": 0.13442619238022713,
+    "reward_rmse": 0.036662871764814545,
+    "value_normalized_rmse": 0.49450667466577136,
+    "value_rmse": 0.19290996039303382
+  },
+  "primary_cell_id": "gladius_paper_high_state_scaled",
+  "simulation": {
+    "n_individuals": 1000,
+    "n_periods": 100,
+    "seed": 245,
+    "show_progress": false
+  },
+  "status": "strict_structural_counterfactual_fail",
+  "summary": {
+    "converged": true,
+    "estimation_time": 175.00887489318848,
+    "log_likelihood": -109344.11493557254,
+    "metadata": {
+      "anchor_action": 2,
+      "anchor_bellman_loss": true,
+      "anchor_bellman_mode": "anchor_moment",
+      "final_loss": 0.5469421708994533
+    },
+    "num_iterations": 161,
+    "num_observations": 100000
+  }
+}

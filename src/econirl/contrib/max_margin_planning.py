@@ -124,7 +124,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
     Examples
     --------
-    >>> from econirl.estimation.max_margin_planning import MaxMarginPlanningEstimator, MMPConfig
+    >>> from econirl.contrib.max_margin_planning import MaxMarginPlanningEstimator, MMPConfig
     >>> from econirl.preferences.action_reward import ActionDependentReward
     >>>
     >>> # Create estimator with custom config

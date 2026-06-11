@@ -16,15 +16,13 @@ the generated panel, the transition law, and the action-dependent reward
 features, not the oracle dynamic objects.
 
 The full result generator is
-[`mpec_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_run.py).
-It writes the rendered table source
-[`mpec_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.tex)
-and the machine-readable results file
-[`mpec_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json).
+[`mpec_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mpec/run.py).
+It writes the machine-readable results file
+[`mpec_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mpec.json).
 To rerun it from the repository root:
 
 ```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/mpec/mpec_run.py
+PYTHONPATH=src:. python validation/estimators/mpec/run.py
 ```
 
 Read the tables as a sequence. The design table states the synthetic cell.

@@ -1,0 +1,217 @@
+{
+  "estimator": "AIRL-Het",
+  "interpretation": "AIRL-Het passes the anchored serialized-content latent-segment known-truth cell.",
+  "primary_cell_id": "airl_het_paper_identification",
+  "results": [
+    {
+      "cell_id": "airl_het_paper_identification",
+      "compatibility": {
+        "compatible": true,
+        "errors": [],
+        "estimator": "AIRL-Het",
+        "warnings": [
+          "58 of 61 states are observed"
+        ]
+      },
+      "dgp_config": {
+        "absorbing_state": 60,
+        "books_per_user": 4,
+        "discount_factor": 0.92,
+        "exit_action": 2,
+        "heterogeneity": "latent_segments",
+        "high_reward_features": 20,
+        "high_state_dim": 18,
+        "kind": "content_heterogeneity",
+        "num_actions": 3,
+        "num_chapters": 5,
+        "num_regular_states": 60,
+        "num_segments": 2,
+        "num_states": 61,
+        "price_levels": 2,
+        "quality_levels": 2,
+        "reward_dim": "high",
+        "reward_mode": "action_dependent",
+        "scale_parameter": 0.85,
+        "seed": 4506,
+        "segment_probabilities": [
+          0.48,
+          0.52
+        ],
+        "state_mode": "high_dim",
+        "transition_noise": 0.0,
+        "wait_bins": 3
+      },
+      "diagnostics": {
+        "action_shares": [
+          0.4565815006468305,
+          0.3391009055627426,
+          0.2043175937904269
+        ],
+        "anchor_valid": true,
+        "condition_number": 20.411303828331157,
+        "errors": [],
+        "feature_rank": 20,
+        "is_action_dependent": true,
+        "max_transition_row_error": 0.0,
+        "min_action_share": 0.2043175937904269,
+        "min_positive_ccp": 0.009708737864077669,
+        "num_features": 20,
+        "num_states": 61,
+        "observed_states": 58,
+        "single_action_states": 0,
+        "state_action_coverage": 0.9344262295081968,
+        "warnings": [
+          "58 of 61 states are observed"
+        ]
+      },
+      "estimator": "AIRL-Het",
+      "gates": [
+        {
+          "name": "num_segments_match",
+          "operator": "is",
+          "passed": true,
+          "threshold": true,
+          "value": true
+        },
+        {
+          "name": "converged",
+          "operator": "is",
+          "passed": true,
+          "threshold": true,
+          "value": true
+        },
+        {
+          "name": "segment_prior_l1",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.35,
+          "value": 0.043477813304278856
+        },
+        {
+          "name": "segment_assignment_accuracy",
+          "operator": ">=",
+          "passed": true,
+          "threshold": 0.7,
+          "value": 0.895
+        },
+        {
+          "name": "max_segment_reward_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.3,
+          "value": 0.2650011487814588
+        },
+        {
+          "name": "max_segment_policy_tv",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.12,
+          "value": 0.05913144436746753
+        },
+        {
+          "name": "max_segment_value_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.3,
+          "value": 0.14197337719868644
+        },
+        {
+          "name": "max_segment_q_normalized_rmse",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.3,
+          "value": 0.21138937605956745
+        },
+        {
+          "name": "type_a_max_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.12,
+          "value": 0.014492342845929596
+        },
+        {
+          "name": "type_b_max_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.12,
+          "value": 0.11893310781701327
+        },
+        {
+          "name": "type_c_max_regret",
+          "operator": "<=",
+          "passed": true,
+          "threshold": 0.12,
+          "value": 0.00686809129514554
+        }
+      ],
+      "metrics": {
+        "max_segment_counterfactual_regret": {
+          "type_a": 0.014492342845929596,
+          "type_b": 0.11893310781701327,
+          "type_c": 0.00686809129514554
+        },
+        "max_segment_policy_tv": 0.05913144436746753,
+        "max_segment_q_normalized_rmse": 0.21138937605956745,
+        "max_segment_reward_normalized_rmse": 0.2650011487814588,
+        "max_segment_value_normalized_rmse": 0.14197337719868644,
+        "segment_assignment_accuracy": 0.895,
+        "segment_permutation": {
+          "estimated_to_true": {
+            "0": 1,
+            "1": 0
+          },
+          "true_to_estimated": [
+            1,
+            0
+          ]
+        },
+        "segment_prior_l1": 0.043477813304278856,
+        "segment_prior_max_abs_error": 0.021738921553300594,
+        "segment_q_normalized_rmse": [
+          0.13125537952018404,
+          0.21138937605956745
+        ],
+        "segment_reward_normalized_rmse": [
+          0.24404583135758476,
+          0.2650011487814588
+        ],
+        "segment_value_normalized_rmse": [
+          0.09269394540489886,
+          0.14197337719868644
+        ]
+      },
+      "simulation": {
+        "n_individuals": 800,
+        "n_periods": 16,
+        "seed": 4507,
+        "show_progress": false
+      },
+      "summary": {
+        "converged": true,
+        "convergence_message": "EM converged",
+        "estimation_time": 30.698772192001343,
+        "log_likelihood": -11614.762960734517,
+        "metadata": {
+          "em_log_likelihoods": [
+            -11609.662028932702,
+            -11614.762960734517
+          ],
+          "generator_reward": "f",
+          "initialization": "behavioral_anchor",
+          "initialization_l2_penalty": 10.0,
+          "initialization_smoothing": 1.0,
+          "learned_shaping": true,
+          "min_airl_rounds": 1,
+          "num_segments": 2,
+          "segment_priors": [
+            0.4982610891755354,
+            0.5017389108244645
+          ]
+        },
+        "num_iterations": 2,
+        "num_observations": 12368
+      }
+    }
+  ],
+  "status": "pass"
+}

@@ -107,13 +107,19 @@ def track_convergence(
             if spec.can_recover_params and summary.parameters is not None:
                 est = summary.parameters
                 if len(est) == len(true_params):
-                    p_rmse = ((est - true_params) ** 2).astype(jnp.float32).mean().sqrt().item()
+                    p_rmse = float(
+                        jnp.sqrt(
+                            ((est - true_params) ** 2).astype(jnp.float32).mean()
+                        ).item()
+                    )
 
             # Policy RMSE
             pol_rmse = float("nan")
             if summary.policy is not None:
-                pol_rmse = (
-                    ((summary.policy - true_policy) ** 2).astype(jnp.float32).mean().sqrt().item()
+                pol_rmse = float(
+                    jnp.sqrt(
+                        ((summary.policy - true_policy) ** 2).astype(jnp.float32).mean()
+                    ).item()
                 )
 
             profile.iterations.append(n_iter)

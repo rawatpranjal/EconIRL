@@ -66,5 +66,5 @@ counterfactual validity.
 
 ## Further Reading
 
-- Machine-readable results file: [gladius_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/gladius/gladius_results.json)
-- Scaled-cell results file: [gladius_scaled_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/gladius/gladius_scaled_results.json)
+- Machine-readable results file: [gladius_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json)
+- Scaled-cell results file: [gladius_scaled_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_scaled.json)

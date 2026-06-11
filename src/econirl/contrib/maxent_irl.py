@@ -492,7 +492,7 @@ class MaxEntIRLEstimator(BaseEstimator):
 
         # Compute gradient for each parameter
         for k in range(n_params):
-            params_plus = np.asarray(params, dtype=np.float32)
+            params_plus = np.array(params, dtype=np.float32, copy=True)
             params_plus[k] += eps
             params_plus = jnp.array(params_plus)
 
@@ -502,7 +502,7 @@ class MaxEntIRLEstimator(BaseEstimator):
                 reward_plus, solver_plus.V
             )
 
-            params_minus = np.asarray(params, dtype=np.float32)
+            params_minus = np.array(params, dtype=np.float32, copy=True)
             params_minus[k] -= eps
             params_minus = jnp.array(params_minus)
 

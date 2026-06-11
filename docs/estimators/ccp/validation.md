@@ -15,15 +15,13 @@ the generated panel, the transition law, and the action-dependent reward
 features, not the oracle dynamic objects.
 
 The full result generator is
-[`ccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_run.py).
-It writes the rendered table source
-[`ccp_results.tex`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.tex)
-and the machine-readable results file
-[`ccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/ccp/ccp_results.json).
+[`ccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/ccp/run.py).
+It writes the machine-readable results file
+[`ccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp.json).
 To rerun it from the repository root:
 
 ```bash
-PYTHONPATH=src:. python papers/econirl_package/primers/ccp/ccp_run.py
+PYTHONPATH=src:. python validation/estimators/ccp/run.py
 ```
 
 Read the tables as a sequence. The design table states the synthetic cell.

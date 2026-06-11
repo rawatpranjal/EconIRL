@@ -66,7 +66,7 @@ and Type C counterfactual oracles.
 | --- | --- |
 | Evidence scope | Synthetic encoded-state simulation. |
 | Primary cell | `canonical_high_action`. |
-| Machine-readable results file | [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/sees/sees_results.json). |
+| Machine-readable results file | [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/sees.json). |
 | Primary Bellman gate | Reported violation `3.08e-6`. |
 | Primary recovery gates | Parameter, reward, policy, value, Q, and counterfactual gates are reported in the results file. |
 | Public example | Uses `SEES` with `utility="linear_cost"` and the package default penalty; the simulation study uses `SEESEstimator` with explicit finite-state penalties. |

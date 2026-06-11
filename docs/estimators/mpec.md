@@ -65,7 +65,7 @@ results file and generated primer results record the reported results.
 | --- | --- |
 | Evidence scope | Synthetic constrained-likelihood simulation. |
 | Primary cell | `canonical_low_action`. |
-| Machine-readable results file | [mpec_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/mpec/mpec_results.json). |
+| Machine-readable results file | [mpec_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mpec.json). |
 | Bellman constraint check | Reported final violation `7.72e-12`. |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `MPECEstimator` with the tabular DDC lower-level API. |

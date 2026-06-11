@@ -51,7 +51,7 @@ results file records the reported results.
 | --- | --- |
 | Evidence scope | Synthetic tabular simulation. |
 | Primary cell | `canonical_low_action`. |
-| Machine-readable results file | [nfxp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/papers/econirl_package/primers/nfxp/nfxp_results.json). |
+| Machine-readable results file | [nfxp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `NFXP` with `utility="linear_cost"`. |
 

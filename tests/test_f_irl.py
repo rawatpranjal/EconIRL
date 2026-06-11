@@ -1,7 +1,6 @@
 """Smoke tests for f-IRL (state-marginal matching IRL)."""
 
 import numpy as np
-import jax.numpy as jnp
 import pytest
 
 from econirl.environments.rust_bus import RustBusEnvironment
@@ -48,6 +47,9 @@ def test_firl_estimate(small_firl_setup):
     )
     assert result.policy is not None
     assert result.policy.shape == (20, 2)
+    assert result.metadata["policy_marginal"].shape == (20, 2)
+    assert np.isfinite(result.metadata["occupancy_l1"])
+    assert result.metadata["reward_range"] > 0.0
 
 
 def test_firl_policy_valid(small_firl_setup):

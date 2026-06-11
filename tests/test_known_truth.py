@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import pytest
 
 from econirl.environments.shapeshifter import ShapeshifterConfig
-from experiments.known_truth import (
+from validation.known_truth import (
     DEFAULT_CELLS,
     ESTIMATOR_CONTRACTS,
     REQUIRED_ESTIMATORS,
@@ -1104,6 +1104,21 @@ def test_iq_learn_non_smoke_gates_require_structural_recovery():
         if gate.name == "raw_bellman_reward_normalized_rmse"
     )
     assert not raw_gate.passed
+
+    sparse_summary = SimpleNamespace(
+        converged=True,
+        metadata={
+            "expert_state_coverage": 2 / 3,
+            "expert_state_action_coverage": 0.90,
+        },
+    )
+    sparse_gates = recovery_gates("IQ-Learn", sparse_summary, metrics, smoke=False)
+    sparse_by_name = {gate.name: gate for gate in sparse_gates}
+
+    assert not sparse_by_name["expert_state_coverage"].passed
+    assert sparse_by_name["expert_state_coverage"].threshold == 1.0
+    assert not sparse_by_name["expert_state_action_coverage"].passed
+    assert sparse_by_name["expert_state_action_coverage"].threshold == 0.95
 
 
 def test_iq_learn_known_truth_q_type_selection_matches_dgp_matrix():

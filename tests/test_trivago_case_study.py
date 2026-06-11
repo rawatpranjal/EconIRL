@@ -36,7 +36,10 @@ N_TEST_SESSIONS = 500
 
 @pytest.fixture(scope="module")
 def sessions_df():
-    return load_trivago_sessions(n_sessions=N_TEST_SESSIONS)
+    try:
+        return load_trivago_sessions(n_sessions=N_TEST_SESSIONS)
+    except FileNotFoundError as exc:
+        pytest.skip(str(exc))
 
 
 @pytest.fixture(scope="module")

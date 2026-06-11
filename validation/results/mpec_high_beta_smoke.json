@@ -1,0 +1,51 @@
+{
+  "artifact_name": "mpec_high_beta_smoke",
+  "artifact_type": "local_smoke_guard",
+  "does_not_replace": "tier4_high_gamma_mpec",
+  "environment": "RustBusEnvironment",
+  "environment_config": {
+    "discount_factor": 0.9999,
+    "num_mileage_bins": 4,
+    "operating_cost": 0.01,
+    "replacement_cost": 1.0,
+    "seed": 7
+  },
+  "estimator": "MPEC",
+  "generated_by": "validation/estimators/mpec/high_beta_smoke.py",
+  "purpose": "Exercise the recommended scipy SLSQP MPEC path at beta=0.9999 without claiming full high-beta release evidence.",
+  "release_status": "local_smoke_only_not_tier4_release_evidence",
+  "result": {
+    "converged": true,
+    "estimation_time": 0.7378158569335938,
+    "final_constraint_violation": 1.5182013157755136e-07,
+    "message": "Optimization terminated successfully",
+    "method": "slsqp",
+    "num_iterations": 5,
+    "num_observations": 48,
+    "parameters": [
+      0.17472468316555023,
+      2.2541611194610596
+    ],
+    "passed": true,
+    "wall_time_seconds": 0.7378771305084229
+  },
+  "simulation_config": {
+    "n_individuals": 6,
+    "n_periods": 8,
+    "seed": 8
+  },
+  "solver_config": {
+    "compute_hessian": false,
+    "constraint_tol": 1e-05,
+    "outer_max_iter": 80,
+    "solver": "sqp",
+    "tol": 1e-06
+  },
+  "thresholds": {
+    "discount_factor_min": 0.999,
+    "estimation_time_max_seconds": 15.0,
+    "final_constraint_violation_max": 1e-05,
+    "num_iterations_max": 80,
+    "wall_time_max_seconds": 15.0
+  }
+}

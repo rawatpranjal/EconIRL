@@ -25,6 +25,10 @@ env/
 .coverage
 htmlcov/
 .mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
 
 # Jupyter
 .ipynb_checkpoints/
@@ -34,6 +38,16 @@ docs/_build/
 
 # Git worktrees
 .worktrees/
+
+# Local assistant/tool state
+.claude/
+.serena/
+
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*.key
 
 # AutoLab runtime artifacts
 autolab/results/
@@ -54,28 +68,48 @@ src/econirl/datasets/lsw_synthetic_data.csv
 # JSS deep-run outputs (downloaded fresh from RunPod, not committed)
 experiments/jss_deep_run/results/
 
+# Retired root research workspaces
+/papers/
+/experiments/
+
 # Cache
 cache/
+.cache/
 
 # macOS
 .DS_Store
 
-# Claude Code
-.claude/
-
 # Personal notes
 notes/
 
-# Loose PDFs in root
-/*.pdf
+# PDFs and TeX sources are external to the package repo
+*.pdf
+*.tex
 
 # LaTeX compilation artifacts
 *.aux
 *.bbl
+*.bcf
 *.blg
 *.fls
 *.fdb_latexmk
 *.log
+*.nav
 *.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
 texput.log
 papers/econirl_package_jss/apikeyrunpod.txt
+
+# Local scratch and editor backups
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# Validation runner byproducts
+validation/estimators/**/*.json
+validation/estimators/**/*.tex
