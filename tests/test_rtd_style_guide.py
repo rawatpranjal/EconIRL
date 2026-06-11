@@ -130,6 +130,37 @@ def test_estimator_docs_use_simulation_study_links_and_terms() -> None:
     assert offenders == []
 
 
+def test_estimator_navigation_is_flat() -> None:
+    """Keep public RTD estimator links at the root navigation level."""
+
+    index = (DOCS / "index.rst").read_text(encoding="utf-8")
+    estimator_overview = (DOCS / "estimators.md").read_text(encoding="utf-8")
+    config = runpy.run_path(str(DOCS / "conf.py"))
+    expected = [
+        "estimators/nfxp",
+        "estimators/ccp",
+        "estimators/mpec",
+        "estimators/nnes",
+        "estimators/tdccp",
+        "estimators/mce_irl",
+        "estimators/deep_mce_irl",
+        "estimators/airl",
+        "estimators/airl_het",
+        "estimators/f_irl",
+        "estimators/gladius",
+        "estimators/iq_learn",
+    ]
+
+    missing = [entry for entry in expected if f"   {entry}" not in index]
+    assert missing == []
+    assert config["html_theme_options"]["navigation_depth"] == 1
+    assert "Estimator Map" not in index
+    assert "Estimator Map" not in estimator_overview
+    assert "Structural Econometrics" not in estimator_overview
+    assert "Inverse Reinforcement Learning" not in estimator_overview
+    assert "```{toctree}" not in estimator_overview
+
+
 def test_under_the_hood_pages_start_with_optimization_and_pseudocode() -> None:
     """Keep estimator internals pages algorithm-first."""
 

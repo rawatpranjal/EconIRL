@@ -15,8 +15,7 @@ Install
 Estimators
 ----------
 
-Start with the estimator map, then open the method page that matches your
-decision problem.
+Open the estimator that matches your decision problem.
 
 `NFXP <estimators/nfxp.html>`__ ·
 `CCP <estimators/ccp.html>`__ ·
@@ -57,9 +56,21 @@ Output
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
+   :maxdepth: 1
 
    user_guide/overview
    estimators
+   estimators/nfxp
+   estimators/ccp
+   estimators/mpec
+   estimators/nnes
+   estimators/tdccp
+   estimators/mce_irl
+   estimators/deep_mce_irl
+   estimators/airl
+   estimators/airl_het
+   estimators/f_irl
+   estimators/gladius
+   estimators/iq_learn
    user_guide/api_design
    user_guide/validation

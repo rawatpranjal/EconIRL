@@ -1,4 +1,4 @@
-# Estimator Map
+# Estimators
 
 Use this page to choose an estimator for your data and decision problem. The
 evidence column states the current public scope.
@@ -20,20 +20,3 @@ evidence column states the current public scope.
 
 Each page states the target, evidence, and current scope. Preview pages are
 for exploration, benchmarking, and method development.
-
-```{toctree}
-:maxdepth: 1
-
-estimators/nfxp
-estimators/ccp
-estimators/mpec
-estimators/nnes
-estimators/tdccp
-estimators/mce_irl
-estimators/deep_mce_irl
-estimators/airl
-estimators/airl_het
-estimators/f_irl
-estimators/gladius
-estimators/iq_learn
-```
