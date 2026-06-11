@@ -81,6 +81,9 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         "validation target": re.compile(
             r"\bvalidation target\b", flags=re.IGNORECASE
         ),
+        "algorithm sketch": re.compile(
+            r"\balgorithm sketch\b", flags=re.IGNORECASE
+        ),
     }
 
     offenders = []
@@ -130,11 +133,14 @@ def test_estimator_docs_use_simulation_study_links_and_terms() -> None:
     assert offenders == []
 
 
-def test_estimator_navigation_is_flat() -> None:
-    """Keep public RTD estimator links at the root navigation level."""
+def test_estimator_navigation_is_owned_by_estimators_page() -> None:
+    """Keep estimator links under the Estimators section, not hardcoded at root."""
 
     index = (DOCS / "index.rst").read_text(encoding="utf-8")
     estimator_overview = (DOCS / "estimators.md").read_text(encoding="utf-8")
+    api_design = (DOCS / "user_guide" / "api_design.md").read_text(
+        encoding="utf-8"
+    )
     config = runpy.run_path(str(DOCS / "conf.py"))
     expected = [
         "estimators/nfxp",
@@ -151,14 +157,20 @@ def test_estimator_navigation_is_flat() -> None:
         "estimators/iq_learn",
     ]
 
-    missing = [entry for entry in expected if f"   {entry}" not in index]
-    assert missing == []
-    assert config["html_theme_options"]["navigation_depth"] == 1
+    root_entries = [entry for entry in expected if f"   {entry}\n" in index]
+    estimator_entries = [
+        entry for entry in expected if f"{entry}\n" not in estimator_overview
+    ]
+    assert root_entries == []
+    assert estimator_entries == []
+    assert config["html_theme_options"]["navigation_depth"] == 2
     assert "Estimator Map" not in index
     assert "Estimator Map" not in estimator_overview
     assert "Structural Econometrics" not in estimator_overview
     assert "Inverse Reinforcement Learning" not in estimator_overview
-    assert "```{toctree}" not in estimator_overview
+    assert "```{toctree}" in estimator_overview
+    assert api_design.startswith("# API Design\n")
+    assert "Problem Setup and API Design" not in api_design
 
 
 def test_under_the_hood_pages_start_with_optimization_and_pseudocode() -> None:

@@ -18,16 +18,17 @@ feature-matching equation.
 ## Pseudocode
 
 ```text
-Given demonstrations, reward features, transitions, discount, and shock scale
+Input: demonstrations, reward features, transitions, discount beta, sigma
 Compute demonstrated feature expectations mu_E
-Initialize theta
-Repeat until feature residuals are small:
-    Build reward r_theta(s, a)
-    Solve the soft Bellman equation
-    Compute pi_theta(a | s) and the induced occupancy measure
-    Compute model feature expectations mu_theta
-    Update theta to reduce mu_theta - mu_E
-Return theta, reward table, policy, value function, and diagnostics
+Choose an initial reward parameter vector theta
+while the feature residual is not small:
+    form r_theta(s, a) = phi(s, a)' theta
+    solve the soft Bellman equation for V_theta
+    compute pi_theta(a | s) from the soft choice-specific values
+    compute the occupancy measure induced by pi_theta
+    compute model feature expectations mu_theta
+    update theta to reduce mu_theta - mu_E
+return theta, reward table, pi_theta, V_theta, and diagnostics
 ```
 
 ## Model
@@ -82,13 +83,7 @@ $$
 \mu_\theta - \mu_E = 0.
 $$
 
-## Algorithm Sketch
-
-The estimator starts with demonstrated trajectories, a transition tensor, and
-an explicit reward feature matrix. For each candidate parameter vector, it
-computes the reward matrix, solves the soft Bellman equation, computes the
-policy-induced occupancy measure, and compares model feature counts with
-demonstrated feature counts.
+## Implementation Notes
 
 The primer simulation uses the root feature-matching optimizer with standard
 errors disabled. The public wrapper defaults are configurable, but the

@@ -21,14 +21,15 @@ for the next iteration.
 ## Pseudocode
 
 ```text
-Given panel, reward features, transitions, discount, and shock scale
-Estimate empirical CCPs pi_hat(a | s)
-Repeat for the configured NPL iterations:
-    Build the policy-weighted transition matrix F_pi
-    Compute Hotz-Miller continuation terms W_phi and W_e
-    Maximize the augmented-feature pseudo likelihood over theta
-    Compute Q_tilde(s, a) and update pi(a | s)
-Return theta, policy, value function, standard errors, and diagnostics
+Input: panel, reward features, transitions, discount beta, shock scale sigma
+Estimate empirical CCPs pi_hat(a | s) from observed state-action counts
+for each configured NPL iteration:
+    build F_pi(s, s_next) = sum_a pi(a | s) P_a(s, s_next)
+    solve Hotz-Miller continuation terms W_phi and W_e
+    build augmented logit features from phi, W_phi, and W_e
+    maximize the pseudo likelihood over theta
+    compute Q_tilde(s, a) and update pi(a | s)
+return theta, pi, value function, standard errors, and diagnostics
 ```
 
 ## Model
@@ -86,14 +87,7 @@ NPL repeats two steps. Given a policy, estimate parameters by logit
 pseudo-likelihood. Given parameters, update the policy from the implied
 choice-specific values.
 
-## Algorithm Sketch
-
-The estimation loop first estimates transitions or accepts a supplied
-transition tensor. It then estimates empirical CCPs, builds the
-policy-weighted transition matrix, computes Hotz-Miller continuation terms,
-maximizes the augmented-feature logit pseudo likelihood, and updates the
-policy for the next NPL step. The fitted object returns structural parameters,
-standard errors, policy, value function, and diagnostics.
+## Implementation Notes
 
 The frequency estimator uses float64 arrays so high-discount problems avoid
 JAX dtype promotion warnings. CCP probabilities are clamped before the log

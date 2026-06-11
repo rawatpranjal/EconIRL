@@ -43,7 +43,7 @@ html_static_path = []
 
 html_theme_options = {
     "collapse_navigation": False,
-    "navigation_depth": 1,
+    "navigation_depth": 2,
     "sticky_navigation": True,
     "titles_only": True,
 }

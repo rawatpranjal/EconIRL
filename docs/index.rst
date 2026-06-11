@@ -56,21 +56,9 @@ Output
 
 .. toctree::
    :hidden:
-   :maxdepth: 1
+   :maxdepth: 2
 
    user_guide/overview
    estimators
-   estimators/nfxp
-   estimators/ccp
-   estimators/mpec
-   estimators/nnes
-   estimators/tdccp
-   estimators/mce_irl
-   estimators/deep_mce_irl
-   estimators/airl
-   estimators/airl_het
-   estimators/f_irl
-   estimators/gladius
-   estimators/iq_learn
    user_guide/api_design
    user_guide/validation

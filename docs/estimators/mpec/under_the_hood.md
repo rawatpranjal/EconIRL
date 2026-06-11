@@ -21,15 +21,16 @@ simulation path uses the constrained SQP likelihood formulation.
 ## Pseudocode
 
 ```text
-Given panel, reward features, transitions, discount, and shock scale
-Initialize theta and V
-Build the Bellman equality constraint V - T_theta(V) = 0
-Repeat until the constrained optimizer stops:
-    Compute Q_theta,V(s, a) from theta and V
-    Compute pi_theta,V(a | s)
-    Evaluate the log likelihood and Bellman constraint
-    Update theta and V with the constrained optimizer
-Return theta, V, policy, standard errors, and constraint diagnostics
+Input: panel, reward features, transitions, discount beta, shock scale sigma
+Choose initial reward parameters theta and value vector V
+Define the equality constraint g(theta, V) = V - T_theta(V)
+while the constrained optimizer has not stopped:
+    compute Q_{theta,V}(s, a) from theta, transitions, beta, and V
+    compute pi_{theta,V}(a | s) by the soft-max rule
+    evaluate the log likelihood of observed actions
+    evaluate g(theta, V) and its derivatives
+    update theta and V with the constrained optimizer
+return theta, V, pi, standard errors, and constraint diagnostics
 ```
 
 ## Model
@@ -99,19 +100,12 @@ $$
 V = T_\theta(V)
 $$
 
-## Algorithm Sketch
-
-The estimation loop first estimates transitions or accepts a supplied
-transition tensor. It initializes reward parameters and value variables, builds
-the Bellman equality constraints, computes the constrained likelihood and its
-derivatives, and updates the joint parameter-value vector until the optimizer
-converges. The fitted object returns structural parameters, standard errors,
-policy, value function, likelihood, and constraint diagnostics.
+## Implementation Notes
 
 The simulation run uses the SQP path and reports the final Bellman constraint
-violation as a threshold check. The table includes both constraint
+violation as a numerical check. The table includes both constraint
 satisfaction and recovery of reward, policy, value, Q, and counterfactual
-oracle objects.
+evaluation objects.
 
 ## Score Calculation
 

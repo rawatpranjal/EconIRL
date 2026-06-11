@@ -22,15 +22,16 @@ optimizer for `theta`.
 ## Pseudocode
 
 ```text
-Given panel, reward features, transitions, discount, and shock scale
-Initialize theta
-Repeat until the outer optimizer stops:
-    Build reward u_theta(s, a)
-    Solve V_theta = T_theta(V_theta)
-    Compute Q_theta(s, a) and pi_theta(a | s)
-    Evaluate the conditional log likelihood
-    Update theta using the likelihood gradient or optimizer step
-Return theta, policy, value function, standard errors, and diagnostics
+Input: panel, reward features, transitions, discount beta, shock scale sigma
+Choose an initial reward parameter vector theta
+while the outer optimizer has not stopped:
+    form u_theta(s, a) = phi(s, a)' theta
+    solve the soft Bellman fixed point V_theta = T_theta(V_theta)
+    compute Q_theta(s, a) from u_theta, transitions, beta, and V_theta
+    compute pi_theta(a | s) by the soft-max rule
+    evaluate sum_{i,t} log pi_theta(a_it | s_it)
+    pass the likelihood value and derivatives to the optimizer
+return theta, pi_theta, V_theta, standard errors, and diagnostics
 ```
 
 ## Model
@@ -90,14 +91,7 @@ $$
 = \arg\max_\theta \sum_{i,t} \log \pi_\theta(a_{it} \mid s_{it})
 $$
 
-## Algorithm Sketch
-
-The estimation loop first estimates transitions or accepts a supplied
-transition tensor. It then initializes the reward parameters, solves the
-Bellman fixed point for each candidate parameter vector, computes choice
-probabilities and the likelihood, and updates the parameters until the outer
-optimizer converges. The fitted object returns structural parameters, standard
-errors, policy, value function, and diagnostics.
+## Implementation Notes
 
 EconIRL uses a hybrid inner solver in the simulation study. It uses safe
 successive approximation far from the fixed point and Newton-Kantorovich style
