@@ -119,3 +119,6 @@ papers/econirl_package_jss/apikeyrunpod.txt
 # Validation runner byproducts
 validation/estimators/**/*.json
 validation/estimators/**/*.tex
+
+# Local session handoff (assistant state)
+handoff.md
