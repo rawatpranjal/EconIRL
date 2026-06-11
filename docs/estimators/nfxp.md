@@ -57,8 +57,16 @@ results file records the reported results.
 
 ## NFXP Guide
 
+- [Context](nfxp/context.md)
+- [Quick Start](nfxp/quick_start.md)
+- [Under the Hood](nfxp/under_the_hood.md)
+- [Pre-Estimation Checks](nfxp/pre_estimation.md)
+- [Simulation Study](nfxp/validation.md)
+- [Counterfactuals](nfxp/counterfactuals.md)
+- [Rust Bus Engine Example](nfxp/rust_bus.md)
+
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 nfxp/context
 nfxp/quick_start

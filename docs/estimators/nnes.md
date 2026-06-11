@@ -116,8 +116,16 @@ Carlo design.
 
 ## NNES Guide
 
+- [Context](nnes/context.md)
+- [Quick Start](nnes/quick_start.md)
+- [Under the Hood](nnes/under_the_hood.md)
+- [Pre-Estimation Checks](nnes/pre_estimation.md)
+- [Simulation Study](nnes/validation.md)
+- [Counterfactuals](nnes/counterfactuals.md)
+- [Rust Bus Engine Example](nnes/rust_bus.md)
+
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 nnes/context
 nnes/quick_start

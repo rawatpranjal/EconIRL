@@ -72,8 +72,16 @@ results file and generated primer results record the reported results.
 
 ## MPEC Guide
 
+- [Context](mpec/context.md)
+- [Quick Start](mpec/quick_start.md)
+- [Under the Hood](mpec/under_the_hood.md)
+- [Pre-Estimation Checks](mpec/pre_estimation.md)
+- [Simulation Study](mpec/validation.md)
+- [Counterfactuals](mpec/counterfactuals.md)
+- [Rust Bus Engine Example](mpec/rust_bus.md)
+
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 mpec/context
 mpec/quick_start

@@ -84,8 +84,16 @@ finite-parameter study.
 
 ## Reading Guide
 
+- [Context](tdccp/context.md)
+- [Quick Start](tdccp/quick_start.md)
+- [Under the Hood](tdccp/under_the_hood.md)
+- [Pre-Estimation Checks](tdccp/pre_estimation.md)
+- [Simulation Study](tdccp/validation.md)
+- [Counterfactuals](tdccp/counterfactuals.md)
+- [Rust Bus Engine Example](tdccp/rust_bus.md)
+
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 tdccp/context
 tdccp/quick_start

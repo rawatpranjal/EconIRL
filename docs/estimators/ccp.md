@@ -66,8 +66,16 @@ results file and generated primer results record the reported results.
 
 ## CCP Guide
 
+- [Context](ccp/context.md)
+- [Quick Start](ccp/quick_start.md)
+- [Under the Hood](ccp/under_the_hood.md)
+- [Pre-Estimation Checks](ccp/pre_estimation.md)
+- [Simulation Study](ccp/validation.md)
+- [Counterfactuals](ccp/counterfactuals.md)
+- [Rust Bus Engine Example](ccp/rust_bus.md)
+
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 ccp/context
 ccp/quick_start

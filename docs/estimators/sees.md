@@ -73,8 +73,16 @@ and Type C counterfactual oracles.
 
 ## SEES Guide
 
+- [Context](sees/context.md)
+- [Quick Start](sees/quick_start.md)
+- [Under the Hood](sees/under_the_hood.md)
+- [Pre-Estimation Checks](sees/pre_estimation.md)
+- [Simulation Study](sees/validation.md)
+- [Counterfactuals](sees/counterfactuals.md)
+- [Rust Bus Engine Example](sees/rust_bus.md)
+
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 sees/context
 sees/quick_start

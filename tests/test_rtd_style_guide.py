@@ -174,6 +174,34 @@ def test_estimator_navigation_is_owned_by_estimators_page() -> None:
     assert "Problem Setup and API Design" not in api_design
 
 
+def test_estimator_landing_pages_do_not_expand_sidebar_guides() -> None:
+    """Keep per-estimator guide pages out of the RTD sidebar tree."""
+
+    pages = [
+        page
+        for page in sorted((DOCS / "estimators").glob("*.md"))
+        if not _is_excluded_from_rtd(page)
+    ]
+    assert pages
+
+    offenders = []
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        for block in _toctree_blocks(text):
+            if ":hidden:" not in block:
+                offenders.append(
+                    f"{page.relative_to(ROOT)}: estimator guide toctree must be hidden"
+                )
+                continue
+            for entry in _toctree_entries(block):
+                if f"]({entry}.md)" not in text:
+                    offenders.append(
+                        f"{page.relative_to(ROOT)}: visible guide link missing for {entry}"
+                    )
+
+    assert offenders == []
+
+
 def test_estimator_pages_name_source_papers_up_front() -> None:
     """Keep estimator pages explicit about the papers they draw from."""
 
@@ -378,3 +406,15 @@ def _section_body(text: str, heading_pos: int) -> str:
     if next_heading == -1:
         return text[body_start:]
     return text[body_start:next_heading]
+
+
+def _toctree_blocks(text: str) -> list[str]:
+    return re.findall(r"```{toctree}\n([\s\S]+?)\n```", text)
+
+
+def _toctree_entries(block: str) -> list[str]:
+    return [
+        line.strip()
+        for line in block.splitlines()
+        if line.strip() and not line.strip().startswith(":")
+    ]

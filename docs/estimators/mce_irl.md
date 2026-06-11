@@ -74,8 +74,16 @@ counterfactual oracles.
 
 ## MCE-IRL Guide
 
+- [Context](mce_irl/context.md)
+- [Quick Start](mce_irl/quick_start.md)
+- [Under the Hood](mce_irl/under_the_hood.md)
+- [Pre-Estimation Checks](mce_irl/pre_estimation.md)
+- [Simulation Study](mce_irl/validation.md)
+- [Counterfactuals](mce_irl/counterfactuals.md)
+- [Rust Bus Engine Example](mce_irl/rust_bus.md)
+
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 mce_irl/context
 mce_irl/quick_start
