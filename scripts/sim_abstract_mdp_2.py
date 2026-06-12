@@ -325,6 +325,19 @@ NARRATIVE = {
                 "Newton-Kantorovich polyalgorithm, so the refinement's value is "
                 "measured on this page rather than asserted."
             ),
+            "after": (
+                "The measured answer on the solver contrast is that there is "
+                "none to report at this scale: successive approximation and "
+                "the Newton-Kantorovich refinement land within a second of "
+                "each other, because a compiled dense contraction over 300 "
+                "states is simply cheap. The textbook slowdown of the plain "
+                "contraction is a statement about iteration counts, and it "
+                "only becomes a wall-clock story when each iteration is "
+                "expensive; the high-dimension page is where that bites. The "
+                "approximation-based members (SEES, TD-CCP) trade some "
+                "parameter precision for their flexibility while matching the "
+                "exact family's behavioral accuracy."
+            ),
         },
         "high_discount": {
             "before": (
@@ -334,7 +347,19 @@ NARRATIVE = {
                 "spread of estimates across replications, RMSE, and the share "
                 "of nominal 95% intervals that actually cover the truth, "
                 "together with how often each estimator produced finite "
-                "standard errors at all."
+                "standard errors at all. (On runtime, the discount move barely "
+                "registers here: even the plain contraction stays around four "
+                "seconds at 300 states, so the cell's content is inference, "
+                "not speed. NFXP-SA runs 2 of 10 replications as a runtime "
+                "spot-check only; its inference is the same MLE as NFXP-NK, "
+                "which runs all 10.)"
+            ),
+            "after": (
+                "The SE-availability column is the cell's headline: one "
+                "estimator routinely fails to deliver usable standard errors "
+                "here while recovering good point estimates, and without that "
+                "column the blank coverage entries would read as a formatting "
+                "gap rather than the inference failure they are."
             ),
         },
         "rank_deficient": {

@@ -1,0 +1,5263 @@
+{
+  "meta": {
+    "title": "Simulation study: harder abstract MDP",
+    "date": "2026-06-12",
+    "package_version": "0.0.4",
+    "cells": [
+      {
+        "cell_id": "harder_300",
+        "label": "300 states, discount 0.95",
+        "description": "A 300-state Garnet MDP with stochastic sparse transitions (branching 5) and a 3-feature linear reward: `random_mdp(num_states=300, num_actions=2, num_features=3, branching=5, discount_factor=0.95, seed=505)`.",
+        "num_states": 300,
+        "num_actions": 2,
+        "discount_factor": 0.95,
+        "n_individuals": 500,
+        "n_periods": 60,
+        "seed": 505,
+        "n_replications": 3,
+        "param_block": false,
+        "figure": "abstract_mdp_2_dgp.png",
+        "parameter_names": [
+          "theta_0",
+          "theta_1",
+          "theta_2"
+        ],
+        "true_theta": [
+          0.3862769901752472,
+          -1.5992529392242432,
+          0.1317286640405655
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 38.77107643786115,
+          "contrast_rank": 3,
+          "contrast_condition_number": 38.77107643786116
+        },
+        "roster": [
+          {
+            "name": "NFXP-SA",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "NFXP-NK",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "NNES",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "SEES",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "TD-CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "UFXP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null
+          }
+        ]
+      },
+      {
+        "cell_id": "high_discount",
+        "label": "Same MDP, discount 0.99",
+        "description": "The identical 300-state MDP with the discount factor moved from 0.95 to 0.99, where continuation values dominate flow payoffs and the inner fixed point becomes a slow contraction. Structural family only, 10 replications, standard errors requested from every estimator.",
+        "num_states": 300,
+        "num_actions": 2,
+        "discount_factor": 0.99,
+        "n_individuals": 500,
+        "n_periods": 60,
+        "seed": 505,
+        "n_replications": 10,
+        "param_block": true,
+        "figure": null,
+        "parameter_names": [
+          "theta_0",
+          "theta_1",
+          "theta_2"
+        ],
+        "true_theta": [
+          0.3862769901752472,
+          -1.5992529392242432,
+          0.1317286640405655
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 38.77107643786115,
+          "contrast_rank": 3,
+          "contrast_condition_number": 38.77107643786116
+        },
+        "roster": [
+          {
+            "name": "NFXP-SA",
+            "family": "structural",
+            "max_reps": 2
+          },
+          {
+            "name": "NFXP-NK",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "NNES",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "SEES",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "TD-CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "UFXP",
+            "family": "structural",
+            "max_reps": null
+          }
+        ]
+      },
+      {
+        "cell_id": "rank_deficient",
+        "label": "Collinear features (24 states)",
+        "description": "A small MDP whose third reward feature is exactly twice the second (design rank 2 of 3). The likelihood identifies only the combination theta_1 + 2 theta_2; no estimator can recover the individual coordinates, and the page checks what each one does about it.",
+        "num_states": 24,
+        "num_actions": 2,
+        "discount_factor": 0.95,
+        "n_individuals": 500,
+        "n_periods": 80,
+        "seed": 606,
+        "n_replications": 20,
+        "param_block": true,
+        "figure": null,
+        "parameter_names": [
+          "theta_0",
+          "theta_1",
+          "theta_2"
+        ],
+        "true_theta": [
+          -0.5,
+          1.0,
+          0.30000001192092896
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 2,
+          "condition_number": 3.0668143987126576e+16,
+          "contrast_rank": 2,
+          "contrast_condition_number": 3.749636448864772
+        },
+        "roster": [
+          {
+            "name": "NFXP-NK",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "UFXP",
+            "family": "structural",
+            "max_reps": null
+          }
+        ]
+      }
+    ],
+    "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
+    "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
+    "excluded": [
+      {
+        "name": "MaxEnt-IRL, IQ-Learn, AIRL, f-IRL, GLADIUS, Deep-MCE-IRL, BC",
+        "reason": "this page's question is structural: parameter recovery, inference quality, and identification as the problem hardens. The IRL family is compared on the Rust bus and gridworld pages; MCE-IRL stays here as the behavioral reference"
+      },
+      {
+        "name": "GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL",
+        "reason": "known slow; their single-run showing is on the Rust bus page"
+      }
+    ],
+    "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).",
+    "snippets": {
+      "NFXP-SA": "def _run_nfxp_sa(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"sa\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "NFXP-NK": "def _run_nfxp_nk(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"polyalgorithm\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"slsqp\", max_iter=200, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "NNES": "def _run_nnes(env, panel):\n    from econirl.estimation.nnes import NNESEstimator\n\n    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,\n                        compute_se=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "SEES": "def _run_sees(env, panel):\n    from econirl.estimation.sees import SEESEstimator\n\n    # Basis must span the value function: bspline basis_dim >= num_states.\n    est = SEESEstimator(basis_type=\"bspline\", basis_dim=int(env.num_states),\n                        warm_start_value=True, penalty_weight=10.0,\n                        compute_se=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "TD-CCP": "def _run_tdccp(env, panel):\n    from econirl.estimation import TDCCPConfig, TDCCPEstimator\n\n    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,\n                                            epochs_per_avi=15, compute_se=True,\n                                            verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "UFXP": "def _run_ufxp(env, panel):\n    from econirl.estimation import UFXPEstimator\n\n    # Bray's unnested fixed point with optimal weighting (OUFXP): closed form\n    # for linear utility, MLE-efficient, standard errors from the efficient\n    # moment variance.\n    est = UFXPEstimator(weights=\"optimal\", verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,\n                                              inner_max_iter=2000, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n"
+    },
+    "diagnoses": {
+      "NFXP-SA": "Rust's original inner loop: successive approximation, a pure contraction with rate equal to the discount factor. It reaches the same maximum-likelihood answer; what changes with scale and discount is how long it takes.",
+      "NFXP-NK": "The Iskhakov et al refinement: successive approximation to get near the fixed point, then Newton-Kantorovich steps. Same estimate, different bill.",
+      "CCP": "Hotz-Miller inversion: estimate choice probabilities, invert once, no fixed point inside the optimizer. Its standard errors come from the outer Hessian and can fail to be finite even when the point estimate is fine; the SE-availability column makes that visible.",
+      "MPEC": "Constrained MLE: the Bellman equation enters as constraints for the SLSQP solver, with one variable per state plus the parameters.",
+      "NNES": "Neural value network plus structural MLE.",
+      "SEES": "Sieve value function: bspline basis with basis_dim = num_states so the basis can span the value function.",
+      "TD-CCP": "Neural CCP with approximate value iteration and cross-fitted standard errors.",
+      "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting (OUFXP). The Bellman first-order conditions are scored directly; the value function is eliminated before the search, so no fixed point is ever solved inside an optimizer and the linear case is closed form. As asymptotically efficient as maximum likelihood, with standard errors from the efficient moment variance, so it enters the coverage table on equal terms.",
+      "MCE-IRL": "Behavioral reference on the harder cell. Its converged flag is conservative (gradient-norm tolerance); read it next to Policy TV."
+    },
+    "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
+  },
+  "records": [
+    {
+      "estimator": "NFXP-SA",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.46564149184996445,
+        -1.5742224460025682,
+        0.061581478740215766
+      ],
+      "standard_errors": [
+        0.13173872232437134,
+        0.15439468622207642,
+        0.15368910133838654
+      ],
+      "policy_tv": 0.002767180968548244,
+      "value_rmse": 0.014563606485273235,
+      "regret": {
+        "baseline": 0.0004714101195816611,
+        "type_a": 0.0004328939340715573,
+        "type_b": 0.00046792211224742155,
+        "type_c": 5.656703605218495e-08,
+        "transferred": true
+      },
+      "runtime": 5.280596017837524,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.4656415269025008,
+        -1.5742224074413276,
+        0.06158143803345387
+      ],
+      "standard_errors": [
+        0.13173872232437134,
+        0.15439468622207642,
+        0.15368910133838654
+      ],
+      "policy_tv": 0.0027671812227964,
+      "value_rmse": 0.01456360978492184,
+      "regret": {
+        "baseline": 0.00047141023891882636,
+        "type_a": 0.0004328939316369003,
+        "type_b": 0.0004679222240485644,
+        "type_c": 5.656705235776998e-08,
+        "transferred": true
+      },
+      "runtime": 3.188431739807129,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.4644654393196106,
+        -1.581817388534546,
+        0.0660695880651474
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003142384735703805,
+      "value_rmse": 0.02500912639982824,
+      "regret": {
+        "baseline": 0.0005284812988260092,
+        "type_a": 0.0004891717140857592,
+        "type_b": 0.0005218314824614654,
+        "type_c": 6.709170426600311e-08,
+        "transferred": true
+      },
+      "runtime": 3.7115468978881836,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.46371573209762573,
+        -1.5757567882537842,
+        0.0632682666182518
+      ],
+      "standard_errors": [
+        0.1322200894355774,
+        0.1548636257648468,
+        0.15423423051834106
+      ],
+      "policy_tv": 0.0027305248028757843,
+      "value_rmse": 0.011020013238988985,
+      "regret": {
+        "baseline": 0.00046622446731250916,
+        "type_a": 0.0004272752659137262,
+        "type_b": 0.0004625368325687017,
+        "type_c": 5.520819422339085e-08,
+        "transferred": true
+      },
+      "runtime": 6.517357587814331,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.4657544195652008,
+        -1.574089765548706,
+        0.061447035521268845
+      ],
+      "standard_errors": [
+        0.13129303231064254,
+        0.1538886883391801,
+        0.1531547309528084
+      ],
+      "policy_tv": 0.002767701253317259,
+      "value_rmse": 0.014564617360266104,
+      "regret": {
+        "baseline": 0.00047164644014335497,
+        "type_a": 0.00043309842425157157,
+        "type_b": 0.0004681879205403623,
+        "type_c": 5.65839449675115e-08,
+        "transferred": true
+      },
+      "runtime": 18.02108597755432,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.566684754045249,
+        -1.4036425631055618,
+        -0.07920079493396749
+      ],
+      "standard_errors": [
+        0.12996422617398434,
+        0.1513915266715593,
+        0.1511543270275554
+      ],
+      "policy_tv": 0.0034489307433842147,
+      "value_rmse": 0.016415457711813408,
+      "regret": {
+        "baseline": 0.0006690202171942116,
+        "type_a": 0.0006231890358357662,
+        "type_b": 0.0006816197402495442,
+        "type_c": 8.951073769198517e-08,
+        "transferred": true
+      },
+      "runtime": 4.215649127960205,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.4437901147013442,
+        -1.652624248717279,
+        0.11476658676916923
+      ],
+      "standard_errors": [
+        0.144425009538792,
+        0.1774361468773258,
+        0.17164907102507557
+      ],
+      "policy_tv": 0.004719044614114959,
+      "value_rmse": 0.11869009548909873,
+      "regret": {
+        "baseline": 0.0013408652436797382,
+        "type_a": 0.0013015538340425052,
+        "type_b": 0.001281162379003112,
+        "type_c": 2.2876601407598595e-07,
+        "transferred": true
+      },
+      "runtime": 3.775146007537842,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.4604493387999758,
+        -1.5639227185887217,
+        0.06394131926168437
+      ],
+      "standard_errors": [
+        0.13190050141182985,
+        0.154540110700716,
+        0.15381806380267404
+      ],
+      "policy_tv": 0.0022709917472299593,
+      "value_rmse": 0.033368843124722325,
+      "regret": {
+        "baseline": 0.00028616369969255404,
+        "type_a": 0.0002672377156451132,
+        "type_b": 0.0002869918112665376,
+        "type_c": 3.667955006066055e-08,
+        "transferred": true
+      },
+      "runtime": 0.06249690055847168,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.46563997864723206,
+        -1.574224591255188,
+        0.06158338114619255
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002767186597115372,
+      "value_rmse": 0.014563373628942927,
+      "regret": {
+        "baseline": 0.0004714116903637576,
+        "type_a": 0.0004328953536397998,
+        "type_b": 0.00046792306158682486,
+        "type_c": 5.656749949808375e-08,
+        "transferred": true
+      },
+      "runtime": 8.195617914199829,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-SA",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.39992934990149326,
+        -1.5786364812751097,
+        0.12207373932954545
+      ],
+      "standard_errors": [
+        0.1312849223613739,
+        0.15428128838539124,
+        0.15324071049690247
+      ],
+      "policy_tv": 0.0025734389944596114,
+      "value_rmse": 0.09314592493795,
+      "regret": {
+        "baseline": 0.00030558105512295175,
+        "type_a": 0.0002930846996632463,
+        "type_b": 0.00030404780244511036,
+        "type_c": 4.049378014521615e-08,
+        "transferred": true
+      },
+      "runtime": 4.321556329727173,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.39992932151652605,
+        -1.5786365152740471,
+        0.12207377331198338
+      ],
+      "standard_errors": [
+        0.1312849223613739,
+        0.15428128838539124,
+        0.15324071049690247
+      ],
+      "policy_tv": 0.0025734389746973883,
+      "value_rmse": 0.09314592608910412,
+      "regret": {
+        "baseline": 0.00030558107259268146,
+        "type_a": 0.000293084713230261,
+        "type_b": 0.00030404778052914755,
+        "type_c": 4.0493801420435674e-08,
+        "transferred": true
+      },
+      "runtime": 4.137401819229126,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.39963436126708984,
+        -1.5814313888549805,
+        0.12379101663827896
+      ],
+      "standard_errors": [
+        0.004689636288016057,
+        0.004749314420819878,
+        0.003424141967772461
+      ],
+      "policy_tv": 0.0027254734833629074,
+      "value_rmse": 0.09911664122258593,
+      "regret": {
+        "baseline": 0.00033413116770672876,
+        "type_a": 0.000321342494082378,
+        "type_b": 0.00033219701638283574,
+        "type_c": 4.5249913373319766e-08,
+        "transferred": true
+      },
+      "runtime": 1.9854090213775635,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.40253952145576477,
+        -1.5749118328094482,
+        0.1184481531381607
+      ],
+      "standard_errors": [
+        0.13073767721652985,
+        0.1536506563425064,
+        0.15258266031742096
+      ],
+      "policy_tv": 0.002486494074113251,
+      "value_rmse": 0.0898108650895777,
+      "regret": {
+        "baseline": 0.0002890833510270232,
+        "type_a": 0.000277230406249107,
+        "type_b": 0.00028791404753713835,
+        "type_c": 3.8047260306722634e-08,
+        "transferred": true
+      },
+      "runtime": 5.75260329246521,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.3999330699443817,
+        -1.578602910041809,
+        0.12205805629491806
+      ],
+      "standard_errors": [
+        0.12989695499916004,
+        0.1528050966948392,
+        0.151555835028889
+      ],
+      "policy_tv": 0.0025732194827268054,
+      "value_rmse": 0.09313134646332873,
+      "regret": {
+        "baseline": 0.00030561790916966815,
+        "type_a": 0.00029311053078452773,
+        "type_b": 0.0003040860527168984,
+        "type_c": 4.049085505313861e-08,
+        "transferred": true
+      },
+      "runtime": 16.228352069854736,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.5005550978031504,
+        -1.4108967068746965,
+        -0.01603712469625296
+      ],
+      "standard_errors": [
+        0.1287245605172239,
+        0.1499032912052244,
+        0.14952520996322793
+      ],
+      "policy_tv": 0.004276522255933083,
+      "value_rmse": 0.08327768299660412,
+      "regret": {
+        "baseline": 0.0009779427616228656,
+        "type_a": 0.0009374478194226745,
+        "type_b": 0.0009590808511395564,
+        "type_c": 1.403287973648753e-07,
+        "transferred": true
+      },
+      "runtime": 2.263672113418579,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.2700684013663481,
+        -1.8361155320574367,
+        0.31945338297096126
+      ],
+      "standard_errors": [
+        0.13308488154511552,
+        0.1598107873314791,
+        0.1564721789665427
+      ],
+      "policy_tv": 0.004970953187176016,
+      "value_rmse": 0.1738130902904811,
+      "regret": {
+        "baseline": 0.001872691727998682,
+        "type_a": 0.0018562586628044528,
+        "type_b": 0.0017395332075863575,
+        "type_c": 3.7115505459159153e-07,
+        "transferred": true
+      },
+      "runtime": 2.498352289199829,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.39372875174410055,
+        -1.5627980454658263,
+        0.1224590004696167
+      ],
+      "standard_errors": [
+        0.13088152212911613,
+        0.15406152541555088,
+        0.1527967831055539
+      ],
+      "policy_tv": 0.003064228528498145,
+      "value_rmse": 0.10353387947924489,
+      "regret": {
+        "baseline": 0.0005314955287597225,
+        "type_a": 0.0004994863472348119,
+        "type_b": 0.0005273771047414183,
+        "type_c": 6.472378871537073e-08,
+        "transferred": true
+      },
+      "runtime": 0.06365680694580078,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.399914026260376,
+        -1.578659176826477,
+        0.12209407240152359
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0025735589843601777,
+      "value_rmse": 0.09315138009848432,
+      "regret": {
+        "baseline": 0.000305588868392704,
+        "type_a": 0.00029309253655797693,
+        "type_b": 0.0003040539272056731,
+        "type_c": 4.049591872186348e-08,
+        "transferred": true
+      },
+      "runtime": 4.475932836532593,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-SA",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.42708118552073776,
+        -1.6896178130569948,
+        0.1385710014384124
+      ],
+      "standard_errors": [
+        0.13212905824184418,
+        0.15495149791240692,
+        0.15405744314193726
+      ],
+      "policy_tv": 0.005195564690532285,
+      "value_rmse": 0.0964493806331524,
+      "regret": {
+        "baseline": 0.0016529290440376611,
+        "type_a": 0.0015895109029655696,
+        "type_b": 0.0015678879828647202,
+        "type_c": 2.7430700608924283e-07,
+        "transferred": true
+      },
+      "runtime": 3.58046293258667,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.4270811855510595,
+        -1.68961781302023,
+        0.13857100140184309
+      ],
+      "standard_errors": [
+        0.13212905824184418,
+        0.15495149791240692,
+        0.15405744314193726
+      ],
+      "policy_tv": 0.005195564690564593,
+      "value_rmse": 0.09644938234147259,
+      "regret": {
+        "baseline": 0.001652929044037922,
+        "type_a": 0.0015895109029655696,
+        "type_b": 0.0015678879828712983,
+        "type_c": 2.7430700608924283e-07,
+        "transferred": true
+      },
+      "runtime": 3.2057559490203857,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.4224521219730377,
+        -1.688770055770874,
+        0.1416553407907486
+      ],
+      "standard_errors": [
+        0.00961282566773579,
+        0.013952477941209962,
+        0.009561303519722723
+      ],
+      "policy_tv": 0.005257758152840502,
+      "value_rmse": 0.0929265603927639,
+      "regret": {
+        "baseline": 0.0015100063746693946,
+        "type_a": 0.0014533839031133436,
+        "type_b": 0.0014308480697023894,
+        "type_c": 2.515946999272654e-07,
+        "transferred": true
+      },
+      "runtime": 2.255810022354126,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.4257570803165436,
+        -1.691774606704712,
+        0.1405259519815445
+      ],
+      "standard_errors": [
+        0.13168467581272125,
+        0.15448087453842163,
+        0.15353767573833466
+      ],
+      "policy_tv": 0.005215087761097123,
+      "value_rmse": 0.09842226788735588,
+      "regret": {
+        "baseline": 0.0016707755037963878,
+        "type_a": 0.001607992147281759,
+        "type_b": 0.0015838594706483885,
+        "type_c": 2.786203317374915e-07,
+        "transferred": true
+      },
+      "runtime": 6.494038105010986,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.4271193742752075,
+        -1.689584732055664,
+        0.13852979242801666
+      ],
+      "standard_errors": [
+        0.13163003004505577,
+        0.15453997553505436,
+        0.15353307622851176
+      ],
+      "policy_tv": 0.005196088980506497,
+      "value_rmse": 0.09645256322865656,
+      "regret": {
+        "baseline": 0.0016531764308934894,
+        "type_a": 0.0015897358158817646,
+        "type_b": 0.0015681411942182965,
+        "type_c": 2.7433280400344144e-07,
+        "transferred": true
+      },
+      "runtime": 16.796264171600342,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.5613694989709159,
+        -1.4789803733654587,
+        -0.041929724734790376
+      ],
+      "standard_errors": [
+        0.13066471632602894,
+        0.1520096609729052,
+        0.1518077129893849
+      ],
+      "policy_tv": 0.004417655309159563,
+      "value_rmse": 0.0701493236849388,
+      "regret": {
+        "baseline": 0.0010230018789898385,
+        "type_a": 0.000954505327197531,
+        "type_b": 0.0010468505104509341,
+        "type_c": 1.3250888137004726e-07,
+        "transferred": true
+      },
+      "runtime": 2.016324996948242,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.31241994223220865,
+        -1.8727961418860464,
+        0.30416025464374447
+      ],
+      "standard_errors": [
+        0.15194426680518663,
+        0.1861122436843487,
+        0.181111115406997
+      ],
+      "policy_tv": 0.007284192270622852,
+      "value_rmse": 0.24076012834438487,
+      "regret": {
+        "baseline": 0.004109853480333126,
+        "type_a": 0.004070187251477116,
+        "type_b": 0.003810489873315856,
+        "type_c": 8.192663352194942e-07,
+        "transferred": true
+      },
+      "runtime": 2.468269109725952,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.41123938374419833,
+        -1.6775749416790948,
+        0.14738667575961753
+      ],
+      "standard_errors": [
+        0.13167619364231234,
+        0.15454609336724426,
+        0.1535637972153558
+      ],
+      "policy_tv": 0.004068534395109912,
+      "value_rmse": 0.10006334891076543,
+      "regret": {
+        "baseline": 0.0010566269106040416,
+        "type_a": 0.001028629539875451,
+        "type_b": 0.00099804692856046,
+        "type_c": 1.848262335260943e-07,
+        "transferred": true
+      },
+      "runtime": 0.0627288818359375,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.4270785450935364,
+        -1.6896182298660278,
+        0.13857287168502808
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005195459010244779,
+      "value_rmse": 0.0964452412826104,
+      "regret": {
+        "baseline": 0.0016528631278984029,
+        "type_a": 0.001589446891326944,
+        "type_b": 0.0015678248136555184,
+        "type_c": 2.7429476610313164e-07,
+        "transferred": true
+      },
+      "runtime": 5.108259201049805,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-SA",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.4057718978856147,
+        -1.6462290825498387,
+        0.13421934943973132
+      ],
+      "standard_errors": [
+        0.1303459256887436,
+        0.1525479406118393,
+        0.151920884847641
+      ],
+      "policy_tv": 0.002695850595745768,
+      "value_rmse": 0.1124820569605796,
+      "regret": {
+        "baseline": -0.0004006501063981763,
+        "type_a": -0.000325530392139578,
+        "type_b": -0.0005286768969965754,
+        "type_c": 1.5786924126356663e-07,
+        "transferred": true
+      },
+      "runtime": 3.755061149597168,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.40577162604153477,
+        -1.646229371817801,
+        0.13421966126510967
+      ],
+      "standard_errors": [
+        0.13034529983997345,
+        0.1525471955537796,
+        0.1519201248884201
+      ],
+      "policy_tv": 0.002695849482590552,
+      "value_rmse": 0.1124819687508094,
+      "regret": {
+        "baseline": -0.00040065067883228423,
+        "type_a": -0.0003255301090681323,
+        "type_b": -0.0005286779931123456,
+        "type_c": 1.5786870031155242e-07,
+        "transferred": true
+      },
+      "runtime": 2.5822508335113525,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.3996104896068573,
+        -1.654951810836792,
+        0.14254963397979736
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00302055456595983,
+      "value_rmse": 0.1396424653784831,
+      "regret": {
+        "baseline": -0.0003102881426394237,
+        "type_a": -0.0002272656864787996,
+        "type_b": -0.0004553069454991109,
+        "type_c": 1.8321995182191586e-07,
+        "transferred": true
+      },
+      "runtime": 3.216371774673462,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.40419676899909973,
+        -1.6490613222122192,
+        0.13678644597530365
+      ],
+      "standard_errors": [
+        0.1303309202194214,
+        0.15256541967391968,
+        0.15191727876663208
+      ],
+      "policy_tv": 0.002718924213414385,
+      "value_rmse": 0.13276485517702946,
+      "regret": {
+        "baseline": -0.00035151233406726355,
+        "type_a": -0.0002722725194176917,
+        "type_b": -0.00048722804846771425,
+        "type_c": 1.714342905454928e-07,
+        "transferred": true
+      },
+      "runtime": 5.947892904281616,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.4059115946292877,
+        -1.646064043045044,
+        0.13405273854732513
+      ],
+      "standard_errors": [
+        0.1303308250621821,
+        0.1525705629344181,
+        0.15192195545628653
+      ],
+      "policy_tv": 0.0026958073744206053,
+      "value_rmse": 0.11248695388540209,
+      "regret": {
+        "baseline": -0.0004010001236483902,
+        "type_a": -0.000325982407396426,
+        "type_b": -0.0005288264517759189,
+        "type_c": 1.5770604914286795e-07,
+        "transferred": true
+      },
+      "runtime": 16.294590950012207,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.9890583289341603,
+        -1.0637502589419616,
+        -0.43790536081307807
+      ],
+      "standard_errors": [
+        0.13171774128813196,
+        0.1530208500005695,
+        0.1529402976037064
+      ],
+      "policy_tv": 0.026654393720757202,
+      "value_rmse": 5.649231339242777,
+      "regret": {
+        "baseline": 0.17657974927773715,
+        "type_a": 0.17435151602105428,
+        "type_b": 0.17866170735276962,
+        "type_c": 2.9603106621008257e-05,
+        "transferred": true
+      },
+      "runtime": 2.1719119548797607,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.3628884402581067,
+        -1.7487690260845992,
+        0.21340566387470628
+      ],
+      "standard_errors": [
+        0.14435646180191575,
+        0.1783478923320524,
+        0.1719508832982518
+      ],
+      "policy_tv": 0.004671882925561272,
+      "value_rmse": 0.7055711231482716,
+      "regret": {
+        "baseline": 0.005479695728965324,
+        "type_a": 0.005564484509621487,
+        "type_b": 0.004836834754704569,
+        "type_c": 1.341803609118404e-06,
+        "transferred": true
+      },
+      "runtime": 3.2963998317718506,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.3913613548253999,
+        -1.6421716668779744,
+        0.14569787281090799
+      ],
+      "standard_errors": [
+        0.13111881089917687,
+        0.15340460175120518,
+        0.15278136157494132
+      ],
+      "policy_tv": 0.0018383052057542603,
+      "value_rmse": 0.1921592041555595,
+      "regret": {
+        "baseline": -0.0014779534210751849,
+        "type_a": -0.0013137256930722116,
+        "type_b": -0.0015636844889250277,
+        "type_c": 2.342919502532755e-08,
+        "transferred": true
+      },
+      "runtime": 0.07636189460754395,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-SA",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.3997383829901116,
+        -1.5425111064840207,
+        0.10763866958984558
+      ],
+      "standard_errors": [
+        0.12984894216060638,
+        0.15238040685653687,
+        0.15143407881259918
+      ],
+      "policy_tv": 0.0027251062452174233,
+      "value_rmse": 0.33993215347190747,
+      "regret": {
+        "baseline": -0.0004566665481554664,
+        "type_a": -0.0004021612540120669,
+        "type_b": -0.0005095463766099242,
+        "type_c": 9.944345597001098e-08,
+        "transferred": true
+      },
+      "runtime": 4.699439764022827,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.39973823298333644,
+        -1.5425112833816155,
+        0.10763885063150298
+      ],
+      "standard_errors": [
+        0.12984894216060638,
+        0.15238040685653687,
+        0.15143407881259918
+      ],
+      "policy_tv": 0.002725105493830953,
+      "value_rmse": 0.33993228483531646,
+      "regret": {
+        "baseline": -0.0004566667050066659,
+        "type_a": -0.00040216142121656125,
+        "type_b": -0.0005095463469854784,
+        "type_c": 9.944310022491186e-08,
+        "transferred": true
+      },
+      "runtime": 2.580165147781372,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.39566588401794434,
+        -1.5491180419921875,
+        0.11339693516492844
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002957281245062619,
+      "value_rmse": 0.3557463951843287,
+      "regret": {
+        "baseline": -0.00047615632676898973,
+        "type_a": -0.00042257850745838803,
+        "type_b": -0.0005238550662182531,
+        "type_c": 9.455698851154072e-08,
+        "transferred": true
+      },
+      "runtime": 3.0814669132232666,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.3925531208515167,
+        -1.5420619249343872,
+        0.1087971106171608
+      ],
+      "standard_errors": [
+        0.12951774895191193,
+        0.15201488137245178,
+        0.1510382443666458
+      ],
+      "policy_tv": 0.0022848881435441814,
+      "value_rmse": 0.09096823675073086,
+      "regret": {
+        "baseline": -0.0011005645039933365,
+        "type_a": -0.000998881038214293,
+        "type_b": -0.0011800743128610386,
+        "type_c": 3.525505888259023e-08,
+        "transferred": true
+      },
+      "runtime": 5.597732782363892,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.399685263633728,
+        -1.5425379276275635,
+        0.10768823325634003
+      ],
+      "standard_errors": [
+        0.12927474982915615,
+        0.15188506712604896,
+        0.15075860661484508
+      ],
+      "policy_tv": 0.0027256689589997816,
+      "value_rmse": 0.33984358729292635,
+      "regret": {
+        "baseline": -0.00045555367517760624,
+        "type_a": -0.00040118839675615454,
+        "type_b": -0.0005084912184525073,
+        "type_c": 9.955075978650207e-08,
+        "transferred": true
+      },
+      "runtime": 16.866536855697632,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.9197235801959687,
+        -1.0649643252866372,
+        -0.4084424685675459
+      ],
+      "standard_errors": [
+        0.12910362096021855,
+        0.14946417713917248,
+        0.14961816101807715
+      ],
+      "policy_tv": 0.019501186683562644,
+      "value_rmse": 3.9548351775709154,
+      "regret": {
+        "baseline": 0.09870727654952921,
+        "type_a": 0.09706413147286712,
+        "type_b": 0.10048523596837612,
+        "type_c": 1.5892821207992205e-05,
+        "transferred": true
+      },
+      "runtime": 2.0549418926239014,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.4150817235114178,
+        -1.6043907616606352,
+        0.12270573326563594
+      ],
+      "standard_errors": [
+        0.13238686684059198,
+        0.16243897399526783,
+        0.1569470988184378
+      ],
+      "policy_tv": 0.003496405222407558,
+      "value_rmse": 0.6877971827900802,
+      "regret": {
+        "baseline": 0.00030866437407322655,
+        "type_a": 0.0004836228440967103,
+        "type_b": 0.00022964135088494436,
+        "type_c": 3.292068322608241e-07,
+        "transferred": true
+      },
+      "runtime": 2.55558705329895,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.38615045938582043,
+        -1.5374999511973553,
+        0.11762933749178323
+      ],
+      "standard_errors": [
+        0.13016189731802308,
+        0.1529533333802687,
+        0.15184325651428837
+      ],
+      "policy_tv": 0.003582326107804006,
+      "value_rmse": 0.3933805074699187,
+      "regret": {
+        "baseline": 0.0012014040364947296,
+        "type_a": 0.0011183671682316436,
+        "type_b": 0.0011034025023558373,
+        "type_c": 2.941694213263972e-07,
+        "transferred": true
+      },
+      "runtime": 0.07882022857666016,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.4683222199325001,
+        -1.6406457107808556,
+        0.0901400214345137
+      ],
+      "standard_errors": [
+        0.13059164583683014,
+        0.15297262370586395,
+        0.1521787792444229
+      ],
+      "policy_tv": 0.005374621357812466,
+      "value_rmse": 0.5325339804255508,
+      "regret": {
+        "baseline": 0.005860291885356905,
+        "type_a": 0.005695893756062771,
+        "type_b": 0.005474971416620572,
+        "type_c": 1.1719266493558398e-06,
+        "transferred": true
+      },
+      "runtime": 4.669105052947998,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.45714133977890015,
+        -1.6456522941589355,
+        0.09991730004549026
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005429279249283736,
+      "value_rmse": 0.4871423719497909,
+      "regret": {
+        "baseline": 0.004852871030969885,
+        "type_a": 0.004733204116094262,
+        "type_b": 0.004492801732048831,
+        "type_c": 1.0155473434993437e-06,
+        "transferred": true
+      },
+      "runtime": 3.1829400062561035,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.47262629866600037,
+        -1.6383423805236816,
+        0.0873107835650444
+      ],
+      "standard_errors": [
+        0.13028423488140106,
+        0.15257516503334045,
+        0.15178976953029633
+      ],
+      "policy_tv": 0.005539555162243214,
+      "value_rmse": 0.6103077612414323,
+      "regret": {
+        "baseline": 0.006382084069897794,
+        "type_a": 0.006233594141495547,
+        "type_b": 0.0059785889223483366,
+        "type_c": 1.2822474425489567e-06,
+        "transferred": true
+      },
+      "runtime": 7.432109832763672,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.4682201147079468,
+        -1.6408025026321411,
+        0.09027549624443054
+      ],
+      "standard_errors": [
+        0.131010087259362,
+        0.15355317438829033,
+        0.15273194860252853
+      ],
+      "policy_tv": 0.005375475550252026,
+      "value_rmse": 0.5326118448023965,
+      "regret": {
+        "baseline": 0.005864156803292426,
+        "type_a": 0.005699740720931787,
+        "type_b": 0.005478240433056231,
+        "type_c": 1.1727321636738402e-06,
+        "transferred": true
+      },
+      "runtime": 16.544729948043823,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.6366107738498041,
+        -1.6428577896341843,
+        0.04074956563296728
+      ],
+      "standard_errors": [
+        0.13200802874446463,
+        0.1529438094310431,
+        0.15306769213354002
+      ],
+      "policy_tv": 0.026131024613579624,
+      "value_rmse": 5.7316758627732876,
+      "regret": {
+        "baseline": 0.17164276244374005,
+        "type_a": 0.17115934406825456,
+        "type_b": 0.16699453988350255,
+        "type_c": 3.244981552064914e-05,
+        "transferred": true
+      },
+      "runtime": 2.079213857650757,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.3663409115686394,
+        -1.818886100566959,
+        0.2422093367721431
+      ],
+      "standard_errors": [
+        0.16726329121316716,
+        0.19872494770193486,
+        0.1983011028034894
+      ],
+      "policy_tv": 0.007524115974499141,
+      "value_rmse": 1.1520432775662817,
+      "regret": {
+        "baseline": 0.017883316836093614,
+        "type_a": 0.017786532194710016,
+        "type_b": 0.01630373358452307,
+        "type_c": 3.7010355616640827e-06,
+        "transferred": true
+      },
+      "runtime": 2.607603073120117,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.4500884539661363,
+        -1.6311374786185378,
+        0.10123060468254771
+      ],
+      "standard_errors": [
+        0.13074943803887643,
+        0.15316720188069477,
+        0.15237326999760423
+      ],
+      "policy_tv": 0.004265346141877065,
+      "value_rmse": 0.5219766473367675,
+      "regret": {
+        "baseline": 0.002768695108601508,
+        "type_a": 0.0027906483096259076,
+        "type_b": 0.0025163378710119882,
+        "type_c": 7.182959474231371e-07,
+        "transferred": true
+      },
+      "runtime": 0.07852983474731445,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        0.39319697111173785,
+        -1.577318313584071,
+        0.10525877301495296
+      ],
+      "standard_errors": [
+        0.13052374124526978,
+        0.1526520699262619,
+        0.15201474726200104
+      ],
+      "policy_tv": 0.0041199002020755535,
+      "value_rmse": 0.7626686400204657,
+      "regret": {
+        "baseline": 0.0011002497577842043,
+        "type_a": 0.001189203101254524,
+        "type_b": 0.001020550919099488,
+        "type_c": 3.90738362092854e-07,
+        "transferred": true
+      },
+      "runtime": 5.687949895858765,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        0.38974061608314514,
+        -1.5841971635818481,
+        0.11058890074491501
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004277794180591148,
+      "value_rmse": 0.7490580931376637,
+      "regret": {
+        "baseline": 0.0009849885321540919,
+        "type_a": 0.0010714408547592776,
+        "type_b": 0.0009154149533623978,
+        "type_c": 3.66233132863413e-07,
+        "transferred": true
+      },
+      "runtime": 3.5693187713623047,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        0.3864598870277405,
+        -1.5775244235992432,
+        0.10567198693752289
+      ],
+      "standard_errors": [
+        0.1305363029241562,
+        0.15266825258731842,
+        0.15202690660953522
+      ],
+      "policy_tv": 0.005620792680906554,
+      "value_rmse": 1.0429396764849954,
+      "regret": {
+        "baseline": 0.0042147679037745625,
+        "type_a": 0.004226278733208582,
+        "type_b": 0.0040821155891962516,
+        "type_c": 8.632936100409094e-07,
+        "transferred": true
+      },
+      "runtime": 6.525676012039185,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        0.3931474983692169,
+        -1.577375888824463,
+        0.10531734675168991
+      ],
+      "standard_errors": [
+        0.13072013866880186,
+        0.1527645314624227,
+        0.15221464239602253
+      ],
+      "policy_tv": 0.004119948197639302,
+      "value_rmse": 0.7626782416121829,
+      "regret": {
+        "baseline": 0.0011001213125462015,
+        "type_a": 0.0011891033313740126,
+        "type_b": 0.0010204715096761622,
+        "type_c": 3.9071479337134714e-07,
+        "transferred": true
+      },
+      "runtime": 16.50546622276306,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        1.067001332587703,
+        -0.6329015330343856,
+        -0.7194031262014264
+      ],
+      "standard_errors": [
+        0.1311295544829872,
+        0.15087492135712702,
+        0.15193060255004937
+      ],
+      "policy_tv": 0.016259156448183418,
+      "value_rmse": 1.1919037475387162,
+      "regret": {
+        "baseline": 0.07890500919783248,
+        "type_a": 0.07655944456491075,
+        "type_b": 0.07739502845667814,
+        "type_c": 1.2254024728768116e-05,
+        "transferred": true
+      },
+      "runtime": 2.0482349395751953,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        0.42215151882734,
+        -1.6036472924658383,
+        0.09891761077197218
+      ],
+      "standard_errors": [
+        0.14640717807620743,
+        0.1722237636869458,
+        0.17071551005893196
+      ],
+      "policy_tv": 0.0025717032238241786,
+      "value_rmse": 0.3331780745574127,
+      "regret": {
+        "baseline": -0.00018427864410124555,
+        "type_a": -0.00019773414414652734,
+        "type_b": -0.0002248257718118706,
+        "type_c": 1.0351510477496741e-07,
+        "transferred": true
+      },
+      "runtime": 2.537476062774658,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        0.3877495054484238,
+        -1.5635316367925025,
+        0.1068872265638352
+      ],
+      "standard_errors": [
+        0.13136615278141398,
+        0.15350779792220037,
+        0.1528955065946698
+      ],
+      "policy_tv": 0.0033725481632374313,
+      "value_rmse": 0.6513050790311268,
+      "regret": {
+        "baseline": 8.436735669765823e-05,
+        "type_a": 0.00025270280122795995,
+        "type_b": -1.8298173487905214e-05,
+        "type_c": 2.85764938924795e-07,
+        "transferred": true
+      },
+      "runtime": 0.07981491088867188,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        0.5756401193697627,
+        -1.36952672613425,
+        -0.0907374284300553
+      ],
+      "standard_errors": [
+        0.1299830675125122,
+        0.1522233635187149,
+        0.1514720767736435
+      ],
+      "policy_tv": 0.003920281149071904,
+      "value_rmse": 0.3231464455647299,
+      "regret": {
+        "baseline": 0.0018721773093564105,
+        "type_a": 0.0019060100717999367,
+        "type_b": 0.0019314583120699726,
+        "type_c": 4.984953291536259e-07,
+        "transferred": true
+      },
+      "runtime": 2.480923891067505,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        0.5850870013237,
+        -1.359123706817627,
+        -0.10195739567279816
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0041318266110677345,
+      "value_rmse": 0.31138206877647884,
+      "regret": {
+        "baseline": 0.0021798142119385327,
+        "type_a": 0.002197948114051103,
+        "type_b": 0.0022453474991834814,
+        "type_c": 5.442353701225156e-07,
+        "transferred": true
+      },
+      "runtime": 3.125462055206299,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        0.5776084065437317,
+        -1.36623215675354,
+        -0.0939536988735199
+      ],
+      "standard_errors": [
+        0.12894994020462036,
+        0.1511150598526001,
+        0.15025770664215088
+      ],
+      "policy_tv": 0.003909764900213376,
+      "value_rmse": 0.29262016070318675,
+      "regret": {
+        "baseline": 0.0018653986453278978,
+        "type_a": 0.001896537256405888,
+        "type_b": 0.0019173306780308557,
+        "type_c": 4.994663004488272e-07,
+        "transferred": true
+      },
+      "runtime": 6.599814176559448,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        0.5757848620414734,
+        -1.3693541288375854,
+        -0.09091050177812576
+      ],
+      "standard_errors": [
+        0.1299082554678087,
+        0.15218950259240122,
+        0.15137562649567907
+      ],
+      "policy_tv": 0.003922791879393948,
+      "value_rmse": 0.32316361962094664,
+      "regret": {
+        "baseline": 0.0018779495757856894,
+        "type_a": 0.001911542342522699,
+        "type_b": 0.0019373105311638703,
+        "type_c": 4.993554470782833e-07,
+        "transferred": true
+      },
+      "runtime": 16.674679040908813,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        1.1832336266038506,
+        -0.6595975172809091,
+        -0.7692075639335936
+      ],
+      "standard_errors": [
+        0.13289737444169836,
+        0.1531665249693111,
+        0.15395881433692718
+      ],
+      "policy_tv": 0.01982758228990616,
+      "value_rmse": 3.320126373296574,
+      "regret": {
+        "baseline": 0.11217789708692061,
+        "type_a": 0.10929554906140061,
+        "type_b": 0.11465049329572627,
+        "type_c": 1.7397299525245037e-05,
+        "transferred": true
+      },
+      "runtime": 2.01076602935791,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        0.5654355164517904,
+        -1.4985718363837222,
+        -0.02420591729318871
+      ],
+      "standard_errors": [
+        0.14820690162137973,
+        0.17868477378530567,
+        0.17555521355754733
+      ],
+      "policy_tv": 0.006671226033592884,
+      "value_rmse": 1.1532550915288824,
+      "regret": {
+        "baseline": 0.0089578877693667,
+        "type_a": 0.008947674657634217,
+        "type_b": 0.008974690303526777,
+        "type_c": 1.7238080223969207e-06,
+        "transferred": true
+      },
+      "runtime": 3.0658328533172607,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        0.5796406141105693,
+        -1.3434113704183304,
+        -0.10172426386198356
+      ],
+      "standard_errors": [
+        0.13073415698755195,
+        0.15313572512730708,
+        0.15235199875312622
+      ],
+      "policy_tv": 0.00444983600682718,
+      "value_rmse": 0.38332444787448405,
+      "regret": {
+        "baseline": 0.0033106944580551293,
+        "type_a": 0.003309252357037651,
+        "type_b": 0.003296848020232463,
+        "type_c": 7.219948477262003e-07,
+        "transferred": true
+      },
+      "runtime": 0.07846784591674805,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.3095169148909418,
+        -1.6122185538733578,
+        0.19531297911959955
+      ],
+      "standard_errors": [
+        0.1283540576696396,
+        0.15081365406513214,
+        0.14967341721057892
+      ],
+      "policy_tv": 0.0031122807460225725,
+      "value_rmse": 0.0814839973691938,
+      "regret": {
+        "baseline": 0.0003528154438975158,
+        "type_a": 0.00032268205862758106,
+        "type_b": 0.0002844545547757208,
+        "type_c": 2.084899193805187e-07,
+        "transferred": true
+      },
+      "runtime": 6.200783967971802,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.3033891022205353,
+        -1.6203737258911133,
+        0.2033090889453888
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003358801317401036,
+      "value_rmse": 0.0611022568489869,
+      "regret": {
+        "baseline": 0.0003899645762160446,
+        "type_a": 0.0003461032868265737,
+        "type_b": 0.00033453047862939673,
+        "type_c": 2.0446584649901903e-07,
+        "transferred": true
+      },
+      "runtime": 3.635246992111206,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.31338629126548767,
+        -1.610621452331543,
+        0.19344933331012726
+      ],
+      "standard_errors": [
+        0.1285734474658966,
+        0.15108925104141235,
+        0.14994856715202332
+      ],
+      "policy_tv": 0.0030165607079089187,
+      "value_rmse": 0.019197052577753042,
+      "regret": {
+        "baseline": 0.0003456097444309147,
+        "type_a": 0.00029221417629229397,
+        "type_b": 0.0002821207045664751,
+        "type_c": 1.8865343990585628e-07,
+        "transferred": true
+      },
+      "runtime": 6.653534889221191,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.3096235692501068,
+        -1.6120647192001343,
+        0.19517523050308228
+      ],
+      "standard_errors": [
+        0.12889214920693653,
+        0.1513840318841717,
+        0.15029936112356257
+      ],
+      "policy_tv": 0.003112897678830972,
+      "value_rmse": 0.08153919372153878,
+      "regret": {
+        "baseline": 0.0003536591195181532,
+        "type_a": 0.00032356702596349137,
+        "type_b": 0.0002850399231003532,
+        "type_c": 2.086877323189461e-07,
+        "transferred": true
+      },
+      "runtime": 16.422619104385376,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.6726722280658815,
+        -1.3757631371653471,
+        -0.08938254592162577
+      ],
+      "standard_errors": [
+        0.1304849345260272,
+        0.15192175755897433,
+        0.1514000127131052
+      ],
+      "policy_tv": 0.02441265013719231,
+      "value_rmse": 5.201907177671674,
+      "regret": {
+        "baseline": 0.13156141498224108,
+        "type_a": 0.12947434384157944,
+        "type_b": 0.13118945839756474,
+        "type_c": 2.1711632723479366e-05,
+        "transferred": true
+      },
+      "runtime": 2.147444009780884,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.2613690269809356,
+        -1.7966182905787331,
+        0.31032876121688097
+      ],
+      "standard_errors": [
+        0.15599857873845993,
+        0.1918117797492206,
+        0.18559945442861522
+      ],
+      "policy_tv": 0.004088991676124909,
+      "value_rmse": 0.723074407273632,
+      "regret": {
+        "baseline": 0.0032094426847509745,
+        "type_a": 0.003289157595040406,
+        "type_b": 0.0028394788113298604,
+        "type_c": 8.889818850906445e-07,
+        "transferred": true
+      },
+      "runtime": 2.6512320041656494,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.2954715486506007,
+        -1.6085627893623506,
+        0.20601990809048426
+      ],
+      "standard_errors": [
+        0.12898155693651087,
+        0.15139464825885873,
+        0.15030337513382658
+      ],
+      "policy_tv": 0.003921615995422352,
+      "value_rmse": 0.03491615637263917,
+      "regret": {
+        "baseline": 0.0022091000190905177,
+        "type_a": 0.002016081884165967,
+        "type_b": 0.0020961687427631733,
+        "type_c": 4.290142021617139e-07,
+        "transferred": true
+      },
+      "runtime": 0.08132314682006836,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.37388518476961097,
+        -1.6157033595828998,
+        0.1609168546620435
+      ],
+      "standard_errors": [
+        0.1289813369512558,
+        0.15182437002658844,
+        0.15044920146465302
+      ],
+      "policy_tv": 0.00428435254981282,
+      "value_rmse": 0.7904341674113742,
+      "regret": {
+        "baseline": 0.0015053406590087672,
+        "type_a": 0.0015449354825178968,
+        "type_b": 0.0014370069525169928,
+        "type_c": 4.283180960477808e-07,
+        "transferred": true
+      },
+      "runtime": 4.448122978210449,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.3826603591442108,
+        -1.604541540145874,
+        0.15057864785194397
+      ],
+      "standard_errors": [
+        0.010208841479747918,
+        0.026741166961331976,
+        0.018769953581628605
+      ],
+      "policy_tv": 0.004433391933296159,
+      "value_rmse": 0.8128220785515138,
+      "regret": {
+        "baseline": 0.0017368179616167121,
+        "type_a": 0.0017703117953986633,
+        "type_b": 0.0016744524977758575,
+        "type_c": 4.590168109581575e-07,
+        "transferred": true
+      },
+      "runtime": 3.544240951538086,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.3727882504463196,
+        -1.6135591268539429,
+        0.1593891978263855
+      ],
+      "standard_errors": [
+        0.12964223325252533,
+        0.15255557000637054,
+        0.15123292803764343
+      ],
+      "policy_tv": 0.003786541870308618,
+      "value_rmse": 0.6949690252318987,
+      "regret": {
+        "baseline": 0.0006639607665352063,
+        "type_a": 0.0007253406883317233,
+        "type_b": 0.000610403853774515,
+        "type_c": 2.9793251764441144e-07,
+        "transferred": true
+      },
+      "runtime": 6.930387020111084,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.37371882796287537,
+        -1.6158969402313232,
+        0.16111378371715546
+      ],
+      "standard_errors": [
+        0.12940061803788894,
+        0.15225839531780513,
+        0.1509501549028389
+      ],
+      "policy_tv": 0.004284187988113592,
+      "value_rmse": 0.7904015843433896,
+      "regret": {
+        "baseline": 0.0015058250440191203,
+        "type_a": 0.0015452935239185382,
+        "type_b": 0.0014373527869381362,
+        "type_c": 4.2839160967230805e-07,
+        "transferred": true
+      },
+      "runtime": 17.40752077102661,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.6202535585829649,
+        -1.3145571603442385,
+        -0.05844329236487517
+      ],
+      "standard_errors": [
+        0.1292335806017701,
+        0.15132996810407384,
+        0.15022461442388624
+      ],
+      "policy_tv": 0.02846539862849108,
+      "value_rmse": 5.80183254080504,
+      "regret": {
+        "baseline": 0.1855642288721292,
+        "type_a": 0.18007261840003277,
+        "type_b": 0.1852088099940367,
+        "type_c": 2.8427808395265e-05,
+        "transferred": true
+      },
+      "runtime": 2.321558952331543,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.34750952155297277,
+        -1.6719600426159138,
+        0.20782413704907832
+      ],
+      "standard_errors": [
+        0.15126584423256037,
+        0.1820128767828652,
+        0.17869218070538706
+      ],
+      "policy_tv": 0.006273081192901917,
+      "value_rmse": 1.1862427107302869,
+      "regret": {
+        "baseline": 0.006228812580392656,
+        "type_a": 0.0061844703975893825,
+        "type_b": 0.005985328074567857,
+        "type_c": 1.2323527440649322e-06,
+        "transferred": true
+      },
+      "runtime": 2.6780242919921875,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.38194766121592666,
+        -1.5803020557719492,
+        0.14418859981467994
+      ],
+      "standard_errors": [
+        0.13025464699814868,
+        0.15342961979922595,
+        0.15203858403185622
+      ],
+      "policy_tv": 0.0049822884566714815,
+      "value_rmse": 0.8873887339960261,
+      "regret": {
+        "baseline": 0.0036288693576322023,
+        "type_a": 0.0034962637061683607,
+        "type_b": 0.0035711890100117555,
+        "type_c": 6.55100571831221e-07,
+        "transferred": true
+      },
+      "runtime": 0.07808780670166016,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.3602911165097703,
+        -1.5573090984131464,
+        0.14281223590451608
+      ],
+      "standard_errors": [
+        0.13072912395000458,
+        0.1533823311328888,
+        0.15253880620002747
+      ],
+      "policy_tv": 0.0034891397470383383,
+      "value_rmse": 0.2814494991426055,
+      "regret": {
+        "baseline": 0.0012000436330168068,
+        "type_a": 0.0010881821069098781,
+        "type_b": 0.001088921105327716,
+        "type_c": 2.85879350009541e-07,
+        "transferred": true
+      },
+      "runtime": 4.896919012069702,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.3625907599925995,
+        -1.550669550895691,
+        0.13850492238998413
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0037265724513969754,
+      "value_rmse": 0.26825453635144175,
+      "regret": {
+        "baseline": 0.0014445983524556958,
+        "type_a": 0.0013185105197147467,
+        "type_b": 0.0013172811213574107,
+        "type_c": 3.2071369665773197e-07,
+        "transferred": true
+      },
+      "runtime": 3.166985034942627,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.3548301160335541,
+        -1.5585075616836548,
+        0.1449694037437439
+      ],
+      "standard_errors": [
+        0.13060809671878815,
+        0.15327422320842743,
+        0.15240436792373657
+      ],
+      "policy_tv": 0.0033428041988645225,
+      "value_rmse": 0.13513271757296835,
+      "regret": {
+        "baseline": 0.0008333177133229936,
+        "type_a": 0.0007608371951709529,
+        "type_b": 0.0007057672380795857,
+        "type_c": 2.590823332914656e-07,
+        "transferred": true
+      },
+      "runtime": 6.7104880809783936,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.36009353399276733,
+        -1.5575683116912842,
+        0.14305762946605682
+      ],
+      "standard_errors": [
+        0.12984362346131503,
+        0.1523579031262433,
+        0.15142869512567345
+      ],
+      "policy_tv": 0.003486962809007083,
+      "value_rmse": 0.28149420027399624,
+      "regret": {
+        "baseline": 0.0011982156829678954,
+        "type_a": 0.0010862538365407721,
+        "type_b": 0.001087387967858757,
+        "type_c": 2.8548717886050784e-07,
+        "transferred": true
+      },
+      "runtime": 17.652353048324585,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.75558684380591,
+        -1.2100394400444598,
+        -0.235917017687874
+      ],
+      "standard_errors": [
+        0.12961011158231966,
+        0.15033138895351075,
+        0.15033829600366744
+      ],
+      "policy_tv": 0.017395493433079147,
+      "value_rmse": 3.5267513327253703,
+      "regret": {
+        "baseline": 0.07354922438292971,
+        "type_a": 0.07211349813156755,
+        "type_b": 0.07433347220313168,
+        "type_c": 1.1595914022534839e-05,
+        "transferred": true
+      },
+      "runtime": 2.095262289047241,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.19246139661613454,
+        -1.8747410025239664,
+        0.39990127684153
+      ],
+      "standard_errors": [
+        0.15073670959395924,
+        0.17786774655122778,
+        0.17659735216367295
+      ],
+      "policy_tv": 0.006611017205962424,
+      "value_rmse": 1.212409013364532,
+      "regret": {
+        "baseline": 0.01136350015331994,
+        "type_a": 0.011117416430770353,
+        "type_b": 0.01070056242703851,
+        "type_c": 2.2130584260239823e-06,
+        "transferred": true
+      },
+      "runtime": 2.576369285583496,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.3445540338366829,
+        -1.5468817470374963,
+        0.15282922986383604
+      ],
+      "standard_errors": [
+        0.13137155796864872,
+        0.15421091914203322,
+        0.15331861801895574
+      ],
+      "policy_tv": 0.0047447013726139246,
+      "value_rmse": 0.34637087283321805,
+      "regret": {
+        "baseline": 0.0044518347663162865,
+        "type_a": 0.004069102769242418,
+        "type_b": 0.004249634141576489,
+        "type_c": 6.735905169115151e-07,
+        "transferred": true
+      },
+      "runtime": 0.09452414512634277,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.3891328502707727,
+        -1.6964660045587985,
+        0.165824229866344
+      ],
+      "standard_errors": [
+        0.12905195355415344,
+        0.1510905772447586,
+        0.15024589002132416
+      ],
+      "policy_tv": 0.003876127500030875,
+      "value_rmse": 0.1903399893872985,
+      "regret": {
+        "baseline": 0.002025826508863091,
+        "type_a": 0.002006918190818682,
+        "type_b": 0.0017172111177318232,
+        "type_c": 5.583506433392538e-07,
+        "transferred": true
+      },
+      "runtime": 5.270522117614746,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.38747161626815796,
+        -1.6986138820648193,
+        0.16801796853542328
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004106008975681047,
+      "value_rmse": 0.19822684012203956,
+      "regret": {
+        "baseline": 0.002050338377778028,
+        "type_a": 0.0020354388862664176,
+        "type_b": 0.001735829842717695,
+        "type_c": 5.671724670451006e-07,
+        "transferred": true
+      },
+      "runtime": 3.428987741470337,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.3840397000312805,
+        -1.697898268699646,
+        0.16787324845790863
+      ],
+      "standard_errors": [
+        0.12866269052028656,
+        0.1506553590297699,
+        0.14978045225143433
+      ],
+      "policy_tv": 0.0038989880950834354,
+      "value_rmse": 0.05076962329712382,
+      "regret": {
+        "baseline": 0.0018980846721656955,
+        "type_a": 0.0018426430976755742,
+        "type_b": 0.0016259144923776484,
+        "type_c": 4.943383574059751e-07,
+        "transferred": true
+      },
+      "runtime": 7.057491064071655,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.3893270790576935,
+        -1.6962355375289917,
+        0.16559243202209473
+      ],
+      "standard_errors": [
+        0.12918396130404225,
+        0.15146262514955883,
+        0.15048418408069267
+      ],
+      "policy_tv": 0.003875647315540558,
+      "value_rmse": 0.1903564395862358,
+      "regret": {
+        "baseline": 0.0020239995843269395,
+        "type_a": 0.0020049538404677673,
+        "type_b": 0.0017157898137067818,
+        "type_c": 5.578531490761692e-07,
+        "transferred": true
+      },
+      "runtime": 17.403728008270264,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.6522750176029823,
+        -1.47683663854645,
+        -0.06338223603980617
+      ],
+      "standard_errors": [
+        0.1295422053889855,
+        0.15089163680453402,
+        0.15040911139175445
+      ],
+      "policy_tv": 0.01669758096412779,
+      "value_rmse": 3.5316075856045055,
+      "regret": {
+        "baseline": 0.06496445508394127,
+        "type_a": 0.06464758078462797,
+        "type_b": 0.06434746444860515,
+        "type_c": 1.1551676734650538e-05,
+        "transferred": true
+      },
+      "runtime": 2.020493984222412,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.44666670715112383,
+        -1.6837204623279651,
+        0.11953216472484955
+      ],
+      "standard_errors": [
+        0.1439470005872673,
+        0.174538167391548,
+        0.17011531187955428
+      ],
+      "policy_tv": 0.005917451189778186,
+      "value_rmse": 0.3975351217903212,
+      "regret": {
+        "baseline": 0.0078890934314524,
+        "type_a": 0.007555865156151834,
+        "type_b": 0.007329285404949786,
+        "type_c": 1.445151855897586e-06,
+        "transferred": true
+      },
+      "runtime": 2.5869431495666504,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.3810080244121764,
+        -1.6861660098210391,
+        0.17013590313863977
+      ],
+      "standard_errors": [
+        0.12963836974464327,
+        0.15176429931877494,
+        0.15085347891446724
+      ],
+      "policy_tv": 0.0030297595313396914,
+      "value_rmse": 0.2655685519340413,
+      "regret": {
+        "baseline": 0.0004468119844117857,
+        "type_a": 0.0005459995867926181,
+        "type_b": 0.00021490916139642658,
+        "type_c": 3.4986214465340765e-07,
+        "transferred": true
+      },
+      "runtime": 0.07773327827453613,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.6681455976362168,
+        -1.2889370024572873,
+        -0.21288679326733784
+      ],
+      "standard_errors": [
+        0.12923564016819,
+        0.15187393128871918,
+        0.15068337321281433
+      ],
+      "policy_tv": 0.006194932138165997,
+      "value_rmse": 0.8919165956372858,
+      "regret": {
+        "baseline": 0.01186923535750699,
+        "type_a": 0.01103696408074614,
+        "type_b": 0.01173540585828081,
+        "type_c": 1.7648808854179706e-06,
+        "transferred": true
+      },
+      "runtime": 4.434809923171997,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.6664917469024658,
+        -1.2866613864898682,
+        -0.21361501514911652
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006626519042381732,
+      "value_rmse": 0.9639887261643285,
+      "regret": {
+        "baseline": 0.012638933544869058,
+        "type_a": 0.011789686822002725,
+        "type_b": 0.012455618027989253,
+        "type_c": 1.8918239202742229e-06,
+        "transferred": true
+      },
+      "runtime": 3.1404292583465576,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.6677435040473938,
+        -1.2865043878555298,
+        -0.21474549174308777
+      ],
+      "standard_errors": [
+        0.12949945032596588,
+        0.15217091143131256,
+        0.1509999930858612
+      ],
+      "policy_tv": 0.006430656924499645,
+      "value_rmse": 0.9675773211267191,
+      "regret": {
+        "baseline": 0.01281369245061571,
+        "type_a": 0.011943530640231539,
+        "type_b": 0.012634910162515441,
+        "type_c": 1.907648544082985e-06,
+        "transferred": true
+      },
+      "runtime": 6.673552989959717,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.6686747670173645,
+        -1.2883116006851196,
+        -0.213517963886261
+      ],
+      "standard_errors": [
+        0.13051984292984117,
+        0.1532174495034309,
+        0.15223191650656942
+      ],
+      "policy_tv": 0.0062012926434384915,
+      "value_rmse": 0.8918647068894993,
+      "regret": {
+        "baseline": 0.011899159605622992,
+        "type_a": 0.011064836140323001,
+        "type_b": 0.01176537976868086,
+        "type_c": 1.7690622571505829e-06,
+        "transferred": true
+      },
+      "runtime": 16.949785947799683,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.80001710235106,
+        -1.1639463661501306,
+        -0.2990835142987023
+      ],
+      "standard_errors": [
+        0.13113434341518626,
+        0.15246138218010052,
+        0.1522101929648377
+      ],
+      "policy_tv": 0.013732593465994659,
+      "value_rmse": 3.0080301036585237,
+      "regret": {
+        "baseline": 0.050894381869689025,
+        "type_a": 0.049959761049365795,
+        "type_b": 0.05190879024689445,
+        "type_c": 8.065215509678542e-06,
+        "transferred": true
+      },
+      "runtime": 2.1416702270507812,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.5888109698387592,
+        -1.4091907619635884,
+        -0.10134219358134715
+      ],
+      "standard_errors": [
+        0.15923295147396926,
+        0.19327392080124017,
+        0.1894033746404402
+      ],
+      "policy_tv": 0.004067404028676695,
+      "value_rmse": 0.4543269923342826,
+      "regret": {
+        "baseline": 0.004315750646520244,
+        "type_a": 0.003880741155016112,
+        "type_b": 0.0043701368232956376,
+        "type_c": 6.448641811343367e-07,
+        "transferred": true
+      },
+      "runtime": 2.524991989135742,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.6594253878147824,
+        -1.2661783861294398,
+        -0.2138623492485382
+      ],
+      "standard_errors": [
+        0.1298494423028063,
+        0.1526035844700172,
+        0.15137307418846188
+      ],
+      "policy_tv": 0.006170924847959287,
+      "value_rmse": 0.9016502383492035,
+      "regret": {
+        "baseline": 0.011090385854290835,
+        "type_a": 0.010540534089358315,
+        "type_b": 0.01077199974606322,
+        "type_c": 1.8483576365732368e-06,
+        "transferred": true
+      },
+      "runtime": 0.11763715744018555,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 0,
+      "params": [
+        -0.517117166807464,
+        -0.04737545647002075,
+        0.8306756274417031
+      ],
+      "standard_errors": [
+        0.02140158601105213,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.002274937870171199,
+      "value_rmse": 0.1081346161561465,
+      "regret": {
+        "baseline": 0.0002519838802802198,
+        "type_a": 0.0002578555176339716,
+        "type_b": 0.0002499698200155084,
+        "type_c": 5.6541744125204515e-08,
+        "transferred": true
+      },
+      "runtime": 4.785796165466309,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 0,
+      "params": [
+        -0.5168805122375488,
+        0.326716810464859,
+        0.6434336304664612
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0022805293235178344,
+      "value_rmse": 0.10802156767859689,
+      "regret": {
+        "baseline": 0.00024884323491521684,
+        "type_a": 0.000254688768760909,
+        "type_b": 0.0002464420989387367,
+        "type_c": 5.5943110179489725e-08,
+        "transferred": true
+      },
+      "runtime": 3.130242109298706,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 0,
+      "params": [
+        -0.5151739716529846,
+        -0.04738172888755798,
+        0.8306019902229309
+      ],
+      "standard_errors": [
+        0.02140270546078682,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.0018333563415205035,
+      "value_rmse": 0.08591270625978968,
+      "regret": {
+        "baseline": 0.00017577384237850124,
+        "type_a": 0.00017962589418181452,
+        "type_b": 0.00017720331056673332,
+        "type_c": 3.833993626141192e-08,
+        "transferred": true
+      },
+      "runtime": 6.083609104156494,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 0,
+      "params": [
+        -0.5165213857185601,
+        0.32250865028098796,
+        0.6450173005619761
+      ],
+      "standard_errors": [
+        0.02133576410118105,
+        8944.237857146538,
+        4472.11892859191
+      ],
+      "policy_tv": 0.0023167429308969495,
+      "value_rmse": 0.11096111920785993,
+      "regret": {
+        "baseline": 0.00025308606809677564,
+        "type_a": 0.00025921735846402865,
+        "type_b": 0.00024916523844392127,
+        "type_c": 5.743812120665858e-08,
+        "transferred": true
+      },
+      "runtime": 0.049751996994018555,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 1,
+      "params": [
+        -0.49695705619630154,
+        -0.05426916801693334,
+        0.8140597468026266
+      ],
+      "standard_errors": [
+        0.021375544369220734,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0026361634483984,
+      "value_rmse": 0.14557201219055266,
+      "regret": {
+        "baseline": 0.00048517805287306835,
+        "type_a": 0.0005080358572421839,
+        "type_b": 0.0005160659963392146,
+        "type_c": 1.531503766567962e-07,
+        "transferred": true
+      },
+      "runtime": 3.163651704788208,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 1,
+      "params": [
+        -0.4968191385269165,
+        0.31862497329711914,
+        0.6272499561309814
+      ],
+      "standard_errors": [
+        0.010083895614451489,
+        0.014316508816424009,
+        0.009580644498076192
+      ],
+      "policy_tv": 0.0026379520929330105,
+      "value_rmse": 0.14895929448068357,
+      "regret": {
+        "baseline": 0.0005093949438068986,
+        "type_a": 0.0005333846708766783,
+        "type_b": 0.0005420940602392615,
+        "type_c": 1.608795216697642e-07,
+        "transferred": true
+      },
+      "runtime": 1.7728641033172607,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 1,
+      "params": [
+        -0.49746668338775635,
+        -0.05428546667098999,
+        0.8140466213226318
+      ],
+      "standard_errors": [
+        0.021370181813836098,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0027535782740983877,
+      "value_rmse": 0.15196659991279474,
+      "regret": {
+        "baseline": 0.0005167716433080812,
+        "type_a": 0.0005409745572155137,
+        "type_b": 0.0005470811523743744,
+        "type_c": 1.6252964991779195e-07,
+        "transferred": true
+      },
+      "runtime": 6.251147031784058,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 1,
+      "params": [
+        -0.49670348350521487,
+        0.3145201949316194,
+        0.6290403898632386
+      ],
+      "standard_errors": [
+        0.02142211681064734,
+        8944.237857146527,
+        4472.118928591835
+      ],
+      "policy_tv": 0.0027386683059801545,
+      "value_rmse": 0.15120821380523264,
+      "regret": {
+        "baseline": 0.0005263053574419898,
+        "type_a": 0.000551088609750511,
+        "type_b": 0.0005603654371827728,
+        "type_c": 1.6629484422906123e-07,
+        "transferred": true
+      },
+      "runtime": 0.04814720153808594,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 2,
+      "params": [
+        -0.5122050444175459,
+        -0.04717935686036517,
+        0.8292686799354143
+      ],
+      "standard_errors": [
+        0.02139853499829769,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0014438521124608133,
+      "value_rmse": 0.06745785270958794,
+      "regret": {
+        "baseline": 0.00011104751964845771,
+        "type_a": 0.0001134552445009495,
+        "type_b": 0.00011241270394189849,
+        "type_c": 2.3535302580330293e-08,
+        "transferred": true
+      },
+      "runtime": 4.3076491355896,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 2,
+      "params": [
+        -0.5119146108627319,
+        0.32616397738456726,
+        0.6423279643058777
+      ],
+      "standard_errors": [
+        0.011538036603557433,
+        0.016251604368588957,
+        0.013247031794834396
+      ],
+      "policy_tv": 0.0014442423192655596,
+      "value_rmse": 0.06771761081201542,
+      "regret": {
+        "baseline": 0.0001087320903201643,
+        "type_a": 0.00011112337558025616,
+        "type_b": 0.00010958446113255624,
+        "type_c": 2.308096040983915e-08,
+        "transferred": true
+      },
+      "runtime": 1.746772050857544,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 2,
+      "params": [
+        -0.5112186670303345,
+        -0.047126106917858124,
+        0.8293609023094177
+      ],
+      "standard_errors": [
+        0.021399393677711487,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.0012002589150822817,
+      "value_rmse": 0.053969099788641145,
+      "regret": {
+        "baseline": 8.362680239527186e-05,
+        "type_a": 8.534560971885879e-05,
+        "type_b": 8.668105089425876e-05,
+        "type_c": 1.714319409160337e-08,
+        "transferred": true
+      },
+      "runtime": 5.584553956985474,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 2,
+      "params": [
+        -0.5118427661221258,
+        0.3221114125315981,
+        0.644222825063196
+      ],
+      "standard_errors": [
+        0.021368117379115675,
+        8944.237857146514,
+        4472.118928591727
+      ],
+      "policy_tv": 0.0014602645537218101,
+      "value_rmse": 0.0686878486840675,
+      "regret": {
+        "baseline": 0.00010964776838958482,
+        "type_a": 0.00011208535087762743,
+        "type_b": 0.00011016341425941197,
+        "type_c": 2.3349315047496754e-08,
+        "transferred": true
+      },
+      "runtime": 0.05006003379821777,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 3,
+      "params": [
+        -0.5604071746431664,
+        -0.039695136287868436,
+        0.8519718529373022
+      ],
+      "standard_errors": [
+        0.02138737216591835,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.006312565632421034,
+      "value_rmse": 0.2760710245888942,
+      "regret": {
+        "baseline": 0.002352635664142508,
+        "type_a": 0.0023993405280945826,
+        "type_b": 0.0024488204549539317,
+        "type_c": 5.182650540657003e-07,
+        "transferred": true
+      },
+      "runtime": 2.7382001876831055,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 3,
+      "params": [
+        -0.5605711936950684,
+        0.3368816673755646,
+        0.6637633442878723
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006337006192308929,
+      "value_rmse": 0.2769161409747708,
+      "regret": {
+        "baseline": 0.002365985819978392,
+        "type_a": 0.0024129552215436537,
+        "type_b": 0.0024625256745830692,
+        "type_c": 5.211729618497769e-07,
+        "transferred": true
+      },
+      "runtime": 1.8529410362243652,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 3,
+      "params": [
+        -0.5607221126556396,
+        -0.039708420634269714,
+        0.8519502282142639
+      ],
+      "standard_errors": [
+        0.021387727931141853,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.006376997804544635,
+      "value_rmse": 0.2802118356905235,
+      "regret": {
+        "baseline": 0.0023923509155418846,
+        "type_a": 0.0024399315387494897,
+        "type_b": 0.0024857957464133914,
+        "type_c": 5.269052346463379e-07,
+        "transferred": true
+      },
+      "runtime": 8.125995874404907,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 3,
+      "params": [
+        -0.5604445237986937,
+        0.33279176166615304,
+        0.6655835233323061
+      ],
+      "standard_errors": [
+        0.021384784263693613,
+        8944.237857146543,
+        4472.118928591959
+      ],
+      "policy_tv": 0.006342973532239155,
+      "value_rmse": 0.27852334161366843,
+      "regret": {
+        "baseline": 0.002368195141275678,
+        "type_a": 0.0024152868158349087,
+        "type_b": 0.002461402429401589,
+        "type_c": 5.216435090471757e-07,
+        "transferred": true
+      },
+      "runtime": 0.04845714569091797,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 4,
+      "params": [
+        -0.5062096984396294,
+        -0.04878063094319277,
+        0.8237067586373374
+      ],
+      "standard_errors": [
+        0.021341143175959587,
+        8.96179485321045,
+        4.480916976928711
+      ],
+      "policy_tv": 0.001648183662283249,
+      "value_rmse": 0.08413581123343682,
+      "regret": {
+        "baseline": 0.0001189112080409338,
+        "type_a": 0.0001231931965757313,
+        "type_b": 0.00011493402866832322,
+        "type_c": 3.0672686043949924e-08,
+        "transferred": true
+      },
+      "runtime": 4.149731159210205,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 4,
+      "params": [
+        -0.5060490369796753,
+        0.32371947169303894,
+        0.637438952922821
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0016113957845166876,
+      "value_rmse": 0.08245433693670395,
+      "regret": {
+        "baseline": 0.00011420131460800688,
+        "type_a": 0.00011832382830108603,
+        "type_b": 0.0001104046316005599,
+        "type_c": 2.942369797679241e-08,
+        "transferred": true
+      },
+      "runtime": 1.819087028503418,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 4,
+      "params": [
+        -0.5067930817604065,
+        -0.04873094707727432,
+        0.8238055109977722
+      ],
+      "standard_errors": [
+        0.021342482417821884,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.001755079610446647,
+      "value_rmse": 0.08941419468522331,
+      "regret": {
+        "baseline": 0.0001343513603639195,
+        "type_a": 0.0001391329983982831,
+        "type_b": 0.00012973228493985158,
+        "type_c": 3.468503533634523e-08,
+        "transferred": true
+      },
+      "runtime": 5.719695091247559,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 4,
+      "params": [
+        -0.5054897652433741,
+        0.3194771524182432,
+        0.6389543048364864
+      ],
+      "standard_errors": [
+        0.021300731089290106,
+        8944.237857146549,
+        4472.118928592002
+      ],
+      "policy_tv": 0.0016368271878777804,
+      "value_rmse": 0.08418255605845876,
+      "regret": {
+        "baseline": 0.00011940474498666933,
+        "type_a": 0.00012388912870463516,
+        "type_b": 0.0001159574589615826,
+        "type_c": 3.14832214615654e-08,
+        "transferred": true
+      },
+      "runtime": 0.04944300651550293,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 5,
+      "params": [
+        -0.5526938386639357,
+        -0.03296280399129568,
+        0.8595737287164106
+      ],
+      "standard_errors": [
+        0.021405886858701706,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0052758061121773265,
+      "value_rmse": 0.03458166048191885,
+      "regret": {
+        "baseline": 0.001692229893173468,
+        "type_a": 0.0017449594390432515,
+        "type_b": 0.0020472586100633602,
+        "type_c": 4.662114136123351e-07,
+        "transferred": true
+      },
+      "runtime": 4.014242172241211,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 5,
+      "params": [
+        -0.5525358319282532,
+        0.3411007225513458,
+        0.6722014546394348
+      ],
+      "standard_errors": [
+        0.4839905431780558,
+        0.40827666420880504,
+        0.026370149907081662
+      ],
+      "policy_tv": 0.005264485520211258,
+      "value_rmse": 0.037082495258314266,
+      "regret": {
+        "baseline": 0.0016711382204151735,
+        "type_a": 0.0017226958159643987,
+        "type_b": 0.002019649130053934,
+        "type_c": 4.583998182847795e-07,
+        "transferred": true
+      },
+      "runtime": 1.7981960773468018,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 5,
+      "params": [
+        -0.5517750382423401,
+        -0.03292426839470863,
+        0.8596792817115784
+      ],
+      "standard_errors": [
+        0.021405087783932686,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.00527483686018725,
+      "value_rmse": 0.024105609466605497,
+      "regret": {
+        "baseline": 0.001682545957655895,
+        "type_a": 0.0017371313196063581,
+        "type_b": 0.0020434462738583383,
+        "type_c": 4.718417752483495e-07,
+        "transferred": true
+      },
+      "runtime": 7.835216045379639,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 5,
+      "params": [
+        -0.5523120071159563,
+        0.3368739900143945,
+        0.673747980028789
+      ],
+      "standard_errors": [
+        0.021448896059807716,
+        8944.237857146572,
+        4472.118928592191
+      ],
+      "policy_tv": 0.005176060522429999,
+      "value_rmse": 0.041795704103734434,
+      "regret": {
+        "baseline": 0.0016379502794297656,
+        "type_a": 0.001687564964943961,
+        "type_b": 0.0019755688860863046,
+        "type_c": 4.4569218862109724e-07,
+        "transferred": true
+      },
+      "runtime": 0.047289133071899414,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 6,
+      "params": [
+        -0.5076356679387835,
+        -0.048397288794685904,
+        0.824390342032118
+      ],
+      "standard_errors": [
+        0.02141696587204933,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0017627744108893722,
+      "value_rmse": 0.08905376513082798,
+      "regret": {
+        "baseline": 0.00013398276052568108,
+        "type_a": 0.0001385134363781903,
+        "type_b": 0.00012897463928022879,
+        "type_c": 3.373877889736091e-08,
+        "transferred": true
+      },
+      "runtime": 5.594042062759399,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 6,
+      "params": [
+        -0.5076498985290527,
+        0.32405567169189453,
+        0.6381113529205322
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0017637424625948622,
+      "value_rmse": 0.0899579957170166,
+      "regret": {
+        "baseline": 0.0001366296501435206,
+        "type_a": 0.00014126669786792068,
+        "type_b": 0.00013154272483525744,
+        "type_c": 3.449863355160555e-08,
+        "transferred": true
+      },
+      "runtime": 1.9058191776275635,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 6,
+      "params": [
+        -0.5080565810203552,
+        -0.04830888286232948,
+        0.8245903849601746
+      ],
+      "standard_errors": [
+        0.013375935144722462,
+        228274.328125,
+        114137.171875
+      ],
+      "policy_tv": 0.001800223299165125,
+      "value_rmse": 0.09070105187662808,
+      "regret": {
+        "baseline": 0.0001394477227241966,
+        "type_a": 0.0001440845115257798,
+        "type_b": 0.00013415926421520217,
+        "type_c": 3.491129785667824e-08,
+        "transferred": true
+      },
+      "runtime": 5.7506959438323975,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 6,
+      "params": [
+        -0.5073577724064362,
+        0.3198271729624986,
+        0.6396543459249969
+      ],
+      "standard_errors": [
+        0.021459793891818752,
+        8944.237857146536,
+        4472.118928591901
+      ],
+      "policy_tv": 0.0018564385398488089,
+      "value_rmse": 0.09440515959386026,
+      "regret": {
+        "baseline": 0.00014987760708952462,
+        "type_a": 0.00015515490393984803,
+        "type_b": 0.00014461048517854387,
+        "type_c": 3.8696206157945834e-08,
+        "transferred": true
+      },
+      "runtime": 0.051621198654174805,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 7,
+      "params": [
+        -0.5079743282104886,
+        -0.034555492462259085,
+        0.8437827386462957
+      ],
+      "standard_errors": [
+        0.021445324644446373,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.004936249613300391,
+      "value_rmse": 0.2761536750418083,
+      "regret": {
+        "baseline": 0.0017740525279609514,
+        "type_a": 0.001866837647066011,
+        "type_b": 0.0019040346388626902,
+        "type_c": 5.972168337137707e-07,
+        "transferred": true
+      },
+      "runtime": 4.1469409465789795,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 7,
+      "params": [
+        -0.5079216361045837,
+        0.33451369404792786,
+        0.6590273976325989
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004946249918394512,
+      "value_rmse": 0.2736720968205348,
+      "regret": {
+        "baseline": 0.0017433062834619614,
+        "type_a": 0.001834440870249934,
+        "type_b": 0.0018711732748897892,
+        "type_c": 5.866955720216112e-07,
+        "transferred": true
+      },
+      "runtime": 1.8083069324493408,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 7,
+      "params": [
+        -0.5085265040397644,
+        -0.034506577998399734,
+        0.8439058661460876
+      ],
+      "standard_errors": [
+        0.021442944183945656,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.004865239496856699,
+      "value_rmse": 0.27154167169249777,
+      "regret": {
+        "baseline": 0.0017407321607090483,
+        "type_a": 0.0018319262944440963,
+        "type_b": 0.001873407591535981,
+        "type_c": 5.869356447314592e-07,
+        "transferred": true
+      },
+      "runtime": 6.665390968322754,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 7,
+      "params": [
+        -0.5077106182323132,
+        0.33039725958984023,
+        0.6607945191796807
+      ],
+      "standard_errors": [
+        0.021426290918535165,
+        8944.237857146554,
+        4472.118928592051
+      ],
+      "policy_tv": 0.0048629933498339495,
+      "value_rmse": 0.272117684224192,
+      "regret": {
+        "baseline": 0.0017177866831571968,
+        "type_a": 0.0018074963943656638,
+        "type_b": 0.0018425455029592063,
+        "type_c": 5.776611077432276e-07,
+        "transferred": true
+      },
+      "runtime": 0.049166202545166016,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 8,
+      "params": [
+        -0.49462585771187945,
+        -0.04138374683577862,
+        0.8319625302273488
+      ],
+      "standard_errors": [
+        0.021351099014282227,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.004140172340913551,
+      "value_rmse": 0.22298891624170583,
+      "regret": {
+        "baseline": 0.0009015421175748565,
+        "type_a": 0.000943414526050353,
+        "type_b": 0.0009092970843406845,
+        "type_c": 2.7964691538052444e-07,
+        "transferred": true
+      },
+      "runtime": 4.6553428173065186,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 8,
+      "params": [
+        -0.49453794956207275,
+        0.3284336030483246,
+        0.6468672156333923
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004150878592531328,
+      "value_rmse": 0.22142689969951973,
+      "regret": {
+        "baseline": 0.0008872453807729804,
+        "type_a": 0.0009283685057208315,
+        "type_b": 0.0008942977149564015,
+        "type_c": 2.748465413217276e-07,
+        "transferred": true
+      },
+      "runtime": 1.8558869361877441,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 8,
+      "params": [
+        -0.49586865305900574,
+        -0.04144105315208435,
+        0.8317906856536865
+      ],
+      "standard_errors": [
+        0.011660792864859104,
+        305569.09375,
+        152784.5625
+      ],
+      "policy_tv": 0.003795898473958616,
+      "value_rmse": 0.20511211494357823,
+      "regret": {
+        "baseline": 0.0007747039995937858,
+        "type_a": 0.0008110081090944014,
+        "type_b": 0.0007849912156109087,
+        "type_c": 2.414344459492126e-07,
+        "transferred": true
+      },
+      "runtime": 5.598133087158203,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 8,
+      "params": [
+        -0.4942187162547253,
+        0.32423428341515337,
+        0.6484685668303064
+      ],
+      "standard_errors": [
+        0.021386734062617426,
+        8944.23785714654,
+        4472.118928591932
+      ],
+      "policy_tv": 0.004062508896837462,
+      "value_rmse": 0.21827344224610978,
+      "regret": {
+        "baseline": 0.000856931296075566,
+        "type_a": 0.0008963955525738524,
+        "type_b": 0.000861962894678073,
+        "type_c": 2.643918919580027e-07,
+        "transferred": true
+      },
+      "runtime": 0.04995894432067871,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 9,
+      "params": [
+        -0.4806210146393351,
+        -0.05691639127316781,
+        0.8054950107393185
+      ],
+      "standard_errors": [
+        0.021313564851880074,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.002861119440185479,
+      "value_rmse": 0.087377602582337,
+      "regret": {
+        "baseline": 0.0005748279252020473,
+        "type_a": 0.0006007665234945037,
+        "type_b": 0.0006842845403660157,
+        "type_c": 1.8425362505957216e-07,
+        "transferred": true
+      },
+      "runtime": 3.7371766567230225,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 9,
+      "params": [
+        -0.480549693107605,
+        0.31480252742767334,
+        0.6196050643920898
+      ],
+      "standard_errors": [
+        0.00664201192035711,
+        0.015320128032547137,
+        0.012284536094883189
+      ],
+      "policy_tv": 0.002863172286279986,
+      "value_rmse": 0.0869484830386565,
+      "regret": {
+        "baseline": 0.0005749211501386723,
+        "type_a": 0.0006008375937057469,
+        "type_b": 0.0006846599945785638,
+        "type_c": 1.8421818186892714e-07,
+        "transferred": true
+      },
+      "runtime": 1.8387420177459717,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 9,
+      "params": [
+        -0.4811897873878479,
+        -0.05691932886838913,
+        0.8054335713386536
+      ],
+      "standard_errors": [
+        0.0213114432990551,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.0028857025315642253,
+      "value_rmse": 0.09504220679311552,
+      "regret": {
+        "baseline": 0.0005986288284098711,
+        "type_a": 0.0006259701387688138,
+        "type_b": 0.0007087720771084975,
+        "type_c": 1.9272414349751577e-07,
+        "transferred": true
+      },
+      "runtime": 5.873932123184204,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 9,
+      "params": [
+        -0.48030296090450586,
+        0.31065894133154803,
+        0.6213178826630957
+      ],
+      "standard_errors": [
+        0.0213735094488018,
+        8944.237857146512,
+        4472.11892859172
+      ],
+      "policy_tv": 0.002910078103690372,
+      "value_rmse": 0.08897643069581762,
+      "regret": {
+        "baseline": 0.0005948779347217558,
+        "type_a": 0.0006217117972769712,
+        "type_b": 0.0007080753983931493,
+        "type_c": 1.9070911446748316e-07,
+        "transferred": true
+      },
+      "runtime": 0.052000999450683594,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 10,
+      "params": [
+        -0.5373206303099314,
+        -0.04154531137239314,
+        0.842288606736118
+      ],
+      "standard_errors": [
+        0.021419847384095192,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.003744074267531089,
+      "value_rmse": 0.14793708791359972,
+      "regret": {
+        "baseline": 0.0008310418328621362,
+        "type_a": 0.0008475239798825782,
+        "type_b": 0.0008889573202215014,
+        "type_c": 1.8532292929057206e-07,
+        "transferred": true
+      },
+      "runtime": 2.9653031826019287,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 10,
+      "params": [
+        -0.5377475023269653,
+        0.3327394127845764,
+        0.655478835105896
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0037538174827187183,
+      "value_rmse": 0.14841924827825984,
+      "regret": {
+        "baseline": 0.0008472493267563667,
+        "type_a": 0.0008640546647075772,
+        "type_b": 0.0009075212465278062,
+        "type_c": 1.890678910335916e-07,
+        "transferred": true
+      },
+      "runtime": 2.0574350357055664,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 10,
+      "params": [
+        -0.537157416343689,
+        -0.041550200432538986,
+        0.8423042297363281
+      ],
+      "standard_errors": [
+        0.021420300006866455,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.003721081183780126,
+      "value_rmse": 0.14580520574241235,
+      "regret": {
+        "baseline": 0.0008202547890845545,
+        "type_a": 0.0008365304897895374,
+        "type_b": 0.0008789578308812225,
+        "type_c": 1.830705591286672e-07,
+        "transferred": true
+      },
+      "runtime": 7.251757860183716,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 10,
+      "params": [
+        -0.5374870826251803,
+        0.32855274984461663,
+        0.6571054996892335
+      ],
+      "standard_errors": [
+        0.02147379655186487,
+        8944.237857146565,
+        4472.118928592133
+      ],
+      "policy_tv": 0.003774940928286716,
+      "value_rmse": 0.1517882150380742,
+      "regret": {
+        "baseline": 0.0008464308719267124,
+        "type_a": 0.0008632117746650447,
+        "type_b": 0.0009020882246052602,
+        "type_c": 1.8846030281988085e-07,
+        "transferred": true
+      },
+      "runtime": 0.051637887954711914,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 11,
+      "params": [
+        -0.542196237342746,
+        -0.049217554855021585,
+        0.8334769350642992
+      ],
+      "standard_errors": [
+        0.02151086926460266,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0077585059704491375,
+      "value_rmse": 0.3812394146974089,
+      "regret": {
+        "baseline": 0.0026035888878245136,
+        "type_a": 0.0026780602933372056,
+        "type_b": 0.002504395079694697,
+        "type_c": 6.382156769753698e-07,
+        "transferred": true
+      },
+      "runtime": 3.694927930831909,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 11,
+      "params": [
+        -0.5413104891777039,
+        0.327310174703598,
+        0.6446203589439392
+      ],
+      "standard_errors": [
+        0.004593660153683659,
+        0.006090470128923021,
+        0.007589868392708881
+      ],
+      "policy_tv": 0.007811566549837147,
+      "value_rmse": 0.3789069043496987,
+      "regret": {
+        "baseline": 0.002560251016362938,
+        "type_a": 0.002634147492960008,
+        "type_b": 0.00246184365013085,
+        "type_c": 6.299183652507603e-07,
+        "transferred": true
+      },
+      "runtime": 1.9494330883026123,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 11,
+      "params": [
+        -0.5422508120536804,
+        -0.049226533621549606,
+        0.8334731459617615
+      ],
+      "standard_errors": [
+        0.02151009440422058,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.007773671965598618,
+      "value_rmse": 0.3820014657486566,
+      "regret": {
+        "baseline": 0.0026135413598130813,
+        "type_a": 0.002688322233882377,
+        "type_b": 0.0025139108210412557,
+        "type_c": 6.407354479472025e-07,
+        "transferred": true
+      },
+      "runtime": 5.8110573291778564,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 11,
+      "params": [
+        -0.541192152078484,
+        0.3231597260154713,
+        0.6463194520309427
+      ],
+      "standard_errors": [
+        0.021382415738263702,
+        8944.237857146549,
+        4472.118928592001
+      ],
+      "policy_tv": 0.007768508493175311,
+      "value_rmse": 0.3826864640446997,
+      "regret": {
+        "baseline": 0.002602857983335706,
+        "type_a": 0.0026785093150450056,
+        "type_b": 0.0025020905295222305,
+        "type_c": 6.422360679400333e-07,
+        "transferred": true
+      },
+      "runtime": 0.051687002182006836,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 12,
+      "params": [
+        -0.5094767194200126,
+        -0.048091152611853774,
+        0.8253796669169842
+      ],
+      "standard_errors": [
+        0.021427057683467865,
+        8.96179485321045,
+        4.480916976928711
+      ],
+      "policy_tv": 0.0019075623783800313,
+      "value_rmse": 0.09522949711062835,
+      "regret": {
+        "baseline": 0.00015635753286497812,
+        "type_a": 0.00016125749908108697,
+        "type_b": 0.0001503632311260296,
+        "type_c": 3.833259804510338e-08,
+        "transferred": true
+      },
+      "runtime": 3.0048599243164062,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 12,
+      "params": [
+        -0.5094178318977356,
+        0.324495792388916,
+        0.6389915943145752
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0019240860971804017,
+      "value_rmse": 0.09583973249920427,
+      "regret": {
+        "baseline": 0.00015799286916368704,
+        "type_a": 0.00016297812645987172,
+        "type_b": 0.00015192447609627103,
+        "type_c": 3.88670426589471e-08,
+        "transferred": true
+      },
+      "runtime": 1.8668229579925537,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 12,
+      "params": [
+        -0.5097217559814453,
+        -0.04808339104056358,
+        0.8253657817840576
+      ],
+      "standard_errors": [
+        0.02142518386244774,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0019683146062488906,
+      "value_rmse": 0.09830724904999284,
+      "regret": {
+        "baseline": 0.00016644728078455965,
+        "type_a": 0.00017167973541383144,
+        "type_b": 0.0001600575823844795,
+        "type_c": 4.0974225415605016e-08,
+        "transferred": true
+      },
+      "runtime": 5.863807201385498,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 12,
+      "params": [
+        -0.5090925150428932,
+        0.32027261713093397,
+        0.6405452342618679
+      ],
+      "standard_errors": [
+        0.02139932012711085,
+        8944.237857146554,
+        4472.118928592045
+      ],
+      "policy_tv": 0.0019833464717882872,
+      "value_rmse": 0.09970588315615013,
+      "regret": {
+        "baseline": 0.00016908011071967288,
+        "type_a": 0.00017462437730501854,
+        "type_b": 0.00016261513417141024,
+        "type_c": 4.243676251517313e-08,
+        "transferred": true
+      },
+      "runtime": 0.05540585517883301,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 13,
+      "params": [
+        -0.48036655952163626,
+        -0.04651828755242366,
+        0.8193229661584924
+      ],
+      "standard_errors": [
+        0.021348970010876656,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.003645618525160193,
+      "value_rmse": 0.1818238954900637,
+      "regret": {
+        "baseline": 0.0005745186607170243,
+        "type_a": 0.0005921704362708967,
+        "type_b": 0.0005541095217787713,
+        "type_c": 1.4548502271342658e-07,
+        "transferred": true
+      },
+      "runtime": 2.486624002456665,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 13,
+      "params": [
+        -0.48031988739967346,
+        0.3224022686481476,
+        0.6348045468330383
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003653736429115578,
+      "value_rmse": 0.18156888960764625,
+      "regret": {
+        "baseline": 0.0005735542012312424,
+        "type_a": 0.0005911347734217118,
+        "type_b": 0.0005532436313315275,
+        "type_c": 1.451076319732601e-07,
+        "transferred": true
+      },
+      "runtime": 2.002516984939575,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 13,
+      "params": [
+        -0.4804753065109253,
+        -0.04653119668364525,
+        0.819288969039917
+      ],
+      "standard_errors": [
+        0.021357031539082527,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0036096035358314164,
+      "value_rmse": 0.17994038844193094,
+      "regret": {
+        "baseline": 0.0005635020965439816,
+        "type_a": 0.0005807600363164167,
+        "type_b": 0.0005435617979014101,
+        "type_c": 1.4248114490016673e-07,
+        "transferred": true
+      },
+      "runtime": 6.932796239852905,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 13,
+      "params": [
+        -0.48008127808606793,
+        0.3182416487819961,
+        0.636483297563992
+      ],
+      "standard_errors": [
+        0.021370779397672908,
+        8944.237857146545,
+        4472.11892859197
+      ],
+      "policy_tv": 0.003596111239628745,
+      "value_rmse": 0.178824774026726,
+      "regret": {
+        "baseline": 0.0005610128562327496,
+        "type_a": 0.0005779115656604068,
+        "type_b": 0.0005416588765759909,
+        "type_c": 1.4096344996364242e-07,
+        "transferred": true
+      },
+      "runtime": 0.05080127716064453,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 14,
+      "params": [
+        -0.5021331843137965,
+        -0.04918825145239617,
+        0.8225169703308391
+      ],
+      "standard_errors": [
+        0.021364271640777588,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0010369815805990241,
+      "value_rmse": 0.05462384092012696,
+      "regret": {
+        "baseline": 5.24588040703584e-05,
+        "type_a": 5.466700510247063e-05,
+        "type_b": 5.208389453013387e-05,
+        "type_c": 1.3730750944103691e-08,
+        "transferred": true
+      },
+      "runtime": 3.4929721355438232,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 14,
+      "params": [
+        -0.502419650554657,
+        0.32317063212394714,
+        0.6363412737846375
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0010533795836563462,
+      "value_rmse": 0.0580130499558777,
+      "regret": {
+        "baseline": 5.8779418528477657e-05,
+        "type_a": 6.122834546113121e-05,
+        "type_b": 5.820297558486917e-05,
+        "type_c": 1.550355982975883e-08,
+        "transferred": true
+      },
+      "runtime": 1.916612148284912,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 14,
+      "params": [
+        -0.5032580494880676,
+        -0.0491153821349144,
+        0.8226331472396851
+      ],
+      "standard_errors": [
+        0.021368855610489845,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0012649599296843562,
+      "value_rmse": 0.06600401577381972,
+      "regret": {
+        "baseline": 7.48607256340745e-05,
+        "type_a": 7.788411959410621e-05,
+        "type_b": 7.359208335019618e-05,
+        "type_c": 1.986748806181422e-08,
+        "transferred": true
+      },
+      "runtime": 5.736303806304932,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 14,
+      "params": [
+        -0.5022326703097933,
+        0.3190327954823625,
+        0.638065590964725
+      ],
+      "standard_errors": [
+        0.021366396152837062,
+        8944.237857146534,
+        4472.118928591889
+      ],
+      "policy_tv": 0.0011477942689482694,
+      "value_rmse": 0.06056941711413184,
+      "regret": {
+        "baseline": 6.490613608983075e-05,
+        "type_a": 6.765669792483269e-05,
+        "type_b": 6.458937337884022e-05,
+        "type_c": 1.7490837644669482e-08,
+        "transferred": true
+      },
+      "runtime": 0.05124092102050781,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 15,
+      "params": [
+        -0.5075177293205815,
+        -0.042987620072362835,
+        0.8315643243781661
+      ],
+      "standard_errors": [
+        0.02138201706111431,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.001284635791430979,
+      "value_rmse": 0.05045362072156983,
+      "regret": {
+        "baseline": 0.00012563024786807803,
+        "type_a": 0.0001318330133653516,
+        "type_b": 0.00014674206115399688,
+        "type_c": 4.041312306629916e-08,
+        "transferred": true
+      },
+      "runtime": 4.878263235092163,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 15,
+      "params": [
+        -0.5076498985290527,
+        0.32793495059013367,
+        0.6458699107170105
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0012672413643033068,
+      "value_rmse": 0.04560573388743737,
+      "regret": {
+        "baseline": 0.00011458946139755251,
+        "type_a": 0.00012018244804048774,
+        "type_b": 0.00013475512602901282,
+        "type_c": 3.656600855143385e-08,
+        "transferred": true
+      },
+      "runtime": 2.590496063232422,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 15,
+      "params": [
+        -0.5073208808898926,
+        -0.04295583441853523,
+        0.8316195607185364
+      ],
+      "standard_errors": [
+        0.021375393494963646,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.0013110874924420403,
+      "value_rmse": 0.05381423171527269,
+      "regret": {
+        "baseline": 0.00013220894050857128,
+        "type_a": 0.0001387853476121256,
+        "type_b": 0.00015358976007531994,
+        "type_c": 4.271561069596379e-08,
+        "transferred": true
+      },
+      "runtime": 6.70724892616272,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 15,
+      "params": [
+        -0.5071384693576103,
+        0.32362815330165867,
+        0.6472563066033171
+      ],
+      "standard_errors": [
+        0.021375953260857363,
+        8944.237857146538,
+        4472.118928591914
+      ],
+      "policy_tv": 0.0011387243864254305,
+      "value_rmse": 0.0410203699645338,
+      "regret": {
+        "baseline": 9.615163902023383e-05,
+        "type_a": 0.00010082154126338604,
+        "type_b": 0.00011329614235082357,
+        "type_c": 3.0332075920514985e-08,
+        "transferred": true
+      },
+      "runtime": 0.056533098220825195,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 16,
+      "params": [
+        -0.5222433985878762,
+        -0.04272643173526064,
+        0.837044294093787
+      ],
+      "standard_errors": [
+        0.021315719932317734,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0020983824992664244,
+      "value_rmse": 0.04872391446933464,
+      "regret": {
+        "baseline": 0.0002707499347846584,
+        "type_a": 0.0002771172504515151,
+        "type_b": 0.00031321290229411084,
+        "type_c": 6.497287753181597e-08,
+        "transferred": true
+      },
+      "runtime": 4.0451459884643555,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 16,
+      "params": [
+        -0.5218345522880554,
+        0.3301781117916107,
+        0.6503562331199646
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0020727691696550738,
+      "value_rmse": 0.04711091816720004,
+      "regret": {
+        "baseline": 0.00026104784355731177,
+        "type_a": 0.000267220734215388,
+        "type_b": 0.00030238050783433745,
+        "type_c": 6.273746611882302e-08,
+        "transferred": true
+      },
+      "runtime": 1.8519930839538574,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 16,
+      "params": [
+        -0.5224453210830688,
+        -0.042725708335638046,
+        0.8370454907417297
+      ],
+      "standard_errors": [
+        0.02131757140159607,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.002116133175454608,
+      "value_rmse": 0.05110918481253256,
+      "regret": {
+        "baseline": 0.0002753738402073454,
+        "type_a": 0.00028176029470470084,
+        "type_b": 0.0003174769942637744,
+        "type_c": 6.570605030527981e-08,
+        "transferred": true
+      },
+      "runtime": 6.167691946029663,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 16,
+      "params": [
+        -0.5215321275470927,
+        0.3260387000766743,
+        0.6520774001533484
+      ],
+      "standard_errors": [
+        0.021273810822040592,
+        8944.237857146536,
+        4472.118928591909
+      ],
+      "policy_tv": 0.0020300001330428516,
+      "value_rmse": 0.048319939846480184,
+      "regret": {
+        "baseline": 0.00025353042175870963,
+        "type_a": 0.00025944267378285517,
+        "type_b": 0.0002926897400597264,
+        "type_c": 6.051145232827629e-08,
+        "transferred": true
+      },
+      "runtime": 0.05217099189758301,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 17,
+      "params": [
+        -0.5149496552081974,
+        -0.04828702203837259,
+        0.8270823701261256
+      ],
+      "standard_errors": [
+        0.021395215764641762,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0027966158531430928,
+      "value_rmse": 0.1384865190121903,
+      "regret": {
+        "baseline": 0.000337686883796443,
+        "type_a": 0.0003477407828242114,
+        "type_b": 0.00032508434920806346,
+        "type_c": 8.301536571321132e-08,
+        "transferred": true
+      },
+      "runtime": 2.6877052783966064,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 17,
+      "params": [
+        -0.5142785906791687,
+        0.32497087121009827,
+        0.6399417519569397
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0028055441089466764,
+      "value_rmse": 0.13756612222653292,
+      "regret": {
+        "baseline": 0.00032985670182290216,
+        "type_a": 0.0003399061609400248,
+        "type_b": 0.00031729857202783746,
+        "type_c": 8.181815718852028e-08,
+        "transferred": true
+      },
+      "runtime": 1.8347430229187012,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 17,
+      "params": [
+        -0.5134192705154419,
+        -0.04833735525608063,
+        0.8269304037094116
+      ],
+      "standard_errors": [
+        0.02706080488860607,
+        276732.5625,
+        138366.296875
+      ],
+      "policy_tv": 0.002478413329322691,
+      "value_rmse": 0.12262011037178391,
+      "regret": {
+        "baseline": 0.0002656006730263858,
+        "type_a": 0.0002734564602720007,
+        "type_b": 0.00025580560368379984,
+        "type_c": 6.476376349600665e-08,
+        "transferred": true
+      },
+      "runtime": 5.759382009506226,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 17,
+      "params": [
+        -0.5141080402648445,
+        0.32083212253103127,
+        0.6416642450620625
+      ],
+      "standard_errors": [
+        0.021315835612643677,
+        8944.237857146538,
+        4472.11892859191
+      ],
+      "policy_tv": 0.0028165687586891564,
+      "value_rmse": 0.14034477120685024,
+      "regret": {
+        "baseline": 0.00034095036634079734,
+        "type_a": 0.00035152377922643806,
+        "type_b": 0.0003278400778359907,
+        "type_c": 8.5256485688045e-08,
+        "transferred": true
+      },
+      "runtime": 0.04998183250427246,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 18,
+      "params": [
+        -0.47668168138700395,
+        -0.05572041306032739,
+        0.8083832199484206
+      ],
+      "standard_errors": [
+        0.02138540893793106,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.002389084891577893,
+      "value_rmse": 0.011563540872919994,
+      "regret": {
+        "baseline": 0.0003445985118228678,
+        "type_a": 0.00035550727199637515,
+        "type_b": 0.0004182848595521778,
+        "type_c": 9.506382193943147e-08,
+        "transferred": true
+      },
+      "runtime": 4.050579071044922,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 18,
+      "params": [
+        -0.47613218426704407,
+        0.31591537594795227,
+        0.6218307614326477
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002335074092360936,
+      "value_rmse": 0.00930176262519755,
+      "regret": {
+        "baseline": 0.00036905971836654277,
+        "type_a": 0.0003810113328156448,
+        "type_b": 0.0004488522689164657,
+        "type_c": 1.0290676165934997e-07,
+        "transferred": true
+      },
+      "runtime": 2.0566887855529785,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 18,
+      "params": [
+        -0.4760877788066864,
+        -0.05558507516980171,
+        0.8086020946502686
+      ],
+      "standard_errors": [
+        0.021394511684775352,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.002368473163303113,
+      "value_rmse": 0.021326196312219457,
+      "regret": {
+        "baseline": 0.00034292380370710377,
+        "type_a": 0.0003530510830914445,
+        "type_b": 0.0004131720987181661,
+        "type_c": 9.192489297703885e-08,
+        "transferred": true
+      },
+      "runtime": 6.9232470989227295,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 18,
+      "params": [
+        -0.4759861698694177,
+        0.3117032668106285,
+        0.623406533621257
+      ],
+      "standard_errors": [
+        0.021328215145026964,
+        8944.237857146503,
+        4472.118928591634
+      ],
+      "policy_tv": 0.0025327240706660256,
+      "value_rmse": 0.007866167263401105,
+      "regret": {
+        "baseline": 0.0003865911657759705,
+        "type_a": 0.0003995166024475713,
+        "type_b": 0.00047124984086693817,
+        "type_c": 1.0931957341018223e-07,
+        "transferred": true
+      },
+      "runtime": 0.050338029861450195,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP-NK",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 19,
+      "params": [
+        -0.4772287715714031,
+        -0.047013224836878933,
+        0.8177767733812952
+      ],
+      "standard_errors": [
+        0.021430425345897675,
+        8.96179485321045,
+        4.480916976928711
+      ],
+      "policy_tv": 0.003931228793253421,
+      "value_rmse": 0.19463434895431128,
+      "regret": {
+        "baseline": 0.0006756273610916871,
+        "type_a": 0.0006953691447809728,
+        "type_b": 0.0006538518525828964,
+        "type_c": 1.6835772618993884e-07,
+        "transferred": true
+      },
+      "runtime": 5.022557258605957,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 19,
+      "params": [
+        -0.4768593907356262,
+        0.3216274678707123,
+        0.6332549452781677
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003954889517724955,
+      "value_rmse": 0.19628228858933464,
+      "regret": {
+        "baseline": 0.000689071048756347,
+        "type_a": 0.0007091067909320274,
+        "type_b": 0.0006671456968329663,
+        "type_c": 1.714543846552116e-07,
+        "transferred": true
+      },
+      "runtime": 1.880424976348877,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 19,
+      "params": [
+        -0.47723132371902466,
+        -0.04703492671251297,
+        0.8177608847618103
+      ],
+      "standard_errors": [
+        0.021428482607007027,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.003923796071807985,
+      "value_rmse": 0.19422574423027356,
+      "regret": {
+        "baseline": 0.0006733244381752283,
+        "type_a": 0.0006929726217553185,
+        "type_b": 0.0006516900408541222,
+        "type_c": 1.6769681190115565e-07,
+        "transferred": true
+      },
+      "runtime": 6.180207252502441,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 19,
+      "params": [
+        -0.47643099963490537,
+        0.31738524680823943,
+        0.6347704936164791
+      ],
+      "standard_errors": [
+        0.021469829368870645,
+        8944.237857146574,
+        4472.118928592206
+      ],
+      "policy_tv": 0.003914531799350461,
+      "value_rmse": 0.19296642363785108,
+      "regret": {
+        "baseline": 0.0006758337683264807,
+        "type_a": 0.0006950206229460749,
+        "type_b": 0.0006556946785585675,
+        "type_c": 1.6672605661522957e-07,
+        "transferred": true
+      },
+      "runtime": 0.05095696449279785,
+      "converged": false,
+      "error": null
+    }
+  ]
+}
