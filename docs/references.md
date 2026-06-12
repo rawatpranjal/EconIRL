@@ -29,6 +29,15 @@ usage examples.
   "Comment on 'Constrained Optimization Approaches to Estimation of Structural
   Models'." *Econometrica*, 84(1), 365-370.
 
+(shapiro-xu-2005)=
+- Shapiro, A., and Xu, H. (2005). "Stochastic Mathematical Programs with
+  Equilibrium Constraints, Modeling and Sample Average Approximation." Published
+  in *Optimization*, 57(3), 395-418 (2008).
+
+(koiso-otani-2024)=
+- Koiso, S., and Otani, S. (2024). "An MPEC Estimator for the Sequential Search
+  Model." arXiv:2409.04378.
+
 ## Approximate Structural Estimation
 
 (luo-sang-2024)=

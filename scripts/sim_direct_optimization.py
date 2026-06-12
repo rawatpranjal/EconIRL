@@ -35,6 +35,7 @@ Its reward is still model-free (it never uses the known P) and so sits in a diff
 identification gauge; that is the point of including it.
 
 Run:  python scripts/sim_direct_optimization.py
+      python scripts/sim_direct_optimization.py --multistart 10   # + local-optima probe
 Writes validation/results/sim_direct_optimization.json and two figures under
 docs/_static/simulation_studies/.
 """
@@ -236,14 +237,17 @@ def run_neural_mpec(env, obs_states, obs_actions, *, width=32, depth=2, rho=1.0,
 # ---------------------------------------------------------------------------
 
 
-def run_tabular_mpec(env, panel, est_features, est_names) -> dict:
+def run_tabular_mpec(env, panel, est_features, est_names, initial_params=None) -> dict:
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
     util = LinearUtility(feature_matrix=jnp.asarray(est_features), parameter_names=est_names)
     est = MPECEstimator(config=MPECConfig(solver="slsqp", outer_max_iter=200,
                                           constraint_tol=1e-6),
                         compute_hessian=False, verbose=False)
-    res = est.estimate(panel, util, env.problem_spec, env.transition_matrices)
+    # initial_params=None keeps the estimator's default start; passing a vector lets
+    # the multi-start probe vary theta0 (V auto-inits at its Bellman fixed point).
+    res = est.estimate(panel, util, env.problem_spec, env.transition_matrices,
+                       initial_params=initial_params)
     est_R = np.einsum("sak,k->sa", np.asarray(est_features), np.asarray(res.parameters))
     true_R = np.asarray(env.true_reward_matrix)
     A = env.num_actions
@@ -251,6 +255,8 @@ def run_tabular_mpec(env, panel, est_features, est_names) -> dict:
         "reward_rmse": rmse(est_R[:, :A - 1], true_R[:, :A - 1]),
         "value_rmse": rmse(res.value_function, oracle_value(env)),
         "converged": bool(res.converged),
+        "theta_hat": np.asarray(res.parameters, dtype=np.float64).tolist(),
+        "constraint_violation": float(res.metadata.get("final_constraint_violation", float("nan"))),
     }
 
 
@@ -273,7 +279,69 @@ def run_gladius(env, panel) -> dict:
         "reward_rmse": rmse(reward_table[:, :A - 1], true_R[:, :A - 1]),
         "value_rmse": rmse(res.value_function, oracle_value(env)),
         "converged": bool(res.converged),
-        "note": "model-free; reward in a different gauge (no known P)",
+        "note": "model-free; reward on a different scale (no known P)",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Multi-start local-optima probe
+# ---------------------------------------------------------------------------
+
+
+def _agg(vals) -> dict:
+    a = np.asarray(vals, dtype=np.float64)
+    return {"reward_rmse_mean": float(a.mean()), "reward_rmse_std": float(a.std()),
+            "reward_rmse_min": float(a.min()), "reward_rmse_max": float(a.max())}
+
+
+def multistart_probe(env, est_feat, est_names, *, n_starts=10, scale=0.5, seed=20240) -> dict:
+    """Hold one linear-cell panel fixed; vary ONLY the optimizer start.
+
+    Isolates optimization robustness from sampling noise. Koiso-Otani (2024) report
+    that their MPEC search estimator "struggles with finding local optima"; this asks
+    whether random starts on our soft-Bellman DDC likelihood agree on the same MLE.
+    Linear MPEC varies theta0 ~ N(0, scale^2); neural MPEC varies the network init seed.
+    """
+    panel, obs_s, obs_a = _panel_obs(env, 400, 40, seed=12345)  # same panel as the main linear cell
+    n_obs = int(len(obs_s))
+    rng = np.random.default_rng(seed)
+    n_par = len(est_names)
+    print(f"\n=== multi-start probe: K={n_starts} on the linear cell ({n_obs} obs) ===")
+
+    lin_starts = []
+    for k in range(n_starts):
+        theta0 = jnp.asarray(rng.normal(0.0, scale, size=n_par), dtype=jnp.float64)
+        r = run_tabular_mpec(env, panel, est_feat, est_names, initial_params=theta0)
+        lin_starts.append({"reward_rmse": r["reward_rmse"], "converged": r["converged"],
+                           "constraint_violation": r["constraint_violation"],
+                           "theta_hat": r["theta_hat"]})
+        print(f"[multistart/linear] start {k}: reward {r['reward_rmse']:.4f} "
+              f"conv={r['converged']} cviol={r['constraint_violation']:.1e}")
+
+    neu_starts = []
+    for k in range(n_starts):
+        r = run_neural_mpec(env, obs_s, obs_a, seed=k)
+        neu_starts.append({"reward_rmse": r["reward_rmse"],
+                           "max_bellman_resid": r["max_bellman_resid"]})
+        print(f"[multistart/neural] start {k}: reward {r['reward_rmse']:.4f} "
+              f"resid={r['max_bellman_resid']:.1e}")
+
+    thetas = np.asarray([s["theta_hat"] for s in lin_starts], dtype=np.float64)
+    return {
+        "cell": "linear reward", "n_obs": n_obs, "n_starts": n_starts,
+        "theta_init_scale": scale,
+        "linear_mpec": {
+            **_agg([s["reward_rmse"] for s in lin_starts]),
+            "n_converged": int(sum(s["converged"] for s in lin_starts)),
+            "max_constraint_violation": float(max(s["constraint_violation"] for s in lin_starts)),
+            "theta_max_component_std": float(thetas.std(axis=0).max()),
+            "starts": lin_starts,
+        },
+        "neural_mpec": {
+            **_agg([s["reward_rmse"] for s in neu_starts]),
+            "max_bellman_resid": float(max(s["max_bellman_resid"] for s in neu_starts)),
+            "starts": neu_starts,
+        },
     }
 
 
@@ -336,7 +404,7 @@ def _panel_obs(env, n_ind, n_per, seed):
     return p, np.asarray(p.get_all_states()), np.asarray(p.get_all_actions())
 
 
-def main() -> None:
+def main(multistart=None) -> None:
     os.makedirs(FIG_DIR, exist_ok=True)
     cells = [("linear reward", *build_linear_cell()),
              ("nonlinear reward", *build_nonlinear_cell())]
@@ -400,6 +468,11 @@ def main() -> None:
     figure_rewards([(t, e) for t, e, _, _ in cells], FIG_REWARDS)
     figure_scaling(scaling_fig, FIG_SCALING)
 
+    # Optional local-optima probe on the linear cell (gated behind --multistart).
+    if multistart:
+        _, env0, feat0, names0 = cells[0]
+        results["multistart"] = multistart_probe(env0, feat0, names0, n_starts=multistart)
+
     with open(RESULTS_JSON, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nWrote {RESULTS_JSON}")
@@ -408,4 +481,12 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--multistart", type=int, nargs="?", const=10, default=None,
+                        metavar="K",
+                        help="also run the K-start local-optima probe on the linear "
+                             "cell (default K=10 when the flag is given with no value)")
+    args = parser.parse_args()
+    main(multistart=args.multistart)

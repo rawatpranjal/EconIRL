@@ -81,8 +81,8 @@ consistency penalty applied to observed transitions. It never uses $P_a(s,s')$:
 the EV network stands in for $\sum_{s'} P_a(s,s')\,V(s')$ and is learned from data.
 It is run here at the repository-standard network size (128 wide, 3 layers, 500
 epochs) with the same action-2 anchor the MPEC methods receive, so it is a fair
-model-free baseline. Because it does not use the transitions, its recovered reward
-sits in a different identification gauge than the known-$P$ methods.
+model-free baseline. Because it does not use the transitions, its recovered
+reward is on a different scale than the known-$P$ methods.
 
 ## Setup
 
@@ -168,6 +168,25 @@ affine map cannot represent the wave, and more data cannot remove an
 approximation error. The flexible neural reward recovers the wave and its error
 keeps shrinking.
 
+Both patterns are the textbook behavior of a sample-average estimator. Each MPEC
+variant is a sample-average approximation of the same population problem: reward
+parameters chosen subject to the Bellman fixed point, with the log-likelihood
+estimated from the panel. Shapiro and Xu (2005) show that such constrained
+estimators are consistent, with the sample objective converging to its population
+counterpart. The root-$N$ decline in the linear regime is that consistency; the
+nonlinear plateau is the standard bias floor under misspecification, which
+consistency cannot cure because an affine model cannot represent the wave at any
+sample size.
+
+It is worth flagging what does not happen here. Koiso and Otani (2024), estimating
+a sequential-search model by MPEC, report the reverse pattern at the top of their
+sweep: higher bias and RMSE at the larger sample, and an optimizer that struggled
+to find local optima, so their MPEC got worse with more data. Our linear MPEC
+improves monotonically across the sweep instead. The difference is the shape of
+the likelihood. Their search likelihood is a product of smoothed inequality
+indicators, far more non-convex than the smooth soft-Bellman logit likelihood
+used here. The next section tests that surface directly.
+
 ## How the three compare
 
 The comparison turns on three axes: the reward form (linear versus neural),
@@ -188,12 +207,43 @@ flexibility exists: when the analyst does not know the functional form, a method
 that can represent it avoids a fixed approximation error.
 
 Both known-$P$ methods recover the value function far better than the model-free
-GLADIUS, with value RMSE around 0.2 to 0.4 against roughly 2.6 to 4.5. That gap is
-the honest cost of not using the known transitions: GLADIUS must learn the
-expected-continuation operator from data instead of computing it. Its reward sits
-in a different, model-free gauge because it never uses $P_a(s,s')$, so its reward
-RMSE is shown as a model-free reference, not a like-for-like structural comparison
-with the two known-$P$ methods.
+GLADIUS, with value RMSE around 0.2 to 0.4 against roughly 2.6 to 4.5. That gap
+is the cost of not using the known transitions. GLADIUS must learn the
+expected-continuation operator from data instead of computing it. Its reward is
+on a different, model-free scale because it never uses $P_a(s,s')$. Its reward
+RMSE is shown as a model-free reference, not a like-for-like structural
+comparison with the two known-$P$ methods.
+
+## Local-optima robustness
+
+The fragility literature on MPEC, from Iskhakov et al. (2016) to the large-sample
+degradation in Koiso and Otani (2024), warns that a constrained estimator can
+report success at a point that is not the global optimum. The estimates above each
+come from a single optimizer start, which invites the question: would a different
+start land somewhere else?
+
+To separate optimization robustness from sampling noise, one linear-cell panel of
+16,000 observations is held fixed and only the start is varied. Linear MPEC is run
+from $K=10$ random reward starts, $\theta_0 \sim \mathcal{N}(0, 0.5^2)$; with each
+start the value vector is initialized at its own Bellman fixed point, so every run
+begins feasible. Neural MPEC is run from $K=10$ random network initializations.
+
+| Method | Reward RMSE: mean ± std (min / max) | Optimization diagnostic |
+|---|---|---|
+| linear MPEC | 0.0209 ± 0.0005 (0.0204 / 0.0215) | 10/10 converged; max constraint violation 9.9e-7; max parameter std across starts 5.7e-4 |
+| neural MPEC | 0.1648 ± 0.0001 (0.1645 / 0.1650) | max Bellman residual 1.6e-2 across the 10 starts |
+
+Both methods are effectively start-independent on this data-generating process. The
+ten linear-MPEC starts, scattered across reward space, all converge to the same
+maximum-likelihood point: the reward RMSE varies by about $10^{-3}$ and the
+recovered parameters by under $10^{-3}$, with every run feasible to solver
+tolerance. The neural starts are tighter still. This is the opposite of the
+Koiso-Otani local-optima struggle, and it is the empirical complement to the
+consistency argument: on the smooth soft-Bellman likelihood the constrained
+problem has a well-behaved surface, so the single-start estimates are not artifacts
+of a lucky initialization. The warning still binds for harder problems, larger
+state spaces, discount factors near one, or sharply non-convex likelihoods, which
+is exactly where this check earns its place before a single fit is trusted.
 
 ## Estimators
 
@@ -266,16 +316,19 @@ def run_gladius(env, panel) -> dict:
         "reward_rmse": rmse(reward_table[:, :A - 1], true_R[:, :A - 1]),
         "value_rmse": rmse(res.value_function, oracle_value(env)),
         "converged": bool(res.converged),
-        "note": "model-free; reward in a different gauge (no known P)",
+        "note": "model-free; reward on a different scale (no known P)",
     }
 ```
 
 ## Reproduce
 
 ```bash
-python scripts/sim_direct_optimization.py
+python scripts/sim_direct_optimization.py                 # main tables + scaling sweep
+python scripts/sim_direct_optimization.py --multistart 10 # also runs the K-start probe
 ```
 
 Numbers are written to `validation/results/sim_direct_optimization.json`; the two
 figures are written under `docs/_static/simulation_studies/`
-(`direct_optimization_rewards.png` and `direct_optimization_scaling.png`).
+(`direct_optimization_rewards.png` and `direct_optimization_scaling.png`). The
+`--multistart K` flag adds a `multistart` block to the JSON with the per-start
+reward RMSE, convergence, and constraint-violation records.

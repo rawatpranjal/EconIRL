@@ -1,61 +1,8 @@
 # Under the Hood
 
-## Model
-
-The data are state, action, next-state triples $(s, a, s')$ from a stationary
-infinite-horizon dynamic discrete choice model with linear flow utility
-$u_\theta(s, a) = \phi(s, a)^\top \theta$, known discount factor $\beta$,
-transition kernels $P_a(s' \mid s)$ in action-state-next-state orientation,
-and i.i.d. logit taste shocks with scale $\sigma$.
-
-The choice-specific value combines the flow payoff with the discounted
-continuation:
-
-$$
-Q_\theta(s, a; V)
-= u_\theta(s, a)
-  + \beta \sum_{s'} P_a(s, s') V(s').
-$$
-
-The soft Bellman operator maps any value vector to its log-sum-exp:
-
-$$
-T_\theta V(s)
-= \sigma \log \sum_a \exp\!\Bigl(Q_\theta(s, a; V) / \sigma\Bigr).
-$$
-
-The logit choice probability at any $({\theta}, V)$ pair is:
-
-$$
-\pi_{\theta,V}(a \mid s)
-= \frac{\exp\bigl(Q_\theta(s, a; V) / \sigma\bigr)}
-       {\sum_b \exp\bigl(Q_\theta(s, b; V) / \sigma\bigr)}.
-$$
-
-## Constrained Estimator
-
-NFXP solves for $V_\theta = T_\theta V_\theta$ inside each likelihood
-evaluation, hiding the fixed point from the optimizer. MPEC keeps $V$ as
-an explicit optimization variable and writes the Bellman condition as a
-per-state equality constraint:
-
-$$
-(\hat\theta,\, \hat V)
-= \arg\max_{\theta,\, V}
-  \sum_{i,t} \log \pi_{\theta,V}(a_{it} \mid s_{it})
-\quad \text{s.t.} \quad
-V - T_\theta V = 0.
-$$
-
-At any feasible point the constraint forces $V = V_\theta$, so MPEC and NFXP
-evaluate the same dynamic discrete choice likelihood. The difference is
-numerical geometry, not the structural target. The fitted summary exposes the
-final Bellman residual directly; NFXP hides it inside each inner solve.
-
-The implementation uses SLSQP with JAX-supplied objective gradients and
-Bellman constraint Jacobians. The value vector is initialized at the Bellman
-fixed point of the starting $\theta$, giving the optimizer a near-feasible
-start.
+The model, the constrained program, the standard-error identity, and the
+consistency argument live on the [MPEC overview](../mpec.md). This page is the
+operational dive: how the constrained problem is actually solved.
 
 ## Pseudocode
 
@@ -71,23 +18,22 @@ while the constrained optimizer has not stopped:
 return theta, V, policy, standard errors, and constraint diagnostics
 ```
 
+The joint variable is $x = (\theta, V)$ and the equality constraint has one row
+per state. Objective gradients and constraint Jacobians come from JAX, not finite
+differences. The value vector is initialized at the Bellman fixed point of the
+starting $\theta$, so the optimizer begins feasible and the SQP steps stay near
+the constraint surface. No Bellman fixed point is solved inside the objective; the
+constraint carries it.
+
 ## Implementation Notes
 
-Standard errors follow the same implicit score logic as NFXP. At the
-constrained optimum, the sensitivity of the value function to the reward
-parameters satisfies
+Standard errors use the implicit-score identity stated on the overview page: at
+the constrained optimum, per-observation score contributions are computed from
+$\partial V / \partial \theta$ after convergence, and the robust covariance is
+their outer product. The fitted summary exposes
+`metadata["final_constraint_violation"]`; gate on it alongside the convergence
+flag, since a high likelihood with a violated constraint is not a solution.
 
-$$
-(I - \beta P_\pi)\,\frac{\partial V}{\partial\theta}
-= \sum_a \pi(a \mid s)\,\phi(s, a),
-$$
-
-where $P_\pi$ is the policy-weighted transition matrix. Per-observation score
-contributions are computed from this expression after convergence. The
-implementation gates on the final Bellman constraint violation as a numerical
-check alongside the standard convergence flag.
-
-The estimator lives in `econirl.estimation.mpec`. Use
-`MPECConfig(solver="sqp")` for the recommended SLSQP path. The
-`augmented_lagrangian` solver is retained for comparison but is less reliable
-at high discount factors.
+The estimator lives in `econirl.estimation.mpec`. Use `MPECConfig(solver="sqp")`
+for the recommended SLSQP path. The `augmented_lagrangian` solver is retained for
+comparison but is less reliable at high discount factors.
