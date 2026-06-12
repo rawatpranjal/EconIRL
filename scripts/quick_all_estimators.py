@@ -239,7 +239,7 @@ DIAGNOSES = {
     "MPEC": "Constrained MLE; recovers cleanly.",
     "NNES": "Neural value network plus structural MLE; recovers cleanly.",
     "SEES": "Fixed: bspline basis with basis_dim >= num_states. A fourier basis of "
-            "dim 4 underfit the 8-state value function (param RMSE 0.89 -> 0.01).",
+            "dim 4 underfit the 8-state value function (param RMSE 0.89 -> 0.025).",
     "TD-CCP": "Neural CCP with approximate value iteration; recovers cleanly.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
             "optimal weighting (OUFXP): closed form for linear utility, as "

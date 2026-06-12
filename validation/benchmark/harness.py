@@ -352,8 +352,15 @@ def _results_table(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
         conv = f"{sum(1 for r in ok if r['converged'])}/{len(ok)}" if ok else "-"
         plists = [r["params"] for r in ok if r["params"] is not None]
         if plists and len({len(p) for p in plists}) == 1:
-            mean_p = np.mean(np.asarray(plists, dtype=np.float64), axis=0)
-            params_s = "[" + ", ".join(f"{v:.3f}" for v in mean_p) + "]"
+            k = len(plists[0])
+            if true_theta is not None and k != true_theta.shape[0]:
+                # Not parameters in the data-generating gauge (e.g. a tabular
+                # reward or a choice-probability table); printing the raw
+                # vector would invite a meaningless comparison to theta.
+                params_s = f"not in theta gauge ({k} values)"
+            else:
+                mean_p = np.mean(np.asarray(plists, dtype=np.float64), axis=0)
+                params_s = "[" + ", ".join(f"{v:.3f}" for v in mean_p) + "]"
         else:
             params_s = "-"
         prmse = "-"
@@ -425,14 +432,20 @@ def _param_block(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
 
 _TABLE_NOTE = (
     "Param RMSE is the structural family only (recovered theta vs true, same "
-    "gauge). Policy TV is total-variation distance from the true-parameter "
-    "policy. Conv is the converged flag reported by the estimator itself; a "
-    "conservative flag can read False while the recovered policy is accurate, "
-    "so read it next to Policy TV, not alone. Regret is welfare loss (lower is "
-    "better): `base` is the observed world; `A` payoff shift, `B` transition "
-    "change, `C` action penalty. Estimators that recovered a reward in the "
-    "linear feature gauge re-solve it under each intervention and adapt; "
-    "estimators without one keep their fixed policy and cannot adapt."
+    "gauge). Recovered params are shown only when the estimator's parameter "
+    "vector lives in the data-generating gauge; a tabular reward or a "
+    "choice-probability table is labeled rather than printed, because "
+    "comparing it to theta entry by entry would be meaningless. Policy TV is "
+    "total-variation distance from the true-parameter policy. Conv is the "
+    "converged flag reported by the estimator itself; a conservative flag can "
+    "read False while the recovered policy is accurate, so read it next to "
+    "Policy TV, not alone. Regret is welfare loss (lower is better): `base` "
+    "is the observed world; `A` payoff shift, `B` transition change, `C` "
+    "action penalty. Estimators that recovered a reward in the linear feature "
+    "gauge re-solve it under each intervention and adapt. Large Type C regret "
+    "has two distinct routes: estimators with no reward in that gauge keep "
+    "their frozen policy and cannot adapt, and an estimator that transfers a "
+    "badly scaled reward adapts to the wrong world."
 )
 
 
@@ -606,6 +619,14 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
             sys.exit(f"No JSON at {results_json}. Run without --verify/--page first.")
         data = json.load(open(results_json))
         if args.page:
+            # Diagnoses and the excluded list are interpretive prose, not
+            # measured facts: render them from the current script so a
+            # rewritten diagnosis reaches the page without re-running. Code
+            # snippets are NOT refreshed - they document the exact code that
+            # produced the stored records and only change through a re-run or
+            # an --only-estimator merge.
+            data["meta"]["diagnoses"] = diagnoses
+            data["meta"]["excluded"] = excluded
             # DGP figures are presentation artifacts that regenerate
             # deterministically from the seeds, so a missing figure never
             # requires re-running the benchmark, and a figure added to the

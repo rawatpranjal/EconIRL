@@ -265,11 +265,14 @@ DIAGNOSES = {
     "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
     "AIRL": "reward_arg='state_action'; recovered parameters stay gauge/shaping-"
             "unidentified by design, so policy TV is the right scorecard.",
-    "f-IRL": "Uses the forward-KL divergence, whose density-ratio gradient is "
-             "bounded; the chi-squared variant's unbounded ratio gradient "
-             "saturates the reward clip on a near-deterministic expert and "
-             "falls back to a flat reward. The reward clip matches the "
-             "problem's natural cost scale.",
+    "f-IRL": "Uses the forward-KL divergence (bounded density-ratio gradient; "
+             "the chi-squared variant's unbounded gradient is unstable on "
+             "near-deterministic experts) with a reward clip matched to the "
+             "problem's cost scale. It recovers a tabular reward, one value "
+             "per state-action pair, which tracks behavior well but lives "
+             "outside the two-feature cost gauge - so it cannot be re-solved "
+             "under the interventions and is scored with its frozen policy, "
+             "which is why its Type C regret is large.",
     "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit interface; "
                     "parameters are the neural reward projected onto the linear "
                     "features.",
@@ -282,18 +285,20 @@ DIAGNOSES = {
                      "flat replacement cost makes the replacement feature "
                      "dominate the margin. The resulting policy distance is "
                      "structural to the method on this problem.",
-    "BC": "Behavioral cloning; matches observed choices but recovers no reward, so "
-          "it cannot transfer to a counterfactual world.",
+    "BC": "Behavioral cloning; matches observed choices but recovers no reward "
+          "at all - its parameter vector is just the smoothed keep/replace "
+          "frequency per mileage bin - so it cannot transfer to a "
+          "counterfactual world and its Type C regret is large.",
 }
 
 EXCLUDED = [
     {"name": "AIRL-Het / AAIRL", "reason": "designed for latent-type heterogeneity; "
      "this panel has a single agent type"},
-    {"name": "MMP", "reason": "one exploratory fit needed over half an hour on "
-     "this small problem (its cousins need seconds); dropped from the roster "
-     "for cost"},
-    {"name": "GAIL", "reason": "did not finish a single fit within a 20-minute "
-     "budget here"},
+    {"name": "MMP", "reason": "dropped from the roster for cost after an "
+     "exploratory fit ran orders of magnitude past its cousins' runtimes on "
+     "this small problem"},
+    {"name": "GAIL", "reason": "did not finish a single exploratory fit within "
+     "this page's per-fit budget"},
     {"name": "GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "dropped from the "
      "page roster by scope decision to keep the comparison on the core "
      "structural and IRL families"},
@@ -339,7 +344,7 @@ NARRATIVE = {
         "Mileage sits on a discrete grid $s \\in \\{0, \\ldots, S-1\\}$. Keeping "
         "the engine (action $0$) pays a per-bin operating cost and lets mileage "
         "drift up by $\\Delta s \\in \\{0, 1, 2\\}$; replacing it (action $1$) "
-        "pays a flat cost and resets mileage to zero:\n"
+        "pays a flat cost and resets the engine:\n"
         "\n"
         "$$\n"
         "u_\\theta(s, a) =\n"
@@ -348,8 +353,12 @@ NARRATIVE = {
         "-\\theta_{\\mathrm{rc}} & a = 1 \\ (\\text{replace}),\n"
         "\\end{cases}\n"
         "\\qquad\n"
-        "P(s' \\mid s, 1) = \\mathbf{1}\\{s' = 0\\},\n"
+        "P(s' \\mid s, 1) = p_{\\Delta s'},\\ s' \\in \\{0, 1, 2\\},\n"
         "$$\n"
+        "\n"
+        "where replacement resets the engine and the same one-period drift "
+        "$p = (p_0, p_1, p_2)$ then applies from zero, so the post-replacement "
+        "state lands on $\\{0, 1, 2\\}$ rather than exactly on zero. "
         "\n"
         "with $\\theta_{\\mathrm{oc}} = 0.01$ and "
         "$\\theta_{\\mathrm{rc}} = 2.0$. The agent discounts at $\\beta$ and "
@@ -366,8 +375,7 @@ NARRATIVE = {
         "and the panel simulates $N$ buses for $T$ periods from $\\pi^*$. The "
         "figure shows the sawtooth mileage paths (rising drift, replacement "
         "resets) and the declining value of holding higher mileage. Every "
-        "estimator below sees the same panels; slow ones run once instead of "
-        "being dropped."
+        "estimator below sees the same panels."
     ),
     "cells": {
         "rust_bus": {

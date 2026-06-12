@@ -211,7 +211,9 @@ class UFXPEstimator(BaseEstimator):
                 n_scored += 1
             rank = int(np.linalg.matrix_rank(D))
             theta = np.linalg.lstsq(D, rhs, rcond=None)[0]
-            obj = 0.0  # exactly identified: the weighted moments are solved
+            # Residual of the weighted moment system; zero under full rank,
+            # nonzero (and reported) when the design is rank deficient.
+            obj = float(np.sum((D @ theta - rhs) ** 2))
             # Efficient variance (sum_x z'G)^{-1}/N, threaded through the
             # asymptotic-SE pipeline as Var = [-hessian]^{-1}.
             if self._compute_hessian:

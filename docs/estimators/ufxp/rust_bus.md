@@ -33,7 +33,8 @@ the efficient moment variance.
 
 This page is a package smoke test on the bundled dataset, not a full
 historical replication of the original study. The estimator's recovery
-properties are established on the synthetic cell with known truth; see the
+properties are established on a synthetic cell whose data-generating process
+is fully specified; see the
 [Simulation Study](validation.md) page. The
 [bus engine simulation page](../../simulation_studies/rust_bus.md) compares
 UFXP against the full estimator roster on a synthetic bus engine panel.
