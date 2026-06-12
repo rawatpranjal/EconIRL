@@ -177,7 +177,8 @@ ROSTER = (
     RosterEntry("UFXP", "structural", _run_ufxp),
     # Wulfmeier et al's deep MaxEnt was introduced on exactly this kind of
     # gridworld; slow, so it runs once, visibly.
-    RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1),
+    RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1,
+                timeout=1800),
 )
 
 
@@ -248,6 +249,7 @@ CELLS = (
         n_periods=20,
         seed=7,
         n_replications=3,
+        fit_timeout=900,
     ),
 )
 

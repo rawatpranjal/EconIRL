@@ -24,6 +24,7 @@ Usage:
 
 from __future__ import annotations
 
+import dataclasses
 import os
 import sys
 
@@ -147,7 +148,14 @@ _STRUCTURAL = (
 )
 
 ROSTER_A = _STRUCTURAL + (RosterEntry("MCE-IRL", "behavioral", _run_mce_irl),)
-ROSTER_B = _STRUCTURAL
+# Cell B: NFXP-SA's slow contraction at discount 0.99 is a runtime story, not
+# an inference story; two measured fits carry it (the same MLE's coverage is
+# carried by NFXP-NK at the full replication count). Each fit gets a hard
+# 30-minute budget, recorded as a timeout if exceeded.
+ROSTER_B = tuple(
+    dataclasses.replace(e, max_reps=2, timeout=1800) if e.name == "NFXP-SA" else e
+    for e in _STRUCTURAL
+)
 ROSTER_C = (
     RosterEntry("NFXP-NK", "structural", _run_nfxp_nk),
     RosterEntry("CCP", "structural", _run_ccp),
@@ -212,6 +220,7 @@ CELLS = (
         seed=505,
         n_replications=3,
         figure=FIGURE_PNG,
+        fit_timeout=1800,
     ),
     Cell(
         cell_id="high_discount",
@@ -230,6 +239,7 @@ CELLS = (
         seed=505,
         n_replications=10,
         param_block=True,
+        fit_timeout=1800,
     ),
     Cell(
         cell_id="rank_deficient",
@@ -248,6 +258,7 @@ CELLS = (
         seed=606,
         n_replications=20,
         param_block=True,
+        fit_timeout=600,
     ),
 )
 

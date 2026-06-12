@@ -105,6 +105,16 @@ def _package_version() -> str:
         return "unknown"
 
 
+class _FitTimeout(BaseException):
+    """Raised by the SIGALRM handler when a fit exceeds its budget.
+
+    Derives from BaseException so an estimator's internal ``except Exception``
+    cannot swallow it (MMP's optimizer loop did exactly that and ran 32 minutes
+    past a 15-minute budget). Still best-effort: a fit stuck inside one long
+    native call is only interrupted when control returns to Python.
+    """
+
+
 def _run_one(env, panel, entry: RosterEntry, cell_id: str, rep: int,
              oracle_policy, oracle_value, timeout: int | None = None) -> dict:
     """Fit one estimator on one panel and record the raw facts.
@@ -121,7 +131,7 @@ def _run_one(env, panel, entry: RosterEntry, cell_id: str, rep: int,
     try:
         if timeout:
             def _on_alarm(signum, frame):  # noqa: ARG001
-                raise TimeoutError(f"fit exceeded the {timeout}s budget")
+                raise _FitTimeout(f"fit exceeded the {timeout}s budget")
 
             old_handler = signal.signal(signal.SIGALRM, _on_alarm)
             signal.alarm(int(timeout))
@@ -148,6 +158,9 @@ def _run_one(env, panel, entry: RosterEntry, cell_id: str, rep: int,
                              "transferred": rr.transferred}
         except Exception:  # noqa: BLE001 - regret is best-effort, never fabricated
             rec["regret"] = None
+    except _FitTimeout as exc:
+        rec["runtime"] = time.time() - t0
+        rec["error"] = f"TimeoutError: {exc}"
     except Exception as exc:  # noqa: BLE001 - the failure IS the result
         rec["runtime"] = time.time() - t0
         rec["error"] = f"{type(exc).__name__}: {exc}"

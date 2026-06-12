@@ -240,6 +240,7 @@ CELLS = (
         seed=707,
         n_replications=3,
         figure=FIGURE_PNG,
+        fit_timeout=2400,
     ),
 )
 
