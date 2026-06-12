@@ -132,7 +132,7 @@ GLADIUS enforces a model-free consistency condition that is not comparable.
 
 | Estimator | Reward RMSE | Value RMSE | Max Bellman residual |
 |---|---|---|---|
-| neural MPEC | 0.175 | 0.391 | 0.0012 |
+| neural MPEC | 0.175 | 0.390 | 0.0012 |
 | tabular MPEC | 0.492 | 1.822 | exact (hard constraint) |
 | GLADIUS | 0.480 | 4.506 | model-free |
 

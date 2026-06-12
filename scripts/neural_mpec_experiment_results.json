@@ -1,0 +1,143 @@
+{
+  "dgp": {
+    "num_states": 20,
+    "num_actions": 3,
+    "discount_factor": 0.95,
+    "scale_parameter": 1.0,
+    "true_parameters": {
+      "a0_const": 0.4,
+      "a0_slope": -0.6,
+      "a1_const": 0.2,
+      "a1_slope": -0.4
+    },
+    "action_shares": [
+      0.2971875,
+      0.39675,
+      0.3060625
+    ],
+    "state_coverage": 20
+  },
+  "panel": {
+    "n_obs": 16000
+  },
+  "neural_mpec": [
+    {
+      "estimator": "neural MPEC w16 d1 rho=1.0 colloc=all",
+      "width": 16,
+      "depth": 1,
+      "rho": 1.0,
+      "collocation": "all",
+      "reward_rmse": 0.1647825326452626,
+      "value_rmse": 0.3353572849905449,
+      "max_bellman_resid": 1.1874653225163456e-05,
+      "final_nll": 1.084227621358623,
+      "nll_floor": 1.0853453940104636,
+      "nll_gap_to_floor": -0.0011177726518405429,
+      "final_penalty": 4.514662092366937e-11,
+      "epochs": 3000,
+      "runtime": 1.716040849685669
+    },
+    {
+      "estimator": "neural MPEC w32 d2 rho=1.0 colloc=all",
+      "width": 32,
+      "depth": 2,
+      "rho": 1.0,
+      "collocation": "all",
+      "reward_rmse": 0.16550517633077827,
+      "value_rmse": 0.3365369654882823,
+      "max_bellman_resid": 0.004060581791087259,
+      "final_nll": 1.084227921907604,
+      "nll_floor": 1.0853453940104636,
+      "nll_gap_to_floor": -0.001117472102859507,
+      "final_penalty": 7.399647518849102e-06,
+      "epochs": 3000,
+      "runtime": 1.6082220077514648
+    },
+    {
+      "estimator": "neural MPEC w32 d2 rho=0.1 colloc=all",
+      "width": 32,
+      "depth": 2,
+      "rho": 0.1,
+      "collocation": "all",
+      "reward_rmse": 0.16466902036318593,
+      "value_rmse": 0.3345947664578443,
+      "max_bellman_resid": 0.0002450422274584696,
+      "final_nll": 1.0842276289881678,
+      "nll_floor": 1.0853453940104636,
+      "nll_gap_to_floor": -0.0011177650222957691,
+      "final_penalty": 1.7188735891571946e-08,
+      "epochs": 3000,
+      "runtime": 1.059251070022583
+    },
+    {
+      "estimator": "neural MPEC w32 d2 rho=10.0 colloc=all",
+      "width": 32,
+      "depth": 2,
+      "rho": 10.0,
+      "collocation": "all",
+      "reward_rmse": 0.16490000583973807,
+      "value_rmse": 0.338651488409386,
+      "max_bellman_resid": 4.460762048097422e-05,
+      "final_nll": 1.0842277793686332,
+      "nll_floor": 1.0853453940104636,
+      "nll_gap_to_floor": -0.0011176146418303556,
+      "final_penalty": 9.370499841829654e-10,
+      "epochs": 3000,
+      "runtime": 1.0411009788513184
+    },
+    {
+      "estimator": "neural MPEC w32 d2 rho=1.0 colloc=observed",
+      "width": 32,
+      "depth": 2,
+      "rho": 1.0,
+      "collocation": "observed",
+      "reward_rmse": 0.16479331343794906,
+      "value_rmse": 0.3354326462716986,
+      "max_bellman_resid": 0.00026332793222394457,
+      "final_nll": 1.084227621775962,
+      "nll_floor": 1.0853453940104636,
+      "nll_gap_to_floor": -0.0011177722345014907,
+      "final_penalty": 1.1644324778689635e-08,
+      "epochs": 3000,
+      "runtime": 1.0791521072387695
+    }
+  ],
+  "baselines": {
+    "tabular MPEC": {
+      "reward_rmse": 0.021355831584817967,
+      "value_rmse": 0.20977302836169942,
+      "converged": true,
+      "runtime": 6.423332691192627
+    },
+    "GLADIUS": {
+      "reward_rmse": 0.18450107240866978,
+      "value_rmse": 2.6083011822741367,
+      "converged": true,
+      "note": "model-free; reward in a different gauge (no known P)",
+      "runtime": 49.09703326225281
+    }
+  },
+  "data_scaling": [
+    {
+      "n_obs": 4000,
+      "neural_reward_rmse": 0.30379197518656703,
+      "neural_value_rmse": 0.6834013785719952,
+      "tabular_reward_rmse": 0.0662069252663886,
+      "tabular_value_rmse": 0.23445039636915033
+    },
+    {
+      "n_obs": 16000,
+      "neural_reward_rmse": 0.16959895297543806,
+      "neural_value_rmse": 0.244143315373726,
+      "tabular_reward_rmse": 0.03548769321236471,
+      "tabular_value_rmse": 0.18645268270654095
+    },
+    {
+      "n_obs": 64000,
+      "neural_reward_rmse": 0.08682278212731857,
+      "neural_value_rmse": 0.10552428664506144,
+      "tabular_reward_rmse": 0.012420238438767535,
+      "tabular_value_rmse": 0.06663082074908051
+    }
+  ]
+}

@@ -69,8 +69,8 @@ over estimated actions {0, 1}.)
 
 | n_obs | neural reward RMSE | neural value RMSE | tabular reward RMSE | tabular value RMSE |
 |---:|---:|---:|---:|---:|
-| 4k | 0.304 | 0.683 | 0.066 | 0.235 |
-| 16k | 0.170 | 0.244 | 0.035 | 0.187 |
+| 4k | 0.304 | 0.683 | 0.066 | 0.234 |
+| 16k | 0.170 | 0.244 | 0.035 | 0.186 |
 | 64k | 0.087 | 0.106 | 0.012 | 0.067 |
 
 Each 4x of data roughly halves the neural reward RMSE, the root-N signature of a consistent
