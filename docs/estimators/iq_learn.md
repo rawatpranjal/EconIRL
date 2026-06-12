@@ -1,31 +1,28 @@
 # IQ-Learn
 
-## Overview
+IQ-Learn learns a soft Q-function from expert data. The Q-function implicitly
+encodes both the policy and the Bellman-implied reward, so the training
+objective collapses the usual adversarial min-max into a single concave
+optimization over Q alone.
 
-IQ-Learn parameterizes soft Q-values directly and recovers a Bellman-implied
-reward as a byproduct. The current package position is a research preview for
-imitation quality and Q-based diagnostics.
-
-Use the structural estimators when the project requires reported
-counterfactual policy evidence.
+Start here when you want an imitation estimator that avoids adversarial
+training and produces a Q-based reward diagnostic alongside the policy.
 
 ## Source Papers
 
-This page draws on {ref}`Garg et al. (2021) <garg-2021>` for IQ-Learn and
-inverse soft-Q learning.
+This page draws on {ref}`Garg et al. (2021) <garg-2021>` for the inverse
+soft-Q learning construction and divergence objectives.
 
-## When to Use
+## Quick Decision
 
-Use IQ-Learn when:
+| Use IQ-Learn when | Prefer another estimator when |
+| --- | --- |
+| You want a policy imitation estimator without adversarial training. | Structural counterfactual analysis is the primary goal (use NFXP, CCP, or UFXP). |
+| A Q-based reward diagnostic is useful alongside the policy fit. | The data-generating process is linear and transitions are known (use UFXP or CCP). |
+| You want to compare behavioral cloning with a Bellman-aware alternative. | Reward recovery with structural standard errors is required (use NFXP or MPEC). |
+| Transitions are available to compute the inverse Bellman operator. | State or state-action coverage is very thin (Q and reward recovery degrade). |
 
-- inverse soft-Q learning is the estimator of interest;
-- you want to compare policy imitation with structural reward recovery;
-- transitions are available for the inverse Bellman reward calculation.
-
-Avoid IQ-Learn when you need structural counterfactual evidence in this
-package.
-
-## Basic Usage
+## Minimal Fit
 
 ```python
 from econirl.estimation import IQLearnConfig, IQLearnEstimator
@@ -47,24 +44,45 @@ summary = estimator.estimate(
 print(summary.parameters)
 ```
 
-Use `q_type="neural"` for a neural Q diagnostic, but keep evidence scope
-separate from imitation accuracy.
+Use `q_type="linear"` with a feature-based utility to let the reward propagate
+to unvisited state-action pairs. Do not pair `q_type="tabular"` with
+`divergence="simple"`: the simple objective is unbounded on a free Q table and
+will drive Q to numerical overflow.
 
 ## Evidence
 
-IQ-Learn is available as a research preview. The current evidence is strongest
-for imitation and Q diagnostics rather than full structural reward recovery.
+IQ-Learn is validated on three synthetic cells. On the primary cell
+(`canonical_low_action`, 21 states, 3 actions, 160 000 observations) the
+estimator converges, achieves full state and state-action coverage, and passes
+policy TV and counterfactual regret checks. It does not pass raw Bellman
+reward, projected reward, value, or Q recovery checks on any tested cell. Use
+the output as an imitation and Q-diagnostic tool rather than a source of
+structural counterfactual evidence.
 
-The low- and high-dimensional action-dependent DGPs are synthetic dynamic
-choice benchmarks with action-specific rewards; the high-dimensional version
-uses encoded states. The state-only diagnostic removes action-varying rewards.
-The machine-readable results file records expert state and state-action coverage as
-hard gates. Treat recovered rewards and counterfactuals as diagnostics unless
-`summary.metadata["expert_state_coverage"] == 1.0` and
-`summary.metadata["expert_state_action_coverage"] >= 0.95`, and all structural
-recovery gates pass. Sparse support is a warning, not evidence for structural
-counterfactual validity.
+| Evidence | Current state |
+| --- | --- |
+| Evidence scope | Synthetic tabular simulation. |
+| Primary cell | `canonical_low_action`. |
+| Machine-readable results file | [iq_learn.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/iq_learn.json). |
+| Imitation and regret checks | Pass on the primary cell (policy TV, Type A, Type B, Type C regret). |
+| Structural recovery checks | Fail on all tested cells (reward, value, Q NRMSE). |
 
-## Further Reading
+## IQ-Learn Guide
 
-- Machine-readable results file: [iq_learn_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/iq_learn.json)
+- [Context](iq_learn/context.md)
+- [Quick Start](iq_learn/quick_start.md)
+- [Under the Hood](iq_learn/under_the_hood.md)
+- [Pre-Estimation Checks](iq_learn/pre_estimation.md)
+- [Simulation Study](iq_learn/validation.md)
+- [Counterfactuals](iq_learn/counterfactuals.md)
+
+```{toctree}
+:hidden:
+
+iq_learn/context
+iq_learn/quick_start
+iq_learn/under_the_hood
+iq_learn/pre_estimation
+iq_learn/validation
+iq_learn/counterfactuals
+```
