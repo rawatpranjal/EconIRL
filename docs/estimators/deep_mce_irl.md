@@ -1,77 +1,89 @@
 # Deep MCE-IRL
 
-## Overview
+Deep MCE-IRL extends maximum causal entropy IRL by replacing a linear reward
+table with a neural reward map. It uses the same occupancy-matching objective
+and soft Bellman planning as MCE-IRL, but the reward function is a small
+feedforward network rather than a dot product with fixed features. The
+validated object is the anchored reward matrix and the behavior it induces,
+not the raw network weights.
 
-Deep MCE-IRL uses the maximum causal entropy occupancy-matching objective with
-a neural reward map. The current simulation-study scope is nonlinear
-reward-map recovery over supplied state encodings and known transitions.
-
-The study evaluates the recovered reward matrix, not the raw neural network
-weights.
+Start here when the reward structure in your problem is nonlinear in the
+available state encodings and you want the full MCE behavioral guarantee -
+policy, value, Q function, and counterfactuals - without committing to a
+hand-chosen linear feature set.
 
 ## Source Papers
 
-This page draws on {ref}`Ziebart (2010) <ziebart-2010>` for maximum causal
-entropy IRL and {ref}`Wulfmeier, Ondruska, and Posner (2015)
+This page draws on {ref}`Ziebart (2010) <ziebart-2010>` for the maximum causal
+entropy IRL framework and on {ref}`Wulfmeier, Ondruska, and Posner (2015)
 <wulfmeier-2015>` for neural maximum-entropy reward learning.
 
-## When to Use
+## Quick Decision
 
-Use Deep MCE-IRL when:
+| Use Deep MCE-IRL when | Prefer another estimator when |
+| --- | --- |
+| Transitions are known or supplied. | Transitions must be estimated jointly. |
+| The reward is nonlinear in the available state encodings. | A linear reward table is adequate (use MCE-IRL). |
+| Behavioral fit - policy, value, Q - matters more than a structural parameter vector. | You need identified structural parameters (use the structural family). |
+| You can impose an anchor action or absorbing state for the reward gauge. | The reward gauge cannot be fixed before estimation. |
+| Counterfactual re-solving under the learned reward is the goal. | Policy-only imitation is enough (use BC). |
 
-- transitions are known or supplied;
-- demonstrations come from a discrete dynamic decision problem;
-- the reward can be represented by a neural map over supplied encodings;
-- you can impose a reward gauge, such as an anchor action or absorbing state;
-- reward-map and counterfactual recovery matter more than finite-theta
-  interpretation.
-
-Avoid Deep MCE-IRL when you need identified finite structural parameters, or
-when the input is raw spatial data that would require a convolutional reward
-network outside the current simulation-study scope.
-
-## Basic Usage
+## Minimal Fit
 
 ```python
-import pandas as pd
-
 from econirl.estimators import MCEIRLNeural
 
-data = pd.read_csv("dynamic_choices.csv")
-
 model = MCEIRLNeural(
-    n_states=32,
-    n_actions=3,
-    discount=0.95,
-    reward_type="state_action",
-    state_encoder=state_encoder,
-    state_dim=state_dim,
+    n_states=32, n_actions=3, discount=0.95,
+    reward_type="state_action", anchor_action=0,
 )
 model.fit(
-    data=data,
-    state="state",
-    action="action",
-    id="agent_id",
+    data=df, state="state", action="action", id="agent_id",
     transitions=transitions,
-    features=reward_features,
 )
 
+print(model.reward_.shape)   # (32, 3)
+print(model.policy_.shape)   # (32, 3)
 print(model.summary())
 ```
 
-Pass `features=` only when you want an interpretable projection of the learned
-reward map onto supplied reward features.
-
 ## Evidence
 
-The reported simulation evidence covers the anchored neural reward-map
-Shapeshifter cell. Finite-theta projections are reported only when the
-projection basis is numerically identified.
+Deep MCE-IRL is reported on a synthetic cell with a frozen nonlinear neural
+reward, known stochastic transitions, and an anchor action that fixes the
+reward gauge. The cell has 32 states, 3 actions, 160,000 observations, and
+known policy, value, Q, and counterfactual oracle objects, so every recovery
+claim is checked against the truth. The machine-readable results file records
+the reported results. Deep MCE-IRL also runs on the bus engine and gridworld
+pages of the [simulation studies](../simulation_studies/index.md) alongside
+the rest of the IRL roster.
 
-Anchored neural reward-map DGP means a known-transition synthetic environment
-with supplied state encodings, an action anchor for the reward gauge, and known
-policy, value, reward-table, and counterfactual truth.
+| Evidence | Current state |
+| --- | --- |
+| Evidence scope | Synthetic tabular simulation with frozen neural reward. |
+| Primary cell | `deep_mce_neural_reward`. |
+| Machine-readable results file | [deep_mce_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json). |
+| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
+| Public example | Uses `MCEIRLNeural` with `reward_type="state_action"`. |
 
-## Further Reading
+## Deep MCE-IRL Guide
 
-- Machine-readable results file: [deep_mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json)
+- [Context](deep_mce_irl/context.md)
+- [Quick Start](deep_mce_irl/quick_start.md)
+- [Under the Hood](deep_mce_irl/under_the_hood.md)
+- [Pre-Estimation Checks](deep_mce_irl/pre_estimation.md)
+- [Simulation Study](deep_mce_irl/validation.md)
+- [Counterfactuals](deep_mce_irl/counterfactuals.md)
+- [Abstract MDP Example](deep_mce_irl/abstract_mdp.md)
+
+```{toctree}
+:hidden:
+
+deep_mce_irl/context
+deep_mce_irl/quick_start
+deep_mce_irl/under_the_hood
+deep_mce_irl/pre_estimation
+deep_mce_irl/validation
+deep_mce_irl/counterfactuals
+deep_mce_irl/abstract_mdp
+```
