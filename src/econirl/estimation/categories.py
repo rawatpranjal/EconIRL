@@ -183,6 +183,18 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
             supports_continuous_states=True,
         ),
     ),
+    "Neural MPEC": (
+        EstimatorCategory.STRUCTURAL_APPROX,
+        ProblemCapabilities(
+            reward_type="neural",
+            requires_transitions=True,
+            recovers_structural_params=False,
+            recovers_reward=True,
+            has_inner_bellman_solve=False,
+            supports_finite_horizon=False,
+            supports_continuous_states=True,
+        ),
+    ),
     "GLADIUS": (
         EstimatorCategory.Q_LEARNING_IRL,
         ProblemCapabilities(

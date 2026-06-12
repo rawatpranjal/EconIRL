@@ -37,10 +37,12 @@ from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
 from econirl.estimation.nnes import NNESEstimator, NNESNFXPEstimator
 from econirl.estimation.sees import SEESEstimator
 from econirl.estimation.ufxp import UFXPEstimator
+from econirl.estimation.neural_mpec import NeuralMPECEstimator, NeuralMPECConfig
 TDCCP = TDCCPEstimator
 NNES = NNESEstimator
 SEES = SEESEstimator
 UFXP = UFXPEstimator
+NeuralMPEC = NeuralMPECEstimator
 
 # Q-learning IRL
 from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
@@ -101,6 +103,9 @@ __all__ = [
     "UFXP",
     "UFXPEstimator",
     "SEESEstimator",
+    "NeuralMPEC",
+    "NeuralMPECEstimator",
+    "NeuralMPECConfig",
     # Q-learning IRL
     "GLADIUS",
     "GLADIUSEstimator",
