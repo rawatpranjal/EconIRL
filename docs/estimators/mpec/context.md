@@ -12,9 +12,13 @@ violation directly.
 
 ## Source Ideas
 
-The primary source is Su and Judd's constrained-optimization approach to
-structural estimation. Iskhakov, Rust, Schjerning, and Seo compare MPEC-style
-and NFXP-style numerical strategies in dynamic discrete choice settings.
+{ref}`Su and Judd (2012) <su-judd-2012>` introduce the constrained-optimization
+approach to structural estimation: optimize structural parameters and equilibrium
+objects jointly while imposing the Bellman fixed point as an equality constraint.
+{ref}`Iskhakov et al. (2016) <iskhakov-2016>` compare MPEC-style and NFXP-style
+numerical strategies in dynamic discrete choice settings and identify where the
+constrained problem becomes fragile as the state dimension or discount factor
+grows.
 
 The core identification lesson matches NFXP and CCP. Reward scale and
 location need a normalization. Transitions need to be separated from payoffs.

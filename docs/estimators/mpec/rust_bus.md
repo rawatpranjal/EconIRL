@@ -56,7 +56,9 @@ tested through the simulation harness and reported on the
 
 ## Replication Boundary
 
-This page is a package smoke example, not the full historical Rust
-replication. The reported simulation study uses a synthetic cell, where
-reward, policy, value, Q, and counterfactual oracle objects are available for
-comparison.
+This page is a package smoke test on the synthetic bus environment, not a full
+historical replication of the original study. The estimator's recovery
+properties are established on a synthetic cell whose data-generating process
+is fully specified; see the [Simulation Study](validation.md) page. The
+[bus engine simulation page](../../simulation_studies/rust_bus.md) compares
+MPEC against the full estimator roster on a shared synthetic bus engine panel.

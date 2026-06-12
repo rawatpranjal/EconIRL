@@ -1,36 +1,20 @@
 # Simulation Study
 
-We run MPEC on the `canonical_low_action` synthetic cell, the same
+MPEC runs on the `canonical_low_action` synthetic cell, the same
 low-dimensional action-dependent structural benchmark used for NFXP and CCP.
-The simulation asks whether the constrained-likelihood formulation can recover
-the structural reward and counterfactual behavior while satisfying the Bellman
-equality constraint. Real bus data cannot answer that question because the
-true reward, policy, value function, Q function, and counterfactual oracles are
-not observed.
-
-These results are not hand-entered examples. They come from the simulation harness. The harness fixes the transition law, action-dependent
-reward features, and reward weights before generating the finite panel. Those
-objects define the true reward, policy, value function, Q function, and
-counterfactual oracles that are held back for evaluation. The estimator sees
-the generated panel, the transition law, and the action-dependent reward
-features, not the oracle dynamic objects.
+The cell has 21 states, 3 actions, known linear reward, known transitions, and
+exact policy, value, Q, and Type A, Type B, and Type C counterfactual oracle
+objects, so every recovery claim is checked against fully specified truth.
 
 The full result generator is
 [`mpec_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mpec/run.py).
 It writes the machine-readable results file
 [`mpec_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mpec.json).
-To rerun it from the repository root:
 
 ```bash
+cd /path/to/econirl
 PYTHONPATH=src:. python validation/estimators/mpec/run.py
 ```
-
-Read the tables as a sequence. The design table states the synthetic cell.
-The fit summary reports convergence, constrained-optimizer iterations, and the
-final Bellman constraint violation. Parameter recovery compares estimated
-reward parameters to truth. Recovery metrics compare the recovered reward,
-value, Q function, and policy to oracle objects. Numerical checks are the
-numerical cutoffs recorded by the harness.
 
 ## Design
 
@@ -117,3 +101,10 @@ cell.
 | Type A | 0.005109 | 7.56e-5 | 0.000238 | 0.000213 |
 | Type B | 0.005457 | 8.20e-5 | 0.000363 | 0.000362 |
 | Type C | 0.003549 | 3.56e-5 | 0.000114 | 0.000086 |
+
+MPEC also appears on the
+[bus engine](../../simulation_studies/rust_bus.md),
+[taxi gridworld](../../simulation_studies/taxi_gridworld.md), and
+[abstract MDP](../../simulation_studies/abstract_mdp_1_sanity.md)
+simulation study pages, where it is compared against the full structural and
+IRL rosters on shared synthetic panels.

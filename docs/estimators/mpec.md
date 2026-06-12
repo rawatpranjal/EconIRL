@@ -50,16 +50,19 @@ print(summary.parameters)
 print(summary.metadata["final_constraint_violation"])
 ```
 
-The MPEC public surface is currently the lower-level estimator API. It expects
-an `econirl.core.Panel`, a utility object, a `DDCProblem`, and transition
-matrices.
+MPEC's public surface is the lower-level estimator API; see
+[Quick Start](mpec/quick_start.md) for full usage.
 
 ## Evidence
 
 MPEC is reported on the low-dimensional action-dependent synthetic data-generating process. The
 simulation cell has known rewards, transitions, policies, values, Q functions,
 and Type A, Type B, and Type C counterfactual oracles. The machine-readable
-results file and generated primer results record the reported results.
+results file records the reported results. MPEC also runs on the
+[bus engine](../simulation_studies/rust_bus.md),
+[taxi gridworld](../simulation_studies/taxi_gridworld.md), and
+[abstract MDP](../simulation_studies/abstract_mdp_1_sanity.md) simulation
+study pages alongside the rest of the structural roster.
 
 | Evidence | Current state |
 | --- | --- |

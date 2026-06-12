@@ -2,21 +2,11 @@
 
 NNES estimates a structural dynamic discrete choice likelihood while learning
 a neural approximation to the integrated value function. The reported path is
-the NPL Bellman path.
-
-## Optimization Setup
-
-The observed panel supplies state, action, and next-state records. The
-transition law is estimated from the panel or supplied directly. Reward
-features, the discount factor, the logit shock scale, the value-network
-architecture, and the NPL iteration count are fixed before optimization.
-
-NNES optimizes the finite-dimensional structural reward parameters `theta`
-while using a value approximation as a nuisance object. In the reported NPL
-path, the finite-state profiled continuation terms define the structural
-likelihood, and the value network is trained against the same continuation
-target. The network supports the approximation path; the structural estimate
-remains `theta`.
+the NPL Bellman path. Transition probabilities must be supplied or estimated
+before the neural value path starts; reward features, discount factor, logit
+scale, value-network architecture, and NPL iteration count are fixed inputs.
+The structural estimate is the finite-dimensional reward parameter `theta`; the
+value network is a nuisance object trained to support the continuation value.
 
 ## Model
 
@@ -32,18 +22,25 @@ $$
 u_\theta(s, a) = \phi(s, a)^\top \theta
 $$
 
-NNES represents the integrated value function with a neural network.
+Choice-specific values combine current utility and discounted continuation.
 
 $$
-V_\psi(s) \approx V_\theta(s)
-$$
-
-Choice-specific values combine current utility and continuation value.
-
-$$
-Q_{\theta,\psi}(s,a)
+Q_{\theta}(s,a)
 = u_\theta(s,a)
-  + \beta \sum_{s'} P_a(s,s') V_\psi(s')
+  + \beta \sum_{s'} P_a(s,s') V_\theta(s')
+$$
+
+The integrated value function $V_\theta$ is defined by the soft Bellman
+equation (logit scale $\sigma$, no additive Euler-gamma constant):
+
+$$
+V_\theta(s) = \sigma \log \sum_a \exp\!\bigl(Q_\theta(s,a) / \sigma\bigr).
+$$
+
+NNES replaces $V_\theta$ with a trained neural network:
+
+$$
+V_\psi(s) \approx V_\theta(s).
 $$
 
 Choice probabilities follow the soft-max rule.
@@ -52,16 +49,32 @@ $$
 \pi_{\theta,\psi}(a \mid s)
 =
 \frac{\exp(Q_{\theta,\psi}(s,a) / \sigma)}
-     {\sum_b \exp(Q_{\theta,\psi}(s,b) / \sigma)}.
+     {\sum_b \exp(Q_{\theta,\psi}(s,b) / \sigma)},
+\qquad
+Q_{\theta,\psi}(s,a) = u_\theta(s,a) + \beta \sum_{s'} P_a(s,s') V_\psi(s').
 $$
 
-The NPL path alternates value-network training with structural likelihood
-updates. In the public results file, both synthetic cells run three outer NPL
-iterations.
+## Objective
 
-The value network is an approximation target, not the structural reward. The
-structural object remains `theta`; the network parameters are nuisance
-parameters used to represent the continuation value.
+For a fixed CCP iterate $\hat{P}$, the NPL profiling step represents the value
+as affine in the structural parameters:
+
+$$
+W_\theta[\hat{P}] = W_z(\hat{P})\,\theta + W_e(\hat{P}).
+$$
+
+Here $W_z(\hat{P})$ is the expected discounted feature matrix under the fixed
+policy iterate and $W_e(\hat{P})$ is the expected discounted logit entropy
+term. The value network is trained on this profiled target, and then the outer
+step maximizes the structural log-likelihood:
+
+$$
+\mathcal{L}(\theta;\,\hat{P})
+= \sum_{i,t} \log \pi_{\theta,\psi}\!\bigl(a_{it} \mid s_{it}\bigr).
+$$
+
+After maximizing, CCPs are updated from the implied policy and the loop repeats.
+In the public results file, both synthetic cells run three outer NPL iterations.
 
 ## Pseudocode
 
@@ -97,24 +110,17 @@ the policy-iteration likelihood path.
 
 ## Finite-State Profiled Path
 
-The package simulation study uses a finite-state version of the NPL argument. For a
-fixed CCP iterate `P`, the policy-evaluation value is affine in the structural
-parameters:
-
-$$
-W_\theta[P] = W_z(P)\theta + W_e(P).
-$$
-
-EconIRL solves the profiled components `W_z(P)` and `W_e(P)` exactly on the
-finite synthetic cells, then optimizes the structural likelihood through the
-choice-specific values implied by those components. The value network is
-trained on the same profiled target and reported through metadata such as
-`v_loss_per_outer`; in the current finite-state study, it is also a
-diagnostic for the large-state approximation path rather than the only object
-driving the likelihood.
+The package simulation study uses a finite-state version of the NPL argument.
+EconIRL solves the profiled components $W_z(\hat{P})$ and $W_e(\hat{P})$
+exactly on the synthetic cells (see Objective above), then optimizes the
+structural likelihood through the choice-specific values implied by those
+components. The value network is trained on the same profiled target and
+reported through metadata such as `v_loss_per_outer`; in the finite-state
+study, it serves as a diagnostic for the large-state approximation path rather
+than the sole driver of the likelihood.
 
 This is why the simulation study can check reward, policy, value, Q, and
-counterfactual recovery directly against known oracle objects.
+counterfactual recovery directly against the fully specified oracle objects.
 
 ## Bellman Options
 

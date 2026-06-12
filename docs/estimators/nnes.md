@@ -15,35 +15,6 @@ This page draws on {ref}`Nguyen (2025) <nguyen-2025>` for NNES and uses the
 CCP/NPL logic of {ref}`Hotz and Miller (1993) <hotz-miller-1993>` and
 {ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>`.
 
-## Questions NNES Answers
-
-**What can NNES do that NFXP cannot do comfortably?** NFXP is the exact
-tabular reference when the state space is manageable. NNES keeps the same
-structural target but replaces the full tabular value object with a trained
-neural approximation, which makes larger or encoded state representations a
-natural simulation-study target.
-
-**What is a concrete example?** In the Nguyen paper, the Monte Carlo design is
-a Rust-style replacement model with multiple bus modules. The true value
-function is additively separable across modules, but NNES is not told that
-shortcut. It trains a single value network and is compared with an oracle NFXP
-benchmark that knows the separability.
-
-**How does NNES work operationally?** It supplies or estimates transitions,
-trains a value network, combines structural rewards with continuation values,
-updates the likelihood through an NPL-style path, and reports structural
-parameters, standard errors, policies, values, and recovery metadata.
-
-## Core Contract
-
-| Contract | Meaning |
-| --- | --- |
-| Simulation path | Use `bellman="npl"`. This is the NNES path tied to the paper's NPL orthogonality argument and the simulation results file. |
-| Diagnostic path | `bellman="nfxp"` trains a neural soft-Bellman approximation, but it does not carry the same zero-Jacobian or standard-error claim. |
-| Transition model | NNES is model-based. Transitions must be known or estimated before policy evaluation. |
-| Neural object | The neural network approximates the value or continuation object. The structural reward remains finite-dimensional. |
-| Inference claim | The paper's efficient-inference claim relies on NPL orthogonality and a sufficiently accurate first-stage value or policy approximation. |
-
 ## Quick Decision
 
 | Use NNES when | Prefer another estimator when |
@@ -53,6 +24,7 @@ parameters, standard errors, policies, values, and recovery metadata.
 | Transitions are known or can be estimated before estimation. | Transition estimation is the main modeling problem. |
 | You want counterfactuals from a recovered structural object. | You only need fitted choice probabilities. |
 | Neural value approximation is the point of the exercise. | You need the cleanest exact likelihood reference. |
+| Use `bellman="npl"` for the reported path. | `bellman="nfxp"` is a diagnostic variant and does not carry the NPL orthogonality claim. |
 
 ## Minimal Fit
 
@@ -92,13 +64,13 @@ Set `bellman="npl"` for the reported NNES path. Set `bellman="nfxp"` for the
 neural soft-Bellman diagnostic variant, which does not carry the same
 orthogonality claim.
 
-## Simulation Study
+## Evidence
 
 NNES is reported on low-dimensional and high-dimensional action-dependent
 synthetic data-generating processes. The high-dimensional cell is the primary study because
 it uses encoded states and a richer reward-feature basis.
 
-| Item | Current state |
+| Evidence | Current state |
 | --- | --- |
 | Question | Recover finite-dimensional structural reward and counterfactual behavior with a neural value approximation. |
 | Study scope | Synthetic low- and high-dimensional structural DDC simulations. |

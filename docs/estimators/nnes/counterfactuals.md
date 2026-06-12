@@ -27,9 +27,9 @@ These rows are the high-dimensional primary-cell results from
 | Type B | 0.021651 | 0.002128 | 0.007916 | 0.005559 |
 | Type C | 0.013053 | 0.000920 | 0.002325 | 0.001314 |
 
-All three regrets are below the 0.05 recorded threshold. The table compares
-intervened policies from the recovered NNES object with oracle counterfactual
-policies.
+All three regrets are below the 0.05 threshold. The table compares intervened
+policies from the recovered NNES object with counterfactual policies from the
+fully specified data-generating process.
 
 ## Low-Dimensional Sanity Check
 

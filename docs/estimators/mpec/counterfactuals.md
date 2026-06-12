@@ -11,8 +11,8 @@ solutions.
 
 ## Counterfactual Families
 
-The simulation harness evaluates three broader counterfactual
-families against oracle solutions.
+The simulation harness evaluates three counterfactual families against oracle
+solutions.
 
 | Type | Intervention | Purpose |
 | --- | --- | --- |

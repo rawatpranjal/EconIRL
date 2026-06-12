@@ -1,20 +1,19 @@
 # Simulation Study
 
-We run NNES on the `canonical_high_action` synthetic cell. The
-low-dimensional `canonical_low_action` cell remains in the results file as a
-sanity check. The simulation asks whether the NPL-profiled neural value path
-can recover a finite-dimensional structural reward and counterfactual behavior
-when the state representation is encoded and richer than the small tabular
-reference. Real data cannot answer that question because the true reward,
-policy, value function, Q function, and counterfactual oracles are not
-observed.
+NNES runs on the `canonical_high_action` synthetic cell. The low-dimensional
+`canonical_low_action` cell remains in the results file as a sanity check.
+The simulation asks whether the NPL-profiled neural value path can recover a
+finite-dimensional structural reward and counterfactual behavior when the state
+representation is encoded and richer than the small tabular reference. Real
+data cannot answer that question because the true reward, policy, value
+function, Q function, and counterfactual objects are not observed.
 
-These results are not hand-entered examples. They come from the simulation harness. The harness fixes the transition law, reward features, and
-reward weights before generating the finite panel. Those objects define the
-true reward, policy, value function, Q function, and counterfactual oracles
-that are held back for evaluation. The estimator sees the generated panel, the
-transition law, encoded state features, and reward features, not the oracle
-dynamic objects.
+These results are not hand-entered examples. They come from the simulation
+harness. The harness fixes the transition law, reward features, and reward
+weights before generating the finite panel. Those objects define the true
+reward, policy, value function, Q function, and counterfactual targets held
+back for evaluation. The estimator sees the generated panel, the transition
+law, encoded state features, and reward features - not the oracle objects.
 
 ## Paper Simulation vs EconIRL Study
 
@@ -36,21 +35,6 @@ package simulation study: the DGP is frozen, the oracle objects are known
 before estimation, the high-dimensional primary cell has encoded states and 32
 reward parameters, and every reported result is tied to machine-readable
 numerical checks.
-
-## Older Plans and Current Status
-
-Older NNES planning files are useful for provenance but are not all current
-claims. A retired alignment note recorded an earlier diagnostic failure where
-NNES fit policy surfaces but did not yet pass the structural recovery checks.
-That failure is stale: the current NPL-profiled, anchored path is the reported
-path, and the live results file passes both the low-dimensional sanity cell and
-the high-dimensional primary cell.
-
-Other older plans, including `plan_rust_big.md` and the Keane-Wolpin JSS
-example plan, are planning or paper-example surfaces. They should not be read
-as current RTD simulation-study claims. In particular, the docs should not claim that
-NFXP or CCP fail on a Rust-big extension until a measured results file supports
-that result.
 
 The full result generator is
 [`nnes_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nnes/run.py).
@@ -135,6 +119,11 @@ The primary high-dimensional cell ran in 36.46 seconds.
 | Type B | 0.021651 | 0.002128 | 0.007916 | 0.005559 |
 | Type C | 0.013053 | 0.000920 | 0.002325 | 0.001314 |
 
-The estimates are not exactly equal to truth because the panel is finite and
-the value function is approximated. The study reports recovery within the
-listed tolerances in the frozen synthetic cells.
+The estimates are not exactly equal to the true parameters because the panel
+is finite and the value function is approximated. The study reports recovery
+within the listed tolerances in the frozen synthetic cells.
+
+NNES also appears in the cross-estimator comparison on the
+[bus engine replacement](../../simulation_studies/rust_bus.md) simulation
+study page, where it is benchmarked against the full structural and IRL
+rosters on a synthetic bus engine panel.

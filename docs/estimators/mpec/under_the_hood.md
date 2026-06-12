@@ -1,119 +1,93 @@
 # Under the Hood
 
-MPEC estimates a structural dynamic discrete choice likelihood while treating
-the value function as part of the optimizer state. The estimator chooses reward
-parameters and value variables jointly, subject to the Bellman fixed-point
-constraint.
-
-## Optimization Setup
-
-The observed panel supplies state, action, and next-state records. The
-transition law is estimated from the panel or supplied directly. Reward
-features, the discount factor, and the logit shock scale are fixed before
-optimization.
-
-MPEC optimizes the structural reward parameters `theta` and the integrated
-value vector `V` together. The objective is the conditional log likelihood of
-the observed actions. The Bellman equation is imposed as an equality
-constraint rather than solved inside each likelihood evaluation. The public
-simulation path uses the constrained SQP likelihood formulation.
-
 ## Model
 
-The observed data are state, action, and next-state trajectories.
+The data are state, action, next-state triples $(s, a, s')$ from a stationary
+infinite-horizon dynamic discrete choice model with linear flow utility
+$u_\theta(s, a) = \phi(s, a)^\top \theta$, known discount factor $\beta$,
+transition kernels $P_a(s' \mid s)$ in action-state-next-state orientation,
+and i.i.d. logit taste shocks with scale $\sigma$.
+
+The choice-specific value combines the flow payoff with the discounted
+continuation:
 
 $$
-(s_{it}, a_{it}, s_{i,t+1})
-$$
-
-The flow payoff is linear in known features.
-
-$$
-u_\theta(s, a) = \phi(s, a)^\top \theta
-$$
-
-The transition kernel is the probability of the next state given the current
-state and action.
-
-$$
-P_a(s, s') = \Pr(s_{t+1} = s' \mid s_t = s, a_t = a)
-$$
-
-The integrated value function must satisfy the soft Bellman equation.
-
-$$
-V(s)
-= \sigma \log \sum_a \exp\left(
-    \frac{
-        u_\theta(s, a)
-        + \beta \sum_{s'} P_a(s, s') V(s')
-    }{\sigma}
-\right)
-$$
-
-MPEC keeps this equation as an equality constraint instead of solving it
-inside each likelihood evaluation.
-
-$$
-g(\theta, V) = V - T_\theta(V) = 0
-$$
-
-The choice-specific value is defined as follows.
-
-$$
-Q_{\theta,V}(s, a)
+Q_\theta(s, a; V)
 = u_\theta(s, a)
-  + \beta \sum_{s'} P_a(s, s') V(s')
+  + \beta \sum_{s'} P_a(s, s') V(s').
 $$
 
-The implied conditional choice probability follows the soft-max rule.
+The soft Bellman operator maps any value vector to its log-sum-exp:
+
+$$
+T_\theta V(s)
+= \sigma \log \sum_a \exp\!\Bigl(Q_\theta(s, a; V) / \sigma\Bigr).
+$$
+
+The logit choice probability at any $({\theta}, V)$ pair is:
 
 $$
 \pi_{\theta,V}(a \mid s)
-=
-\frac{\exp(Q_{\theta,V}(s, a) / \sigma)}
-     {\sum_b \exp(Q_{\theta,V}(s, b) / \sigma)}
+= \frac{\exp\bigl(Q_\theta(s, a; V) / \sigma\bigr)}
+       {\sum_b \exp\bigl(Q_\theta(s, b; V) / \sigma\bigr)}.
 $$
 
-MPEC solves the constrained likelihood problem.
+## Constrained Estimator
+
+NFXP solves for $V_\theta = T_\theta V_\theta$ inside each likelihood
+evaluation, hiding the fixed point from the optimizer. MPEC keeps $V$ as
+an explicit optimization variable and writes the Bellman condition as a
+per-state equality constraint:
 
 $$
-(\hat{\theta}, \hat{V})
-= \arg\max_{\theta,V} \sum_{i,t}
-    \log \pi_{\theta,V}(a_{it} \mid s_{it})
+(\hat\theta,\, \hat V)
+= \arg\max_{\theta,\, V}
+  \sum_{i,t} \log \pi_{\theta,V}(a_{it} \mid s_{it})
 \quad \text{s.t.} \quad
-V = T_\theta(V)
+V - T_\theta V = 0.
 $$
+
+At any feasible point the constraint forces $V = V_\theta$, so MPEC and NFXP
+evaluate the same dynamic discrete choice likelihood. The difference is
+numerical geometry, not the structural target. The fitted summary exposes the
+final Bellman residual directly; NFXP hides it inside each inner solve.
+
+The implementation uses SLSQP with JAX-supplied objective gradients and
+Bellman constraint Jacobians. The value vector is initialized at the Bellman
+fixed point of the starting $\theta$, giving the optimizer a near-feasible
+start.
 
 ## Pseudocode
 
 ```text
-Input: panel, reward features, transitions, discount beta, shock scale sigma
-Choose initial reward parameters theta and value vector V
-Define the equality constraint g(theta, V) = V - T_theta(V)
+initialize theta; solve V = T_theta(V) for the starting value vector
+define the constraint c(theta, V) = V - T_theta(V)
 while the constrained optimizer has not stopped:
-    compute Q_{theta,V}(s, a) from theta, transitions, beta, and V
-    compute pi_{theta,V}(a | s) by the soft-max rule
-    evaluate the log likelihood of observed actions
-    evaluate g(theta, V) and its derivatives
-    update theta and V with the constrained optimizer
-return theta, V, pi, standard errors, and constraint diagnostics
+    compute Q(s, a) from theta, V, transitions, and beta
+    compute log pi(a | s) by the log-softmax rule
+    evaluate the conditional log likelihood
+    evaluate c(theta, V) and its Jacobian via JAX
+    update theta and V with SLSQP
+return theta, V, policy, standard errors, and constraint diagnostics
 ```
 
 ## Implementation Notes
 
-The simulation run uses the SQP path and reports the final Bellman constraint
-violation as a numerical check. The table includes both constraint
-satisfaction and recovery of reward, policy, value, Q, and counterfactual
-evaluation objects.
+Standard errors follow the same implicit score logic as NFXP. At the
+constrained optimum, the sensitivity of the value function to the reward
+parameters satisfies
 
-## Score Calculation
+$$
+(I - \beta P_\pi)\,\frac{\partial V}{\partial\theta}
+= \sum_a \pi(a \mid s)\,\phi(s, a),
+$$
 
-For linear rewards, the score has the same logit structure as NFXP, but the
-value function is part of the constrained optimizer state rather than an
-implicit inner-loop solution.
+where $P_\pi$ is the policy-weighted transition matrix. Per-observation score
+contributions are computed from this expression after convergence. The
+implementation gates on the final Bellman constraint violation as a numerical
+check alongside the standard convergence flag.
 
-The implementation computes per-observation gradients for inference after the
-constrained optimum is found. Standard errors are attached to the shared
-summary object so MPEC remains compatible with the same inference surface used
-by NFXP and CCP.
+The estimator lives in `econirl.estimation.mpec`. Use
+`MPECConfig(solver="sqp")` for the recommended SLSQP path. The
+`augmented_lagrangian` solver is retained for comparison but is less reliable
+at high discount factors.
