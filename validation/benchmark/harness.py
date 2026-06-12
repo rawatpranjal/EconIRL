@@ -463,12 +463,17 @@ def render_page(data: dict, narrative: dict) -> str:
         tt = ("" if cm["true_theta"] is None
               else f"True theta `{[round(x, 4) for x in cm['true_theta']]}`. ")
         d = cm["diagnostics"]
+        contrast = ""
+        if "contrast_rank" in d:
+            contrast = (f", action-contrast rank {d['contrast_rank']}/"
+                        f"{d['num_features']} (the rank that identification "
+                        f"from choices actually uses)")
         L.append(
             f"{cm['description']} {cm['n_individuals']} x {cm['n_periods']} "
             f"observations, {cm['n_replications']} replications, seed {cm['seed']}. "
             f"{tt}Design rank {d['feature_rank']}/{d['num_features']}, condition "
-            f"number {d['condition_number']:.2e}. Generated {meta['date']} with "
-            f"econirl {meta['package_version']}.\n"
+            f"number {d['condition_number']:.2e}{contrast}. Generated "
+            f"{meta['date']} with econirl {meta['package_version']}.\n"
         )
         before = narrative.get("cells", {}).get(cm["cell_id"], {}).get("before")
         if before:
@@ -627,6 +632,24 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
             # an --only-estimator merge.
             data["meta"]["diagnoses"] = diagnoses
             data["meta"]["excluded"] = excluded
+            # The displayed roster also follows the current script: estimators
+            # dropped from a page's scope after a run keep their raw records
+            # in the JSON but are no longer rendered, with the reason stated
+            # in the excluded list.
+            roster_by_cell = {c.cell_id: [{"name": e.name, "family": e.family,
+                                           "max_reps": e.max_reps}
+                                          for e in c.roster] for c in cells}
+            for cm in data["meta"]["cells"]:
+                if cm["cell_id"] in roster_by_cell:
+                    cm["roster"] = roster_by_cell[cm["cell_id"]]
+            # Diagnostics are deterministic functions of the environment, so
+            # newly added checks (e.g. the action-contrast rank) reach old
+            # pages without a re-run.
+            env_by_cell = {c.cell_id: c.env_factory for c in cells}
+            for cm in data["meta"]["cells"]:
+                if cm["cell_id"] in env_by_cell:
+                    cm["diagnostics"] = M.feature_diagnostics(
+                        np.asarray(env_by_cell[cm["cell_id"]]().feature_matrix))
             # DGP figures are presentation artifacts that regenerate
             # deterministically from the seeds, so a missing figure never
             # requires re-running the benchmark, and a figure added to the

@@ -176,35 +176,46 @@ ROSTER = (
 
 
 DIAGNOSES = {
-    "MaxEnt-IRL": "The Ziebart tradition this environment comes from. Fed "
-                  "action-dependent features: the terminal-reward feature depends "
-                  "on where the action leads, not on the state alone.",
-    "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether the "
-               "gradient norm crossed the tolerance; the objective often plateaus "
-               "first, so the flag can read False while the recovered policy is "
-               "essentially exact. Read it next to Policy TV.",
+    "MaxEnt-IRL": "The Ziebart tradition this environment comes from. Matches "
+                  "discounted feature counts; with two of three features "
+                  "state-only, most of its objective is insensitive to the "
+                  "choice contrasts the data carry.",
+    "MCE-IRL": "Causal maximum-entropy IRL. Two of its three reward directions "
+               "are unidentified here (state-only features), so its gradient "
+               "ascent can drift far along them; in one replication of three "
+               "the resulting policy collapsed outright. Read the per-rep "
+               "records, not just the mean.",
     "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit interface; "
                     "parameters are the neural reward projected onto the linear "
                     "features.",
     "AIRL": "reward_arg='state_action'; recovered parameters stay gauge/shaping-"
-            "unidentified by design, so policy TV is the right scorecard.",
-    "IQ-Learn": "q_type='linear' uses the feature structure; a tabular Q-table does "
-                "not propagate to states the expert never visits, and most of this "
-                "grid is rarely visited.",
-    "f-IRL": "f-divergence IRL; tracks behavior.",
-    "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
-    "BC": "Behavioral cloning; matches observed choices where data exists, but has "
-          "nothing to say at unvisited states and recovers no reward.",
-    "NFXP": "Structural contrast: full MLE with the correct linear utility.",
-    "CCP": "Structural contrast. CCP inverts estimated choice probabilities, which "
-           "is exactly where a concentrated state distribution (most trajectories "
-           "hug the start-to-goal diagonal) can hurt it.",
-    "MPEC": "Structural contrast: constrained MLE.",
+            "unidentified by design, so policy TV is the right scorecard, and "
+            "here even behavior is hard: the discriminator sees mostly "
+            "corridor states.",
+    "IQ-Learn": "q_type='linear' ties its Q function to the same feature basis, "
+                "so it inherits the contrast-rank problem on top of thin "
+                "coverage.",
+    "f-IRL": "Recovers a tabular reward, one value per state-action pair, which "
+             "does not depend on the deficient feature basis at all - the "
+             "strongest behavioral score on this page.",
+    "GLADIUS": "Neural Q and expected-value networks; tracks behavior where "
+               "data exists.",
+    "BC": "Behavioral cloning; matches observed choices where data exists, "
+          "falls back to uniform where it does not, and recovers no reward.",
+    "NFXP": "Structural contrast: exact MLE. It reproduces the true policy "
+            "almost perfectly while reporting parameters far from the truth - "
+            "the likelihood is flat along the two state-only feature "
+            "directions, so the parameter numbers are arbitrary points on a "
+            "ridge, not estimation error.",
+    "CCP": "Structural contrast. Same flat likelihood as NFXP, plus inverted "
+           "choice probabilities estimated from a concentrated state "
+           "distribution.",
+    "MPEC": "Structural contrast: constrained MLE on the same ridge.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
-            "weighting (OUFXP). Like CCP it starts from inverted empirical "
-            "choice probabilities, so thin state coverage is its natural "
-            "stress; its conditions are scored only at visited states and the "
-            "optimal weights downweight thin states by their sample share.",
+            "weighting (OUFXP). Its moment system is built from exactly the "
+            "action-contrast features, so the rank-1 contrast design leaves "
+            "two directions to the minimum-norm solution; behavior stays "
+            "close, parameters are pinned only in the identified direction.",
 }
 
 EXCLUDED = [
@@ -296,6 +307,22 @@ NARRATIVE = {
     "cells": {
         "gridworld": {
             "after": (
+                "The headline reading is the gap between the Policy TV and "
+                "Param RMSE columns for the structural family: near-perfect "
+                "behavior with parameter estimates orders of magnitude from "
+                "the truth. That is not estimation error, it is structural "
+                "non-identification, and the design line above the table "
+                "says why: the raw feature design has full rank, but the "
+                "action-contrast design - the only thing choice data can "
+                "ever identify - has rank 1, because the step-penalty and "
+                "distance features take the same value for every action at a "
+                "state and difference out of every choice probability. Any "
+                "parameter vector on that two-dimensional ridge produces the "
+                "same behavior, so each estimator reports an arbitrary ridge "
+                "point. The practical lesson: check the rank of the "
+                "action-differenced features before estimating, not just the "
+                "raw design.\n"
+                "\n"
                 "One regret caveat specific to this page: transitions here are "
                 "deterministic, so the Type B intervention (replace the dynamics "
                 "with a random sparse world) is a stark change rather than a "

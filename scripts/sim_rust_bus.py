@@ -221,10 +221,8 @@ ROSTER = (
     RosterEntry("IQ-Learn", "behavioral", _run_iq_learn),
     RosterEntry("GLADIUS", "behavioral", _run_gladius),
     RosterEntry("AIRL", "behavioral", _run_airl),
-    RosterEntry("f-IRL", "behavioral", _run_firl),
     RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl),
     RosterEntry("MaxMargin-IRL", "behavioral", _run_max_margin),
-    RosterEntry("BC", "behavioral", _run_bc),
 )
 
 
@@ -302,6 +300,11 @@ EXCLUDED = [
     {"name": "GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "dropped from the "
      "page roster by scope decision to keep the comparison on the core "
      "structural and IRL families"},
+    {"name": "f-IRL, BC", "reason": "dropped from this page's display by scope "
+     "decision: both recover objects outside the two-parameter cost gauge (a "
+     "tabular reward and a choice-probability table respectively), so their "
+     "rows invite meaningless parameter comparisons here; their raw records "
+     "remain in the results file"},
 ]
 
 CELLS = (

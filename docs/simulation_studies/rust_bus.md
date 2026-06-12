@@ -26,7 +26,7 @@ $$
 
 and the panel simulates $N$ buses for $T$ periods from $\pi^*$. The figure shows the sawtooth mileage paths (rising drift, replacement resets) and the declining value of holding higher mileage. Every estimator below sees the same panels.
 
-Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-replace choice over a discretized mileage state, with linear operating and replacement costs. `RustBusEnvironment(num_mileage_bins=20, operating_cost=0.01, replacement_cost=2.0, discount_factor=0.95)`. 500 x 80 observations, 3 replications, seed 42. True theta `[0.01, 2.0]`. Design rank 2/2, condition number 1.11e+01. Generated 2026-06-12 with econirl 0.0.4.
+Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-replace choice over a discretized mileage state, with linear operating and replacement costs. `RustBusEnvironment(num_mileage_bins=20, operating_cost=0.01, replacement_cost=2.0, discount_factor=0.95)`. 500 x 80 observations, 3 replications, seed 42. True theta `[0.01, 2.0]`. Design rank 2/2, condition number 1.11e+01, action-contrast rank 2/2 (the rank that identification from choices actually uses). Generated 2026-06-12 with econirl 0.0.4.
 
 ![Simulated trajectories and the optimal value function for Bus engine (20 mileage bins)](../_static/simulation_studies/rust_bus_dgp.png)
 
@@ -46,10 +46,8 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 | IQ-Learn | behavioral | 3/3 | 3/3 | [-0.016, 1.519] | - | 0.0420 | 0.4733 | 0.5252 | 0.1696 | 0.0004 | 1.9 |
 | GLADIUS | behavioral | 3/3 | 3/3 | [0.029, 2.031] | - | 0.0095 | 0.0773 | 0.0795 | 0.0631 | 0.0542 | 32.7 |
 | AIRL | behavioral | 3/3 | 0/3 | [0.020, 2.034] | - | 0.0528 | 0.0251 | 0.0261 | 0.0140 | 0.0025 | 132.5 |
-| f-IRL | behavioral | 3/3 | 3/3 | not in theta gauge (40 values) | - | 0.0266 | 0.0536 | 0.0490 | 0.1652 | 20.4010 | 23.9 |
 | Deep-MCE-IRL | behavioral | 3/3 | 3/3 | [-0.082, 0.568] | - | 0.0092 | 3.3450 | 3.2419 | 1.6305 | 0.0005 | 14.0 |
 | MaxMargin-IRL | behavioral | 3/3 | 3/3 | [0.244, 0.970] | - | 0.6341 | 5.0624 | 5.0810 | 19.6480 | 10.1756 | 0.5 |
-| BC | behavioral | 3/3 | 3/3 | not in theta gauge (40 values) | - | 0.0191 | 0.0045 | 0.0054 | 0.3624 | 23.8907 | 0.2 |
 
 Param RMSE is the structural family only (recovered theta vs true, same gauge). Recovered params are shown only when the estimator's parameter vector lives in the data-generating gauge; a tabular reward or a choice-probability table is labeled rather than printed, because comparing it to theta entry by entry would be meaningless. Policy TV is total-variation distance from the true-parameter policy. Conv is the converged flag reported by the estimator itself; a conservative flag can read False while the recovered policy is accurate, so read it next to Policy TV, not alone. Regret is welfare loss (lower is better): `base` is the observed world; `A` payoff shift, `B` transition change, `C` action penalty. Estimators that recovered a reward in the linear feature gauge re-solve it under each intervention and adapt. Large Type C regret has two distinct routes: estimators with no reward in that gauge keep their frozen policy and cannot adapt, and an estimator that transfers a badly scaled reward adapts to the wrong world.
 
@@ -234,23 +232,6 @@ def _run_airl(env, panel):
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 ```
 
-### f-IRL
-
-Uses the forward-KL divergence (bounded density-ratio gradient; the chi-squared variant's unbounded gradient is unstable on near-deterministic experts) with a reward clip matched to the problem's cost scale. It recovers a tabular reward, one value per state-action pair, which tracks behavior well but lives outside the two-feature cost gauge - so it cannot be re-solved under the interventions and is scored with its frozen policy, which is why its Type C regret is large.
-
-```python
-def _run_firl(env, panel):
-    from econirl.estimation.f_irl import FIRLEstimator
-
-    # fkl is the estimator's validated divergence for state-action cells: its
-    # log density-ratio gradient is bounded, where the chi2 ratio gradient is
-    # unbounded and saturates the reward clip on near-deterministic experts.
-    # reward_clip=10 matches the natural cost scale (the estimator default).
-    est = FIRLEstimator(f_divergence="fkl", lr=0.2, max_iter=400, reward_clip=10.0,
-                        verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
-
 ### Deep-MCE-IRL
 
 Neural-reward MCE-IRL via its sklearn-style fit interface; parameters are the neural reward projected onto the linear features.
@@ -287,18 +268,6 @@ def _run_max_margin(env, panel):
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 ```
 
-### BC
-
-Behavioral cloning; matches observed choices but recovers no reward at all - its parameter vector is just the smoothed keep/replace frequency per mileage bin - so it cannot transfer to a counterfactual world and its Type C regret is large.
-
-```python
-def _run_bc(env, panel):
-    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator
-
-    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
-
 ## Reproduce
 
 ```bash
@@ -309,4 +278,4 @@ python scripts/sim_rust_bus.py --verify        # re-derive the table from JSON
 
 Raw facts: `validation/results/sim_rust_bus.json`. Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).
 
-Excluded from this run: AIRL-Het / AAIRL (designed for latent-type heterogeneity; this panel has a single agent type); MMP (dropped from the roster for cost after an exploratory fit ran orders of magnitude past its cousins' runtimes on this small problem); GAIL (did not finish a single exploratory fit within this page's per-fit budget); GCL, DeepMaxEnt-IRL, Bayesian-IRL (dropped from the page roster by scope decision to keep the comparison on the core structural and IRL families).
+Excluded from this run: AIRL-Het / AAIRL (designed for latent-type heterogeneity; this panel has a single agent type); MMP (dropped from the roster for cost after an exploratory fit ran orders of magnitude past its cousins' runtimes on this small problem); GAIL (did not finish a single exploratory fit within this page's per-fit budget); GCL, DeepMaxEnt-IRL, Bayesian-IRL (dropped from the page roster by scope decision to keep the comparison on the core structural and IRL families); f-IRL, BC (dropped from this page's display by scope decision: both recover objects outside the two-parameter cost gauge (a tabular reward and a choice-probability table respectively), so their rows invite meaningless parameter comparisons here; their raw records remain in the results file).
