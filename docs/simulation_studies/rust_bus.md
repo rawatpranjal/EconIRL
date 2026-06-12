@@ -4,7 +4,7 @@ The canonical structural benchmark (Rust 1987). A single agent decides each peri
 
 ## The data-generating process
 
-Mileage sits on a discrete grid $s \in \{0, \ldots, S-1\}$. Keeping the engine (action $0$) pays a per-bin operating cost and lets mileage drift up by $\Delta s \in \{0, 1, 2\}$; replacing it (action $1$) pays a flat cost and resets the engine:
+Mileage sits on a discrete grid $s \in \{0, \ldots, S-1\}$. Keeping the engine (action $0$) pays a per-bin operating cost and lets mileage drift up by $\Delta s \in \{0, 1, 2\}$. Replacing it (action $1$) pays a flat cost and resets the engine:
 
 $$
 u_\theta(s, a) =
@@ -16,8 +16,9 @@ u_\theta(s, a) =
 P(s' \mid s, 1) = p_{\Delta s'},\ s' \in \{0, 1, 2\},
 $$
 
-where replacement resets the engine and the same one-period drift $p = (p_0, p_1, p_2)$ then applies from zero, so the post-replacement state lands on $\{0, 1, 2\}$ rather than exactly on zero. 
-with $\theta_{\mathrm{oc}} = 0.01$ and $\theta_{\mathrm{rc}} = 2.0$. The agent discounts at $\beta$ and faces i.i.d. logit taste shocks (scale $\sigma = 1$), so behavior solves the soft Bellman equation
+where replacement resets the engine and the same one-period drift $p = (p_0, p_1, p_2)$ then applies from zero, so the post-replacement state lands on $\{0, 1, 2\}$ rather than exactly on zero.
+
+The true parameters are $\theta_{\mathrm{oc}} = 0.01$ and $\theta_{\mathrm{rc}} = 2.0$. The agent discounts at $\beta$ and faces i.i.d. logit taste shocks (scale $\sigma = 1$), so behavior solves the soft Bellman equation
 
 $$
 V(s) = \log \sum_{a} \exp\Bigl(u_\theta(s,a) + \beta\, \mathbb{E}\bigl[V(s') \mid s,a\bigr]\Bigr),
@@ -49,224 +50,39 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 | Deep-MCE-IRL | behavioral | 3/3 | 3/3 | [-0.082, 0.568] | - | 0.0092 | 3.3450 | 3.2419 | 1.6305 | 0.0005 | 14.0 |
 | MaxMargin-IRL | behavioral | 3/3 | 3/3 | [0.244, 0.970] | - | 0.6341 | 5.0624 | 5.0810 | 19.6480 | 10.1756 | 0.5 |
 
-Param RMSE is the structural family only (recovered theta vs true, same gauge). Recovered params are shown only when the estimator's parameter vector lives in the data-generating gauge; a tabular reward or a choice-probability table is labeled rather than printed, because comparing it to theta entry by entry would be meaningless. Policy TV is total-variation distance from the true-parameter policy. Conv is the converged flag reported by the estimator itself; a conservative flag can read False while the recovered policy is accurate, so read it next to Policy TV, not alone. Regret is welfare loss (lower is better): `base` is the observed world; `A` payoff shift, `B` transition change, `C` action penalty. Estimators that recovered a reward in the linear feature gauge re-solve it under each intervention and adapt. Large Type C regret has two distinct routes: estimators with no reward in that gauge keep their frozen policy and cannot adapt, and an estimator that transfers a badly scaled reward adapts to the wrong world.
+Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only on that same scale. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
 
-Reading the table: the structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP) recovers the cost parameters in the same gauge as the truth, so Param RMSE applies to it alone. The IRL family is scored on behavior and regret; reward parameters from these methods live in a different gauge (reward is only partially identified from behavior), so parameter-level comparisons across the divide would be meaningless. Estimators that recover a reward in the linear feature gauge adapt under the Type A/B/C interventions; policy-only methods keep their frozen policy, which is exactly why their Type C regret is large.
+The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the cost parameters on the same scale as the truth, so Param RMSE applies to it alone. The IRL family is scored on behavior and regret. Its reward parameters are on a different scale, because reward is only partially identified from behavior. Estimators that recover a transferable reward adapt under the interventions. Policy-only methods keep their old policy, which is why their Type C regret is large.
 
-## Code used
+## Notes per estimator
 
-The exact construction for each estimator (configs are modest defaults with documented fixes, not tuned per cell):
+**NFXP.** Reference structural estimator; recovers cleanly.
 
-### NFXP
+**CCP.** Hotz-Miller conditional choice probabilities; recovers cleanly.
 
-Reference structural estimator; recovers cleanly.
+**MPEC.** Constrained MLE; recovers cleanly.
 
-```python
-def _run_nfxp(env, panel):
-    from econirl.estimation import NFXPEstimator
+**NNES.** Neural value network plus structural MLE.
 
-    est = NFXPEstimator(inner_solver="hybrid", inner_tol=1e-10,
-                        inner_max_iter=100000, compute_hessian=True, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
+**SEES.** Solver-limited here, not model-limited. The spline basis represents the true value function exactly, but the two cost coefficients live on very different scales. That stretches the optimization landscape, and the default iteration limit stopped the search mid-descent. With a larger budget and an extra data-driven start it matches the other structural methods.
 
-### CCP
+**TD-CCP.** Neural CCP with approximate value iteration.
 
-Hotz-Miller conditional choice probabilities; recovers cleanly.
+**UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting (OUFXP). The value function is eliminated before any parameter search, so the linear case is closed form. The optimal weights make it as efficient as maximum likelihood, and the standard errors come from the same theory.
 
-```python
-def _run_ccp(env, panel):
-    from econirl.estimation import CCPEstimator
+**MCE-IRL.** Causal maximum-entropy IRL. Its converged flag reports whether the gradient norm crossed the tolerance. The objective often plateaus first, so the flag can read False while the recovered policy is essentially exact. Read it next to Policy TV.
 
-    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
+**MaxEnt-IRL.** Fed action-dependent features. Its gradient loop previously took a fixed scalar step, which overshoots when feature columns differ in scale by an order of magnitude. The loop now takes adaptive per-parameter steps, the same scheme MCE-IRL uses. A small residual gap to MCE-IRL remains because trajectory-entropy matching is not the causal choice model that generated the data.
 
-### MPEC
+**IQ-Learn.** q_type='linear' uses the feature structure. A tabular Q-table does not propagate to unvisited states.
 
-Constrained MLE; recovers cleanly.
+**GLADIUS.** Neural Q and expected-value networks; tracks behavior.
 
-```python
-def _run_mpec(env, panel):
-    from econirl.estimation.mpec import MPECConfig, MPECEstimator
+**AIRL.** Uses reward_arg='state_action'. The recovered reward is on its own scale by design, so policy TV is the right scorecard.
 
-    est = MPECEstimator(config=MPECConfig(solver="slsqp", max_iter=200, constraint_tol=1e-6),
-                        compute_hessian=True, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
+**Deep-MCE-IRL.** Neural-reward MCE-IRL via its sklearn-style fit interface; parameters are the neural reward projected onto the linear features.
 
-### NNES
-
-Neural value network plus structural MLE.
-
-```python
-def _run_nnes(env, panel):
-    from econirl.estimation.nnes import NNESEstimator
-
-    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,
-                        compute_se=False, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
-
-### SEES
-
-Solver-limited here, not model-limited: the spline value basis represents the true value function exactly, but the cost coefficients live on very different scales (a tiny per-bin operating cost against a large flat replacement cost), which stretches the optimization landscape so the default iteration limit stopped the search mid-descent. With a larger budget and an extra data-driven start it reaches the same estimates as the other structural methods.
-
-```python
-def _run_sees(env, panel):
-    from econirl.estimation.sees import SEESEstimator
-
-    # Basis must span the value function: bspline basis_dim >= num_states (20).
-    # The cost coefficients live on very different scales here (per-bin
-    # operating cost vs a flat replacement cost), which stretches the
-    # optimization landscape: the default 500 L-BFGS iterations stop
-    # mid-descent. More iterations plus a data-driven extra start reach the
-    # optimum the basis already represents exactly.
-    est = SEESEstimator(basis_type="bspline", basis_dim=20, warm_start_value=True,
-                        penalty_weight=10.0, max_iter=3000, num_theta_starts=3,
-                        compute_se=False, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
-
-### TD-CCP
-
-Neural CCP with approximate value iteration.
-
-```python
-def _run_tdccp(env, panel):
-    from econirl.estimation import TDCCPConfig, TDCCPEstimator
-
-    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,
-                                            epochs_per_avi=15, compute_se=False, verbose=False))
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
-
-### UFXP
-
-Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting (OUFXP). Bellman first-order conditions are scored with the value function eliminated before any parameter search, so the linear case is closed form; the optimal weights make it as asymptotically efficient as maximum likelihood, and standard errors come from the efficient moment variance.
-
-```python
-def _run_ufxp(env, panel):
-    from econirl.estimation import UFXPEstimator
-
-    # Bray's unnested fixed point with the paper's optimal weighting (OUFXP):
-    # closed form for linear utility, MLE-efficient, with standard errors from
-    # the efficient moment variance.
-    est = UFXPEstimator(weights="optimal", verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
-
-### MCE-IRL
-
-Causal maximum-entropy IRL. Its converged flag reports whether the gradient norm crossed the tolerance; the objective often plateaus first, so the flag can read False while the recovered policy is essentially exact. Read it next to Policy TV.
-
-```python
-def _run_mce_irl(env, panel):
-    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
-
-    est = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,
-                                              inner_max_iter=2000, compute_se=False, verbose=False))
-    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
-```
-
-### MaxEnt-IRL
-
-Fed action-dependent features. Its gradient loop previously took a fixed scalar step, which overshoots when feature columns differ in scale by an order of magnitude (mileage cost vs a unit replacement indicator); the loop now takes adaptive per-parameter steps, the same scheme its causal cousin MCE-IRL uses. A small residual gap to MCE-IRL remains because trajectory-entropy feature matching is not the causal choice model that generated the data.
-
-```python
-def _run_maxent_irl(env, panel):
-    from econirl.contrib.maxent_irl import MaxEntIRLEstimator
-
-    # Feed the action-dependent features: a state-only reward cannot represent
-    # the action contrast that drives the keep/replace choice. learning_rate
-    # drives the Adam step (a fixed scalar step overshoots the mileage-cost
-    # coordinate, whose feature column is ~19x the replacement indicator's).
-    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,
-                             learning_rate=0.05, compute_hessian=False, verbose=False)
-    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
-```
-
-### IQ-Learn
-
-q_type='linear' uses the feature structure; a tabular Q-table does not propagate to unvisited states.
-
-```python
-def _run_iq_learn(env, panel):
-    from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
-
-    # q_type="linear" uses the feature structure; a tabular Q does not
-    # propagate to unvisited states.
-    est = IQLearnEstimator(config=IQLearnConfig(q_type="linear", divergence="chi2",
-                                                alpha=3.0, max_iter=2000, verbose=False))
-    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
-```
-
-### GLADIUS
-
-Neural Q and expected-value networks; tracks behavior.
-
-```python
-def _run_gladius(env, panel):
-    from econirl.estimation import GLADIUSConfig, GLADIUSEstimator
-
-    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=300, q_hidden_dim=128,
-                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,
-                                                patience=60, compute_se=False, verbose=False))
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-```
-
-### AIRL
-
-reward_arg='state_action'; recovered parameters stay gauge/shaping-unidentified by design, so policy TV is the right scorecard.
-
-```python
-def _run_airl(env, panel):
-    from econirl.estimation import AIRLConfig, AIRLEstimator
-
-    # reward_arg="state_action": the default "state" marginalizes the reward
-    # across actions. Recovered parameters stay gauge/shaping-unidentified by
-    # design, so policy TV is the right scorecard.
-    est = AIRLEstimator(config=AIRLConfig(reward_type="linear", reward_arg="state_action",
-                                          reward_lr=0.01, discriminator_steps=10,
-                                          max_rounds=300, compute_se=False, verbose=False))
-    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
-```
-
-### Deep-MCE-IRL
-
-Neural-reward MCE-IRL via its sklearn-style fit interface; parameters are the neural reward projected onto the linear features.
-
-```python
-def _run_deep_mce_irl(env, panel):
-    from types import SimpleNamespace
-
-    from econirl.estimators.mceirl_neural import MCEIRLNeural
-
-    # sklearn-style .fit interface; adapted to the uniform result shape. coef_
-    # is the neural reward projected onto the linear features, so the regret
-    # transfer uses that projection, not the raw network.
-    m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),
-                     discount=float(env.problem_spec.discount_factor),
-                     max_epochs=200, verbose=False)
-    m.fit(panel, features=np.asarray(env.feature_matrix),
-          transitions=np.asarray(env.transition_matrices))
-    return SimpleNamespace(parameters=m.coef_, standard_errors=None, policy=m.policy_,
-                           value_function=m.value_, converged=bool(m.converged_))
-```
-
-### MaxMargin-IRL
-
-An honest structural failure, not a tuning problem: max-margin apprenticeship learning recovers a reward direction under a unit-norm normalization with no link to the choice model's noise scale, so the policy it implies is far sharper than the truth, and the extreme asymmetry between the per-bin operating cost and the flat replacement cost makes the replacement feature dominate the margin. The resulting policy distance is structural to the method on this problem.
-
-```python
-def _run_max_margin(env, panel):
-    from econirl.contrib.max_margin_irl import MaxMarginIRLEstimator
-
-    # Requires a reward spec (LinearReward/ActionDependentReward), not the
-    # structural LinearUtility wrapper.
-    est = MaxMarginIRLEstimator(max_iterations=50, compute_hessian=False, verbose=False)
-    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
-```
+**MaxMargin-IRL.** A structural failure, not a tuning problem. Max-margin apprenticeship learning recovers a reward direction under a unit-norm constraint, with no link to the choice model's noise scale. The policy it implies is far sharper than the truth. The flat replacement cost also dominates the margin against the small per-bin operating cost. The policy distance is inherent to the method on this problem.
 
 ## Reproduce
 
@@ -278,4 +94,4 @@ python scripts/sim_rust_bus.py --verify        # re-derive the table from JSON
 
 Raw facts: `validation/results/sim_rust_bus.json`. Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).
 
-Excluded from this run: AIRL-Het / AAIRL (designed for latent-type heterogeneity; this panel has a single agent type); MMP (dropped from the roster for cost after an exploratory fit ran orders of magnitude past its cousins' runtimes on this small problem); GAIL (did not finish a single exploratory fit within this page's per-fit budget); GCL, DeepMaxEnt-IRL, Bayesian-IRL (dropped from the page roster by scope decision to keep the comparison on the core structural and IRL families); f-IRL, BC (dropped from this page's display by scope decision: both recover objects outside the two-parameter cost gauge (a tabular reward and a choice-probability table respectively), so their rows invite meaningless parameter comparisons here; their raw records remain in the results file).
+Excluded from this run: AIRL-Het / AAIRL (designed for latent-type heterogeneity; this panel has a single agent type); MMP (dropped from the roster for cost after an exploratory fit ran orders of magnitude past its cousins' runtimes on this small problem); GAIL (did not finish a single exploratory fit within this page's per-fit budget); GCL, DeepMaxEnt-IRL, Bayesian-IRL (dropped from the page roster by scope decision to keep the comparison on the core structural and IRL families); f-IRL, BC (dropped from this page's display by scope decision. Both recover objects in a different parameterization, a tabular reward and a choice-probability table. Their rows would invite meaningless parameter comparisons here. Their raw records remain in the results file).

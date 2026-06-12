@@ -354,10 +354,10 @@ def _results_table(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
         if plists and len({len(p) for p in plists}) == 1:
             k = len(plists[0])
             if true_theta is not None and k != true_theta.shape[0]:
-                # Not parameters in the data-generating gauge (e.g. a tabular
+                # Not parameters on the true model's scale (e.g. a tabular
                 # reward or a choice-probability table); printing the raw
                 # vector would invite a meaningless comparison to theta.
-                params_s = f"not in theta gauge ({k} values)"
+                params_s = f"different parameterization ({k} values)"
             else:
                 mean_p = np.mean(np.asarray(plists, dtype=np.float64), axis=0)
                 params_s = "[" + ", ".join(f"{v:.3f}" for v in mean_p) + "]"
@@ -421,31 +421,26 @@ def _param_block(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
                      f"{s['mean_estimate'][k]:.3f} | {s['bias'][k]:+.3f} | "
                      f"{s['empirical_se'][k]:.3f} | {s['rmse'][k]:.3f} | {cov_s} | {se_rate} |")
     L.append("")
-    L.append("Coverage is the share of replications whose normal-approximation 95% "
-             "interval contains the truth, with its Monte Carlo standard error; it is "
-             "computed only where every replication produced a finite standard error. "
-             "SE avail is the share of replications with finite standard errors for "
-             "all parameters.")
+    L.append("Coverage is the share of replications whose 95% interval contains the "
+             "truth, shown with its Monte Carlo standard error. It is computed only "
+             "where every replication produced a finite standard error. SE avail is "
+             "the share of replications with finite standard errors.")
     L.append("")
     return L
 
 
 _TABLE_NOTE = (
-    "Param RMSE is the structural family only (recovered theta vs true, same "
-    "gauge). Recovered params are shown only when the estimator's parameter "
-    "vector lives in the data-generating gauge; a tabular reward or a "
-    "choice-probability table is labeled rather than printed, because "
-    "comparing it to theta entry by entry would be meaningless. Policy TV is "
-    "total-variation distance from the true-parameter policy. Conv is the "
-    "converged flag reported by the estimator itself; a conservative flag can "
-    "read False while the recovered policy is accurate, so read it next to "
-    "Policy TV, not alone. Regret is welfare loss (lower is better): `base` "
-    "is the observed world; `A` payoff shift, `B` transition change, `C` "
-    "action penalty. Estimators that recovered a reward in the linear feature "
-    "gauge re-solve it under each intervention and adapt. Large Type C regret "
-    "has two distinct routes: estimators with no reward in that gauge keep "
-    "their frozen policy and cannot adapt, and an estimator that transfers a "
-    "badly scaled reward adapts to the wrong world."
+    "Param RMSE is reported for the structural family only. Those estimators "
+    "share the parameterization of the true model, so the comparison is "
+    "meaningful. Recovered params are printed only on that same scale. A "
+    "tabular reward or a choice-probability table is labeled instead of "
+    "printed. Policy TV is the total-variation distance from the "
+    "true-parameter policy. Conv is the estimator's own convergence flag. A "
+    "conservative flag can read False while the policy is accurate, so read "
+    "it next to Policy TV. Regret is welfare loss, lower is better. Base is "
+    "the observed world. Type A shifts a payoff, Type B changes the "
+    "transitions, Type C penalizes an action. Structural estimators re-solve "
+    "the model and adapt. Behavioral estimators keep their old policy."
 )
 
 
@@ -523,23 +518,20 @@ def render_page(data: dict, narrative: dict) -> str:
     if extra:
         L.append(extra.strip() + "\n")
 
-    L.append("## Code used\n")
-    L.append("The exact construction for each estimator (configs are modest "
-             "defaults with documented fixes, not tuned per cell):\n")
-    seen = set()
     diagnoses = meta.get("diagnoses", {})
+    seen = set()
+    notes = []
     for cm in meta["cells"]:
         for spec in cm["roster"]:
             name = spec["name"]
-            if name in seen or name not in meta["snippets"]:
+            if name in seen:
                 continue
             seen.add(name)
-            L.append(f"### {name}\n")
             if diagnoses.get(name):
-                L.append(f"{diagnoses[name]}\n")
-            L.append("```python")
-            L.append(meta["snippets"][name].rstrip())
-            L.append("```\n")
+                notes.append(f"**{name}.** {diagnoses[name]}")
+    if notes:
+        L.append("## Notes per estimator\n")
+        L.append("\n\n".join(notes) + "\n")
 
     L.append("## Reproduce\n")
     L.append("```bash")
@@ -642,6 +634,12 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
             for cm in data["meta"]["cells"]:
                 if cm["cell_id"] in roster_by_cell:
                     cm["roster"] = roster_by_cell[cm["cell_id"]]
+            # Cell descriptions and labels are interpretive prose like the
+            # diagnoses, so they also follow the current script.
+            desc_by_cell = {c.cell_id: (c.label, c.description) for c in cells}
+            for cm in data["meta"]["cells"]:
+                if cm["cell_id"] in desc_by_cell:
+                    cm["label"], cm["description"] = desc_by_cell[cm["cell_id"]]
             # Diagnostics are deterministic functions of the environment, so
             # newly added checks (e.g. the action-contrast rank) reach old
             # pages without a re-run.

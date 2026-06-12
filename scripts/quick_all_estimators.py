@@ -178,7 +178,7 @@ def _run_airl(env, panel):
     # reward_arg="state_action": the default "state" marginalizes the reward
     # across actions and cannot represent the action contrast (workflow
     # diagnosis). AIRL accepts a reward spec, not a utility. Policy TV is fixed;
-    # the recovered parameters stay gauge/shaping-unidentified by design.
+    # the recovered reward is on its own scale by design.
     est = AIRLEstimator(config=AIRLConfig(reward_type="linear", reward_arg="state_action",
                                           reward_lr=0.01, discriminator_steps=10,
                                           max_rounds=300, compute_se=False, verbose=False))
@@ -251,12 +251,12 @@ DIAGNOSES = {
                   "contrast (policy TV 0.23 -> 0.01).",
     "IQ-Learn": "Fixed: q_type='linear'. A tabular Q-table does not propagate to "
                 "unvisited states (policy TV 0.29 -> 0.04).",
-    "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
+    "GLADIUS": "Neural Q and expected-value networks. Tracks behavior.",
     "AIRL": "Fixed: reward_arg='state_action'. The default 'state' marginalized the "
-            "reward across actions (policy TV 0.24 -> 0.02); recovered parameters "
-            "stay gauge/shaping-unidentified by design, so TV is the right scorecard.",
-    "f-IRL": "f-divergence IRL; tracks behavior.",
-    "BC": "Behavioral cloning; matches observed choices but recovers no reward, so "
+            "reward across actions (policy TV 0.24 -> 0.02). The recovered reward "
+            "is on its own scale by design, so TV is the right scorecard.",
+    "f-IRL": "f-divergence IRL. Tracks behavior.",
+    "BC": "Behavioral cloning. Matches observed choices but recovers no reward, so "
           "it cannot transfer to a counterfactual world.",
 }
 
@@ -419,9 +419,9 @@ def render(data: dict) -> str:
         lines.append(f"{name:<12} {family:<11} {ran:>5} {prmse:>10} {tv:>9} {rt:>8}  {note}")
 
     lines.append("")
-    lines.append("ParamRMSE: structural family only (recovered theta vs true, same gauge).")
+    lines.append("ParamRMSE: structural family only (recovered theta vs true, same parameterization).")
     lines.append("PolicyTV: total-variation distance from the true-parameter policy (all estimators).")
-    lines.append("Configs are modest quick-run defaults, not tuned; numbers are config-sensitive "
+    lines.append("Configs are modest quick-run defaults, not tuned. Numbers are config-sensitive "
                  "(e.g. SEES depends on basis_dim), so read this as a smoke test, not a ranking.")
     if meta["excluded"]:
         lines.append("Excluded from this quick run:")
@@ -458,12 +458,13 @@ def render_page(data: dict) -> str:
     L = []
     L.append("# Abstract MDP 1: sanity check\n")
     L.append(
-        "The simplest abstract problem: a small but non-trivial random MDP with an "
-        "action-dependent linear reward, easy enough that a correct estimator must "
-        "recover it. It is the sanity check that the whole roster works before "
-        "harder regimes. Every estimator on the uniform estimate interface is run; "
-        "the table reports the exact recovered parameters, recovery error, policy "
-        "distance from the true policy, and counterfactual regret.\n"
+        "The simplest abstract problem. A small but non-trivial random MDP "
+        "with an action-dependent linear reward, easy enough that a correct "
+        "estimator must recover it. It is the sanity check that the whole "
+        "roster works before the harder regimes. Every estimator on the "
+        "uniform estimate interface runs here. The table reports the exact "
+        "recovered parameters, the recovery error, the policy distance from "
+        "the truth, and the counterfactual regret.\n"
     )
     L.append(
         f"Environment: `random_mdp(num_states={m['num_states']}, "
@@ -491,8 +492,8 @@ def render_page(data: dict) -> str:
     )
     L.append(
         "The reward is linear in features of the normalized state index "
-        "$x_s = s/(S-1)$. Action $0$ is a zeroed outside option (the "
-        "identification anchor); for action $1$,\n"
+        "$x_s = s/(S-1)$. Action $0$ is a zeroed outside option, the "
+        "identification anchor. For action $1$,\n"
     )
     L.append(
         "$$\n"
@@ -517,7 +518,7 @@ def render_page(data: dict) -> str:
     L.append(
         "and the data are $N$ independent agents simulated for $T$ periods "
         "from $\\pi^*$ and the transition law. The figure shows what that "
-        "produces: state paths mix across the whole space, and the optimal "
+        "produces. State paths mix across the whole space, and the optimal "
         "value function varies smoothly in the state index.\n"
     )
     L.append("![Simulated trajectories and the optimal value function]"
@@ -532,13 +533,13 @@ def render_page(data: dict) -> str:
         ok = [r for r in recs if r["error"] is None]
         ran = f"{len(ok)}/{len(recs)}"
         # Exact recovered params: mean over successful reps when lengths agree.
-        # Vectors outside the data-generating gauge (a tabular reward, a
-        # choice-probability table) are labeled, not printed: comparing them
-        # to theta entry by entry would be meaningless.
+        # Vectors on a different scale (a tabular reward, a choice-probability
+        # table) are labeled, not printed: comparing them to theta entry by
+        # entry would be meaningless.
         plists = [r["params"] for r in ok if r["params"] is not None]
         if plists and len({len(p) for p in plists}) == 1:
             if len(plists[0]) != true_theta.shape[0]:
-                params_s = f"not in theta gauge ({len(plists[0])} values)"
+                params_s = f"different parameterization ({len(plists[0])} values)"
             else:
                 mean_p = np.mean(np.asarray(plists, dtype=np.float64), axis=0)
                 params_s = "[" + ", ".join(f"{v:.3f}" for v in mean_p) + "]"
@@ -564,32 +565,27 @@ def render_page(data: dict) -> str:
         L.append(f"| {name}{note} | {family} | {ran} | {params_s} | {prmse} | {tv} | "
                  f"{rb} | {ra} | {rbb} | {rc} | {rt} |")
     L.append("")
-    L.append("Param RMSE is the structural family only (recovered theta vs true, same "
-             "gauge). Policy TV is total-variation distance from the true-parameter "
-             "policy. Regret is welfare loss (lower is better): `base` is the observed "
-             "world; `A` payoff shift, `B` transition change, `C` action penalty. "
-             "Transfer uses the recovered reward in the linear feature gauge "
-             "(theta . features): estimators that recovered such a reward re-solve it "
-             "under each intervention and adapt. Estimators that return a tabular "
-             "object outside that gauge (here f-IRL and behavioral cloning) are scored "
-             "with their fixed policy and cannot adapt, which shows up as large Type C "
-             "regret. For behavioral cloning that frozen reading is exactly correct "
-             "(it recovers no reward); for a tabular-reward method it is a conservative "
-             "lower bound on what the method could transfer.\n")
+    L.append("Param RMSE is reported for the structural family only. Those estimators "
+             "share the parameterization of the true model. Policy TV is the "
+             "total-variation distance from the true-parameter policy. Regret is "
+             "welfare loss, lower is better. Base is the observed world. Type A "
+             "shifts a payoff, Type B changes the transitions, Type C penalizes an "
+             "action. Estimators that recovered a linear feature reward re-solve it "
+             "under each intervention and adapt. f-IRL and behavioral cloning return "
+             "tabular objects instead, so they are scored with their fixed policy. "
+             "That shows up as large Type C regret. For behavioral cloning the fixed "
+             "reading is exact, because it recovers no reward. For a tabular-reward "
+             "method it is a conservative reading.\n")
 
-    L.append("## Code used\n")
-    L.append("The exact construction for each estimator (configs are modest quick-run "
-             "defaults, not tuned):\n")
-    snippets = meta.get("snippets", {})
     diagnoses = meta.get("diagnoses", {})
+    notes = []
     for name, _family in order:
-        if name in snippets:
-            L.append(f"### {name}\n")
-            if name in diagnoses:
-                L.append(f"{diagnoses[name]}\n")
-            L.append("```python")
-            L.append(snippets[name].rstrip())
-            L.append("```\n")
+        if diagnoses.get(name):
+            notes.append(f"**{name}.** {diagnoses[name]}")
+    if notes:
+        L.append("## Notes per estimator\n")
+        L.append("\n\n".join(notes) + "\n")
+        L.append("Configs are modest quick-run defaults, not tuned.\n")
 
     L.append("## Reproduce\n")
     L.append("```bash")
