@@ -122,7 +122,13 @@ def estimator_regret(env, params, baseline_policy) -> RegretRow:
     discount = float(problem.discount_factor)
     scale = float(problem.scale_parameter)
     init = jnp.asarray(env._get_initial_state_distribution(), dtype=jnp.float32)
-    true_reward = jnp.asarray(env.true_reward_matrix, dtype=jnp.float32)
+    # ArrayMDP/Shapeshifter expose true_reward_matrix directly; for any other
+    # linear-reward DDCEnvironment (RustBus, Gridworld) features . true_theta
+    # is the same object.
+    true_r = getattr(env, "true_reward_matrix", None)
+    if true_r is None:
+        true_r = env.compute_utility_matrix()
+    true_reward = jnp.asarray(true_r, dtype=jnp.float32)
     R_hat = recovered_reward(env, params)
     base_pol = None if baseline_policy is None else jnp.asarray(baseline_policy, dtype=jnp.float32)
 
