@@ -1,7 +1,9 @@
 # Counterfactuals
 
-The public `counterfactual` method handles structural parameter changes. It
-solves the fitted model again after changing one or more fitted parameters.
+NFXP recovers the utility parameters in the same gauge as the
+data-generating process, so counterfactual analysis is straightforward:
+change a parameter, re-solve the dynamic program once, and read off the new
+policy and value function.
 
 ```python
 cf = model.counterfactual(RC=4.0)
@@ -11,14 +13,10 @@ print(cf.value_function)
 print(cf.policy)
 ```
 
-The method returns a parameter dictionary, value function, and policy. It does
-not currently expose a one-call public interface for changing transitions or
-disabling actions.
-
 ## Counterfactual Families
 
-The simulation harness evaluates three broader counterfactual
-families against oracle solutions.
+The simulation cell checks recovered counterfactual behavior against exact
+oracle objects for three intervention families:
 
 | Type | Intervention | Purpose |
 | --- | --- | --- |
@@ -28,8 +26,9 @@ families against oracle solutions.
 
 ## Reported Results
 
-These rows come from the same simulation results file used on the
-[simulation study page](validation.md).
+These rows come from the same results file used on the
+[Simulation Study](validation.md) page (see also the
+[machine-readable results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp.json)).
 
 | Counterfactual | Policy TV | Policy KL | Value RMSE | Regret |
 | --- | ---: | ---: | ---: | ---: |
@@ -37,5 +36,6 @@ These rows come from the same simulation results file used on the
 | Type B | 0.005457 | 8.20e-5 | 0.000363 | 0.000362 |
 | Type C | 0.003548 | 3.56e-5 | 0.000114 | 0.000086 |
 
-The regret values report how the policy from the recovered reward compares
-with the oracle counterfactual policy.
+The regret values are small because the recovered reward is close enough to
+the true reward that re-solving the dynamic program under each intervention
+produces nearly the same policy as the true-parameter solution.

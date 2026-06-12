@@ -1,17 +1,10 @@
 # Simulation Study
 
-We run NFXP on the `canonical_low_action` synthetic cell. The simulation
-asks whether exact nested fixed-point estimation can recover structural reward
-parameters and counterfactual behavior when the data-generating process is
-fully known. Real bus data cannot answer that question because the true
-reward, value function, policy, and counterfactual oracles are not observed.
-
-These results are not hand-entered examples. They come from the simulation harness. The harness fixes the transition law, action-dependent
-reward features, and reward weights before generating the finite panel. Those
-objects define the true reward, policy, value function, Q function, and
-counterfactual oracles that are held back for evaluation. The estimator sees
-the generated panel, the transition law, and the action-dependent reward
-features, not the oracle dynamic objects.
+NFXP runs on the `canonical_low_action` synthetic cell. The cell has known
+rewards, transitions, policies, values, Q functions, and Type A, Type B, and
+Type C counterfactual oracles, so every recovery claim is checked against the
+truth. Real bus data cannot answer that question because the true reward, value
+function, policy, and counterfactual oracles are not observed.
 
 The full result generator is
 [`nfxp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/run.py).
@@ -26,8 +19,8 @@ PYTHONPATH=src:. python validation/estimators/nfxp/run.py
 Read the tables as a sequence. The design table states the synthetic cell.
 The fit summary reports how the estimator ran. Parameter recovery compares
 estimated reward parameters to truth. Recovery metrics compare the recovered
-reward, value, Q function, and policy to oracle objects. Numerical checks are
-the numerical cutoffs recorded by the harness.
+reward, value, Q function, and policy to the true objects. Numerical checks
+are the pass-fail gates recorded by the runner.
 
 ## Design
 
@@ -44,7 +37,7 @@ the numerical cutoffs recorded by the harness.
 | Periods per individual | 80 |
 | Observations | 160,000 |
 
-The simulation DGP has action-dependent reward features and an exit action
+The synthetic cell has action-dependent reward features and an exit action
 that anchors the reward level.
 
 ## Fit Summary
@@ -97,6 +90,10 @@ that anchors the reward level.
 | Type B regret | at most 0.05 | 0.000362 | pass |
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
-The estimates are not exactly equal to truth because the panel is finite. The
-study reports recovery within the listed tolerances in the frozen synthetic
-cell.
+The estimates differ from truth because the panel is finite. The study reports
+recovery within the listed tolerances on this synthetic cell.
+
+NFXP also appears on every page of the
+[simulation studies](../../simulation_studies/index.md), where it is compared
+against the full structural and IRL rosters on the bus engine, gridworld, and
+abstract MDP benchmarks.

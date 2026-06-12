@@ -4,9 +4,9 @@ Nested fixed point is the reference estimator for tabular structural dynamic
 discrete choice. It estimates primitive reward parameters by solving the
 agent's dynamic program inside each likelihood evaluation.
 
-Start here for a small or moderate tabular dynamic discrete choice problem.
-The page tree below replaces the old primer document as the public
-documentation surface.
+Start here for a small or moderate tabular dynamic discrete choice problem
+where exact nested Bellman solves are feasible and a structural MLE benchmark
+is the goal.
 
 ## Source Papers
 
@@ -42,10 +42,12 @@ print(model.summary())
 
 ## Evidence
 
-NFXP is reported on the low-dimensional action-dependent synthetic data-generating process. The
-simulation cell has known rewards, transitions, policies, values, Q functions,
-and Type A, Type B, and Type C counterfactual oracles. The machine-readable
-results file records the reported results.
+NFXP is reported on the low-dimensional action-dependent synthetic
+data-generating process. The simulation cell has known rewards, transitions,
+policies, values, Q functions, and Type A, Type B, and Type C counterfactual
+oracles. The machine-readable results file records the reported results. NFXP
+also runs on every page of the [simulation studies](../simulation_studies/index.md)
+alongside the rest of the structural family.
 
 | Evidence | Current state |
 | --- | --- |

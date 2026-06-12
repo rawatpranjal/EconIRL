@@ -1,18 +1,18 @@
 # Simulation Study
 
-We run MCE-IRL on two synthetic cells. The primary cell is
+MCE-IRL runs on two synthetic cells. The primary cell is
 `mce_low_high_reward`, a compact state-space problem with eight
 action-dependent reward features. The sanity cell is `canonical_low_action`.
-The simulation asks whether the feature-matching MCE-IRL route can recover
+The simulation checks whether the feature-matching route recovers
 reward and counterfactual behavior when the transition law and reward-feature
-basis are supplied. Real data cannot answer that question because the true
-reward, policy, value function, Q function, occupancy measure, and
+basis are supplied. Real data cannot answer that question because the reward,
+policy, value function, Q function, occupancy measure, and
 counterfactual oracles are not observed.
 
-The numbers come from the simulation harness. In that harness, we
-choose the transition law, reward features, and reward weights before generating
+The numbers come from the simulation harness. In that harness, the
+transition law, reward features, and reward weights are fixed before generating
 the panel. The estimator sees the generated demonstrations, the transition
-law, and the supplied reward features. The true reward, policy, value function,
+law, and the supplied reward features. The reward, policy, value function,
 Q function, occupancy measure, and counterfactual oracles are held back for
 evaluation.
 
@@ -105,3 +105,8 @@ compare the recovered-reward policy with the oracle policy.
 
 The same set of checks is also recorded for the sanity cell in the JSON
 results file.
+
+MCE-IRL also appears on the
+[bus engine](../../simulation_studies/rust_bus.md) and
+[gridworld](../../simulation_studies/taxi_gridworld.md) simulation study pages,
+where it is compared against the full structural and IRL rosters.

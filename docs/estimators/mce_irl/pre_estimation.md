@@ -14,11 +14,10 @@ fit as reward recovery.
 | Action support | Rare actions make action-specific rewards weakly pinned down. |
 | Reward anchor | MCE rewards need a normalization for level and scale. |
 
-## Primary Simulation Checks
+## Canonical Simulation Checks
 
-The primary `mce_low_high_reward` results file records these checks. The
-[simulation study page](validation.md) links the generator script, rendered table
-source, and JSON results file.
+Values from the primary `mce_low_high_reward` synthetic run (see
+[Simulation Study](validation.md)):
 
 | Check | Value | Status |
 | --- | ---: | --- |

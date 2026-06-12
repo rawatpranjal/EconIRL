@@ -1,23 +1,22 @@
 # Pre-Estimation Checks
 
-NFXP can show estimation risk for reasons that are visible before optimization
-starts. Run these checks before treating a result as structural evidence.
+NFXP maximizes the conditional log likelihood over the reward parameters, so
+identification and numerical stability need to hold before optimization starts.
+Run these checks before treating a result as structural evidence.
 
 | Check | Why it matters |
 | --- | --- |
 | Feature rank | Rank below the number of parameters means theta is not identified. |
 | Feature condition number | A high condition number signals unstable estimates. |
 | Transition row sums | Each transition row must be a valid probability distribution. |
+| Transition orientation | NFXP expects transitions in the $(A, S, S)$ orientation. |
 | State coverage | Unobserved states produce weak or degenerate likelihood regions. |
-| Action support | Rare actions make their payoff weakly identified. |
+| Action support | Rare actions leave their payoff weakly identified. |
 | Reward normalization | Reward level and scale need a valid anchor. |
-| Transition orientation | NFXP expects action, state, next-state transition tensors internally. |
 
 ## Canonical Simulation Checks
 
-The NFXP results file records these pre-estimation checks.
-See the [simulation study page](validation.md) for the generator script,
-machine-readable JSON results file.
+Values from the canonical synthetic run (see [Simulation Study](validation.md)):
 
 | Check | Value | Status |
 | --- | ---: | --- |
@@ -32,8 +31,11 @@ machine-readable JSON results file.
 
 ## Common Risk Patterns
 
-Feature matrices with copied state-only features across actions can collapse
-the action-specific payoff differences. Data with almost no replacement
-choices can fit in-sample behavior while leaving replacement cost weakly
-identified. Transition matrices with wrong orientation can produce plausible
-arrays and wrong economics.
+Feature matrices with state-only features copied identically across actions
+collapse the action-specific payoff differences, leaving them unidentified.
+Data with almost no replacement choices can fit in-sample behavior while
+leaving the replacement cost weakly identified. Transition matrices with the
+wrong orientation produce plausible arrays but wrong economics. When state
+coverage is thin, UFXP's optimal weighting handles missing states more
+gracefully; NFXP pools all observations through the likelihood and degrades
+more slowly in coverage.

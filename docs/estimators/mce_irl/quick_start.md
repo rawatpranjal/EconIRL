@@ -31,14 +31,9 @@ print(model.params_)
 print(model.policy_.shape)
 ```
 
-Output
-
-```text
-No fixed output. Estimates depend on the supplied reward features, transition
-specification, and inference settings.
-```
-
-The fitted estimator exposes reward parameters, standard errors when requested,
+Estimates depend on the supplied reward features, transition specification, and
+inference settings, so no canonical output is shown here. The fitted estimator
+exposes reward parameters, standard errors when requested,
 the recovered reward, the policy, the value function, and feature-matching
 diagnostics.
 

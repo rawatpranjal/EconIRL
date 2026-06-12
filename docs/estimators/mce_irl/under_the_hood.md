@@ -3,81 +3,68 @@
 MCE-IRL chooses reward parameters so the induced soft optimal policy matches
 demonstrated feature expectations.
 
-## Optimization Setup
-
-The observed demonstrations supply state, action, and next-state records.
-Transitions, reward features, the discount factor, the logit shock scale, and
-the initial state distribution are fixed before optimization.
-
-MCE-IRL optimizes the reward parameter vector `theta`. For each candidate
-`theta`, the estimator solves the soft Bellman equation, computes the induced
-policy and occupancy measure, and compares model feature expectations with
-demonstrated feature expectations. The public simulation path solves the root
-feature-matching equation.
-
 ## Model
 
-The observed data are state, action, and next-state trajectories.
+The data are state, action, and next-state trajectories $(s_{it}, a_{it},
+s_{i,t+1})$. The reward is linear in known state-action features:
 
 $$
-(s_{it}, a_{it}, s_{i,t+1})
+r_\theta(s, a) = \phi(s, a)^\top \theta.
 $$
 
-The reward is linear in known state-action features.
+Transitions $P_a(s' \mid s)$, the discount factor $\beta$, and the logit scale
+$\sigma$ are fixed before optimization. For a candidate $\theta$, the
+choice-specific value function solves
 
 $$
-r_\theta(s, a) = \phi(s, a)^\top \theta
+Q_\theta(s, a) = r_\theta(s, a) + \beta \sum_{s'} P_a(s' \mid s)\, V_\theta(s'),
 $$
 
-Given a candidate reward, the integrated value function solves the soft
-Bellman fixed point.
+the soft value function is
 
 $$
-V_\theta(s)
-= \sigma \log \sum_a \exp\left(
-    \frac{
-        r_\theta(s, a)
-        + \beta \sum_{s'} P_a(s, s') V_\theta(s')
-    }{\sigma}
-\right)
+V_\theta(s) = \sigma \log \sum_a \exp\!\left(\frac{Q_\theta(s, a)}{\sigma}\right),
 $$
 
-The implied policy is the soft-max policy over choice-specific values.
+and the implied policy is the softmax of the choice-specific values:
 
 $$
-\pi_\theta(a \mid s)
-=
-\frac{\exp(Q_\theta(s, a) / \sigma)}
-     {\sum_b \exp(Q_\theta(s, b) / \sigma)}
+\pi_\theta(a \mid s) = \frac{\exp(Q_\theta(s, a) / \sigma)}{\sum_b \exp(Q_\theta(s, b) / \sigma)}.
 $$
 
-MCE-IRL matches feature counts:
+## Moment Condition
+
+MCE-IRL matches discounted feature expectations. Let $D_E(s, a)$ be the
+empirical discounted expert occupancy and $D_{\pi_\theta}(s, a)$ the occupancy
+induced by $\pi_\theta$ and the known transition model. The estimator solves
 
 $$
-\mu_E
-= \sum_{s,a} D_E(s, a)\phi(s, a),
+\mu_E = \mu_\theta,
 \qquad
-\mu_\theta
-= \sum_s D_{\pi_\theta}(s)\sum_a \pi_\theta(a\mid s)\phi(s, a).
+\mu_E = \sum_{s,a} D_E(s, a)\,\phi(s, a),
+\quad
+\mu_\theta = \sum_{s,a} D_{\pi_\theta}(s, a)\,\phi(s, a).
 $$
 
-The simulation path solves:
+Equivalently, the gradient of the causal-entropy dual objective is
 
 $$
-\mu_\theta - \mu_E = 0.
+\nabla_\theta L(\theta) = \mu_E - \mu_\theta.
 $$
+
+The simulation path solves the root condition $\mu_\theta - \mu_E = 0$ directly.
 
 ## Pseudocode
 
 ```text
 Input: demonstrations, reward features, transitions, discount beta, sigma
 Compute demonstrated feature expectations mu_E
-Choose an initial reward parameter vector theta
+Initialize reward parameter vector theta
 while the feature residual is not small:
     form r_theta(s, a) = phi(s, a)' theta
-    solve the soft Bellman equation for V_theta
-    compute pi_theta(a | s) from the soft choice-specific values
-    compute the occupancy measure induced by pi_theta
+    solve the soft Bellman equation for Q_theta and V_theta
+    compute pi_theta(a | s) = softmax(Q_theta / sigma)
+    compute the occupancy measure D induced by pi_theta
     compute model feature expectations mu_theta
     update theta to reduce mu_theta - mu_E
 return theta, reward table, pi_theta, V_theta, and diagnostics
@@ -85,13 +72,14 @@ return theta, reward table, pi_theta, V_theta, and diagnostics
 
 ## Implementation Notes
 
-The primer simulation uses the root feature-matching optimizer with standard
-errors disabled. The public wrapper defaults are configurable, but the
-simulation results file is generated from the root path above.
+The implementation lives in `econirl.estimation.mce_irl`. The public simulation
+path uses the root feature-matching optimizer. The occupancy measure is computed
+by a forward pass under $\pi_\theta$ and the known transition tensor, which must
+be in `(n_actions, n_states, n_states)` orientation.
 
 ## Identification Boundary
 
 Action-dependent features are required for multi-action reward recovery.
-State-only features broadcast across actions can leave action-specific payoff
-differences unidentified. MCE-IRL rewards are interpreted with the
+State-only features broadcast across actions and leave action-specific payoff
+differences unidentified. MCE-IRL rewards are interpreted relative to the
 normalization encoded by the supplied feature basis and anchor.

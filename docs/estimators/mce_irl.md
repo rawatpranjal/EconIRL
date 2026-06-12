@@ -57,19 +57,22 @@ Multi-action MCE-IRL needs an explicit reward specification. Pass a
 `RewardSpec` to `fit()` or provide `feature_matrix` at construction time. The
 wrapper no longer treats `feature_matrix=None` as a structural default.
 
-## Simulation Study
+## Evidence
 
-The simulation uses two action-dependent synthetic cells. The primary cell
-has 25 states, 3 actions, 8 reward features, known transitions, known rewards,
-known policies, known value and Q functions, and Type A, Type B, and Type C
-counterfactual oracles.
+MCE-IRL is reported on two action-dependent synthetic cells whose reward,
+transitions, policy, value, Q functions, and counterfactual oracles are all
+specified before any data are generated. The primary cell has 25 states, 3
+actions, and 8 reward features. The machine-readable results file records the
+reported results. MCE-IRL also runs on the bus engine and gridworld pages of
+the [simulation studies](../simulation_studies/index.md) alongside the full
+IRL roster.
 
-| Item | Current state |
+| Evidence | Current state |
 | --- | --- |
-| Question | Recover reward and counterfactual behavior in a synthetic MCE data-generating process. |
+| Evidence scope | Synthetic tabular simulation. |
 | Primary cell | `mce_low_high_reward`. |
-| Machine-readable results file | [mce_irl_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json). |
-| Recovery outputs | Reward, policy, value, Q, feature-moment, and counterfactual metrics. |
+| Machine-readable results file | [mce_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json). |
+| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `MCEIRL` with explicit action-dependent features. |
 
 ## MCE-IRL Guide

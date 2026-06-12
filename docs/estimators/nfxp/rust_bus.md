@@ -1,11 +1,7 @@
-# Rust Bus Engine Example
+# Bus Engine Example
 
-The Rust bus-engine replacement problem is the canonical dynamic discrete
-choice example. A bus operator observes mileage and chooses whether to keep the
-current engine or replace it.
-
-EconIRL ships a bundled Rust-style dataset that is suitable for a quick public
-NFXP smoke test.
+The bundled bus engine replacement dataset gives a quick end-to-end smoke
+test: load the panel, fit, inspect, and run a counterfactual.
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -17,32 +13,31 @@ model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
+print(model.se_)
 print(model.summary())
+
+# What if replacement became 50 percent more expensive?
+cf = model.counterfactual(RC=model.params_["RC"] * 1.5)
+print(cf.policy)
 ```
 
 ## Interpretation
 
-The `linear_cost` specification estimates two parameters. The first is the
-operating cost slope over mileage states. The second is the replacement cost.
-The fitted policy gives the replacement probability by mileage state.
+The `linear_cost` specification estimates two parameters: the operating cost
+slope over mileage states (`theta_c`) and the flat replacement cost (`RC`).
+The fitted policy gives the replacement probability by mileage state. You can
+inspect the replacement probability at specific mileage bins:
 
 ```python
 states = [0, 10, 50, 89]
 print(model.predict_proba(states))
 ```
 
-## Counterfactual Replacement Cost
-
-```python
-cf = model.counterfactual(RC=4.0)
-print(cf.policy[50, 1])
-```
-
-Increasing replacement cost should reduce replacement probabilities in worn
-states relative to a lower replacement-cost counterfactual.
-
 ## Replication Boundary
 
-This page is a package smoke example, not the full historical Rust replication.
-The reported simulation study uses a synthetic cell, where reward, policy,
-value, Q, and counterfactual oracle objects are available for comparison.
+This page is a package smoke test on the bundled dataset, not a full
+historical replication of the original study. The estimator's recovery
+properties are established on a synthetic cell whose data-generating process
+is fully specified; see the [Simulation Study](validation.md) page. The
+[bus engine simulation page](../../simulation_studies/rust_bus.md) compares
+NFXP against the full estimator roster on a synthetic bus engine panel.
