@@ -135,6 +135,18 @@ ESTIMATOR_REGISTRY: dict[str, tuple[EstimatorCategory, ProblemCapabilities]] = {
             supports_continuous_states=False,
         ),
     ),
+    "UFXP": (
+        EstimatorCategory.STRUCTURAL,
+        ProblemCapabilities(
+            reward_type="linear",
+            requires_transitions=True,
+            recovers_structural_params=True,
+            recovers_reward=True,
+            has_inner_bellman_solve=False,
+            supports_finite_horizon=False,
+            supports_continuous_states=False,
+        ),
+    ),
     "MCE IRL": (
         EstimatorCategory.ENTROPY_IRL,
         ProblemCapabilities(

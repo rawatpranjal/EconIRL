@@ -17,23 +17,24 @@ from econirl.estimation.categories import (
 class TestEstimatorRegistry:
     """Tests for the estimator registry."""
 
-    def test_10_production_estimators_registered(self):
-        """10 production estimators should be in the registry."""
-        assert len(ESTIMATOR_REGISTRY) == 10
+    def test_production_estimators_registered(self):
+        """14 production estimators (incl. UFXP, Neural MPEC, IQ-Learn)."""
+        assert len(ESTIMATOR_REGISTRY) == 14
 
-    def test_8_contrib_estimators_registered(self):
-        """8 contrib estimators should be in the contrib registry."""
-        assert len(CONTRIB_REGISTRY) == 8
+    def test_contrib_estimators_registered(self):
+        """7 contrib estimators (IQ-Learn moved to production)."""
+        assert len(CONTRIB_REGISTRY) == 7
 
     def test_known_estimators_present(self):
         """Key production estimators should be in the registry."""
-        for name in ["NFXP", "CCP", "MCE IRL", "AIRL", "BC", "GLADIUS",
-                      "TD-CCP", "NNES", "SEES", "f-IRL"]:
+        for name in ["NFXP", "CCP", "MPEC", "UFXP", "MCE IRL", "AIRL", "BC",
+                      "GLADIUS", "IQ-Learn", "TD-CCP", "NNES", "SEES",
+                      "Neural MPEC", "f-IRL"]:
             assert name in ESTIMATOR_REGISTRY, f"{name} not in registry"
 
     def test_contrib_estimators_present(self):
         """Moved estimators should be in contrib registry."""
-        for name in ["MaxEnt IRL", "Deep MaxEnt", "GAIL", "IQ-Learn",
+        for name in ["MaxEnt IRL", "Deep MaxEnt", "GAIL",
                       "Max Margin", "GCL", "BIRL"]:
             assert name in CONTRIB_REGISTRY, f"{name} not in contrib registry"
 
@@ -48,10 +49,9 @@ class TestEstimatorCategory:
     """Tests for category enumeration."""
 
     def test_structural_estimators(self):
-        """NFXP and CCP should be structural."""
+        """NFXP, CCP, MPEC, UFXP should be structural."""
         structural = get_estimators_by_category(EstimatorCategory.STRUCTURAL)
-        assert "NFXP" in structural
-        assert "CCP" in structural
+        assert set(structural) == {"NFXP", "CCP", "MPEC", "UFXP"}
 
     def test_adversarial_estimators(self):
         """Only AIRL should be in production adversarial."""
@@ -59,18 +59,18 @@ class TestEstimatorCategory:
         assert set(adversarial) == {"AIRL"}
 
     def test_q_learning_estimators(self):
-        """GLADIUS should be in q_learning_irl."""
+        """GLADIUS and IQ-Learn should be in q_learning_irl."""
         q_learning = get_estimators_by_category(EstimatorCategory.Q_LEARNING_IRL)
-        assert set(q_learning) == {"GLADIUS"}
+        assert set(q_learning) == {"GLADIUS", "IQ-Learn"}
 
     def test_imitation_is_bc_only(self):
         """Only BC should be in the imitation category."""
         assert get_estimators_by_category(EstimatorCategory.IMITATION) == ["BC"]
 
     def test_structural_approx(self):
-        """SEES, NNES, TD-CCP should be structural_approx."""
+        """SEES, NNES, TD-CCP, Neural MPEC should be structural_approx."""
         approx = get_estimators_by_category(EstimatorCategory.STRUCTURAL_APPROX)
-        assert set(approx) == {"SEES", "NNES", "TD-CCP"}
+        assert set(approx) == {"SEES", "NNES", "TD-CCP", "Neural MPEC"}
 
     def test_entropy_irl(self):
         """MCE IRL should be entropy_irl."""
@@ -105,9 +105,9 @@ class TestProblemCapabilities:
         assert "BC" in no_solve
 
     def test_scalable_estimators(self):
-        """SEES, NNES, TD-CCP, GLADIUS should support continuous states."""
+        """SEES, NNES, TD-CCP, GLADIUS, Neural MPEC support continuous states."""
         scalable = get_estimators_with_capability(supports_continuous_states=True)
-        assert set(scalable) == {"SEES", "NNES", "TD-CCP", "GLADIUS"}
+        assert set(scalable) == {"SEES", "NNES", "TD-CCP", "GLADIUS", "Neural MPEC"}
 
     def test_finite_horizon_support(self):
         """NFXP, MCE IRL, AIRL should support finite horizon."""

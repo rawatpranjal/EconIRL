@@ -235,7 +235,8 @@ def test_type_a_b_c_counterfactual_oracles_change_truth():
 
 
 def test_estimator_contract_registry_has_required_estimators():
-    assert len(REQUIRED_ESTIMATORS) == 13
+    assert len(REQUIRED_ESTIMATORS) == 14
+    assert "UFXP" in REQUIRED_ESTIMATORS
     assert "BC" not in REQUIRED_ESTIMATORS
     assert "MCE-IRL Deep" in REQUIRED_ESTIMATORS
     assert "AIRL-Het" in REQUIRED_ESTIMATORS
