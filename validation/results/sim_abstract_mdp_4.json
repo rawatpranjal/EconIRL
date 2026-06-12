@@ -1,0 +1,874 @@
+{
+  "meta": {
+    "title": "Abstract MDP 4: an interaction effect in the reward",
+    "date": "2026-06-12",
+    "package_version": "0.0.6",
+    "n_replications": 3,
+    "dgp": {
+      "num_states": 24,
+      "num_actions": 3,
+      "discount_factor": 0.95,
+      "theta": [
+        1.0,
+        -0.8
+      ],
+      "gamma": 2.5,
+      "branching": 4,
+      "seed": 404
+    },
+    "n_individuals": 300,
+    "n_periods": 50,
+    "oracle": "true-reward policy/value via SoftBellmanOperator + value_iteration",
+    "determinism": "structural estimators are deterministic given the seeds; neural estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
+    "excluded": [
+      {
+        "name": "GAIL",
+        "reason": "known slow (~9 min/fit); not run here"
+      },
+      {
+        "name": "DeepMaxEnt-IRL",
+        "reason": "known slow (~7 min/fit); not run here"
+      },
+      {
+        "name": "Bayesian-IRL",
+        "reason": "known slow (~16 min/fit); not run here"
+      }
+    ],
+    "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention; estimators without one keep their fixed policy and cannot adapt.",
+    "snippets": {
+      "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"hybrid\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8,\n                                          constraint_tol=1e-6),\n                        compute_hessian=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "NNES": "def _run_nnes(env, panel):\n    from econirl.estimation.nnes import NNESEstimator\n\n    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,\n                        compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "SEES": "def _run_sees(env, panel):\n    from econirl.estimation.sees import SEESEstimator\n\n    est = SEESEstimator(basis_type=\"bspline\", basis_dim=NUM_STATES, warm_start_value=True,\n                        penalty_weight=10.0, compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "TD-CCP": "def _run_tdccp(env, panel):\n    from econirl.estimation import TDCCPConfig, TDCCPEstimator\n\n    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,\n                                            epochs_per_avi=15, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "UFXP": "def _run_ufxp(env, panel):\n    from econirl.estimation import UFXPEstimator\n\n    est = UFXPEstimator(weights=\"optimal\", verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,\n                                              inner_max_iter=2000, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "MaxEnt-IRL": "def _run_maxent_irl(env, panel):\n    from econirl.contrib.maxent_irl import MaxEntIRLEstimator\n\n    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,\n                             learning_rate=0.05, compute_hessian=False, verbose=False)\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "IQ-Learn": "def _run_iq_learn(env, panel):\n    from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator\n\n    est = IQLearnEstimator(config=IQLearnConfig(q_type=\"linear\", divergence=\"chi2\",\n                                                alpha=3.0, max_iter=2000, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "f-IRL": "def _run_firl(env, panel):\n    from econirl.estimation.f_irl import FIRLEstimator\n\n    est = FIRLEstimator(f_divergence=\"fkl\", lr=0.2, max_iter=400, reward_clip=10.0, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "BC": "def _run_bc(env, panel):\n    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator\n\n    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "GLADIUS": "def _run_gladius(env, panel):\n    # Neural Q and value networks; the policy comes from the learned Q, so it can\n    # represent the interaction-driven behavior.\n    from econirl.estimation import GLADIUSConfig, GLADIUSEstimator\n\n    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=500, q_hidden_dim=128,\n                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,\n                                                patience=60, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "AIRL": "def _run_airl(env, panel):\n    # Neural reward; reward_arg=\"state_action\" keeps the action contrast.\n    from econirl.estimation import AIRLConfig, AIRLEstimator\n\n    est = AIRLEstimator(config=AIRLConfig(reward_type=\"neural\", reward_arg=\"state_action\",\n                                          reward_lr=0.01, discriminator_steps=10,\n                                          max_rounds=300, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "Deep MCE-IRL": "def _run_deep_mce_irl(env, panel):\n    # Neural reward over the features plus action; can represent the product.\n    from types import SimpleNamespace\n\n    from econirl.estimators import MCEIRLNeural\n\n    m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),\n                     discount=float(env.problem_spec.discount_factor),\n                     reward_type=\"state_action\", max_epochs=400, verbose=False)\n    m.fit(panel, features=np.asarray(env.feature_matrix),\n          transitions=np.asarray(env.transition_matrices))\n    return SimpleNamespace(parameters=None, standard_errors=None, policy=m.policy_,\n                           value_function=m.value_, converged=bool(m.converged_))\n"
+    },
+    "diagnoses": {
+      "BC": "Clones the observed choice frequencies. It matches behavior with no reward, so it has nothing to carry to a counterfactual.",
+      "f-IRL": "Matches the state-visitation marginals. It tracks the choices, but the recovered reward does not hold up under a re-solve, so its counterfactual stays on the fixed policy.",
+      "GLADIUS": "Learns the behavior through a value network, then projects the reward back onto the linear features. The projection cannot hold the interaction, so its counterfactual regret is as large as the linear family's."
+    },
+    "honesty": "Every number in the table is recomputed from the records below. Crashes carry the verbatim exception. There is no parameter table: the true reward is not linear in the two features the estimators see, so there is no shared parameterization to compare against."
+  },
+  "records": [
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10427906352722043,
+      "value_rmse": 0.7373529552801499,
+      "regret": {
+        "baseline": 0.9638239028508554,
+        "type_a": 0.9624469011943726,
+        "type_b": 0.9125130364160091,
+        "type_c": 0.6545985979466904,
+        "transferred": true
+      },
+      "runtime": 2.7125377655029297,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10399530361260483,
+      "value_rmse": 0.3830512079353065,
+      "regret": {
+        "baseline": 0.960156401043132,
+        "type_a": 0.9578814256106237,
+        "type_b": 0.9139231395291378,
+        "type_c": 0.6414061061719686,
+        "transferred": true
+      },
+      "runtime": 1.7820212841033936,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10427905814950401,
+      "value_rmse": 0.7373521618265609,
+      "regret": {
+        "baseline": 0.9638238982393539,
+        "type_a": 0.962446893346991,
+        "type_b": 0.9125129806402223,
+        "type_c": 0.6545985780891488,
+        "transferred": true
+      },
+      "runtime": 0.31791210174560547,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10427864724535678,
+      "value_rmse": 0.7372672600952915,
+      "regret": {
+        "baseline": 0.9638228754677692,
+        "type_a": 0.9624455758675671,
+        "type_b": 0.9125113272142317,
+        "type_c": 0.6545934969547568,
+        "transferred": true
+      },
+      "runtime": 11.451799869537354,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10361099317888678,
+      "value_rmse": 0.7272538946995126,
+      "regret": {
+        "baseline": 0.964378781015124,
+        "type_a": 0.9628301333327186,
+        "type_b": 0.9091233668953341,
+        "type_c": 0.6501776599332271,
+        "transferred": true
+      },
+      "runtime": 0.9060251712799072,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10760968461693621,
+      "value_rmse": 1.465579030432831,
+      "regret": {
+        "baseline": 0.990785654413316,
+        "type_a": 0.9888136158741384,
+        "type_b": 0.8764447424448516,
+        "type_c": 0.625880563542496,
+        "transferred": true
+      },
+      "runtime": 3.1851987838745117,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10755353892643114,
+      "value_rmse": 1.454971021980052,
+      "regret": {
+        "baseline": 0.9862411176178901,
+        "type_a": 0.9847749644307469,
+        "type_b": 0.8828723587881522,
+        "type_c": 0.6350973000051916,
+        "transferred": true
+      },
+      "runtime": 0.24361705780029297,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10427906218791046,
+      "value_rmse": 0.7373522191833752,
+      "regret": {
+        "baseline": 0.963823873151814,
+        "type_a": 0.9624468857717559,
+        "type_b": 0.9125130330092449,
+        "type_c": 0.6545985903994993,
+        "transferred": true
+      },
+      "runtime": 7.306840896606445,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MaxEnt-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.10389361657918073,
+      "value_rmse": 0.6548777949585469,
+      "regret": {
+        "baseline": 0.9622429908915012,
+        "type_a": 0.9608645259649312,
+        "type_b": 0.9164303764806819,
+        "type_c": 0.6568797932392582,
+        "transferred": true
+      },
+      "runtime": 7.313355207443237,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "IQ-Learn",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.1269419179132474,
+      "value_rmse": 37.779067722354725,
+      "regret": {
+        "baseline": 1.1092377861194016,
+        "type_a": 1.112911674311353,
+        "type_b": 0.8998477573630044,
+        "type_c": 0.6754773722431405,
+        "transferred": true
+      },
+      "runtime": 1.3622329235076904,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "f-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 0,
+      "policy_tv": 0.020501493313174565,
+      "value_rmse": 20.2106094606289,
+      "regret": {
+        "baseline": 0.02535840656294448,
+        "type_a": 0.05730531095488512,
+        "type_b": 0.3806138735875656,
+        "type_c": 71.69579022480997,
+        "transferred": false
+      },
+      "runtime": 20.83974003791809,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "BC",
+      "family": "behavioral",
+      "reward": "none",
+      "rep": 0,
+      "policy_tv": 0.019340927137918518,
+      "value_rmse": 39.57323153586644,
+      "regret": {
+        "baseline": 0.022362299871075964,
+        "type_a": 0.05126313913726884,
+        "type_b": 0.3680588645085494,
+        "type_c": 71.25145862581135,
+        "transferred": false
+      },
+      "runtime": 0.12562179565429688,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 0,
+      "policy_tv": 0.03908633183816714,
+      "value_rmse": 37.29640856665373,
+      "regret": {
+        "baseline": 1.0496019102366108,
+        "type_a": 1.0449234526670597,
+        "type_b": 0.853436779558077,
+        "type_c": 0.5912647524578053,
+        "transferred": true
+      },
+      "runtime": 12.167963743209839,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 0,
+      "policy_tv": 0.021709774580142643,
+      "value_rmse": 38.075557478024244,
+      "regret": {
+        "baseline": 0.03146136322759409,
+        "type_a": 0.06329050116563381,
+        "type_b": 0.42056460357934344,
+        "type_c": 71.39574847350849,
+        "transferred": false
+      },
+      "runtime": 107.45157408714294,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "Deep MCE-IRL",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 0,
+      "policy_tv": 0.018497602607881438,
+      "value_rmse": 17.390715876900067,
+      "regret": {
+        "baseline": 0.029617098197847375,
+        "type_a": 0.07385039774472188,
+        "type_b": 0.4073789872358321,
+        "type_c": 71.6213817891182,
+        "transferred": false
+      },
+      "runtime": 24.834237813949585,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.1056768221131596,
+      "value_rmse": 1.0428540683724372,
+      "regret": {
+        "baseline": 0.9713697944459261,
+        "type_a": 0.9699682701276845,
+        "type_b": 0.8987402933195232,
+        "type_c": 0.6459165975029674,
+        "transferred": true
+      },
+      "runtime": 2.62666916847229,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.10520973691881208,
+      "value_rmse": 0.6771226704779821,
+      "regret": {
+        "baseline": 0.9669778575510309,
+        "type_a": 0.9645656138645307,
+        "type_b": 0.8982613167363291,
+        "type_c": 0.6322125777047256,
+        "transferred": true
+      },
+      "runtime": 1.9337852001190186,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.10567682277018563,
+      "value_rmse": 1.042853825536733,
+      "regret": {
+        "baseline": 0.9713697735479733,
+        "type_a": 0.9699682349724402,
+        "type_b": 0.8987402748738359,
+        "type_c": 0.6459165966978143,
+        "transferred": true
+      },
+      "runtime": 0.3874950408935547,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.10567632806910343,
+      "value_rmse": 1.042747865281289,
+      "regret": {
+        "baseline": 0.9713684658843671,
+        "type_a": 0.9699665649634811,
+        "type_b": 0.8987381308098644,
+        "type_c": 0.6459105139848923,
+        "transferred": true
+      },
+      "runtime": 11.126734018325806,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.1049751654800446,
+      "value_rmse": 1.0314441291551057,
+      "regret": {
+        "baseline": 0.9723750378687789,
+        "type_a": 0.9707911173960139,
+        "type_b": 0.8956402016592901,
+        "type_c": 0.6417740616493874,
+        "transferred": true
+      },
+      "runtime": 1.066985845565796,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.10958591165259214,
+      "value_rmse": 1.7625013663002467,
+      "regret": {
+        "baseline": 1.0075953247247726,
+        "type_a": 1.0054263898249507,
+        "type_b": 0.8673835038508186,
+        "type_c": 0.6185488699374356,
+        "transferred": true
+      },
+      "runtime": 4.114011287689209,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.10892137967391302,
+      "value_rmse": 1.7488978346917678,
+      "regret": {
+        "baseline": 0.9994520381140146,
+        "type_a": 0.9980450213501887,
+        "type_b": 0.8751664624883009,
+        "type_c": 0.6305077424080479,
+        "transferred": true
+      },
+      "runtime": 0.30700016021728516,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.10567681887256246,
+      "value_rmse": 1.0428534627047203,
+      "regret": {
+        "baseline": 0.9713697735479733,
+        "type_a": 0.9699682349724402,
+        "type_b": 0.8987402748738359,
+        "type_c": 0.6459165966978143,
+        "transferred": true
+      },
+      "runtime": 7.498461008071899,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MaxEnt-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.10597435639303472,
+      "value_rmse": 1.1023875209609035,
+      "regret": {
+        "baseline": 0.9709328892492359,
+        "type_a": 0.9701347388515864,
+        "type_b": 0.9070294578022138,
+        "type_c": 0.6586910230171245,
+        "transferred": true
+      },
+      "runtime": 7.497180938720703,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "IQ-Learn",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.12851614425787256,
+      "value_rmse": 37.78855227590848,
+      "regret": {
+        "baseline": 1.13159415496183,
+        "type_a": 1.1351751373966494,
+        "type_b": 0.9007917628271633,
+        "type_c": 0.6729232090011185,
+        "transferred": true
+      },
+      "runtime": 1.4810280799865723,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "f-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 1,
+      "policy_tv": 0.01960165785099963,
+      "value_rmse": 20.135885998123776,
+      "regret": {
+        "baseline": 0.03201231129815184,
+        "type_a": 0.06888459287317394,
+        "type_b": 0.36755760934989,
+        "type_c": 71.3801585873261,
+        "transferred": false
+      },
+      "runtime": 23.532913208007812,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "BC",
+      "family": "behavioral",
+      "reward": "none",
+      "rep": 1,
+      "policy_tv": 0.018718606583785335,
+      "value_rmse": 39.57323153586644,
+      "regret": {
+        "baseline": 0.027409224047496208,
+        "type_a": 0.06031903559422091,
+        "type_b": 0.36001765602168256,
+        "type_c": 71.15462519131606,
+        "transferred": false
+      },
+      "runtime": 0.15326523780822754,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 1,
+      "policy_tv": 0.037818576955465935,
+      "value_rmse": 37.26186428494087,
+      "regret": {
+        "baseline": 1.1404443147699113,
+        "type_a": 1.1290071475090515,
+        "type_b": 0.9013059896453444,
+        "type_c": 0.5728262993549738,
+        "transferred": true
+      },
+      "runtime": 12.88250207901001,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 1,
+      "policy_tv": 0.0201387148033885,
+      "value_rmse": 37.99410942353034,
+      "regret": {
+        "baseline": 0.03193727828763441,
+        "type_a": 0.06822013003295403,
+        "type_b": 0.3985372299464398,
+        "type_c": 71.84698568546341,
+        "transferred": false
+      },
+      "runtime": 111.91600799560547,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "Deep MCE-IRL",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 1,
+      "policy_tv": 0.01968696422103151,
+      "value_rmse": 22.183497955543988,
+      "regret": {
+        "baseline": 0.03665272787303554,
+        "type_a": 0.06494350075643278,
+        "type_b": 0.32696727865985736,
+        "type_c": 71.88965850997575,
+        "transferred": false
+      },
+      "runtime": 24.832141160964966,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.10462546348093386,
+      "value_rmse": 0.8052539924476223,
+      "regret": {
+        "baseline": 0.9708888352776113,
+        "type_a": 0.9684614015815188,
+        "type_b": 0.8923061043502791,
+        "type_c": 0.6291606546954306,
+        "transferred": true
+      },
+      "runtime": 2.7069997787475586,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.10450557252947452,
+      "value_rmse": 0.42265304121150105,
+      "regret": {
+        "baseline": 0.9701470868116263,
+        "type_a": 0.9666940308251759,
+        "type_b": 0.8952552183112362,
+        "type_c": 0.6161553249869257,
+        "transferred": true
+      },
+      "runtime": 1.960273027420044,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.1046254647019086,
+      "value_rmse": 0.8052540051876425,
+      "regret": {
+        "baseline": 0.9708888932697565,
+        "type_a": 0.9684614877936082,
+        "type_b": 0.8923060687375659,
+        "type_c": 0.6291606354018547,
+        "transferred": true
+      },
+      "runtime": 0.3869450092315674,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.10462541627978533,
+      "value_rmse": 0.8052428457792208,
+      "regret": {
+        "baseline": 0.9708886978523721,
+        "type_a": 0.9684612702811757,
+        "type_b": 0.8923062946077862,
+        "type_c": 0.6291605307296066,
+        "transferred": true
+      },
+      "runtime": 11.56558632850647,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.10391789355492675,
+      "value_rmse": 0.7937871224555766,
+      "regret": {
+        "baseline": 0.9725292975130053,
+        "type_a": 0.969898500101404,
+        "type_b": 0.8895929824863846,
+        "type_c": 0.6252050437396046,
+        "transferred": true
+      },
+      "runtime": 1.0799479484558105,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.11098467604082117,
+      "value_rmse": 1.681687739160012,
+      "regret": {
+        "baseline": 1.0249303015708486,
+        "type_a": 1.021049581603584,
+        "type_b": 0.857700461282313,
+        "type_c": 0.5984536581122969,
+        "transferred": true
+      },
+      "runtime": 3.616551160812378,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.10899916219709967,
+      "value_rmse": 1.690546782431858,
+      "regret": {
+        "baseline": 1.0026102363655185,
+        "type_a": 1.0005455367420708,
+        "type_b": 0.8698458809150426,
+        "type_c": 0.6209952250652563,
+        "transferred": true
+      },
+      "runtime": 0.32289576530456543,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.10462546487287944,
+      "value_rmse": 0.8052544641541294,
+      "regret": {
+        "baseline": 0.9708888932697565,
+        "type_a": 0.9684614877936082,
+        "type_b": 0.8923060687375659,
+        "type_c": 0.6291606354018547,
+        "transferred": true
+      },
+      "runtime": 6.7583818435668945,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MaxEnt-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.10400749955779903,
+      "value_rmse": 0.6614600576532016,
+      "regret": {
+        "baseline": 0.9683463990847276,
+        "type_a": 0.965761632733327,
+        "type_b": 0.8956118402683447,
+        "type_c": 0.628575311031003,
+        "transferred": true
+      },
+      "runtime": 7.5966737270355225,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "IQ-Learn",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.12881570554499708,
+      "value_rmse": 37.78187754751754,
+      "regret": {
+        "baseline": 1.1371380762778818,
+        "type_a": 1.1388496943414694,
+        "type_b": 0.8883844899410032,
+        "type_c": 0.653048352291639,
+        "transferred": true
+      },
+      "runtime": 1.5339782238006592,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "f-IRL",
+      "family": "behavioral",
+      "reward": "linear",
+      "rep": 2,
+      "policy_tv": 0.0183765232094699,
+      "value_rmse": 20.25927371414368,
+      "regret": {
+        "baseline": 0.02989767720209673,
+        "type_a": 0.06857619884217639,
+        "type_b": 0.4467353449714279,
+        "type_c": 70.34605210335087,
+        "transferred": false
+      },
+      "runtime": 24.726226806640625,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "BC",
+      "family": "behavioral",
+      "reward": "none",
+      "rep": 2,
+      "policy_tv": 0.016443640118945616,
+      "value_rmse": 39.57323153586644,
+      "regret": {
+        "baseline": 0.024044447559762625,
+        "type_a": 0.062101680175070124,
+        "type_b": 0.430447636958882,
+        "type_c": 70.14893277261999,
+        "transferred": false
+      },
+      "runtime": 0.15470600128173828,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 2,
+      "policy_tv": 0.036790271081719436,
+      "value_rmse": 37.23578560332555,
+      "regret": {
+        "baseline": 1.293937743279053,
+        "type_a": 1.2779961128401447,
+        "type_b": 0.9392251360261235,
+        "type_c": 0.596277389109015,
+        "transferred": true
+      },
+      "runtime": 13.038944721221924,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 2,
+      "policy_tv": 0.02348985340274858,
+      "value_rmse": 37.93248998114549,
+      "regret": {
+        "baseline": 0.04203540818563596,
+        "type_a": 0.08886614233637546,
+        "type_b": 0.4832609151090607,
+        "type_c": 70.82293348205685,
+        "transferred": false
+      },
+      "runtime": 111.95451378822327,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "Deep MCE-IRL",
+      "family": "behavioral",
+      "reward": "neural",
+      "rep": 2,
+      "policy_tv": 0.026961850699227945,
+      "value_rmse": 19.657537421828014,
+      "regret": {
+        "baseline": 0.05109577703580031,
+        "type_a": 0.0763404152436412,
+        "type_b": 0.5111530683881979,
+        "type_c": 69.27419519448746,
+        "transferred": false
+      },
+      "runtime": 26.534074306488037,
+      "converged": true,
+      "error": null
+    }
+  ]
+}
