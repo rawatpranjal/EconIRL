@@ -40,20 +40,26 @@ system is ever solved again: for a linear-in-parameters utility
 and the UFXP objective ``sum_i residual_i^2`` is an ordinary least-squares
 problem with a closed-form solution.
 
+Two weighting modes are implemented. ``weights="optimal"`` is the paper's
+OUFXP: per-state optimal weights built from the CCP covariance and the
+inverse-CCP Jacobian. For linear utility the weights are independent of theta,
+so OUFXP stays a single closed-form weighted moment solve and, by Theorem 2,
+is asymptotically as efficient as maximum likelihood; its standard errors come
+from the efficient moment variance ``(sum_x z(x)' G(x))^{-1} / N``.
+``weights="random"`` is plain UFXP with ``m`` random projections — consistent
+but less efficient, kept for the paper-faithful baseline and no standard
+errors.
+
 Scope of this implementation:
 
 - Linear utility (``LinearUtility`` / the uniform benchmark path). The paper's
   neural-utility training loop is out of scope here.
-- Random-projection weights (plain UFXP). The optimally weighted second step
-  (OUFXP), which attains the MLE's asymptotic efficiency, is not implemented;
-  expect UFXP point estimates to be consistent but noisier than NFXP/MPEC in
-  small samples.
-- No Hessian-based standard errors are produced (``standard_errors`` are NaN).
 
 First-order conditions are used only at states observed at least
 ``ccp_min_count`` times; unvisited states still enter ``V_P`` through the
 transition structure (with uniform CCPs substituted there, as in the package's
-CCP estimator).
+CCP estimator). Under optimal weights, thin states are additionally
+downweighted by their sample share and unvisited states drop out entirely.
 """
 
 from __future__ import annotations
@@ -71,9 +77,26 @@ from econirl.preferences.base import UtilityFunction
 class UFXPEstimator(BaseEstimator):
     """Unnested Fixed Point estimator (Bray; Oguz and Bray 2026).
 
+    Two weighting modes:
+
+    - ``weights="optimal"`` (default, the paper's OUFXP): per-state optimal
+      weights ``z(x) = [Gamma(x) Sigma(x) Gamma(x)' / eta(x)]^{-1} G(x)`` with
+      ``eta(x) = N(x)/N`` the state's sample share, ``Sigma(x)`` the
+      multinomial CCP covariance, ``Gamma(x)`` the Jacobian of the inverse CCP
+      map, and ``G(x)`` the moment Jacobian. For linear utility every piece is
+      independent of theta, so the estimator stays closed form, and Theorem 2
+      of the paper gives asymptotic efficiency equal to maximum likelihood.
+      Standard errors come from the efficient moment variance
+      ``Var(theta) = (sum_x z(x)' G(x))^{-1} / N``, delivered through the
+      package's asymptotic-SE pipeline. Thin states are downweighted by
+      ``eta(x)``; unvisited states drop out.
+    - ``weights="random"`` (plain UFXP): ``m`` random projections of the
+      stacked FOCs, consistent but less efficient, no standard errors.
+
     Attributes:
-        num_projections: Number of random projections ``m`` (must exceed the
-            parameter count; more projections reduce projection noise).
+        weights: ``"optimal"`` (OUFXP) or ``"random"`` (plain UFXP).
+        num_projections: Number of random projections ``m`` for
+            ``weights="random"`` (must exceed the parameter count).
         ccp_min_count: Minimum visits for a state's FOCs to be scored.
         ccp_smoothing: Additive smoothing for the frequency CCPs.
         seed: Seed for the random projection matrices.
@@ -81,17 +104,21 @@ class UFXPEstimator(BaseEstimator):
 
     def __init__(
         self,
+        weights: str = "optimal",
         num_projections: int = 32,
         ccp_min_count: int = 1,
         ccp_smoothing: float = 1e-6,
         seed: int = 0,
-        compute_hessian: bool = False,
+        compute_hessian: bool = True,
         verbose: bool = False,
     ):
         super().__init__(se_method="asymptotic", compute_hessian=compute_hessian,
                          verbose=verbose)
+        if weights not in ("optimal", "random"):
+            raise ValueError(f"weights must be 'optimal' or 'random', got {weights!r}")
         if num_projections < 1:
             raise ValueError("num_projections must be positive")
+        self._weights = weights
         self._num_projections = num_projections
         self._ccp_min_count = ccp_min_count
         self._ccp_smoothing = ccp_smoothing
@@ -118,7 +145,7 @@ class UFXPEstimator(BaseEstimator):
         beta = float(problem.discount_factor)
         sigma = float(problem.scale_parameter)
         m = self._num_projections
-        if m <= K:
+        if self._weights == "random" and m <= K:
             raise ValueError(f"num_projections ({m}) must exceed the parameter "
                              f"count ({K})")
 
@@ -145,27 +172,73 @@ class UFXPEstimator(BaseEstimator):
         F_P = np.einsum("sa,asx->sx", P, F)  # (S, S)
         phi_P = np.einsum("sa,sak->sk", P, phi)  # (S, K)
 
-        # Random projections, zeroed at unsupported states so only observed
-        # FOCs are scored.
-        rng = np.random.default_rng(self._seed)
-        Z = rng.standard_normal((m, S, A - 1))
-        Z[:, ~supported, :] = 0.0
-
-        # Duals: one factorization of (I - beta F_P'), m right-hand sides.
-        # w_i = -beta * sum_{a != ref} (F_a - F_A)' Z_i[:, a]
         dF = F[:ref] - F[ref:ref + 1]  # (A-1, S, S)
-        W = -beta * np.einsum("asx,msa->xm", dF, Z)  # (S, m)
-        lam = np.linalg.solve(np.eye(S) - beta * F_P.T, W)  # (S, m)
-
-        # --- Closed form for linear utility -------------------------------
-        # residual_i(theta) = b_i + c_i' theta with
-        #   b_i = <Z_i, logratio> + lambda_i' ent
-        #   c_i = -sum_{x,a} Z_i[x,a] (phi[x,a] - phi[x,ref]) + phi_P' lambda_i
         dphi = phi[:, :ref, :] - phi[:, ref:ref + 1, :]  # (S, A-1, K)
-        b = np.einsum("msa,sa->m", Z, logratio) + lam.T @ ent  # (m,)
-        C = -np.einsum("msa,sak->mk", Z, dphi) + lam.T @ phi_P  # (m, K)
-        theta, residuals, rank, _ = np.linalg.lstsq(C, -b, rcond=None)
-        obj = float(np.sum((C @ theta + b) ** 2))
+        hessian = None
+
+        if self._weights == "optimal":
+            # --- OUFXP: optimal per-state weights, closed form -------------
+            # One factorization of (I - beta F_P) gives both theta-gradient
+            # and entropy components of the policy value:
+            #   dV = (I - beta F_P)^{-1} phi_P     (S, K)
+            #   v_ent = (I - beta F_P)^{-1} ent    (S,)
+            sol_v = np.linalg.solve(np.eye(S) - beta * F_P,
+                                    np.hstack([phi_P, ent[:, None]]))
+            dV, v_ent = sol_v[:, :K], sol_v[:, K]
+            # Moment Jacobian and intercept: residual(x) = y(x) - G(x) theta.
+            G = dphi + beta * np.einsum("asx,xk->sak", dF, dV)  # (S, A-1, K)
+            y = logratio - beta * np.einsum("asx,x->sa", dF, v_ent)  # (S, A-1)
+
+            # Gamma(x): Jacobian of the inverse CCP map, (A-1, A) per state;
+            # Gamma Sigma Gamma' is invariant to the simplex gauge.
+            eta = state_counts[:, 0] / max(states.shape[0], 1)  # (S,)
+            D = np.zeros((K, K))
+            rhs = np.zeros(K)
+            n_scored = 0
+            for x in range(S):
+                if not supported[x] or eta[x] <= 0.0:
+                    continue
+                Gam = np.zeros((A - 1, A))
+                for a in range(A - 1):
+                    Gam[a, a] = sigma / P[x, a]
+                    Gam[a, ref] = -sigma / P[x, ref]
+                Sig = np.diag(P[x]) - np.outer(P[x], P[x])
+                GSG = Gam @ Sig @ Gam.T  # (A-1, A-1)
+                Wx = eta[x] * np.linalg.pinv(GSG)
+                zx = Wx @ G[x]  # (A-1, K)
+                D += G[x].T @ Wx @ G[x]
+                rhs += zx.T @ y[x]
+                n_scored += 1
+            rank = int(np.linalg.matrix_rank(D))
+            theta = np.linalg.lstsq(D, rhs, rcond=None)[0]
+            obj = 0.0  # exactly identified: the weighted moments are solved
+            # Efficient variance (sum_x z'G)^{-1}/N, threaded through the
+            # asymptotic-SE pipeline as Var = [-hessian]^{-1}.
+            if self._compute_hessian:
+                hessian = jnp.asarray(-states.shape[0] * D)
+            mode_msg = (f"closed-form OUFXP over {n_scored} supported states "
+                        f"(optimal weights)")
+        else:
+            # --- Plain UFXP: m random projections, dual trick --------------
+            # Projections are zeroed at unsupported states so only observed
+            # FOCs are scored.
+            rng = np.random.default_rng(self._seed)
+            Z = rng.standard_normal((m, S, A - 1))
+            Z[:, ~supported, :] = 0.0
+
+            # Duals: one factorization of (I - beta F_P'), m right-hand sides.
+            # w_i = -beta * sum_{a != ref} (F_a - F_A)' Z_i[:, a]
+            W = -beta * np.einsum("asx,msa->xm", dF, Z)  # (S, m)
+            lam = np.linalg.solve(np.eye(S) - beta * F_P.T, W)  # (S, m)
+
+            # residual_i(theta) = b_i + c_i' theta with
+            #   b_i = <Z_i, logratio> + lambda_i' ent
+            #   c_i = -sum_{x,a} Z_i[x,a] (phi[x,a] - phi[x,ref]) + phi_P' lambda_i
+            b = np.einsum("msa,sa->m", Z, logratio) + lam.T @ ent  # (m,)
+            C = -np.einsum("msa,sak->mk", Z, dphi) + lam.T @ phi_P  # (m, K)
+            theta, _, rank, _ = np.linalg.lstsq(C, -b, rcond=None)
+            obj = float(np.sum((C @ theta + b) ** 2))
+            mode_msg = f"closed-form least squares over {m} random projections"
 
         # --- One model solve at theta_hat for policy and value ------------
         from econirl.core.bellman import SoftBellmanOperator
@@ -184,14 +257,14 @@ class UFXPEstimator(BaseEstimator):
             log_likelihood=ll,
             value_function=sol.V,
             policy=sol.policy,
-            hessian=None,
+            hessian=hessian,
             converged=bool(rank == K),
             num_iterations=1,
-            message=f"closed-form least squares over {m} projections, "
-                    f"objective {obj:.3e}",
+            message=f"{mode_msg}, objective {obj:.3e}",
             optimization_time=time.time() - t0,
             metadata={
-                "num_projections": m,
+                "weights": self._weights,
+                "num_projections": m if self._weights == "random" else None,
                 "ufxp_objective": obj,
                 "supported_state_share": float(supported.mean()),
                 "design_rank": int(rank),

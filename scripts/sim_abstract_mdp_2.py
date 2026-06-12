@@ -122,9 +122,10 @@ def _run_tdccp(env, panel):
 def _run_ufxp(env, panel):
     from econirl.estimation import UFXPEstimator
 
-    # Bray's unnested fixed point: duals computed once before the parameter
-    # search; the linear-utility case is closed-form least squares.
-    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    # Bray's unnested fixed point with optimal weighting (OUFXP): closed form
+    # for linear utility, MLE-efficient, standard errors from the efficient
+    # moment variance.
+    est = UFXPEstimator(weights="optimal", verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -183,12 +184,13 @@ DIAGNOSES = {
             "the basis can span the value function.",
     "TD-CCP": "Neural CCP with approximate value iteration and cross-fitted "
               "standard errors.",
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026). The Bellman "
-            "first-order conditions are scored directly; the value function is "
-            "eliminated by duals computed once before the search, so no fixed "
-            "point is ever solved inside the optimizer and the linear case is "
-            "closed-form. Random-projection weights (not the efficient OUFXP "
-            "step), no standard errors.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
+            "optimal weighting (OUFXP). The Bellman first-order conditions are "
+            "scored directly; the value function is eliminated before the "
+            "search, so no fixed point is ever solved inside an optimizer and "
+            "the linear case is closed form. As asymptotically efficient as "
+            "maximum likelihood, with standard errors from the efficient "
+            "moment variance, so it enters the coverage table on equal terms.",
     "MCE-IRL": "Behavioral reference on the harder cell. Its converged flag is "
                "conservative (gradient-norm tolerance); read it next to Policy TV.",
 }

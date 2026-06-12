@@ -39,13 +39,22 @@ shares (~0.30 / 0.40 / 0.31) and full state coverage.
 |---|---:|---:|---:|
 | tabular MPEC (gold) | 0.017 | 0.210 | exact |
 | neural MPEC (shallow) | 0.135 | 0.336 | 1e-5 to 4e-3 |
-| GLADIUS (model-free) | 1.291 | 25.71 | n/a |
+| GLADIUS (under-configured, unanchored)* | 1.291 | 25.71 | n/a |
 
-Neural MPEC drives the Bellman residual to near zero and recovers reward and value far
-better than model-free GLADIUS, but sits about 8x above tabular MPEC on reward RMSE.
-Sweeping `rho` over {0.1, 1, 10}, net width/depth, and collocation set (all states vs
-observed-frequency-weighted) barely moves the number. The model's final NLL reaches the
-true-policy NLL floor, so the likelihood is fully optimized. The gap is not optimization.
+Reward RMSE here is over the full (S, A) matrix, which includes the reference action whose
+reward is anchored to zero in both truth and estimate; over the two estimated actions only
+the neural figure is 0.165. Neural MPEC drives the Bellman residual to near zero and sits
+about 8x above tabular MPEC on reward RMSE. Sweeping `rho` over {0.1, 1, 10}, net
+width/depth, and collocation barely moves the number. The model's final in-sample NLL
+reaches the true-policy floor, so the likelihood is fully optimized and the gap is not
+optimization.
+
+*The GLADIUS row is **not a fair baseline**. It is run here under-sized (32-wide, 1 layer,
+300 epochs) and without the action-2 anchor that tabular and neural MPEC both receive. Run
+at the repo-standard size (128-wide, 3 layers) with the same anchor, GLADIUS reaches value
+RMSE ~2.6 and reward RMSE ~0.15. The like-for-like, anchored comparison lives in the
+`direct_optimization` simulation-studies page, not here. This prototype keeps GLADIUS only
+as a rough model-free reference.
 
 ## Result 2, why the gap is variance, not bias
 
@@ -60,17 +69,17 @@ pooling. Textbook nonparametric-versus-parametric tradeoff, not a defect.
 | 4k | 0.248 | 0.683 | 0.054 | 0.235 |
 | 16k | 0.139 | 0.244 | 0.029 | 0.187 |
 | 64k | 0.071 | 0.106 | 0.010 | 0.067 |
-| 256k | 0.033 | 0.119 | 0.007 | 0.112 |
 
-By 256k obs the neural value RMSE matches tabular (0.119 vs 0.112) and the reward RMSE
-is still falling. (The 256k row is from the convergence probe, not the default sweep.)
+Each 4x of data roughly halves the neural reward RMSE, the root-N signature of a consistent
+estimator, while tabular MPEC stays about 4x to 5x lower throughout (every row reproduces
+from `neural_mpec_experiment_results.json`).
 
 ## Takeaway
 
 Neural MPEC is real and well-behaved. The known-`P` exact residual makes it stable
-(soft Bellman is a contraction for fixed reward, no double-sampling), it is consistent,
-and it dominates the model-free neural cousin. Its cost is statistical efficiency under
-correct linear specification, which is exactly the price of not knowing the reward is
-linear. The place it should win is a DGP where the true reward is **not** linear in the
-features, where pooling into 4 parameters is misspecification and the flexible reward
-pays off. That is the natural next experiment.
+(soft Bellman is a contraction for fixed reward, no double-sampling) and it is consistent.
+Its cost is statistical efficiency under correct linear specification, which is exactly the
+price of not knowing the reward is linear. The place it should win is a DGP where the true
+reward is **not** linear in the features, where pooling into 4 parameters is misspecification
+and the flexible reward pays off. That comparison, with all methods anchored like-for-like
+and a fair GLADIUS, is the `direct_optimization` simulation-studies page.

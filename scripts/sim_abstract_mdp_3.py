@@ -157,10 +157,11 @@ def _run_bc(env, panel):
 def _run_ufxp(env, panel):
     from econirl.estimation import UFXPEstimator
 
-    # Bray's unnested fixed point. Exactly one dense (S, S) factorization
-    # before the parameter search, then closed-form least squares; this scale
-    # is the regime the paper targets, so the probe checks the claim here.
-    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    # Bray's unnested fixed point with optimal weighting (OUFXP). Exactly one
+    # dense (S, S) factorization before the search, then a closed-form
+    # weighted moment solve; this scale is the regime the paper targets, so
+    # the probe checks the claim here.
+    est = UFXPEstimator(weights="optimal", verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -191,11 +192,12 @@ ROSTER = (
 
 
 DIAGNOSES = {
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026), built for exactly "
-            "this regime: one dense factorization before the parameter search, "
-            "then closed-form least squares on projected Bellman first-order "
-            "conditions, with no fixed point inside the optimizer. "
-            "Random-projection weights, no standard errors.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
+            "weighting (OUFXP), built for exactly this regime: one dense "
+            "factorization before the parameter search, then a closed-form "
+            "weighted moment solve on Bellman first-order conditions, with no "
+            "fixed point inside any optimizer. MLE-efficient with standard "
+            "errors from the efficient moment variance.",
     "TD-CCP": "Neural CCP with approximate value iteration on sampled batches; "
               "never materializes a dense fixed point.",
     "NNES": "Neural value network plus structural MLE; the network replaces the "

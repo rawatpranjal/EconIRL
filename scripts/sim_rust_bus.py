@@ -97,10 +97,10 @@ def _run_tdccp(env, panel):
 def _run_ufxp(env, panel):
     from econirl.estimation import UFXPEstimator
 
-    # Bray's unnested fixed point: the value-function dependence of the Bellman
-    # first-order conditions is removed by duals computed once before the
-    # search, so the linear-utility case is closed-form least squares.
-    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    # Bray's unnested fixed point with the paper's optimal weighting (OUFXP):
+    # closed form for linear utility, MLE-efficient, with standard errors from
+    # the efficient moment variance.
+    est = UFXPEstimator(weights="optimal", verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -222,12 +222,12 @@ DIAGNOSES = {
     "SEES": "bspline basis with basis_dim >= num_states (20); a smaller basis "
             "underfits the value function and biases theta.",
     "TD-CCP": "Neural CCP with approximate value iteration.",
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026). Scores projected "
-            "Bellman first-order conditions; the value function is eliminated by "
-            "duals computed once before the parameter search, making the linear "
-            "case closed-form. Uses random-projection weights (not the efficient "
-            "OUFXP second step) and reports no standard errors, so expect "
-            "consistency with some efficiency loss against the MLE family.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
+            "optimal weighting (OUFXP). Bellman first-order conditions are scored "
+            "with the value function eliminated before any parameter search, so "
+            "the linear case is closed form; the optimal weights make it as "
+            "asymptotically efficient as maximum likelihood, and standard errors "
+            "come from the efficient moment variance.",
     "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether the "
                "gradient norm crossed the tolerance; the objective often plateaus "
                "first, so the flag can read False while the recovered policy is "

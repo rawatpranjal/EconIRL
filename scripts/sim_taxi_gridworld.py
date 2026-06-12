@@ -146,11 +146,11 @@ def _run_bc(env, panel):
 def _run_ufxp(env, panel):
     from econirl.estimation import UFXPEstimator
 
-    # Bray's unnested fixed point: duals computed once before the parameter
-    # search; the linear-utility case is closed-form least squares. Its
-    # first-order conditions are scored only at visited states, which is the
-    # interesting stress on this concentrated-coverage grid.
-    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    # Bray's unnested fixed point with optimal weighting (OUFXP). Conditions
+    # are scored only at visited states and the optimal weights downweight
+    # thin states by their sample share, which is the interesting behavior on
+    # this concentrated-coverage grid.
+    est = UFXPEstimator(weights="optimal", verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -195,12 +195,11 @@ DIAGNOSES = {
            "is exactly where a concentrated state distribution (most trajectories "
            "hug the start-to-goal diagonal) can hurt it.",
     "MPEC": "Structural contrast: constrained MLE.",
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026): scores Bellman "
-            "first-order conditions with the value function eliminated by "
-            "pre-computed duals. Like CCP it starts from inverted empirical "
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
+            "weighting (OUFXP). Like CCP it starts from inverted empirical "
             "choice probabilities, so thin state coverage is its natural "
-            "stress; unlike CCP its conditions are scored only at visited "
-            "states. Random-projection weights, no standard errors.",
+            "stress; its conditions are scored only at visited states and the "
+            "optimal weights downweight thin states by their sample share.",
 }
 
 EXCLUDED = [

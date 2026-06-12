@@ -26,7 +26,7 @@ def test_ufxp_matches_nfxp_on_abstract_mdp() -> None:
                      branching=3, discount_factor=0.9, seed=0)
     panel = simulate_panel(env, n_individuals=400, n_periods=60, seed=123)
 
-    ufxp = _fit(env, panel, UFXPEstimator(num_projections=64, seed=0))
+    ufxp = _fit(env, panel, UFXPEstimator(weights="random", num_projections=64, seed=0))
     nfxp = _fit(env, panel, NFXPEstimator(inner_solver="hybrid", inner_tol=1e-10,
                                           compute_hessian=False, verbose=False))
 
@@ -40,11 +40,46 @@ def test_ufxp_matches_nfxp_on_abstract_mdp() -> None:
     assert np.max(np.abs(theta_u - true)) < 0.2
 
 
+def test_oufxp_efficiency_and_standard_errors() -> None:
+    # Optimal weights (OUFXP): the point estimate should hug the MLE at least
+    # as closely as the random-projection version, and the efficient-variance
+    # standard errors should agree with NFXP's asymptotic SEs (Theorem 2 says
+    # both are efficient, so they estimate the same limit).
+    env = random_mdp(num_states=8, num_actions=2, num_features=2,
+                     branching=3, discount_factor=0.9, seed=0)
+    panel = simulate_panel(env, n_individuals=400, n_periods=60, seed=123)
+
+    oufxp = _fit(env, panel, UFXPEstimator(weights="optimal"))
+    random_z = _fit(env, panel, UFXPEstimator(weights="random",
+                                              num_projections=64, seed=0))
+    nfxp = _fit(env, panel, NFXPEstimator(inner_solver="hybrid", inner_tol=1e-10,
+                                          compute_hessian=True, verbose=False))
+
+    theta_o = np.asarray(oufxp.parameters)
+    theta_r = np.asarray(random_z.parameters)
+    theta_n = np.asarray(nfxp.parameters)
+
+    assert oufxp.converged
+    gap_o = float(np.max(np.abs(theta_o - theta_n)))
+    gap_r = float(np.max(np.abs(theta_r - theta_n)))
+    assert gap_o <= gap_r + 1e-6
+    assert gap_o < 0.1
+
+    se_o = np.asarray(oufxp.standard_errors)
+    se_n = np.asarray(nfxp.standard_errors)
+    assert np.all(np.isfinite(se_o)) and np.all(se_o > 0)
+    # Both efficient: SEs within 30% of each other, parameter by parameter.
+    assert np.all(np.abs(se_o - se_n) / se_n < 0.30)
+
+    # The random-projection mode reports no standard errors.
+    assert not np.any(np.isfinite(np.asarray(random_z.standard_errors)))
+
+
 def test_ufxp_on_rust_bus() -> None:
     env = RustBusEnvironment(num_mileage_bins=10, operating_cost=0.01,
                              replacement_cost=2.0, discount_factor=0.9)
     panel = simulate_panel(env, n_individuals=400, n_periods=60, seed=5)
-    res = _fit(env, panel, UFXPEstimator(num_projections=64, seed=0))
+    res = _fit(env, panel, UFXPEstimator())
     true = np.asarray(env.get_true_parameter_vector())
     assert res.converged
     assert np.max(np.abs(np.asarray(res.parameters) - true)) < 0.25
@@ -55,9 +90,13 @@ def test_ufxp_seed_determinism() -> None:
     env = random_mdp(num_states=8, num_actions=2, num_features=2,
                      branching=3, discount_factor=0.9, seed=0)
     panel = simulate_panel(env, n_individuals=200, n_periods=40, seed=9)
-    a = _fit(env, panel, UFXPEstimator(num_projections=32, seed=3))
-    b = _fit(env, panel, UFXPEstimator(num_projections=32, seed=3))
+    a = _fit(env, panel, UFXPEstimator(weights="random", num_projections=32, seed=3))
+    b = _fit(env, panel, UFXPEstimator(weights="random", num_projections=32, seed=3))
     assert np.allclose(np.asarray(a.parameters), np.asarray(b.parameters))
+    # Optimal weights are deterministic by construction (no randomness at all).
+    c = _fit(env, panel, UFXPEstimator(weights="optimal"))
+    d = _fit(env, panel, UFXPEstimator(weights="optimal"))
+    assert np.allclose(np.asarray(c.parameters), np.asarray(d.parameters))
 
 
 def test_ufxp_dual_identity() -> None:
