@@ -1,8 +1,21 @@
 # Under the Hood
 
-The model, the constrained program, the standard-error identity, and the
-consistency argument live on the [MPEC overview](../mpec.md). This page is the
-operational dive: how the constrained problem is actually solved.
+## Model
+
+The data are state, action, next-state triples $(s, a, s')$ from a stationary
+infinite-horizon dynamic discrete choice model with linear flow utility
+$u_\theta(s, a) = \varphi(s, a)^\top \theta$, discount factor $\beta$, known
+transition kernels $F_a(s' \mid s)$, and i.i.d. logit shocks. The integrated
+value function satisfies the soft Bellman fixed point
+
+$$
+V_\theta(s) = \log \sum_a \exp\!\bigl(u_\theta(s,a) + \beta \sum_{s'} F_a(s'\mid s)\,V_\theta(s')\bigr).
+$$
+
+MPEC treats the value vector $V$ as an explicit optimization variable alongside
+$\theta$ and enforces the Bellman constraint directly. The full model
+derivation, standard-error identity, and consistency argument are on the
+[MPEC overview](../mpec.md).
 
 ## Pseudocode
 

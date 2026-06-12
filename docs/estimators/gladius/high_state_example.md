@@ -40,7 +40,7 @@ The Q-network maps `(state_features, action_onehot)` - a vector of length
 `state_dim + n_actions` - to a scalar action-value. The zeta network maps the
 same input to a scalar approximation of $\mathbb{E}[V(s') \mid s, a]$.
 During training, the zeta network is updated on even mini-batches against the
-soft value of next states from the frozen Q-network; the Q-network is updated on
+soft value of next states from the Q-network held fixed during that step; the Q-network is updated on
 odd mini-batches against the NLL of observed choices and the anchor Bellman
 residual.
 

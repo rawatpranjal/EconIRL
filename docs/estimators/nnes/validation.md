@@ -23,7 +23,7 @@ different questions.
 | Source | What it shows |
 | --- | --- |
 | Nguyen paper | NNES nearly matches oracle NFXP in Rust-style multi-module Monte Carlo designs where the oracle knows the separable structure and NNES does not. |
-| EconIRL study | The package implementation recovers known reward, policy, value, Q, and counterfactual objects inside frozen low- and high-dimensional DGP cells. |
+| EconIRL study | The package implementation recovers known reward, policy, value, Q, and counterfactual objects inside fixed low- and high-dimensional DGP cells. |
 
 The paper simulation uses continuous mileage states, joint replacement actions,
 50 buses, 20 kept periods after burn-in, 1,000 observations per replication,
@@ -31,7 +31,7 @@ and 100 replications in the two-module baseline. It also reports a
 four-dimensional extension and high-discount anchoring checks.
 
 The EconIRL results file is not a literal replication of that Monte Carlo. It is a
-package simulation study: the DGP is frozen, the oracle objects are known
+package simulation study: the DGP is held fixed, the oracle objects are known
 before estimation, the high-dimensional primary cell has encoded states and 32
 reward parameters, and every reported result is tied to machine-readable
 numerical checks.
@@ -121,7 +121,7 @@ The primary high-dimensional cell ran in 36.46 seconds.
 
 The estimates are not exactly equal to the true parameters because the panel
 is finite and the value function is approximated. The study reports recovery
-within the listed tolerances in the frozen synthetic cells.
+within the listed tolerances in the synthetic cells.
 
 NNES also appears in the cross-estimator comparison on the
 [bus engine replacement](../../simulation_studies/rust_bus.md) simulation

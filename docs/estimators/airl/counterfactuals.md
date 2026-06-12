@@ -1,6 +1,7 @@
 # Counterfactuals
 
-AIRL does not provide a structural gauge. The recovered reward component
+AIRL does not recover a reward in the same parameterization as the
+data-generating process. The recovered reward component
 $g_\theta$ is identified only up to potential-based shaping, so raw parameter
 values cannot be re-solved under an arbitrary intervention the way NFXP or
 MCE-IRL can. The package evaluates AIRL counterfactuals through the simulation
@@ -15,9 +16,9 @@ of deploying the recovered policy in the changed world.
 | Type B | Change transitions, hold the recovered reward fixed. | Re-solve the oracle under new transitions; report regret from the old AIRL policy. |
 | Type C | Disable one non-anchor action. | Re-solve the oracle with the penalized action; report regret from the old AIRL policy. |
 
-Because AIRL's recovered reward is state-only and not anchored to a structural
-gauge, it is not re-solved under each intervention. The harness instead treats
-the recovered policy as frozen and measures how much welfare it loses in the
+Because AIRL's recovered reward is state-only and on its own scale, it is not
+re-solved under each intervention. The harness instead treats
+the recovered policy as fixed and measures how much welfare it loses in the
 counterfactual world relative to the oracle policy that was re-solved under the
 intervention.
 
@@ -43,4 +44,4 @@ and the value function accessible from the lower-level result. For controlled
 payoff, transition, or action-set interventions, use the package's simulation
 and evaluation utilities with an explicit problem and transition environment.
 The `AIRLEstimator` does not expose a `.counterfactual()` method; the
-counterfactual evaluation in the results file comes from the validation harness.
+counterfactual evaluation in the results file comes from the simulation study runner.

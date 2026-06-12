@@ -25,7 +25,7 @@ entropy IRL framework and on {ref}`Wulfmeier, Ondruska, and Posner (2015)
 | Transitions are known or supplied. | Transitions must be estimated jointly. |
 | The reward is nonlinear in the available state encodings. | A linear reward table is adequate (use MCE-IRL). |
 | Behavioral fit - policy, value, Q - matters more than a structural parameter vector. | You need identified structural parameters (use the structural family). |
-| You can impose an anchor action or absorbing state for the reward gauge. | The reward gauge cannot be fixed before estimation. |
+| You can impose an anchor action or absorbing state to normalize the reward. | The reward normalization cannot be fixed before estimation. |
 | Counterfactual re-solving under the learned reward is the goal. | Policy-only imitation is enough (use BC). |
 
 ## Minimal Fit
@@ -49,9 +49,9 @@ print(model.summary())
 
 ## Evidence
 
-Deep MCE-IRL is reported on a synthetic cell with a frozen nonlinear neural
-reward, known stochastic transitions, and an anchor action that fixes the
-reward gauge. The cell has 32 states, 3 actions, 160,000 observations, and
+Deep MCE-IRL is reported on a synthetic cell with a fixed nonlinear neural
+reward, known stochastic transitions, and an anchor action that normalizes
+the reward. The cell has 32 states, 3 actions, 160,000 observations, and
 known policy, value, Q, and counterfactual oracle objects, so every recovery
 claim is checked against the truth. The machine-readable results file records
 the reported results. Deep MCE-IRL also runs on the bus engine and gridworld
@@ -60,7 +60,7 @@ the rest of the IRL roster.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic tabular simulation with frozen neural reward. |
+| Evidence scope | Synthetic tabular simulation with fixed neural reward. |
 | Primary cell | `deep_mce_neural_reward`. |
 | Machine-readable results file | [deep_mce_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |

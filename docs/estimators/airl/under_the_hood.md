@@ -79,12 +79,30 @@ reward from the action-contrast direction; the disentanglement guarantee does
 not hold. The action-dependent diagnostic cell confirms this failure in the
 package's simulation results.
 
+## Pseudocode
+
+```
+initialize reward parameters theta and shaping potential phi to zero
+choose an initial policy pi (e.g. uniform)
+while the discriminator loss has not converged:
+    sample expert transitions (s, a, s') from the demonstration panel
+    sample policy transitions (s, a, s') by rolling out pi
+    compute discriminator logit f(s,a,s') = g_theta(s) + beta*h_phi(s') - h_phi(s)
+    update theta and phi via binary cross-entropy on expert vs. policy transitions
+    re-solve the soft Bellman equation using the shaped reward as flow utility
+    update pi from the new value function
+extract g_theta as the recovered reward
+project g_theta onto the reward feature basis if structural parameters are needed
+report g_theta, pi, value function, and diagnostics
+```
+
 ## Implementation Notes
 
 The implementation lives in `econirl.estimation.adversarial.airl`. Reward
 parameters are updated with Adam at each round; the shaping potential is
 initialized to zero and updated alongside the reward. The `shaping_l2_penalty`
-parameter applies a small L2 regularizer to both reward and shaping parameters
-to suppress gauge drift during training. State-only mode projects the reward
+parameter applies a small L2 regularizer to both reward and shaping parameters.
+This suppresses drift along directions that leave behavior unchanged during
+training. State-only mode projects the reward
 matrix onto the state subspace by averaging across actions before computing the
 discriminator logit.

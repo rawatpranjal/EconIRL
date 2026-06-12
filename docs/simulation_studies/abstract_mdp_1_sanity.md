@@ -77,7 +77,7 @@ Param RMSE is reported for the structural family only. Those estimators share th
 
 **GLADIUS.** Neural Q and expected-value networks; tracks behavior.
 
-**AIRL.** Fixed: reward_arg='state_action'. The default 'state' marginalized the reward across actions (policy TV 0.24 -> 0.02); recovered parameters stay gauge/shaping-unidentified by design, so TV is the right scorecard.
+**AIRL.** Fixed: reward_arg='state_action'. The default 'state' marginalized the reward across actions (policy TV 0.24 -> 0.02); recovered parameters are identified only up to shaping transformations by design, so TV is the right scorecard.
 
 **f-IRL.** f-divergence IRL; tracks behavior.
 

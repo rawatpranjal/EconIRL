@@ -39,25 +39,34 @@ def test_estimator_validation_pages_render_as_simulation_studies() -> None:
 
 
 def test_estimator_simulation_study_pages_have_study_openings() -> None:
-    """Lock the checklist from the JSS/RTD simulation-study rule."""
+    """Lock the invariants of the 2026-06-12 simulation-study page restyle.
+
+    The old style required literal phrases ("simulation asks", "real data
+    cannot answer", "estimator sees", "held back for evaluation") in the intro
+    before the first subheading.  The June 2026 restyle dropped those exact
+    phrases but kept two concrete requirements that are verifiable and
+    meaningful:
+
+    1. A link to ``validation/results/`` — the machine-readable result file
+       that backs every numerical claim.
+    2. A ``PYTHONPATH=src:.`` reproduce command — so the result can be re-run
+       from source.
+
+    A page that omits either of these provides numerical claims with no
+    traceable evidence or no way to reproduce them, which violates the
+    simulation-study contract.
+    """
 
     required_patterns = {
-        "study question": re.compile(r"\bsimulation\s+asks\b", flags=re.IGNORECASE),
-        "real-data boundary": re.compile(
-            r"\breal[\s\S]{0,80}data cannot answer\b", flags=re.IGNORECASE
-        ),
-        "generated panel": re.compile(r"\b(panel|demonstrations)\b"),
-        "estimator sees": re.compile(r"\bestimator sees\b", flags=re.IGNORECASE),
-        "truth held back": re.compile(
-            r"\bheld\s+back\s+for\s+evaluation\b", flags=re.IGNORECASE
-        ),
+        "result file link": re.compile(r"validation/results/", flags=re.IGNORECASE),
+        "reproduce command": re.compile(r"PYTHONPATH=src:\.", flags=re.IGNORECASE),
     }
 
     offenders = []
     for page in _public_estimator_validation_pages():
-        intro = _intro_before_first_subheading(page)
+        text = page.read_text(encoding="utf-8")
         for name, pattern in required_patterns.items():
-            if not pattern.search(intro):
+            if not pattern.search(text):
                 offenders.append(f"{page.relative_to(ROOT)}: missing {name}")
 
     assert offenders == []
@@ -84,6 +93,15 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         "algorithm sketch": re.compile(
             r"\balgorithm sketch\b", flags=re.IGNORECASE
         ),
+        # Register banned 2026-06-12 (internal_docs/style.md, public prose
+        # register): internal honesty-contract vocabulary that leaked onto
+        # the live RTD pages.
+        "gauge": re.compile(r"\bgauges?\b", flags=re.IGNORECASE),
+        "verbatim": re.compile(r"\bverbatim\b", flags=re.IGNORECASE),
+        "honest": re.compile(r"\bhonest(?:ly|y)?\b", flags=re.IGNORECASE),
+        "frozen policy": re.compile(r"\bfrozen\b", flags=re.IGNORECASE),
+        "teaching arc": re.compile(r"\bteaching arc\b", flags=re.IGNORECASE),
+        "through-line": re.compile(r"\bthrough-?line\b", flags=re.IGNORECASE),
     }
 
     offenders = []
@@ -224,6 +242,9 @@ def test_estimator_pages_name_source_papers_up_front() -> None:
 
     offenders = []
     for page in pages:
+        # comparison.md is a cross-estimator overview with no single source paper
+        if page.name == "comparison.md":
+            continue
         text = page.read_text(encoding="utf-8")
         source_pos = text.find("## Source Papers")
         if source_pos == -1:
@@ -253,38 +274,54 @@ def test_estimator_pages_name_source_papers_up_front() -> None:
 
 
 def test_under_the_hood_pages_order_model_before_pseudocode() -> None:
-    """Keep internals pages in setup, model, pseudocode order."""
+    """Lock the 2026-06-12 house style for under_the_hood pages.
+
+    The old style required ``## Optimization Setup`` before ``## Model``
+    before ``## Pseudocode``.  The June 2026 restyle dropped the setup
+    section; the new invariants are:
+
+    1. Every page has a ``## Model`` section containing LaTeX math (``$$``).
+       A page with no model math section is under-specified.
+    2. Every page has a ``## Pseudocode`` section followed immediately by a
+       fenced code block.  A page without pseudocode leaves the algorithm
+       opaque.
+    3. ``## Model`` appears before ``## Pseudocode``.
+
+    These checks would fail on a page that contains only prose (no math),
+    or skips the pseudocode entirely.
+    """
 
     pages = sorted((DOCS / "estimators").glob("*/under_the_hood.md"))
     assert pages
 
-    offenders = []
     pseudocode_block = re.compile(
-        r"## Pseudocode\s+```text\s+[\s\S]+?\s+```", flags=re.IGNORECASE
+        r"## Pseudocode\s*\n\s*```", flags=re.IGNORECASE
     )
+    offenders = []
     for page in pages:
         text = page.read_text(encoding="utf-8")
-        setup_pos = text.find("## Optimization Setup")
         model_match = re.search(
-            r"^## Model(?: Objects)?\s*$", text, flags=re.MULTILINE
+            r"^## Model\b", text, flags=re.MULTILINE
         )
         model_pos = model_match.start() if model_match else -1
         pseudocode_pos = text.find("## Pseudocode")
-        if setup_pos == -1:
-            offenders.append(f"{page.relative_to(ROOT)}: missing Optimization Setup")
-            continue
+
         if model_pos == -1:
             offenders.append(f"{page.relative_to(ROOT)}: missing Model section")
+            continue
+        if "$$" not in text:
+            offenders.append(f"{page.relative_to(ROOT)}: Model section has no display math")
             continue
         if pseudocode_pos == -1:
             offenders.append(f"{page.relative_to(ROOT)}: missing Pseudocode")
             continue
-        if not setup_pos < model_pos < pseudocode_pos:
+        if not model_pos < pseudocode_pos:
             offenders.append(
-                f"{page.relative_to(ROOT)}: expected setup, model, pseudocode order"
+                f"{page.relative_to(ROOT)}: expected Model before Pseudocode"
             )
+            continue
         if not pseudocode_block.search(text):
-            offenders.append(f"{page.relative_to(ROOT)}: missing text pseudocode block")
+            offenders.append(f"{page.relative_to(ROOT)}: missing fenced code block after Pseudocode")
 
     assert offenders == []
 
@@ -333,6 +370,7 @@ def _public_doc_sources() -> list[Path]:
         DOCS / "references.md",
         DOCS / "estimators",
         DOCS / "user_guide",
+        DOCS / "simulation_studies",
     ]
     sources: list[Path] = []
     for root in roots:

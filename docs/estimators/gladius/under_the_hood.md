@@ -49,7 +49,7 @@ $$
 Training uses alternating mini-batch updates following Algorithm 1 of
 {ref}`Kang, Yoganarasimhan, and Jain (2025) <kang-2025>`. Even batches update
 the zeta network to minimize the squared error against the soft value of the
-next state under the current Q-network (Q is frozen during this step):
+next state under the current Q-network (Q is held fixed during this step):
 
 $$
 L_\zeta = \mathbb{E}\!\left[\Bigl(\zeta_\xi(s,a) - V_{Q_\eta}(s')\Bigr)^2\right].
@@ -111,9 +111,9 @@ extract (s, a, s') tuples from panel
 initialize Q-network and zeta-network
 for each epoch:
     for each even mini-batch:
-        update zeta to minimize (zeta(s,a) - V_Q(s'))^2   # Q frozen
+        update zeta to minimize (zeta(s,a) - V_Q(s'))^2   # Q held fixed
     for each odd mini-batch:
-        update Q to minimize NLL + lambda * anchor_bellman  # zeta frozen
+        update Q to minimize NLL + lambda * anchor_bellman  # zeta held fixed
     apply early stopping if patience exceeded
 compute implied rewards: r_hat = Q - beta * zeta
 stack action-difference rewards and features

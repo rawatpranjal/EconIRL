@@ -91,8 +91,7 @@ the constraint diagnostic alone.
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-study reports recovery within the listed tolerances in the frozen synthetic
-cell.
+study reports recovery within the listed tolerances in the synthetic cell.
 
 ## Counterfactual Recovery
 

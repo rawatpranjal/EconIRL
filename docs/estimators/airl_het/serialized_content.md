@@ -48,9 +48,9 @@ for k, rw in enumerate(summary.metadata["segment_reward_matrices"]):
 ## Interpreting Segment Outputs
 
 The estimated segments may not align with the data-generating segment labels in
-an arbitrary order. The validation harness finds the minimum-cost permutation
+an arbitrary order. The simulation study runner finds the minimum-cost permutation
 between estimated and true segments before reporting accuracy and NRMSE
-metrics. When comparing against ground truth outside the harness, align
+metrics. When comparing against ground truth outside the simulation study, align
 segments manually by the prior or by reward similarity before computing
 any per-segment metric.
 

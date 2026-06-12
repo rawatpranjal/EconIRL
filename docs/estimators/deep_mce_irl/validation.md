@@ -1,8 +1,8 @@
 # Simulation Study
 
-Deep MCE-IRL runs on a synthetic cell with a frozen nonlinear neural reward,
+Deep MCE-IRL runs on a synthetic cell with a fixed nonlinear neural reward,
 known stochastic transitions, linear state features, and an anchor action that
-fixes the reward gauge. The cell has 32 states, 3 actions, and full
+normalizes the reward. The cell has 32 states, 3 actions, and full
 state-action coverage, so every recovery claim is checked against the oracle
 reward matrix, policy, value function, Q function, and counterfactual objects.
 
@@ -26,7 +26,7 @@ PYTHONPATH=src:. python validation/estimators/deep_mce_irl/run.py
 | Periods per individual | 80 |
 | Observations | 160,000 |
 | Discount factor | 0.95 |
-| Reward type | Frozen nonlinear neural (2 layers, hidden dim 32) |
+| Reward type | Fixed nonlinear neural (2 layers, hidden dim 32) |
 | Anchor action | 0 |
 
 ## Fit Summary
