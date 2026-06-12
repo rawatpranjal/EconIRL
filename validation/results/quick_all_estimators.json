@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Quick run: all uniform-interface estimators on a tiny abstract MDP",
-    "date": "2026-06-11",
+    "date": "2026-06-12",
     "package_version": "0.0.4",
     "n_replications": 3,
     "mdp": {
@@ -46,12 +46,13 @@
       "NNES": "def _run_nnes(env, panel):\n    from econirl.estimation.nnes import NNESEstimator\n\n    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,\n                        compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "SEES": "def _run_sees(env, panel):\n    from econirl.estimation.sees import SEESEstimator\n\n    # Basis must span the value function: bspline basis_dim >= num_states. A\n    # fourier basis_dim=4 underfit the 8-state value (workflow diagnosis).\n    est = SEESEstimator(basis_type=\"bspline\", basis_dim=8, warm_start_value=True,\n                        penalty_weight=10.0, compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "TD-CCP": "def _run_tdccp(env, panel):\n    from econirl.estimation import TDCCPConfig, TDCCPEstimator\n\n    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,\n                                            epochs_per_avi=15, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "UFXP": "def _run_ufxp(env, panel):\n    from econirl.estimation import UFXPEstimator\n\n    # Bray's unnested fixed point with the paper's optimal weighting (OUFXP):\n    # closed form for linear utility, MLE-efficient, with standard errors from\n    # the efficient moment variance.\n    est = UFXPEstimator(weights=\"optimal\", verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,\n                                              inner_max_iter=2000, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
-      "MaxEnt-IRL": "def _run_maxent_irl(env, panel):\n    from econirl.contrib.maxent_irl import MaxEntIRLEstimator\n\n    # Feed the action-dependent features: a state-only reward is broadcast\n    # equally across actions and cannot represent the action contrast that\n    # drives choice here (workflow diagnosis).\n    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,\n                             compute_hessian=False, verbose=False)\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "MaxEnt-IRL": "def _run_maxent_irl(env, panel):\n    from econirl.contrib.maxent_irl import MaxEntIRLEstimator\n\n    # Feed the action-dependent features: a state-only reward is broadcast\n    # equally across actions and cannot represent the action contrast that\n    # drives choice here (workflow diagnosis). Adaptive per-parameter steps\n    # (Adam) handle mixed feature scales.\n    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,\n                             learning_rate=0.05, compute_hessian=False, verbose=False)\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
       "IQ-Learn": "def _run_iq_learn(env, panel):\n    from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator\n\n    # q_type=\"linear\" uses the feature structure; a tabular Q does not propagate\n    # to unvisited states (workflow diagnosis).\n    est = IQLearnEstimator(config=IQLearnConfig(q_type=\"linear\", divergence=\"chi2\",\n                                                alpha=3.0, max_iter=2000, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
       "GLADIUS": "def _run_gladius(env, panel):\n    from econirl.estimation import GLADIUSConfig, GLADIUSEstimator\n\n    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=300, q_hidden_dim=128,\n                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,\n                                                patience=60, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "AIRL": "def _run_airl(env, panel):\n    from econirl.estimation import AIRLConfig, AIRLEstimator\n\n    # reward_arg=\"state_action\": the default \"state\" marginalizes the reward\n    # across actions and cannot represent the action contrast (workflow\n    # diagnosis). AIRL accepts a reward spec, not a utility. Policy TV is fixed;\n    # the recovered parameters stay gauge/shaping-unidentified by design.\n    est = AIRLEstimator(config=AIRLConfig(reward_type=\"linear\", reward_arg=\"state_action\",\n                                          reward_lr=0.01, discriminator_steps=10,\n                                          max_rounds=300, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
-      "f-IRL": "def _run_firl(env, panel):\n    from econirl.estimation.f_irl import FIRLEstimator\n\n    est = FIRLEstimator(f_divergence=\"chi2\", lr=0.5, max_iter=400, reward_clip=100.0,\n                        verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "f-IRL": "def _run_firl(env, panel):\n    from econirl.estimation.f_irl import FIRLEstimator\n\n    # fkl (bounded gradient) with the estimator's default reward clip; the\n    # chi2 ratio gradient is unbounded on near-deterministic experts.\n    est = FIRLEstimator(f_divergence=\"fkl\", lr=0.2, max_iter=400, reward_clip=10.0,\n                        verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "BC": "def _run_bc(env, panel):\n    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator\n\n    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n"
     },
     "diagnoses": {
@@ -59,8 +60,9 @@
       "CCP": "Hotz-Miller conditional choice probabilities; recovers cleanly.",
       "MPEC": "Constrained MLE; recovers cleanly.",
       "NNES": "Neural value network plus structural MLE; recovers cleanly.",
-      "SEES": "Fixed: bspline basis with basis_dim >= num_states. A fourier basis of dim 4 underfit the 8-state value function (param RMSE 0.89 -> 0.01).",
+      "SEES": "Fixed: bspline basis with basis_dim >= num_states. A fourier basis of dim 4 underfit the 8-state value function (param RMSE 0.89 -> 0.025).",
       "TD-CCP": "Neural CCP with approximate value iteration; recovers cleanly.",
+      "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting (OUFXP): closed form for linear utility, as asymptotically efficient as maximum likelihood, standard errors from the efficient moment variance.",
       "MCE-IRL": "Causal maximum-entropy IRL; recovers behavior cleanly.",
       "MaxEnt-IRL": "Fixed: feed action-dependent features. A state-only reward is broadcast equally across actions and cannot represent the action contrast (policy TV 0.23 -> 0.01).",
       "IQ-Learn": "Fixed: q_type='linear'. A tabular Q-table does not propagate to unvisited states (policy TV 0.29 -> 0.04).",
@@ -93,7 +95,7 @@
         "type_c": 6.880679807082929e-08,
         "transferred": true
       },
-      "runtime": 4.782831192016602,
+      "runtime": 5.460697174072266,
       "converged": true,
       "error": null
     },
@@ -118,7 +120,7 @@
         "type_c": 6.786113059762669e-08,
         "transferred": true
       },
-      "runtime": 2.3943419456481934,
+      "runtime": 2.844332695007324,
       "converged": true,
       "error": null
     },
@@ -143,7 +145,7 @@
         "type_c": 7.597183432407639e-08,
         "transferred": true
       },
-      "runtime": 4.174569845199585,
+      "runtime": 4.796772003173828,
       "converged": true,
       "error": null
     },
@@ -168,7 +170,7 @@
         "type_c": 6.870794000873913e-08,
         "transferred": true
       },
-      "runtime": 11.369211912155151,
+      "runtime": 12.614564895629883,
       "converged": true,
       "error": null
     },
@@ -193,7 +195,7 @@
         "type_c": 6.87887168550512e-08,
         "transferred": true
       },
-      "runtime": 0.6211059093475342,
+      "runtime": 0.6985201835632324,
       "converged": false,
       "error": null
     },
@@ -218,7 +220,32 @@
         "type_c": 8.758431164704187e-09,
         "transferred": true
       },
-      "runtime": 3.051017999649048,
+      "runtime": 3.8787319660186768,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "rep": 0,
+      "params": [
+        -0.1151855922814029,
+        0.775231175142178
+      ],
+      "standard_errors": [
+        0.06013899228879675,
+        0.03529252763773966
+      ],
+      "policy_tv": 0.002093894100820384,
+      "value_rmse": 0.06713545105435613,
+      "regret": {
+        "baseline": 0.00011766360333553827,
+        "type_a": 0.00012363663183290186,
+        "type_b": 0.00013545539741910417,
+        "type_c": 6.524388679145232e-08,
+        "transferred": true
+      },
+      "runtime": 0.09554290771484375,
       "converged": true,
       "error": null
     },
@@ -243,7 +270,7 @@
         "type_c": 6.880679807082929e-08,
         "transferred": true
       },
-      "runtime": 5.929025173187256,
+      "runtime": 6.903146028518677,
       "converged": false,
       "error": null
     },
@@ -252,24 +279,24 @@
       "family": "behavioral",
       "rep": 0,
       "params": [
-        -0.011727462522685528,
-        0.7326544523239136
+        -0.33171790838241577,
+        0.9169533252716064
       ],
       "standard_errors": [
         NaN,
         NaN
       ],
-      "policy_tv": 0.009853419486240987,
-      "value_rmse": 0.32362804662474226,
+      "policy_tv": 0.009242691071503478,
+      "value_rmse": 0.1979932257784715,
       "regret": {
-        "baseline": 0.002597392439544821,
-        "type_a": 0.0027307821221635997,
-        "type_b": 0.0029817567823171576,
-        "type_c": 1.534997818361224e-06,
+        "baseline": 0.004664928815732772,
+        "type_a": 0.005131806800108718,
+        "type_b": 0.0012043415862832418,
+        "type_c": 1.2165804429300857e-06,
         "transferred": true
       },
-      "runtime": 14.508166790008545,
-      "converged": false,
+      "runtime": 14.178174018859863,
+      "converged": true,
       "error": null
     },
     {
@@ -293,7 +320,7 @@
         "type_c": 5.76830499110628e-06,
         "transferred": true
       },
-      "runtime": 1.3002758026123047,
+      "runtime": 1.5092830657958984,
       "converged": true,
       "error": null
     },
@@ -318,7 +345,7 @@
         "type_c": 1.7143934373830053e-06,
         "transferred": true
       },
-      "runtime": 12.319010257720947,
+      "runtime": 13.836310148239136,
       "converged": true,
       "error": null
     },
@@ -343,7 +370,7 @@
         "type_c": 5.038056445135953e-05,
         "transferred": true
       },
-      "runtime": 58.037606954574585,
+      "runtime": 67.4145736694336,
       "converged": true,
       "error": null
     },
@@ -352,22 +379,22 @@
       "family": "behavioral",
       "rep": 0,
       "params": [
-        -0.2778804809908064,
-        0.26034972018005254,
-        -0.3217085732743086,
-        0.2732717206576057,
-        -1.0417891342515155,
-        -0.18597538165634886,
-        -0.6202018981743422,
-        0.0584492277504185,
-        -0.6782843295937508,
-        0.29272643074424765,
-        -0.548235577434464,
-        0.354215505010267,
-        -0.6563550774701096,
-        0.42830273385435036,
-        -0.45871671942058145,
-        0.9960015741323994
+        -0.2850605398200017,
+        0.19169986167598319,
+        -0.48535598779725886,
+        0.16387624809386456,
+        -1.4049490290173217,
+        -0.30750890489207655,
+        -0.6839525394200271,
+        0.0010509984272503462,
+        -0.7575940232737599,
+        0.23166176181032067,
+        -0.6419644144632343,
+        0.24628512491599272,
+        -0.7479531594510622,
+        0.3244298634598186,
+        -0.783865330111724,
+        0.7072348789491917
       ],
       "standard_errors": [
         NaN,
@@ -387,16 +414,16 @@
         NaN,
         NaN
       ],
-      "policy_tv": 0.008171007596684184,
-      "value_rmse": 6.432567972020554,
+      "policy_tv": 0.007949069433627606,
+      "value_rmse": 7.883857804285583,
       "regret": {
-        "baseline": 0.001849745237378686,
-        "type_a": 0.04456835540843218,
-        "type_b": 0.07110758160693043,
-        "type_c": 61.62710147833229,
+        "baseline": 0.0017592518988416295,
+        "type_a": 0.042819269954960326,
+        "type_b": 0.07162752208833845,
+        "type_c": 61.54938135570012,
         "transferred": false
       },
-      "runtime": 20.268095016479492,
+      "runtime": 22.542206048965454,
       "converged": true,
       "error": null
     },
@@ -449,7 +476,7 @@
         "type_c": 61.55354889909482,
         "transferred": false
       },
-      "runtime": 0.12797999382019043,
+      "runtime": 0.14708304405212402,
       "converged": true,
       "error": null
     },
@@ -474,7 +501,7 @@
         "type_c": 1.501032041352642e-07,
         "transferred": true
       },
-      "runtime": 2.7309179306030273,
+      "runtime": 3.0179619789123535,
       "converged": true,
       "error": null
     },
@@ -499,7 +526,7 @@
         "type_c": 1.4776304766412718e-07,
         "transferred": true
       },
-      "runtime": 1.0322949886322021,
+      "runtime": 1.156709909439087,
       "converged": true,
       "error": null
     },
@@ -524,7 +551,7 @@
         "type_c": 1.666216204229535e-07,
         "transferred": true
       },
-      "runtime": 4.6697797775268555,
+      "runtime": 5.509597301483154,
       "converged": true,
       "error": null
     },
@@ -549,7 +576,7 @@
         "type_c": 1.5010047575250468e-07,
         "transferred": true
       },
-      "runtime": 9.8456392288208,
+      "runtime": 13.072017908096313,
       "converged": true,
       "error": null
     },
@@ -574,7 +601,7 @@
         "type_c": 1.513371961328787e-07,
         "transferred": true
       },
-      "runtime": 0.5916531085968018,
+      "runtime": 0.9870378971099854,
       "converged": true,
       "error": null
     },
@@ -599,7 +626,32 @@
         "type_c": 8.227518557931053e-08,
         "transferred": true
       },
-      "runtime": 2.1820082664489746,
+      "runtime": 3.067784309387207,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "rep": 1,
+      "params": [
+        -0.1509000882556372,
+        0.7999908875411725
+      ],
+      "standard_errors": [
+        0.06068738418240655,
+        0.03571379449551037
+      ],
+      "policy_tv": 0.0021179615280902363,
+      "value_rmse": 0.10427078253117869,
+      "regret": {
+        "baseline": 0.00019608472759213846,
+        "type_a": 0.0002227374415870731,
+        "type_b": 0.00013751943955431223,
+        "type_c": 1.3146248163488686e-07,
+        "transferred": true
+      },
+      "runtime": 0.05301618576049805,
       "converged": true,
       "error": null
     },
@@ -624,7 +676,7 @@
         "type_c": 1.5010618095229926e-07,
         "transferred": true
       },
-      "runtime": 3.1561837196350098,
+      "runtime": 3.751818895339966,
       "converged": false,
       "error": null
     },
@@ -633,24 +685,24 @@
       "family": "behavioral",
       "rep": 1,
       "params": [
-        -0.055368177592754364,
-        0.7678633332252502
+        -0.4231565296649933,
+        0.9807519912719727
       ],
       "standard_errors": [
         NaN,
         NaN
       ],
-      "policy_tv": 0.011193391381626304,
-      "value_rmse": 0.43018507078340207,
+      "policy_tv": 0.01374554003812586,
+      "value_rmse": 0.3061697172591271,
       "regret": {
-        "baseline": 0.003001392863817509,
-        "type_a": 0.003266691489845819,
-        "type_b": 0.003598430075744785,
-        "type_c": 2.3361342167895914e-06,
+        "baseline": 0.010283307873186986,
+        "type_a": 0.01136704317656756,
+        "type_b": 0.002674129402336911,
+        "type_c": 2.7958635961007616e-06,
         "transferred": true
       },
-      "runtime": 14.590027809143066,
-      "converged": false,
+      "runtime": 15.444547891616821,
+      "converged": true,
       "error": null
     },
     {
@@ -674,7 +726,7 @@
         "type_c": 5.004791648733432e-06,
         "transferred": true
       },
-      "runtime": 0.5546760559082031,
+      "runtime": 1.2400918006896973,
       "converged": true,
       "error": null
     },
@@ -699,7 +751,7 @@
         "type_c": 2.297581339480903e-06,
         "transferred": true
       },
-      "runtime": 15.314505338668823,
+      "runtime": 17.658796072006226,
       "converged": true,
       "error": null
     },
@@ -724,7 +776,7 @@
         "type_c": 4.935886742280182e-06,
         "transferred": true
       },
-      "runtime": 105.04408311843872,
+      "runtime": 117.12489318847656,
       "converged": false,
       "error": null
     },
@@ -733,22 +785,22 @@
       "family": "behavioral",
       "rep": 1,
       "params": [
-        -0.40205983056901073,
-        0.1694293758626907,
-        -0.4474719085331623,
-        0.1968662419209115,
-        -0.8849318650724904,
-        -0.20674107812550546,
-        -0.656720498017114,
-        0.18972317096375801,
-        -0.7543104291674543,
-        0.28156183020728154,
-        -0.6469039763627876,
-        0.3175714584022461,
-        -0.5125612603516366,
-        0.60881325512038,
-        -0.47099125398868524,
-        0.9616340361031142
+        -0.42449214112084255,
+        0.0863937444669384,
+        -0.6187669636151427,
+        0.09034842022649893,
+        -1.2057012972251493,
+        -0.29858146820388753,
+        -0.720428740413682,
+        0.14703491734240212,
+        -0.8360957854916472,
+        0.2103687904031876,
+        -0.7501195738314467,
+        0.20744472708146683,
+        -0.6153985323727259,
+        0.5064864242080857,
+        -0.8128792953966864,
+        0.6703058324775826
       ],
       "standard_errors": [
         NaN,
@@ -768,16 +820,16 @@
         NaN,
         NaN
       ],
-      "policy_tv": 0.007806730435242,
-      "value_rmse": 6.429861497640228,
+      "policy_tv": 0.007555001901627022,
+      "value_rmse": 7.88920363183034,
       "regret": {
-        "baseline": 0.004407668757619776,
-        "type_a": 0.05387453573647849,
-        "type_b": 0.073612750645629,
-        "type_c": 61.611434938328536,
+        "baseline": 0.004182732907336728,
+        "type_a": 0.05221579486716332,
+        "type_b": 0.07307646508705745,
+        "type_c": 61.541194665427646,
         "transferred": false
       },
-      "runtime": 21.942884922027588,
+      "runtime": 23.178707122802734,
       "converged": true,
       "error": null
     },
@@ -830,7 +882,7 @@
         "type_c": 61.62191107199133,
         "transferred": false
       },
-      "runtime": 0.17471599578857422,
+      "runtime": 0.18050503730773926,
       "converged": true,
       "error": null
     },
@@ -855,7 +907,7 @@
         "type_c": 1.1047102793689391e-07,
         "transferred": true
       },
-      "runtime": 4.36982798576355,
+      "runtime": 4.5959203243255615,
       "converged": true,
       "error": null
     },
@@ -880,7 +932,7 @@
         "type_c": 1.1308322926364056e-07,
         "transferred": true
       },
-      "runtime": 2.5305590629577637,
+      "runtime": 2.6717121601104736,
       "converged": true,
       "error": null
     },
@@ -905,7 +957,7 @@
         "type_c": 1.113364064415077e-07,
         "transferred": true
       },
-      "runtime": 5.462639808654785,
+      "runtime": 6.0163140296936035,
       "converged": true,
       "error": null
     },
@@ -930,7 +982,7 @@
         "type_c": 1.1046932709880158e-07,
         "transferred": true
       },
-      "runtime": 11.574830055236816,
+      "runtime": 11.97187089920044,
       "converged": true,
       "error": null
     },
@@ -955,7 +1007,7 @@
         "type_c": 1.1233234993107905e-07,
         "transferred": true
       },
-      "runtime": 0.6916308403015137,
+      "runtime": 0.7119808197021484,
       "converged": false,
       "error": null
     },
@@ -980,7 +1032,32 @@
         "type_c": 1.5398712705668696e-07,
         "transferred": true
       },
-      "runtime": 3.2609310150146484,
+      "runtime": 3.5422987937927246,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "rep": 2,
+      "params": [
+        -0.19750936492800888,
+        0.8132769821773744
+      ],
+      "standard_errors": [
+        0.06000505805243702,
+        0.035263049708317735
+      ],
+      "policy_tv": 0.0032727302150162996,
+      "value_rmse": 0.08345557651100954,
+      "regret": {
+        "baseline": 0.0003157789384733434,
+        "type_a": 0.0003282438707616908,
+        "type_b": 0.00031190673207603936,
+        "type_c": 1.2838879151147323e-07,
+        "transferred": true
+      },
+      "runtime": 0.08596205711364746,
       "converged": true,
       "error": null
     },
@@ -1005,7 +1082,7 @@
         "type_c": 1.1047102793689391e-07,
         "transferred": true
       },
-      "runtime": 6.4017767906188965,
+      "runtime": 6.756644010543823,
       "converged": false,
       "error": null
     },
@@ -1014,24 +1091,24 @@
       "family": "behavioral",
       "rep": 2,
       "params": [
-        0.004734114743769169,
-        0.7031988501548767
+        -0.28892281651496887,
+        0.8721503615379333
       ],
       "standard_errors": [
         NaN,
         NaN
       ],
-      "policy_tv": 0.007502781557943674,
-      "value_rmse": 0.08730599001764888,
+      "policy_tv": 0.007272655314127269,
+      "value_rmse": 0.05159953389732484,
       "regret": {
-        "baseline": 0.00208983538425378,
-        "type_a": 0.002179832954825711,
-        "type_b": 0.0012236742698810144,
-        "type_c": 4.997361835271672e-07,
+        "baseline": 0.0019906593833745045,
+        "type_a": 0.0020945739762328053,
+        "type_b": 0.001039746061643143,
+        "type_c": 4.1674027431102536e-07,
         "transferred": true
       },
-      "runtime": 15.032623767852783,
-      "converged": false,
+      "runtime": 13.479002952575684,
+      "converged": true,
       "error": null
     },
     {
@@ -1055,7 +1132,7 @@
         "type_c": 7.912845158401734e-06,
         "transferred": true
       },
-      "runtime": 1.4957342147827148,
+      "runtime": 1.5463240146636963,
       "converged": true,
       "error": null
     },
@@ -1080,7 +1157,7 @@
         "type_c": 1.5284779495481737e-06,
         "transferred": true
       },
-      "runtime": 18.939001083374023,
+      "runtime": 19.901954889297485,
       "converged": true,
       "error": null
     },
@@ -1105,7 +1182,7 @@
         "type_c": 7.723661539864427e-06,
         "transferred": true
       },
-      "runtime": 109.5325071811676,
+      "runtime": 110.64284300804138,
       "converged": false,
       "error": null
     },
@@ -1114,22 +1191,22 @@
       "family": "behavioral",
       "rep": 2,
       "params": [
-        -0.12266861252024308,
-        0.23731938373017925,
-        -0.18482082231851843,
-        0.3227278768589781,
-        -1.1229790229565122,
-        -0.16904950563007343,
-        -0.5623704923559332,
-        0.034878817522880634,
-        -0.7372308941659649,
-        0.3921508190505344,
-        -0.5588403782508287,
-        0.40968510186974083,
-        -0.6760578216705958,
-        0.4174731805147096,
-        -0.5271674633840214,
-        0.9124930665989734
+        -0.1030590708282143,
+        0.18723036186842695,
+        -0.31627821790586264,
+        0.23582858741608054,
+        -1.5158459566745883,
+        -0.3118847968612727,
+        -0.6111976060181885,
+        -0.026162387217240617,
+        -0.8218667544494969,
+        0.3256000688273462,
+        -0.6502186391635868,
+        0.2919986445458376,
+        -0.76527580527867,
+        0.30102921009486766,
+        -0.8389949692015435,
+        0.6444904576693827
       ],
       "standard_errors": [
         NaN,
@@ -1149,16 +1226,16 @@
         NaN,
         NaN
       ],
-      "policy_tv": 0.01103406417113174,
-      "value_rmse": 6.445751110639732,
+      "policy_tv": 0.011907267248590422,
+      "value_rmse": 7.839929573828015,
       "regret": {
-        "baseline": 0.00396087577834936,
-        "type_a": 0.043463652303877165,
-        "type_b": 0.07395665613790214,
-        "type_c": 61.26010503324697,
+        "baseline": 0.004316675207873155,
+        "type_a": 0.04370398065786052,
+        "type_b": 0.07606129299766473,
+        "type_c": 61.261853168144114,
         "transferred": false
       },
-      "runtime": 22.422930002212524,
+      "runtime": 23.145092248916626,
       "converged": true,
       "error": null
     },
@@ -1211,7 +1288,7 @@
         "type_c": 61.19247723036844,
         "transferred": false
       },
-      "runtime": 0.282365083694458,
+      "runtime": 0.29599809646606445,
       "converged": true,
       "error": null
     }

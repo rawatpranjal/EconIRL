@@ -532,10 +532,16 @@ def render_page(data: dict) -> str:
         ok = [r for r in recs if r["error"] is None]
         ran = f"{len(ok)}/{len(recs)}"
         # Exact recovered params: mean over successful reps when lengths agree.
+        # Vectors outside the data-generating gauge (a tabular reward, a
+        # choice-probability table) are labeled, not printed: comparing them
+        # to theta entry by entry would be meaningless.
         plists = [r["params"] for r in ok if r["params"] is not None]
         if plists and len({len(p) for p in plists}) == 1:
-            mean_p = np.mean(np.asarray(plists, dtype=np.float64), axis=0)
-            params_s = "[" + ", ".join(f"{v:.3f}" for v in mean_p) + "]"
+            if len(plists[0]) != true_theta.shape[0]:
+                params_s = f"not in theta gauge ({len(plists[0])} values)"
+            else:
+                mean_p = np.mean(np.asarray(plists, dtype=np.float64), axis=0)
+                params_s = "[" + ", ".join(f"{v:.3f}" for v in mean_p) + "]"
         else:
             params_s = "-"
         # Param RMSE (structural family, recovered theta vs true).
