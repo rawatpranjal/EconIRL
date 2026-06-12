@@ -190,6 +190,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
     where Z(R) is the partition function (soft value at initial state).
 
     Supports two reward types:
+
     - ``reward_type="state_action"`` (default): R(s,a) via a network that
       takes [state_features, action_onehot].  This is more general and
       correctly handles action-dependent rewards.
@@ -251,7 +252,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
     pvalues_ : dict or None
         P-values from Wald t-test on pseudo SEs.
     coef_ : numpy.ndarray or None
-        Coefficient array (same values as params_ in array form).
+        Coefficient array (same values as ``params_`` in array form).
     policy_ : numpy.ndarray or None
         Estimated choice probabilities P(a|s) of shape (n_states, n_actions).
     value_ : numpy.ndarray or None
@@ -386,7 +387,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             the neural reward is projected onto these features to extract
             interpretable theta.
         transitions : numpy.ndarray
-            Transition matrices P(s'|s,a), shape (n_actions, n_states, n_states).
+            Transition matrices ``P(s'|s,a)``, shape (n_actions, n_states, n_states).
             Required for v1 (exact soft value iteration).
         context : ignored
             Accepted for API compatibility but not used.
@@ -750,7 +751,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         policy : jnp.ndarray
             Policy pi(a|s), shape (n_states, n_actions).
         transitions : jnp.ndarray
-            Transition matrices P(s'|s,a), shape (n_actions, n_states, n_states).
+            Transition matrices ``P(s'|s,a)``, shape (n_actions, n_states, n_states).
         n_states : int
             Number of states.
         discount : float

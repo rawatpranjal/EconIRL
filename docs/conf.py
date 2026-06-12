@@ -11,12 +11,13 @@ sys.path.insert(0, os.path.abspath("../src"))
 project = "econirl"
 copyright = "2024, econirl contributors"
 author = "econirl contributors"
-release = "0.0.4"
+release = "0.0.6"
 
 # -- General configuration ---------------------------------------------------
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
@@ -61,7 +62,7 @@ napoleon_include_special_with_doc = True
 napoleon_use_admonition_for_examples = True
 napoleon_use_admonition_for_notes = True
 napoleon_use_admonition_for_references = True
-napoleon_use_ivar = False
+napoleon_use_ivar = True
 napoleon_use_param = True
 napoleon_use_rtype = True
 napoleon_type_aliases = None
@@ -75,6 +76,11 @@ autodoc_default_options = {
     "exclude-members": "__weakref__",
 }
 autodoc_typehints = "description"
+
+# Autosummary settings
+# Generated stub pages are rebuilt on every build and are git-ignored.
+autosummary_generate = True
+autosummary_generate_overwrite = True
 
 # Intersphinx mapping
 intersphinx_mapping = {
@@ -95,3 +101,34 @@ myst_enable_extensions = [
     "deflist",
     "dollarmath",
 ]
+
+
+# -- API reference member filtering ------------------------------------------
+# The autosummary class pages use :inherited-members:, which in Sphinx 9 pulls
+# inherited dunders and gymnasium.Env internals through even when special- and
+# exclude-members are set on the directive. Filter them here instead.
+
+_GYM_INTERNALS = {
+    "metadata", "render", "reset", "step", "close", "action_space",
+    "observation_space", "np_random", "np_random_seed", "render_mode",
+    "reward_range", "spec", "unwrapped", "get_wrapper_attr",
+    "has_wrapper_attr", "set_wrapper_attr",
+}
+
+
+def _skip_api_member(app, what, name, obj, skip, options):
+    # Drop every dunder except __init__, and drop gymnasium.Env internals.
+    # Return None elsewhere so napoleon and autodoc defaults still decide.
+    if name == "__init__":
+        return None
+    if name.startswith("__") and name.endswith("__"):
+        return True
+    if name in _GYM_INTERNALS:
+        return True
+    return None
+
+
+def setup(app):
+    # priority=0 runs this before napoleon's own skip handler, whose
+    # include-special-with-doc rule would otherwise re-admit gym's __str__.
+    app.connect("autodoc-skip-member", _skip_api_member, priority=0)

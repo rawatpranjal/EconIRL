@@ -32,11 +32,10 @@ def load_robinson_crusoe(
     """Load or generate Robinson Crusoe production/leisure data.
 
     Model structure:
+
     - State: inventory (0 to n_inventory_bins-1)
-    - Actions:
-        - 0: Fish (increases inventory)
-        - 1: Leisure (decreases inventory, increases utility)
-        - 2: Hunt (optional, higher risk/reward than fishing)
+    - Actions: 0 Fish (increases inventory), 1 Leisure (decreases inventory,
+      increases utility), 2 Hunt (optional, higher risk/reward than fishing)
     - Transition: inventory += catch - consumption
 
     Args:

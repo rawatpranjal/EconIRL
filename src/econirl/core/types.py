@@ -24,8 +24,8 @@ class DDCProblem:
     decision environment, following the notation in Rust (1987).
 
     Attributes:
-        num_states: Number of discrete states |S|
-        num_actions: Number of discrete actions |A|
+        num_states: Number of discrete states ``|S|``
+        num_actions: Number of discrete actions ``|A|``
         discount_factor: Time discount factor beta in [0, 1)
         scale_parameter: Logit scale parameter sigma > 0 (extreme value shock scale)
 

@@ -21,7 +21,7 @@ class SufficientStats:
 
     Attributes:
         state_action_counts: Array of shape (S, A) with raw observation counts.
-        transitions: Array of shape (A, S, S) with estimated P(s'|s,a).
+        transitions: Array of shape (A, S, S) with estimated ``P(s'|s,a)``.
         empirical_ccps: Array of shape (S, A) with empirical P(a|s).
         initial_distribution: Array of shape (S,) with empirical starting
             state distribution across individuals.

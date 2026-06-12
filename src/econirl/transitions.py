@@ -40,7 +40,7 @@ class TransitionEstimator:
     probs_ : tuple of float
         Estimated probabilities (theta_0, theta_1, theta_2) after fitting.
     matrix_ : ndarray of shape (n_states, n_states)
-        Transition probability matrix P(s'|s, a=keep) after fitting.
+        Transition probability matrix ``P(s'|s, a=keep)`` after fitting.
     n_transitions_ : int
         Number of valid transitions used for estimation.
 

@@ -407,7 +407,7 @@ def build_trivago_transitions(
     n_actions: int = N_ACTIONS,
     smoothing: float = 1e-8,
 ) -> jnp.ndarray:
-    """Build empirical transition matrix P(s'|s,a) from training data.
+    """Build empirical transition matrix ``P(s'|s,a)`` from training data.
 
     Parameters
     ----------

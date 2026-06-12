@@ -35,6 +35,10 @@ htmlcov/
 
 # Documentation build
 docs/_build/
+# Autosummary-generated API stubs (rebuilt on every Sphinx run)
+docs/api/generated/
+# Local /search research scratch
+/search/
 
 # Git worktrees
 .worktrees/

@@ -47,10 +47,11 @@ def load_icu_sepsis_mdp(data_path: str | Path | None = None) -> dict:
     """Load the raw ICU-Sepsis MDP components as numpy arrays.
 
     Returns a dictionary with the following keys:
-    - transitions: shape (25, 716, 716), transitions[a, s, s'] = P(s'|s,a)
+
+    - transitions: shape (25, 716, 716), ``transitions[a, s, s'] = P(s'|s,a)``
     - rewards: shape (716,), state rewards (+1 at survival state 714)
     - initial_distribution: shape (716,), starting state probabilities
-    - expert_policy: shape (716, 25), clinician behavior policy pi(a|s)
+    - expert_policy: shape (716, 25), clinician behavior policy ``pi(a|s)``
     - sofa_scores: shape (716,), mean SOFA score per state cluster
 
     Args:
