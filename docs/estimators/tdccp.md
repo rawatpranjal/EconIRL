@@ -28,7 +28,7 @@ the CCP foundation.
 | The reward is a finite linear function of known features. | The target is an unrestricted neural reward map (use the IRL family). |
 | Valid inference with locally robust standard errors is required. | Observed action support is very sparse at key states. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.datasets import load_rust_bus

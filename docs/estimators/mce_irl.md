@@ -24,7 +24,7 @@ causal entropy formulation.
 | The behavioral model is maximum causal entropy. | The target is deterministic optimal control without entropy regularization. |
 | You want reward, policy, value, Q, and counterfactual recovery checks. | You only need fitted conditional choice probabilities. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 import numpy as np

@@ -26,7 +26,7 @@ inversion and {ref}`Aguirregabiria and Mira (2002)
 | NFXP is too expensive for repeated comparison runs. | You need the reference nested fixed-point likelihood. |
 | You want a Hotz-Miller or NPL structural estimate. | You only need a behavioral cloning baseline. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.datasets import load_rust_bus

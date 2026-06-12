@@ -23,7 +23,7 @@ and the anchor-action identification strategy.
 | Projected structural reward recovery is the target. | Full structural counterfactual validity is required (GLADIUS has not reached this; see [Simulation Study](gladius/validation.md)). |
 | A policy-imitation and projected-reward diagnostic is sufficient. | Structural standard errors are required (use the structural family). |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl import GLADIUS

@@ -26,7 +26,7 @@ result.
 | Adversarial recovery is the research object. | Counterfactual analysis needs a reward in the same parameterization as the data-generating process (use NFXP or MCE-IRL). |
 | Transitions are available for policy update and evaluation. | Thin state coverage makes adversarial training unstable. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.estimation import AIRLConfig

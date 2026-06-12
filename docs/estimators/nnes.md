@@ -26,7 +26,7 @@ CCP/NPL logic of {ref}`Hotz and Miller (1993) <hotz-miller-1993>` and
 | Neural value approximation is the point of the exercise. | You need the cleanest exact likelihood reference. |
 | Use `bellman="npl"` for the reported path. | `bellman="nfxp"` is a diagnostic variant and does not carry the NPL orthogonality claim. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.datasets import load_rust_bus

@@ -28,7 +28,7 @@ entropy IRL framework and on {ref}`Wulfmeier, Ondruska, and Posner (2015)
 | You can impose an anchor action or absorbing state to normalize the reward. | The reward normalization cannot be fixed before estimation. |
 | Counterfactual re-solving under the learned reward is the goal. | Policy-only imitation is enough (use BC). |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.estimators import MCEIRLNeural

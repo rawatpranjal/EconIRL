@@ -22,7 +22,7 @@ soft-Q learning construction and divergence objectives.
 | You want to compare behavioral cloning with a Bellman-aware alternative. | Reward recovery with structural standard errors is required (use NFXP or MPEC). |
 | Transitions are available to compute the inverse Bellman operator. | State or state-action coverage is very thin (Q and reward recovery degrade). |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.estimation import IQLearnConfig, IQLearnEstimator

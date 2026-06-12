@@ -25,7 +25,7 @@ with constrained optimization.
 | You need a structural reference estimate. | You only need a fast imitation baseline. |
 | Counterfactual policy analysis is central. | You only need fitted choice probabilities. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.datasets import load_rust_bus

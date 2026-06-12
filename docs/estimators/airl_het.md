@@ -29,7 +29,7 @@ heterogeneous extension and the serialized-content identification setting.
 | Action-dependent structural reward recovery is the target. | State-only reward recovery is enough (use base AIRL). |
 | Segment-specific counterfactuals are central. | Only fitted choice probabilities are needed. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.estimation.adversarial.airl_het import AIRLHetConfig, AIRLHetEstimator

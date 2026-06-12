@@ -27,7 +27,7 @@ optimally weighted form and its efficiency result.
 | Most states are visited in the data. | State coverage is very thin everywhere (CCP-style inversion degrades). |
 | Counterfactual policy analysis is central. | You only need fitted choice probabilities. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.datasets import load_rust_bus

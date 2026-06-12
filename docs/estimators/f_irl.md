@@ -25,7 +25,7 @@ state-marginal matching via f-divergence minimization.
 | You want multiple f-divergence choices (forward KL, reverse KL, JS, chi-squared, TV). | You need standard errors on the recovered parameters. |
 | An imitation or behavioral baseline with divergence control is needed. | Counterfactual re-solving in a structural model is the primary goal. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.estimation import FIRLEstimator

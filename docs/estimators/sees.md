@@ -25,7 +25,7 @@ structural estimation.
 | A deterministic value basis is credible. | The value basis cannot approximate the Bellman solution. |
 | You want a scalable structural check after MPEC. | You need a pure CCP or behavioral-cloning baseline. |
 
-## Minimal Fit
+## Quick Start
 
 ```python
 from econirl.datasets import load_rust_bus

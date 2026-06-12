@@ -168,24 +168,24 @@ affine map cannot represent the wave, and more data cannot remove an
 approximation error. The flexible neural reward recovers the wave and its error
 keeps shrinking.
 
-Both patterns are the textbook behavior of a sample-average estimator. Each MPEC
-variant is a sample-average approximation of the same population problem: reward
-parameters chosen subject to the Bellman fixed point, with the log-likelihood
-estimated from the panel. Shapiro and Xu (2005) show that such constrained
-estimators are consistent, with the sample objective converging to its population
-counterpart. The root-$N$ decline in the linear regime is that consistency; the
-nonlinear plateau is the standard bias floor under misspecification, which
-consistency cannot cure because an affine model cannot represent the wave at any
-sample size.
+Both patterns are textbook behavior for a sample-average estimator. Each MPEC
+variant is a sample-average approximation of the same population problem. The
+reward parameters are chosen subject to the Bellman fixed point, and the
+log-likelihood is estimated from the panel. Shapiro and Xu (2005) show that such
+constrained estimators are consistent. The sample objective converges to its
+population counterpart. The root-$N$ decline in the linear regime is that
+consistency. The nonlinear plateau is the standard bias floor under
+misspecification. Consistency cannot cure it, because an affine model cannot
+represent the wave at any sample size.
 
-It is worth flagging what does not happen here. Koiso and Otani (2024), estimating
-a sequential-search model by MPEC, report the reverse pattern at the top of their
-sweep: higher bias and RMSE at the larger sample, and an optimizer that struggled
-to find local optima, so their MPEC got worse with more data. Our linear MPEC
-improves monotonically across the sweep instead. The difference is the shape of
-the likelihood. Their search likelihood is a product of smoothed inequality
-indicators, far more non-convex than the smooth soft-Bellman logit likelihood
-used here. The next section tests that surface directly.
+It is worth flagging what does not happen here. Koiso and Otani (2024) estimate a
+sequential-search model by MPEC. At the top of their sweep the pattern reverses.
+Their estimator had higher bias and error at the larger sample and struggled to
+find local optima. It got worse with more data. Our linear MPEC improves
+monotonically across the sweep instead. The difference is the shape of the
+likelihood. Their search likelihood is a product of smoothed inequality
+indicators. It is far more non-convex than the smooth soft-Bellman logit
+likelihood used here. The next section tests that surface directly.
 
 ## How the three compare
 
@@ -216,34 +216,34 @@ comparison with the two known-$P$ methods.
 
 ## Local-optima robustness
 
-The fragility literature on MPEC, from Iskhakov et al. (2016) to the large-sample
-degradation in Koiso and Otani (2024), warns that a constrained estimator can
-report success at a point that is not the global optimum. The estimates above each
-come from a single optimizer start, which invites the question: would a different
-start land somewhere else?
+The cautions about MPEC come from Iskhakov et al. (2016) and the large-sample
+results in Koiso and Otani (2024). They warn that a constrained estimator can
+report success at a point that is not the global optimum. Each estimate above
+comes from a single optimizer start. A different start could in principle land
+elsewhere.
 
 To separate optimization robustness from sampling noise, one linear-cell panel of
 16,000 observations is held fixed and only the start is varied. Linear MPEC is run
-from $K=10$ random reward starts, $\theta_0 \sim \mathcal{N}(0, 0.5^2)$; with each
+from $K=10$ random reward starts, $\theta_0 \sim \mathcal{N}(0, 0.5^2)$. With each
 start the value vector is initialized at its own Bellman fixed point, so every run
 begins feasible. Neural MPEC is run from $K=10$ random network initializations.
 
 | Method | Reward RMSE: mean ± std (min / max) | Optimization diagnostic |
 |---|---|---|
-| linear MPEC | 0.0209 ± 0.0005 (0.0204 / 0.0215) | 10/10 converged; max constraint violation 9.9e-7; max parameter std across starts 5.7e-4 |
+| linear MPEC | 0.0209 ± 0.0005 (0.0204 / 0.0215) | 10/10 converged, max constraint violation 9.9e-7, max parameter std across starts 5.7e-4 |
 | neural MPEC | 0.1648 ± 0.0001 (0.1645 / 0.1650) | max Bellman residual 1.6e-2 across the 10 starts |
 
-Both methods are effectively start-independent on this data-generating process. The
-ten linear-MPEC starts, scattered across reward space, all converge to the same
-maximum-likelihood point: the reward RMSE varies by about $10^{-3}$ and the
-recovered parameters by under $10^{-3}$, with every run feasible to solver
+Both methods are effectively start-independent on this data-generating process.
+The ten linear-MPEC starts are scattered across reward space. They all converge to
+the same maximum-likelihood point. The reward RMSE varies by about $10^{-3}$ and
+the recovered parameters by under $10^{-3}$, and every run is feasible to solver
 tolerance. The neural starts are tighter still. This is the opposite of the
-Koiso-Otani local-optima struggle, and it is the empirical complement to the
-consistency argument: on the smooth soft-Bellman likelihood the constrained
-problem has a well-behaved surface, so the single-start estimates do not depend
-on a lucky initialization. The warning still binds for harder problems, larger
-state spaces, discount factors near one, or sharply non-convex likelihoods, which
-is exactly where this check earns its place before a single fit is trusted.
+Koiso-Otani local-optima struggle. It is the empirical complement to the
+consistency argument. On the smooth soft-Bellman likelihood the constrained
+problem has a well-behaved surface, so the single-start estimates do not depend on
+a lucky initialization. The warning still binds for harder problems. Larger state
+spaces, discount factors near one, or sharply non-convex likelihoods are exactly
+where this check earns its place.
 
 ## Estimators
 
