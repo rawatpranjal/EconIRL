@@ -166,35 +166,16 @@ ROSTER_C = (
 
 
 DIAGNOSES = {
-    "NFXP-SA": "Rust's original inner loop. Successive approximation, a pure "
-               "contraction with rate equal to the discount factor. It "
-               "reaches the same maximum-likelihood answer. What changes "
-               "with scale and discount is how long it takes.",
-    "NFXP-NK": "The Iskhakov et al refinement. Successive approximation to "
-               "get near the fixed point, then Newton-Kantorovich steps. "
-               "Same estimate, different bill.",
-    "CCP": "Hotz-Miller inversion. Estimate choice probabilities, invert "
-           "once, no fixed point inside the optimizer. Its standard errors "
-           "come from the outer Hessian and can fail to be finite even when "
-           "the point estimate is fine. The SE avail column makes that "
-           "visible.",
-    "MPEC": "Constrained MLE. The Bellman equation enters as constraints for "
-            "the SLSQP solver, with one variable per state plus the "
-            "parameters.",
-    "NNES": "Neural value network plus structural MLE.",
-    "SEES": "Sieve value function. A bspline basis with basis_dim = "
-            "num_states, so the basis can span the value function.",
-    "TD-CCP": "Neural CCP with approximate value iteration and cross-fitted "
-              "standard errors.",
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the "
-            "paper's optimal weighting (OUFXP). The value function is "
-            "eliminated before the search, so no fixed point is ever solved "
-            "inside an optimizer and the linear case is closed form. It "
-            "matches maximum likelihood efficiency and reports standard "
+    "NFXP-SA": "Rust's original successive-approximation inner loop. Same "
+               "maximum-likelihood answer as NFXP-NK, different runtime.",
+    "CCP": "Its standard errors come from the outer Hessian and can fail to "
+           "be finite even when the point estimate is fine. The SE avail "
+           "column makes that visible.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
+            "weighting. As efficient as maximum likelihood, with standard "
             "errors, so it enters the coverage table on equal terms.",
-    "MCE-IRL": "Behavioral reference on the harder cell. Its converged flag "
-               "is conservative, a gradient-norm tolerance. Read it next to "
-               "Policy TV.",
+    "MCE-IRL": "Behavioral reference. Its converged flag is a conservative "
+               "gradient-norm check, so read it next to Policy TV.",
 }
 
 EXCLUDED = [
@@ -204,7 +185,7 @@ EXCLUDED = [
      "family is compared on the bus engine and gridworld pages. MCE-IRL "
      "stays here as the behavioral reference"},
     {"name": "GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL",
-     "reason": "known slow. Their single-run showing is on the bus engine page"},
+     "reason": "research code or too slow; not benchmarked in this study"},
 ]
 
 CELLS = (
@@ -251,9 +232,8 @@ CELLS = (
         description=(
             "A small MDP whose third reward feature is exactly twice the "
             "second (design rank 2 of 3). The likelihood identifies only the "
-            "combination theta_1 + 2 theta_2; no estimator can recover the "
-            "individual coordinates, and the page checks what each one does "
-            "about it."
+            "combination theta_1 + 2 theta_2, so no estimator can recover "
+            "the individual coordinates."
         ),
         env_factory=_rank_deficient,
         roster=ROSTER_C,
@@ -261,13 +241,16 @@ CELLS = (
         n_periods=80,
         seed=606,
         n_replications=20,
-        param_block=True,
+        # Individual coordinates are not identified, so per-coordinate
+        # parameter tables would print arbitrary ridge points.
+        param_block=False,
+        show_params=False,
         fit_timeout=600,
     ),
 )
 
 NARRATIVE = {
-    "title": "Abstract MDP 2: scale, discount, and identification",
+    "title": "Abstract MDP 2",
     "intro": (
         "The sanity-check page showed every estimator recovering an easy "
         "problem. This page hardens the problem along three separate axes and "
@@ -329,33 +312,23 @@ NARRATIVE = {
                 "asserted."
             ),
             "after": (
-                "On the solver contrast there is nothing to report at this "
-                "scale. Successive approximation and the Newton-Kantorovich "
-                "refinement land within a second of each other. A compiled "
-                "dense contraction over 300 states is simply cheap. The "
-                "textbook slowdown of the plain contraction is a statement "
-                "about iteration counts. It only becomes a wall-clock story "
-                "when each iteration is expensive, and the high-dimension "
-                "page is where that bites. The approximation-based members "
-                "(SEES, TD-CCP) trade some parameter precision for "
-                "flexibility while matching the exact family's behavioral "
-                "accuracy."
+                "The two NFXP rows land within a second of each other, so "
+                "the textbook solver gap does not bite at 300 states. The "
+                "high-dimension page is where it starts to. The "
+                "approximation-based members (SEES, TD-CCP) give up some "
+                "parameter precision relative to the exact family while "
+                "staying close on behavior."
             ),
         },
         "high_discount": {
             "before": (
                 "The second cell moves the discount factor to 0.99 and asks "
-                "a harder question than point recovery. Is the reported "
-                "uncertainty usable? The parameter table reports bias, the "
-                "spread of estimates across replications, RMSE, and the "
-                "share of nominal 95% intervals that actually cover the "
-                "truth, together with how often each estimator produced "
-                "finite standard errors at all. On runtime the discount move "
-                "barely registers. Even the plain contraction stays around "
-                "four seconds at 300 states, so this cell is about "
-                "inference, not speed. NFXP-SA runs 2 of 10 replications as "
-                "a runtime spot-check. Its inference is the same MLE as "
-                "NFXP-NK, which runs all 10."
+                "whether the reported uncertainty is usable. The parameter "
+                "table shows bias, the spread across replications, RMSE, "
+                "coverage of the nominal 95% intervals, and how often each "
+                "estimator produced finite standard errors. NFXP-SA runs 2 "
+                "of 10 replications as a runtime spot-check. Its inference "
+                "is the same MLE as NFXP-NK, which runs all 10."
             ),
             "after": (
                 "The SE avail column is the headline. One estimator "
@@ -368,13 +341,11 @@ NARRATIVE = {
         "rank_deficient": {
             "before": (
                 "The last cell breaks identification on purpose. The third "
-                "feature is exactly twice the second, so the design matrix "
-                "has rank 2. The coordinates theta_1 and theta_2 are not "
-                "separately identified, only their combination. The "
-                "interesting output is not the per-coordinate bias, which is "
-                "meaningless here. It is the design diagnostics above the "
-                "table, and how each estimator's intervals behave when the "
-                "question has no answer."
+                "feature is exactly twice the second, so only the "
+                "combination theta_1 + 2 theta_2 is identified, and the "
+                "design diagnostics above flag it. The parameter columns "
+                "are omitted. Every estimator still matches behavior, which "
+                "is what partial identification looks like in practice."
             ),
         },
     },

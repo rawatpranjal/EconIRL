@@ -222,82 +222,36 @@ ROSTER = (
     RosterEntry("GLADIUS", "behavioral", _run_gladius),
     RosterEntry("AIRL", "behavioral", _run_airl),
     RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl),
-    RosterEntry("MaxMargin-IRL", "behavioral", _run_max_margin),
 )
 
 
 DIAGNOSES = {
-    "NFXP": "Reference structural estimator; recovers cleanly.",
-    "CCP": "Hotz-Miller conditional choice probabilities; recovers cleanly.",
-    "MPEC": "Constrained MLE; recovers cleanly.",
-    "NNES": "Neural value network plus structural MLE.",
-    "SEES": "Solver-limited here, not model-limited. The spline basis "
-            "represents the true value function exactly, but the two cost "
-            "coefficients live on very different scales. That stretches the "
-            "optimization landscape, and the default iteration limit stopped "
-            "the search mid-descent. With a larger budget and an extra "
-            "data-driven start it matches the other structural methods.",
-    "TD-CCP": "Neural CCP with approximate value iteration.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
-            "optimal weighting (OUFXP). The value function is eliminated before "
-            "any parameter search, so the linear case is closed form. The "
-            "optimal weights make it as efficient as maximum likelihood, and "
-            "the standard errors come from the same theory.",
-    "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether "
-               "the gradient norm crossed the tolerance. The objective often "
-               "plateaus first, so the flag can read False while the recovered "
-               "policy is essentially exact. Read it next to Policy TV.",
-    "MaxEnt-IRL": "Fed action-dependent features. Its gradient loop previously "
-                  "took a fixed scalar step, which overshoots when feature "
-                  "columns differ in scale by an order of magnitude. The loop "
-                  "now takes adaptive per-parameter steps, the same scheme "
-                  "MCE-IRL uses. A small residual gap to MCE-IRL remains "
-                  "because trajectory-entropy matching is not the causal "
-                  "choice model that generated the data.",
-    "IQ-Learn": "q_type='linear' uses the feature structure. A tabular Q-table "
-                "does not propagate to unvisited states.",
-    "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
-    "AIRL": "Uses reward_arg='state_action'. The recovered reward is in its "
-            "own parameterization by design, so policy TV is the right "
-            "scorecard.",
-    "f-IRL": "Uses the forward-KL divergence with a reward clip matched to the "
-             "cost scale. The chi-squared variant is unstable on "
-             "near-deterministic experts. It recovers a tabular reward, one "
-             "value per state-action pair. That tracks behavior well but "
-             "cannot be re-solved under the interventions, so it is scored "
-             "with its original policy and its Type C regret is large.",
-    "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit interface; "
-                    "parameters are the neural reward projected onto the linear "
-                    "features.",
-    "MaxMargin-IRL": "A structural failure, not a tuning problem. Max-margin "
-                     "apprenticeship learning recovers a reward direction "
-                     "under a unit-norm constraint, with no link to the "
-                     "choice model's noise scale. The policy it implies is "
-                     "far sharper than the truth. The flat replacement cost "
-                     "also dominates the margin against the small per-bin "
-                     "operating cost. The policy distance is inherent to the "
-                     "method on this problem.",
-    "BC": "Matches observed choices but recovers no reward. Its parameters are "
-          "the smoothed keep/replace frequencies per mileage bin. It cannot "
-          "transfer to a counterfactual world, so its Type C regret is large.",
+            "optimal weighting. The value function is eliminated before any "
+            "parameter search, so the linear case is closed form and as "
+            "efficient as maximum likelihood.",
+    "MCE-IRL": "Its converged flag reports whether the gradient norm crossed "
+               "the tolerance. The objective often plateaus first, so the "
+               "flag can read False while the policy is essentially exact.",
+    "MaxEnt-IRL": "It trails MCE-IRL because trajectory-entropy matching is "
+                  "not the causal choice model that generated the data.",
+    "IQ-Learn": "Uses the linear feature structure. A tabular Q-table would "
+                "not propagate to unvisited states.",
 }
 
 EXCLUDED = [
-    {"name": "AIRL-Het / AAIRL", "reason": "designed for latent-type heterogeneity; "
-     "this panel has a single agent type"},
-    {"name": "MMP", "reason": "dropped from the roster for cost after an "
-     "exploratory fit ran orders of magnitude past its cousins' runtimes on "
-     "this small problem"},
-    {"name": "GAIL", "reason": "did not finish a single exploratory fit within "
-     "this page's per-fit budget"},
-    {"name": "GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "dropped from the "
-     "page roster by scope decision to keep the comparison on the core "
-     "structural and IRL families"},
-    {"name": "f-IRL, BC", "reason": "dropped from this page's display by scope "
-     "decision. Both recover objects in a different parameterization, a "
-     "tabular reward and a choice-probability table. Their rows would invite "
-     "meaningless parameter comparisons here. Their raw records remain in the "
-     "results file"},
+    {"name": "AIRL-Het / AAIRL", "reason": "designed for latent-type "
+     "heterogeneity; this panel has one agent type"},
+    {"name": "MMP, GAIL", "reason": "too slow for this page's per-fit budget"},
+    {"name": "GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "research code, "
+     "not benchmarked"},
+    {"name": "MaxMargin-IRL", "reason": "its unit-norm reward direction has "
+     "no link to the choice model's noise scale, so it is not a "
+     "like-for-like baseline on this problem; it ran 3/3 and its raw records "
+     "remain in the results file"},
+    {"name": "f-IRL, BC", "reason": "they recover a tabular reward and a "
+     "choice-probability table, objects in a different parameterization; "
+     "their raw records remain in the results file"},
 ]
 
 CELLS = (

@@ -1,6 +1,6 @@
-# Abstract MDP 3: high dimension
+# Abstract MDP 3: High Dimensional Case
 
-This page asks what survives when the state space reaches a few thousand states. Every tabular structural solver consumes a dense transition tensor whose memory and per-iteration cost grow with the square of the state count. An optimizer like MPEC additionally carries one variable per state. Rather than assert where that breaks, the feasibility probes below run every candidate once per scale under a hard time budget and report what happened. The measured answer is more interesting than the folklore. At 3000 states the entire classical family still completes, so the main table benchmarks it alongside the approximation-based estimators. The probes at the larger scale show where the costs actually separate.
+This page asks what survives when the state space reaches a few thousand states. Every tabular structural solver consumes a dense transition tensor whose memory and per-iteration cost grow with the square of the state count. An optimizer like MPEC additionally carries one variable per state. Rather than assert where that breaks, the feasibility probes below run every candidate except behavioral cloning, which is trivially cheap, once per scale under a hard time budget and report what happened. The measured answer is more interesting than the folklore. At 3000 states the entire classical family still completes, so the main table benchmarks it alongside the approximation-based estimators. The probes at the larger scale show where the costs actually separate.
 
 ## The data-generating process
 
@@ -47,7 +47,7 @@ A 3000-state Garnet MDP with stochastic sparse transitions (branching 8) and a 3
 | Deep-MCE-IRL | behavioral | 3/3 | 3/3 | [0.070, -0.038, 0.045] | - | 0.0516 | 0.2016 | 0.2014 | 0.2058 | 0.0000 | 59.8 |
 | BC | behavioral | 3/3 | 3/3 | different parameterization (6000 values) | - | 0.1069 | 0.7059 | 0.7172 | 0.7922 | 93.5663 | 0.1 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 Behavioral cloning is the control group. It is nearly free and matches the data where the data exists, but it carries no reward. It can say nothing at unvisited states or under the counterfactual interventions. The gap between its regret and the reward-recovering estimators' regret is the value of estimating structure at this scale.
 
@@ -80,25 +80,9 @@ Each probe is a single fit in its own subprocess with a hard 900-second budget; 
 
 ## Notes per estimator
 
-**NFXP-SA.** Rust's original successive-approximation inner loop. The probes show it still completes here. Its cost grows with the dense tensor, and that ceiling is measured, not asserted.
+**MPEC.** Constrained MLE with one optimizer variable per state plus the parameters, 3003 variables here. The SQP solver handles that joint problem and matches the nested-solver MLE at roughly 100 seconds per fit.
 
-**NFXP-NK.** The Newton-Kantorovich polyalgorithm refinement of the same estimator.
-
-**CCP.** Hotz-Miller inversion. One fixed-point solve total, so scale barely touches it until the dense algebra does.
-
-**MPEC.** Constrained MLE with one optimizer variable per state plus the parameters, 3003 variables here. The SQP solver handles that joint problem directly and matches the nested-solver MLE at roughly 100 seconds per fit. The package's legacy penalty solver stops when the Bellman equation is satisfied, which is not the same as finding the best parameters. This page uses SQP.
-
-**UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with optimal weighting (OUFXP), built for exactly this regime. One dense factorization before the parameter search, then a closed-form weighted moment solve, with no fixed point inside any optimizer. It matches maximum likelihood efficiency and reports standard errors.
-
-**TD-CCP.** Neural CCP with approximate value iteration on sampled batches. It never materializes a dense fixed point.
-
-**NNES.** Neural value network plus structural MLE. The network replaces the inner solve.
-
-**GLADIUS.** Neural Q and expected-value networks trained on sampled batches with a Bellman penalty.
-
-**Deep-MCE-IRL.** Neural-reward MCE-IRL. Each epoch still re-solves soft value iteration on the dense tensor, so it sits between the classical and sampled families. Parameters are the neural reward projected onto the linear features.
-
-**BC.** Behavioral cloning, the cheap baseline. It counts choices where data exists, knows nothing anywhere else, and recovers no reward.
+**UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with optimal weighting, built for exactly this regime. One factorization before the parameter search, no fixed point inside any optimizer, and the fastest accurate structural fit on the page.
 
 ## Reproduce
 
@@ -108,6 +92,6 @@ python scripts/sim_abstract_mdp_3.py --page          # regenerate this page
 python scripts/sim_abstract_mdp_3.py --verify        # re-derive the table from JSON
 ```
 
-Raw facts: `validation/results/sim_abstract_mdp_3.json`. Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).
+Raw facts: `validation/results/sim_abstract_mdp_3.json`.
 
-Excluded from this run: SEES (a spline value basis with basis_dim near the state count is its own scaling wall at thousands of states. Its showing is on the harder abstract MDP page); MCE-IRL, MaxEnt-IRL, AIRL, IQ-Learn, f-IRL and the other IRL methods (their exact inner solvers face the same dense-tensor cost the probes document for the classical family. The IRL comparison lives on the bus engine and gridworld pages).
+Not shown on this page: SEES (a spline value basis with basis_dim near the state count is its own scaling wall at thousands of states. Its showing is on the harder abstract MDP page); MCE-IRL, MaxEnt-IRL, AIRL, IQ-Learn, f-IRL and the other IRL methods (their exact inner solvers face the same dense-tensor cost the probes document for the classical family. The IRL comparison lives on the bus engine and gridworld pages).

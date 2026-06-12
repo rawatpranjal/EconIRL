@@ -200,38 +200,15 @@ ROSTER = (
 
 
 DIAGNOSES = {
-    "NFXP-SA": "Rust's original successive-approximation inner loop. The "
-               "probes show it still completes here. Its cost grows with the "
-               "dense tensor, and that ceiling is measured, not asserted.",
-    "NFXP-NK": "The Newton-Kantorovich polyalgorithm refinement of the same "
-               "estimator.",
-    "CCP": "Hotz-Miller inversion. One fixed-point solve total, so scale "
-           "barely touches it until the dense algebra does.",
     "MPEC": "Constrained MLE with one optimizer variable per state plus the "
             "parameters, 3003 variables here. The SQP solver handles that "
-            "joint problem directly and matches the nested-solver MLE at "
-            "roughly 100 seconds per fit. The package's legacy penalty "
-            "solver stops when the Bellman equation is satisfied, which is "
-            "not the same as finding the best parameters. This page uses "
-            "SQP.",
+            "joint problem and matches the nested-solver MLE at roughly 100 "
+            "seconds per fit.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
-            "weighting (OUFXP), built for exactly this regime. One dense "
-            "factorization before the parameter search, then a closed-form "
-            "weighted moment solve, with no fixed point inside any "
-            "optimizer. It matches maximum likelihood efficiency and "
-            "reports standard errors.",
-    "TD-CCP": "Neural CCP with approximate value iteration on sampled "
-              "batches. It never materializes a dense fixed point.",
-    "NNES": "Neural value network plus structural MLE. The network replaces "
-            "the inner solve.",
-    "GLADIUS": "Neural Q and expected-value networks trained on sampled batches "
-               "with a Bellman penalty.",
-    "Deep-MCE-IRL": "Neural-reward MCE-IRL. Each epoch still re-solves soft "
-                    "value iteration on the dense tensor, so it sits between "
-                    "the classical and sampled families. Parameters are the "
-                    "neural reward projected onto the linear features.",
-    "BC": "Behavioral cloning, the cheap baseline. It counts choices where "
-          "data exists, knows nothing anywhere else, and recovers no reward.",
+            "weighting, built for exactly this regime. One factorization "
+            "before the parameter search, no fixed point inside any "
+            "optimizer, and the fastest accurate structural fit on the "
+            "page.",
 }
 
 EXCLUDED = [
@@ -270,15 +247,16 @@ CELLS = (
 )
 
 NARRATIVE = {
-    "title": "Abstract MDP 3: high dimension",
+    "title": "Abstract MDP 3: High Dimensional Case",
     "intro": (
         "This page asks what survives when the state space reaches a few "
         "thousand states. Every tabular structural solver consumes a dense "
         "transition tensor whose memory and per-iteration cost grow with the "
         "square of the state count. An optimizer like MPEC additionally "
         "carries one variable per state. Rather than assert where that "
-        "breaks, the feasibility probes below run every candidate once per "
-        "scale under a hard time budget and report what happened. The "
+        "breaks, the feasibility probes below run every candidate except "
+        "behavioral cloning, which is trivially cheap, once per scale under "
+        "a hard time budget and report what happened. The "
         "measured answer is more interesting than the folklore. At 3000 "
         "states the entire classical family still completes, so the main "
         "table benchmarks it alongside the approximation-based estimators. "

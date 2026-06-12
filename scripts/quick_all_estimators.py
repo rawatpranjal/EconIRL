@@ -233,33 +233,10 @@ ROSTER = [
 
 # One-line diagnosis per estimator (the "fixed" notes come from the
 # improve-underperformers workflow's diagnose/retry phases).
-DIAGNOSES = {
-    "NFXP": "Reference structural estimator; recovers cleanly.",
-    "CCP": "Hotz-Miller conditional choice probabilities; recovers cleanly.",
-    "MPEC": "Constrained MLE; recovers cleanly.",
-    "NNES": "Neural value network plus structural MLE; recovers cleanly.",
-    "SEES": "Fixed: bspline basis with basis_dim >= num_states. A fourier basis of "
-            "dim 4 underfit the 8-state value function (param RMSE 0.89 -> 0.025).",
-    "TD-CCP": "Neural CCP with approximate value iteration; recovers cleanly.",
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
-            "optimal weighting (OUFXP): closed form for linear utility, as "
-            "asymptotically efficient as maximum likelihood, standard errors "
-            "from the efficient moment variance.",
-    "MCE-IRL": "Causal maximum-entropy IRL; recovers behavior cleanly.",
-    "MaxEnt-IRL": "Fixed: feed action-dependent features. A state-only reward is "
-                  "broadcast equally across actions and cannot represent the action "
-                  "contrast (policy TV 0.23 -> 0.01).",
-    "IQ-Learn": "Fixed: q_type='linear'. A tabular Q-table does not propagate to "
-                "unvisited states (policy TV 0.29 -> 0.04).",
-    "GLADIUS": "Neural Q and expected-value networks. Tracks behavior.",
-    "AIRL": "Fixed: reward_arg='state_action'. The default 'state' marginalized the "
-            "reward across actions (policy TV 0.24 -> 0.02). The recovered reward "
-            "is in its own parameterization by design, so TV is the right "
-            "scorecard.",
-    "f-IRL": "f-divergence IRL. Tracks behavior.",
-    "BC": "Behavioral cloning. Matches observed choices but recovers no reward, so "
-          "it cannot transfer to a counterfactual world.",
-}
+# This page is a smoke test; per-estimator notes live on the harder pages.
+# Config choices (basis dims, feature args, q_type) are documented in the
+# runner functions above.
+DIAGNOSES = {}
 
 
 # ---------------------------------------------------------------------------
@@ -457,7 +434,7 @@ def render_page(data: dict) -> str:
 
     m = meta["mdp"]
     L = []
-    L.append("# Abstract MDP 1: sanity check\n")
+    L.append("# Abstract MDP 1\n")
     L.append(
         "The simplest abstract problem. A small but non-trivial random MDP "
         "with an action-dependent linear reward, easy enough that a correct "
@@ -526,13 +503,14 @@ def render_page(data: dict) -> str:
              "(../_static/simulation_studies/abstract_mdp_1_dgp.png)\n")
 
     L.append("## Results\n")
-    L.append("| Estimator | Family | Ran | Recovered params | Param RMSE | Policy TV | "
+    L.append("| Estimator | Family | Ran | Conv | Recovered params | Param RMSE | Policy TV | "
              "Regret base | Regret A | Regret B | Regret C | Time (s) |")
-    L.append("|---|---|---|---|---|---|---|---|---|---|---|")
+    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for name, family in order:
         recs = by_est[name]
         ok = [r for r in recs if r["error"] is None]
         ran = f"{len(ok)}/{len(recs)}"
+        conv = f"{sum(1 for r in ok if r['converged'])}/{len(ok)}" if ok else "-"
         # Exact recovered params: mean over successful reps when lengths agree.
         # Vectors in a different parameterization (a tabular reward, a
         # choice-probability table) are labeled, not printed: comparing them
@@ -563,20 +541,20 @@ def render_page(data: dict) -> str:
         rc = _fmt(_agg_regret(recs, "type_c"))
         crashed = [r for r in recs if r["error"] is not None]
         note = f" (crashed {len(crashed)}/{len(recs)})" if crashed else ""
-        L.append(f"| {name}{note} | {family} | {ran} | {params_s} | {prmse} | {tv} | "
+        L.append(f"| {name}{note} | {family} | {ran} | {conv} | {params_s} | {prmse} | {tv} | "
                  f"{rb} | {ra} | {rbb} | {rc} | {rt} |")
     L.append("")
-    L.append("Param RMSE is reported for the structural family only. Those estimators "
-             "share the parameterization of the true model. Policy TV is the "
-             "total-variation distance from the true-parameter policy. Regret is "
-             "welfare loss, lower is better. Base is the observed world. Type A "
-             "shifts a payoff, Type B changes the transitions, Type C penalizes an "
-             "action. Estimators that recovered a linear feature reward re-solve it "
-             "under each intervention and adapt. f-IRL and behavioral cloning return "
-             "tabular objects instead, so they are scored with their fixed policy. "
-             "That shows up as large Type C regret. For behavioral cloning the fixed "
-             "reading is exact, because it recovers no reward. For a tabular-reward "
-             "method it is a conservative reading.\n")
+    L.append("Param RMSE covers the structural family only, which shares the "
+             "parameterization of the true model. Policy TV is the distance "
+             "between estimated and true choice probabilities, lower is "
+             "better. Conv is the estimator's own convergence flag. A "
+             "cautious flag can read False while the recovered policy is "
+             "accurate. Regret base is welfare lost in the observed "
+             "environment. Types A, B, and C are welfare lost after a "
+             "change. Type A shifts a payoff, Type B changes the "
+             "transitions, Type C penalizes an action. Estimators with a "
+             "recovered reward re-solve it and adapt. Those without one "
+             "keep their old policy.\n")
 
     diagnoses = meta.get("diagnoses", {})
     notes = []
@@ -586,7 +564,7 @@ def render_page(data: dict) -> str:
     if notes:
         L.append("## Notes per estimator\n")
         L.append("\n\n".join(notes) + "\n")
-        L.append("Configs are modest quick-run defaults, not tuned.\n")
+    L.append("Configs are modest quick-run defaults, not tuned.\n")
 
     L.append("## Reproduce\n")
     L.append("```bash")
@@ -595,7 +573,7 @@ def render_page(data: dict) -> str:
     L.append("python scripts/quick_all_estimators.py --page          # regenerate this page")
     L.append("python scripts/quick_all_estimators.py --verify        # re-derive the table from JSON")
     L.append("```\n")
-    L.append(f"Raw facts: `validation/results/quick_all_estimators.json`. {meta['regret']}\n")
+    L.append("Raw facts: `validation/results/quick_all_estimators.json`.\n")
     if meta["excluded"]:
         L.append("Excluded from this run: " +
                  "; ".join(f"{e['name']} ({e['reason']})" for e in meta["excluded"]) + ".")

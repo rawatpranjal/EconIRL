@@ -83,6 +83,12 @@ class Cell:
     param_block: bool = False  # render the bias/SE/RMSE/coverage table
     figure: str | None = None  # absolute PNG path for the 1x2 DGP figure
     fit_timeout: int | None = None  # default per-fit budget in seconds
+    # Page-level display choices. Drop the parameter columns on cells where
+    # parameters are not separately identified (printing arbitrary ridge
+    # points would only confuse), and drop the regret columns where transfer
+    # of an unidentified reward is not a meaningful exercise.
+    show_params: bool = True
+    show_regret: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +189,8 @@ def _cell_meta(cell: Cell, env) -> dict:
         "seed": cell.seed,
         "n_replications": cell.n_replications,
         "param_block": cell.param_block,
+        "show_params": cell.show_params,
+        "show_regret": cell.show_regret,
         "figure": os.path.basename(cell.figure) if cell.figure else None,
         "parameter_names": names,
         "true_theta": true_theta,
@@ -338,10 +346,18 @@ def _results_table(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
     """The per-cell results table (one row per roster estimator)."""
     true_theta = (np.asarray(cell_meta["true_theta"], dtype=np.float64)
                   if cell_meta["true_theta"] is not None else None)
+    show_params = cell_meta.get("show_params", True)
+    show_regret = cell_meta.get("show_regret", True)
+    head = ["Estimator", "Family", "Ran", "Conv"]
+    if show_params:
+        head += ["Recovered params", "Param RMSE"]
+    head += ["Policy TV"]
+    if show_regret:
+        head += ["Regret base", "Regret A", "Regret B", "Regret C"]
+    head += ["Time (s)"]
     L = []
-    L.append("| Estimator | Family | Ran | Conv | Recovered params | Param RMSE | "
-             "Policy TV | Regret base | Regret A | Regret B | Regret C | Time (s) |")
-    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    L.append("| " + " | ".join(head) + " |")
+    L.append("|" + "---|" * len(head))
     for spec in cell_meta["roster"]:
         name, family = spec["name"], spec["family"]
         recs = by_est.get(name, [])
@@ -376,10 +392,15 @@ def _results_table(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
         rt = "-" if not rts else f"{np.mean(rts):.1f}"
         crashed = [r for r in recs if r["error"] is not None]
         note = f" (crashed {len(crashed)}/{len(recs)})" if crashed else ""
-        L.append(f"| {name}{note} | {family} | {ran} | {conv} | {params_s} | {prmse} | "
-                 f"{tv} | {_fmt(_agg_regret(recs, 'baseline'))} | "
-                 f"{_fmt(_agg_regret(recs, 'type_a'))} | {_fmt(_agg_regret(recs, 'type_b'))} | "
-                 f"{_fmt(_agg_regret(recs, 'type_c'))} | {rt} |")
+        row = [f"{name}{note}", family, ran, conv]
+        if show_params:
+            row += [params_s, prmse]
+        row += [tv]
+        if show_regret:
+            row += [_fmt(_agg_regret(recs, "baseline")), _fmt(_agg_regret(recs, "type_a")),
+                    _fmt(_agg_regret(recs, "type_b")), _fmt(_agg_regret(recs, "type_c"))]
+        row += [rt]
+        L.append("| " + " | ".join(row) + " |")
     L.append("")
     return L
 
@@ -429,20 +450,24 @@ def _param_block(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
     return L
 
 
-_TABLE_NOTE = (
-    "Param RMSE is reported for the structural family only. Those estimators "
-    "share the parameterization of the true model, so the comparison is "
-    "meaningful. Recovered params are printed only in that same "
-    "parameterization. A "
-    "tabular reward or a choice-probability table is labeled instead of "
-    "printed. Policy TV is the total-variation distance from the "
-    "true-parameter policy. Conv is the estimator's own convergence flag. A "
-    "conservative flag can read False while the policy is accurate, so read "
-    "it next to Policy TV. Regret is welfare loss, lower is better. Base is "
-    "the observed world. Type A shifts a payoff, Type B changes the "
-    "transitions, Type C penalizes an action. Structural estimators re-solve "
-    "the model and adapt. Behavioral estimators keep their old policy."
-)
+def _table_note(cell_meta: dict) -> str:
+    parts = []
+    if cell_meta.get("show_params", True):
+        parts.append("Param RMSE covers the structural family only, which "
+                     "shares the parameterization of the true model.")
+    parts.append("Policy TV is the distance between estimated and true "
+                 "choice probabilities, lower is better.")
+    parts.append("Conv is the estimator's own convergence flag. A cautious "
+                 "flag can read False while the recovered policy is "
+                 "accurate.")
+    if cell_meta.get("show_regret", True):
+        parts.append("Regret base is welfare lost in the observed "
+                     "environment. Types A, B, and C are welfare lost after "
+                     "a change. Type A shifts a payoff, Type B changes the "
+                     "transitions, Type C penalizes an action. Estimators "
+                     "with a recovered reward re-solve it and adapt. Those "
+                     "without one keep their old policy.")
+    return " ".join(parts)
 
 
 def render_page(data: dict, narrative: dict) -> str:
@@ -479,7 +504,7 @@ def render_page(data: dict, narrative: dict) -> str:
                      f"for {cm['label']}](../_static/simulation_studies/{cm['figure']})\n")
         L.append("### Results\n" if not single else "## Results\n")
         L.extend(_results_table(cm, by_est))
-        L.append(_TABLE_NOTE + "\n")
+        L.append(_table_note(cm) + "\n")
         if cm["param_block"] and cm["true_theta"] is not None:
             L.append("### Parameter recovery\n" if not single
                      else "## Parameter recovery\n")
@@ -541,9 +566,9 @@ def render_page(data: dict, narrative: dict) -> str:
     L.append(f"python {script} --page          # regenerate this page")
     L.append(f"python {script} --verify        # re-derive the table from JSON")
     L.append("```\n")
-    L.append(f"Raw facts: `{narrative['results_rel']}`. {meta['regret']}\n")
+    L.append(f"Raw facts: `{narrative['results_rel']}`.\n")
     if meta["excluded"]:
-        L.append("Excluded from this run: " +
+        L.append("Not shown on this page: " +
                  "; ".join(f"{e['name']} ({e['reason']})" for e in meta["excluded"]) + ".")
     return "\n".join(L)
 
@@ -635,12 +660,18 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
             for cm in data["meta"]["cells"]:
                 if cm["cell_id"] in roster_by_cell:
                     cm["roster"] = roster_by_cell[cm["cell_id"]]
-            # Cell descriptions and labels are interpretive prose like the
-            # diagnoses, so they also follow the current script.
-            desc_by_cell = {c.cell_id: (c.label, c.description) for c in cells}
+            # Cell descriptions, labels, and display flags are interpretive
+            # choices like the diagnoses, so they also follow the current
+            # script.
+            desc_by_cell = {c.cell_id: c for c in cells}
             for cm in data["meta"]["cells"]:
-                if cm["cell_id"] in desc_by_cell:
-                    cm["label"], cm["description"] = desc_by_cell[cm["cell_id"]]
+                c = desc_by_cell.get(cm["cell_id"])
+                if c is not None:
+                    cm["label"] = c.label
+                    cm["description"] = c.description
+                    cm["param_block"] = c.param_block
+                    cm["show_params"] = c.show_params
+                    cm["show_regret"] = c.show_regret
             # Diagnostics are deterministic functions of the environment, so
             # newly added checks (e.g. the action-contrast rank) reach old
             # pages without a re-run.

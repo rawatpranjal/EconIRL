@@ -1,4 +1,4 @@
-# Abstract MDP 2: scale, discount, and identification
+# Abstract MDP 2
 
 The sanity-check page showed every estimator recovering an easy problem. This page hardens the problem along three separate axes and watches the structural family specifically. What happens to runtime as the state space grows? What happens to inference as the discount factor approaches one? What happens to the parameters when the reward features are collinear? Each axis gets its own cell, run on the same engine and reported from the same raw records as every other page.
 
@@ -50,15 +50,15 @@ The first cell is about cost at scale. All estimators face the same 300-state pr
 | UFXP | structural | 3/3 | 3/3 | [0.422, -1.601, 0.111] | 0.0440 | 0.0031 | 0.0006 | 0.0006 | 0.0006 | 0.0000 | 0.1 |
 | MCE-IRL | behavioral | 3/3 | 0/3 | [0.431, -1.614, 0.107] | - | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 5.9 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
-On the solver contrast there is nothing to report at this scale. Successive approximation and the Newton-Kantorovich refinement land within a second of each other. A compiled dense contraction over 300 states is simply cheap. The textbook slowdown of the plain contraction is a statement about iteration counts. It only becomes a wall-clock story when each iteration is expensive, and the high-dimension page is where that bites. The approximation-based members (SEES, TD-CCP) trade some parameter precision for flexibility while matching the exact family's behavioral accuracy.
+The two NFXP rows land within a second of each other, so the textbook solver gap does not bite at 300 states. The high-dimension page is where it starts to. The approximation-based members (SEES, TD-CCP) give up some parameter precision relative to the exact family while staying close on behavior.
 
 ## Same MDP, discount 0.99
 
 The identical 300-state MDP with the discount factor moved from 0.95 to 0.99, where continuation values dominate flow payoffs and the inner fixed point becomes a slow contraction. Structural family only, 10 replications, standard errors requested from every estimator. 500 x 60 observations, 10 replications, seed 505. True theta `[0.3863, -1.5993, 0.1317]`. Design rank 3/3, condition number 3.88e+01, action-contrast rank 3/3 (the rank that identification from choices actually uses). Generated 2026-06-12 with econirl 0.0.4.
 
-The second cell moves the discount factor to 0.99 and asks a harder question than point recovery. Is the reported uncertainty usable? The parameter table reports bias, the spread of estimates across replications, RMSE, and the share of nominal 95% intervals that actually cover the truth, together with how often each estimator produced finite standard errors at all. On runtime the discount move barely registers. Even the plain contraction stays around four seconds at 300 states, so this cell is about inference, not speed. NFXP-SA runs 2 of 10 replications as a runtime spot-check. Its inference is the same MLE as NFXP-NK, which runs all 10.
+The second cell moves the discount factor to 0.99 and asks whether the reported uncertainty is usable. The parameter table shows bias, the spread across replications, RMSE, coverage of the nominal 95% intervals, and how often each estimator produced finite standard errors. NFXP-SA runs 2 of 10 replications as a runtime spot-check. Its inference is the same MLE as NFXP-NK, which runs all 10.
 
 ### Results
 
@@ -73,7 +73,7 @@ The second cell moves the discount factor to 0.99 and asks a harder question tha
 | TD-CCP | structural | 10/10 | 10/10 | [0.397, -1.671, 0.159] | 0.1189 | 0.0052 | 0.0065 | 0.0065 | 0.0061 | 0.0000 | 2.7 |
 | UFXP | structural | 10/10 | 10/10 | [0.426, -1.541, 0.083] | 0.0857 | 0.0040 | 0.0028 | 0.0027 | 0.0026 | 0.0000 | 0.1 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 ### Parameter recovery
 
@@ -110,59 +110,30 @@ The SE avail column is the headline. One estimator routinely fails to deliver us
 
 ## Collinear features (24 states)
 
-A small MDP whose third reward feature is exactly twice the second (design rank 2 of 3). The likelihood identifies only the combination theta_1 + 2 theta_2; no estimator can recover the individual coordinates, and the page checks what each one does about it. 500 x 80 observations, 20 replications, seed 606. True theta `[-0.5, 1.0, 0.3]`. Design rank 2/3, condition number 3.07e+16, action-contrast rank 2/3 (the rank that identification from choices actually uses). Generated 2026-06-12 with econirl 0.0.4.
+A small MDP whose third reward feature is exactly twice the second (design rank 2 of 3). The likelihood identifies only the combination theta_1 + 2 theta_2, so no estimator can recover the individual coordinates. 500 x 80 observations, 20 replications, seed 606. True theta `[-0.5, 1.0, 0.3]`. Design rank 2/3, condition number 3.07e+16, action-contrast rank 2/3 (the rank that identification from choices actually uses). Generated 2026-06-12 with econirl 0.0.4.
 
-The last cell breaks identification on purpose. The third feature is exactly twice the second, so the design matrix has rank 2. The coordinates theta_1 and theta_2 are not separately identified, only their combination. The interesting output is not the per-coordinate bias, which is meaningless here. It is the design diagnostics above the table, and how each estimator's intervals behave when the question has no answer.
+The last cell breaks identification on purpose. The third feature is exactly twice the second, so only the combination theta_1 + 2 theta_2 is identified, and the design diagnostics above flag it. The parameter columns are omitted. Every estimator still matches behavior, which is what partial identification looks like in practice.
 
 ### Results
 
-| Estimator | Family | Ran | Conv | Recovered params | Param RMSE | Policy TV | Regret base | Regret A | Regret B | Regret C | Time (s) |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| NFXP-NK | structural | 20/20 | 20/20 | [-0.510, -0.046, 0.829] | 0.6770 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 3.9 |
-| CCP | structural | 20/20 | 20/20 | [-0.510, 0.326, 0.643] | 0.4367 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 2.0 |
-| MPEC | structural | 20/20 | 20/20 | [-0.510, -0.046, 0.829] | 0.6770 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.5 |
-| UFXP | structural | 20/20 | 0/20 | [-0.510, 0.322, 0.644] | 0.4393 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.1 |
+| Estimator | Family | Ran | Conv | Policy TV | Regret base | Regret A | Regret B | Regret C | Time (s) |
+|---|---|---|---|---|---|---|---|---|---|
+| NFXP-NK | structural | 20/20 | 20/20 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 3.9 |
+| CCP | structural | 20/20 | 20/20 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 2.0 |
+| MPEC | structural | 20/20 | 20/20 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.5 |
+| UFXP | structural | 20/20 | 0/20 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.1 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
-
-### Parameter recovery
-
-| Estimator | Parameter | True | Mean est | Bias | Emp. SE | RMSE | 95% coverage | SE avail |
-|---|---|---|---|---|---|---|---|---|
-| NFXP-NK | theta_0 | -0.500 | -0.510 | -0.010 | 0.024 | 0.025 | 0.85 +/- 0.08 | 100% (20 reps) |
-| NFXP-NK | theta_1 | 1.000 | -0.046 | -1.046 | 0.006 | 1.046 | 1.00 +/- 0.00 | 100% (20 reps) |
-| NFXP-NK | theta_2 | 0.300 | 0.829 | +0.529 | 0.014 | 0.529 | 1.00 +/- 0.00 | 100% (20 reps) |
-| CCP | theta_0 | -0.500 | -0.510 | -0.010 | 0.024 | 0.025 | - | 25% (20 reps) |
-| CCP | theta_1 | 1.000 | 0.326 | -0.674 | 0.007 | 0.674 | - | 25% (20 reps) |
-| CCP | theta_2 | 0.300 | 0.643 | +0.343 | 0.013 | 0.343 | - | 25% (20 reps) |
-| MPEC | theta_0 | -0.500 | -0.510 | -0.010 | 0.024 | 0.025 | 0.85 +/- 0.08 | 100% (20 reps) |
-| MPEC | theta_1 | 1.000 | -0.046 | -1.046 | 0.006 | 1.046 | 1.00 +/- 0.00 | 100% (20 reps) |
-| MPEC | theta_2 | 0.300 | 0.829 | +0.529 | 0.014 | 0.529 | 1.00 +/- 0.00 | 100% (20 reps) |
-| UFXP | theta_0 | -0.500 | -0.510 | -0.010 | 0.024 | 0.025 | 0.90 +/- 0.07 | 100% (20 reps) |
-| UFXP | theta_1 | 1.000 | 0.322 | -0.678 | 0.007 | 0.678 | 1.00 +/- 0.00 | 100% (20 reps) |
-| UFXP | theta_2 | 0.300 | 0.644 | +0.344 | 0.013 | 0.344 | 1.00 +/- 0.00 | 100% (20 reps) |
-
-Coverage is the share of replications whose 95% interval contains the truth, shown with its Monte Carlo standard error. It is computed only where every replication produced a finite standard error. SE avail is the share of replications with finite standard errors.
+Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 ## Notes per estimator
 
-**NFXP-SA.** Rust's original inner loop. Successive approximation, a pure contraction with rate equal to the discount factor. It reaches the same maximum-likelihood answer. What changes with scale and discount is how long it takes.
+**NFXP-SA.** Rust's original successive-approximation inner loop. Same maximum-likelihood answer as NFXP-NK, different runtime.
 
-**NFXP-NK.** The Iskhakov et al refinement. Successive approximation to get near the fixed point, then Newton-Kantorovich steps. Same estimate, different bill.
+**CCP.** Its standard errors come from the outer Hessian and can fail to be finite even when the point estimate is fine. The SE avail column makes that visible.
 
-**CCP.** Hotz-Miller inversion. Estimate choice probabilities, invert once, no fixed point inside the optimizer. Its standard errors come from the outer Hessian and can fail to be finite even when the point estimate is fine. The SE avail column makes that visible.
+**UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with optimal weighting. As efficient as maximum likelihood, with standard errors, so it enters the coverage table on equal terms.
 
-**MPEC.** Constrained MLE. The Bellman equation enters as constraints for the SLSQP solver, with one variable per state plus the parameters.
-
-**NNES.** Neural value network plus structural MLE.
-
-**SEES.** Sieve value function. A bspline basis with basis_dim = num_states, so the basis can span the value function.
-
-**TD-CCP.** Neural CCP with approximate value iteration and cross-fitted standard errors.
-
-**UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting (OUFXP). The value function is eliminated before the search, so no fixed point is ever solved inside an optimizer and the linear case is closed form. It matches maximum likelihood efficiency and reports standard errors, so it enters the coverage table on equal terms.
-
-**MCE-IRL.** Behavioral reference on the harder cell. Its converged flag is conservative, a gradient-norm tolerance. Read it next to Policy TV.
+**MCE-IRL.** Behavioral reference. Its converged flag is a conservative gradient-norm check, so read it next to Policy TV.
 
 ## Reproduce
 
@@ -172,6 +143,6 @@ python scripts/sim_abstract_mdp_2.py --page          # regenerate this page
 python scripts/sim_abstract_mdp_2.py --verify        # re-derive the table from JSON
 ```
 
-Raw facts: `validation/results/sim_abstract_mdp_2.json`. Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).
+Raw facts: `validation/results/sim_abstract_mdp_2.json`.
 
-Excluded from this run: MaxEnt-IRL, IQ-Learn, AIRL, f-IRL, GLADIUS, Deep-MCE-IRL, BC (this page's question is structural. Parameter recovery, inference quality, and identification as the problem hardens. The IRL family is compared on the bus engine and gridworld pages. MCE-IRL stays here as the behavioral reference); GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL (known slow. Their single-run showing is on the bus engine page).
+Not shown on this page: MaxEnt-IRL, IQ-Learn, AIRL, f-IRL, GLADIUS, Deep-MCE-IRL, BC (this page's question is structural. Parameter recovery, inference quality, and identification as the problem hardens. The IRL family is compared on the bus engine and gridworld pages. MCE-IRL stays here as the behavioral reference); GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code or too slow; not benchmarked in this study).

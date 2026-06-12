@@ -42,7 +42,7 @@
     "snippets": {
       "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"hybrid\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"slsqp\", max_iter=200, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "NNES": "def _run_nnes(env, panel):\n    from econirl.estimation.nnes import NNESEstimator\n\n    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,\n                        compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "SEES": "def _run_sees(env, panel):\n    from econirl.estimation.sees import SEESEstimator\n\n    # Basis must span the value function: bspline basis_dim >= num_states. A\n    # fourier basis_dim=4 underfit the 8-state value (workflow diagnosis).\n    est = SEESEstimator(basis_type=\"bspline\", basis_dim=8, warm_start_value=True,\n                        penalty_weight=10.0, compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "TD-CCP": "def _run_tdccp(env, panel):\n    from econirl.estimation import TDCCPConfig, TDCCPEstimator\n\n    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,\n                                            epochs_per_avi=15, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
@@ -51,7 +51,7 @@
       "MaxEnt-IRL": "def _run_maxent_irl(env, panel):\n    from econirl.contrib.maxent_irl import MaxEntIRLEstimator\n\n    # Feed the action-dependent features: a state-only reward is broadcast\n    # equally across actions and cannot represent the action contrast that\n    # drives choice here (workflow diagnosis). Adaptive per-parameter steps\n    # (Adam) handle mixed feature scales.\n    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,\n                             learning_rate=0.05, compute_hessian=False, verbose=False)\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
       "IQ-Learn": "def _run_iq_learn(env, panel):\n    from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator\n\n    # q_type=\"linear\" uses the feature structure; a tabular Q does not propagate\n    # to unvisited states (workflow diagnosis).\n    est = IQLearnEstimator(config=IQLearnConfig(q_type=\"linear\", divergence=\"chi2\",\n                                                alpha=3.0, max_iter=2000, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
       "GLADIUS": "def _run_gladius(env, panel):\n    from econirl.estimation import GLADIUSConfig, GLADIUSEstimator\n\n    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=300, q_hidden_dim=128,\n                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,\n                                                patience=60, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "AIRL": "def _run_airl(env, panel):\n    from econirl.estimation import AIRLConfig, AIRLEstimator\n\n    # reward_arg=\"state_action\": the default \"state\" marginalizes the reward\n    # across actions and cannot represent the action contrast (workflow\n    # diagnosis). AIRL accepts a reward spec, not a utility. Policy TV is fixed;\n    # the recovered parameters stay gauge/shaping-unidentified by design.\n    est = AIRLEstimator(config=AIRLConfig(reward_type=\"linear\", reward_arg=\"state_action\",\n                                          reward_lr=0.01, discriminator_steps=10,\n                                          max_rounds=300, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "AIRL": "def _run_airl(env, panel):\n    from econirl.estimation import AIRLConfig, AIRLEstimator\n\n    # reward_arg=\"state_action\": the default \"state\" marginalizes the reward\n    # across actions and cannot represent the action contrast (workflow\n    # diagnosis). AIRL accepts a reward spec, not a utility. Policy TV is fixed;\n    # the recovered reward is in its own parameterization by design.\n    est = AIRLEstimator(config=AIRLConfig(reward_type=\"linear\", reward_arg=\"state_action\",\n                                          reward_lr=0.01, discriminator_steps=10,\n                                          max_rounds=300, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
       "f-IRL": "def _run_firl(env, panel):\n    from econirl.estimation.f_irl import FIRLEstimator\n\n    # fkl (bounded gradient) with the estimator's default reward clip; the\n    # chi2 ratio gradient is unbounded on near-deterministic experts.\n    est = FIRLEstimator(f_divergence=\"fkl\", lr=0.2, max_iter=400, reward_clip=10.0,\n                        verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "BC": "def _run_bc(env, panel):\n    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator\n\n    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n"
     },
@@ -66,10 +66,10 @@
       "MCE-IRL": "Causal maximum-entropy IRL; recovers behavior cleanly.",
       "MaxEnt-IRL": "Fixed: feed action-dependent features. A state-only reward is broadcast equally across actions and cannot represent the action contrast (policy TV 0.23 -> 0.01).",
       "IQ-Learn": "Fixed: q_type='linear'. A tabular Q-table does not propagate to unvisited states (policy TV 0.29 -> 0.04).",
-      "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
-      "AIRL": "Fixed: reward_arg='state_action'. The default 'state' marginalized the reward across actions (policy TV 0.24 -> 0.02); recovered parameters stay gauge/shaping-unidentified by design, so TV is the right scorecard.",
-      "f-IRL": "f-divergence IRL; tracks behavior.",
-      "BC": "Behavioral cloning; matches observed choices but recovers no reward, so it cannot transfer to a counterfactual world."
+      "GLADIUS": "Neural Q and expected-value networks. Tracks behavior.",
+      "AIRL": "Fixed: reward_arg='state_action'. The default 'state' marginalized the reward across actions (policy TV 0.24 -> 0.02). The recovered reward is in its own parameterization by design, so TV is the right scorecard.",
+      "f-IRL": "f-divergence IRL. Tracks behavior.",
+      "BC": "Behavioral cloning. Matches observed choices but recovers no reward, so it cannot transfer to a counterfactual world."
     },
     "honesty": "Every number in the printed table is recomputed from the records below. Crashes carry the verbatim exception. true_theta is included so bias can be recomputed independently."
   },
@@ -95,7 +95,7 @@
         "type_c": 6.880679807082929e-08,
         "transferred": true
       },
-      "runtime": 5.460697174072266,
+      "runtime": 4.7511680126190186,
       "converged": true,
       "error": null
     },
@@ -120,7 +120,7 @@
         "type_c": 6.786113059762669e-08,
         "transferred": true
       },
-      "runtime": 2.844332695007324,
+      "runtime": 2.484618902206421,
       "converged": true,
       "error": null
     },
@@ -129,23 +129,23 @@
       "family": "structural",
       "rep": 0,
       "params": [
-        -0.11429616808891296,
-        0.7751778960227966
+        -0.1148095428943634,
+        0.7751657366752625
       ],
       "standard_errors": [
-        0.060233376920223236,
-        0.035331714898347855
+        0.060214508324861526,
+        0.035322435200214386
       ],
-      "policy_tv": 0.0022458973687862795,
-      "value_rmse": 0.07319451943040199,
+      "policy_tv": 0.002146534563300554,
+      "value_rmse": 0.06916562560987369,
       "regret": {
-        "baseline": 0.00013208712071133277,
-        "type_a": 0.00013911812832922976,
-        "type_b": 0.00015429673578171155,
-        "type_c": 7.597183432407639e-08,
+        "baseline": 0.00012271326423229922,
+        "type_a": 0.0001290309599220052,
+        "type_b": 0.00014191718256895136,
+        "type_c": 6.881591057387201e-08,
         "transferred": true
       },
-      "runtime": 4.796772003173828,
+      "runtime": 0.32447290420532227,
       "converged": true,
       "error": null
     },
@@ -170,7 +170,7 @@
         "type_c": 6.870794000873913e-08,
         "transferred": true
       },
-      "runtime": 12.614564895629883,
+      "runtime": 11.531159162521362,
       "converged": true,
       "error": null
     },
@@ -195,7 +195,7 @@
         "type_c": 6.87887168550512e-08,
         "transferred": true
       },
-      "runtime": 0.6985201835632324,
+      "runtime": 1.014172077178955,
       "converged": false,
       "error": null
     },
@@ -220,7 +220,7 @@
         "type_c": 8.758431164704187e-09,
         "transferred": true
       },
-      "runtime": 3.8787319660186768,
+      "runtime": 3.05265212059021,
       "converged": true,
       "error": null
     },
@@ -245,7 +245,7 @@
         "type_c": 6.524388679145232e-08,
         "transferred": true
       },
-      "runtime": 0.09554290771484375,
+      "runtime": 0.08014297485351562,
       "converged": true,
       "error": null
     },
@@ -270,7 +270,7 @@
         "type_c": 6.880679807082929e-08,
         "transferred": true
       },
-      "runtime": 6.903146028518677,
+      "runtime": 6.006651878356934,
       "converged": false,
       "error": null
     },
@@ -295,7 +295,7 @@
         "type_c": 1.2165804429300857e-06,
         "transferred": true
       },
-      "runtime": 14.178174018859863,
+      "runtime": 13.085855960845947,
       "converged": true,
       "error": null
     },
@@ -320,7 +320,7 @@
         "type_c": 5.76830499110628e-06,
         "transferred": true
       },
-      "runtime": 1.5092830657958984,
+      "runtime": 1.3360121250152588,
       "converged": true,
       "error": null
     },
@@ -345,7 +345,7 @@
         "type_c": 1.7143934373830053e-06,
         "transferred": true
       },
-      "runtime": 13.836310148239136,
+      "runtime": 12.026123046875,
       "converged": true,
       "error": null
     },
@@ -370,7 +370,7 @@
         "type_c": 5.038056445135953e-05,
         "transferred": true
       },
-      "runtime": 67.4145736694336,
+      "runtime": 57.43905282020569,
       "converged": true,
       "error": null
     },
@@ -423,7 +423,7 @@
         "type_c": 61.54938135570012,
         "transferred": false
       },
-      "runtime": 22.542206048965454,
+      "runtime": 20.233511924743652,
       "converged": true,
       "error": null
     },
@@ -476,7 +476,7 @@
         "type_c": 61.55354889909482,
         "transferred": false
       },
-      "runtime": 0.14708304405212402,
+      "runtime": 0.12771987915039062,
       "converged": true,
       "error": null
     },
@@ -501,7 +501,7 @@
         "type_c": 1.501032041352642e-07,
         "transferred": true
       },
-      "runtime": 3.0179619789123535,
+      "runtime": 2.7388641834259033,
       "converged": true,
       "error": null
     },
@@ -526,7 +526,7 @@
         "type_c": 1.4776304766412718e-07,
         "transferred": true
       },
-      "runtime": 1.156709909439087,
+      "runtime": 1.0138280391693115,
       "converged": true,
       "error": null
     },
@@ -535,23 +535,23 @@
       "family": "structural",
       "rep": 1,
       "params": [
-        -0.15095901489257812,
-        0.8010846376419067
+        -0.15172001719474792,
+        0.8010542392730713
       ],
       "standard_errors": [
-        0.06092766299843788,
-        0.03589531406760216
+        0.06087864562869072,
+        0.03586702048778534
       ],
-      "policy_tv": 0.002402291574773733,
-      "value_rmse": 0.11742666600099073,
+      "policy_tv": 0.0022520571362947862,
+      "value_rmse": 0.11129079116841328,
       "regret": {
-        "baseline": 0.000245200445571081,
-        "type_a": 0.0002785077309641615,
-        "type_b": 0.00017581885231821026,
-        "type_c": 1.666216204229535e-07,
+        "baseline": 0.00022442011707912712,
+        "type_a": 0.00025498950749458515,
+        "type_b": 0.0001560061061927076,
+        "type_c": 1.5009399790015185e-07,
         "transferred": true
       },
-      "runtime": 5.509597301483154,
+      "runtime": 0.26601719856262207,
       "converged": true,
       "error": null
     },
@@ -576,7 +576,7 @@
         "type_c": 1.5010047575250468e-07,
         "transferred": true
       },
-      "runtime": 13.072017908096313,
+      "runtime": 9.775229930877686,
       "converged": true,
       "error": null
     },
@@ -601,7 +601,7 @@
         "type_c": 1.513371961328787e-07,
         "transferred": true
       },
-      "runtime": 0.9870378971099854,
+      "runtime": 0.6066608428955078,
       "converged": true,
       "error": null
     },
@@ -626,7 +626,7 @@
         "type_c": 8.227518557931053e-08,
         "transferred": true
       },
-      "runtime": 3.067784309387207,
+      "runtime": 2.005953073501587,
       "converged": true,
       "error": null
     },
@@ -651,7 +651,7 @@
         "type_c": 1.3146248163488686e-07,
         "transferred": true
       },
-      "runtime": 0.05301618576049805,
+      "runtime": 0.04094696044921875,
       "converged": true,
       "error": null
     },
@@ -676,7 +676,7 @@
         "type_c": 1.5010618095229926e-07,
         "transferred": true
       },
-      "runtime": 3.751818895339966,
+      "runtime": 3.1088778972625732,
       "converged": false,
       "error": null
     },
@@ -701,7 +701,7 @@
         "type_c": 2.7958635961007616e-06,
         "transferred": true
       },
-      "runtime": 15.444547891616821,
+      "runtime": 13.191706657409668,
       "converged": true,
       "error": null
     },
@@ -726,7 +726,7 @@
         "type_c": 5.004791648733432e-06,
         "transferred": true
       },
-      "runtime": 1.2400918006896973,
+      "runtime": 0.5488379001617432,
       "converged": true,
       "error": null
     },
@@ -751,7 +751,7 @@
         "type_c": 2.297581339480903e-06,
         "transferred": true
       },
-      "runtime": 17.658796072006226,
+      "runtime": 15.073943853378296,
       "converged": true,
       "error": null
     },
@@ -776,7 +776,7 @@
         "type_c": 4.935886742280182e-06,
         "transferred": true
       },
-      "runtime": 117.12489318847656,
+      "runtime": 105.43862390518188,
       "converged": false,
       "error": null
     },
@@ -829,7 +829,7 @@
         "type_c": 61.541194665427646,
         "transferred": false
       },
-      "runtime": 23.178707122802734,
+      "runtime": 22.613187074661255,
       "converged": true,
       "error": null
     },
@@ -882,7 +882,7 @@
         "type_c": 61.62191107199133,
         "transferred": false
       },
-      "runtime": 0.18050503730773926,
+      "runtime": 0.15911579132080078,
       "converged": true,
       "error": null
     },
@@ -907,7 +907,7 @@
         "type_c": 1.1047102793689391e-07,
         "transferred": true
       },
-      "runtime": 4.5959203243255615,
+      "runtime": 4.812203884124756,
       "converged": true,
       "error": null
     },
@@ -932,7 +932,7 @@
         "type_c": 1.1308322926364056e-07,
         "transferred": true
       },
-      "runtime": 2.6717121601104736,
+      "runtime": 2.849764108657837,
       "converged": true,
       "error": null
     },
@@ -941,23 +941,23 @@
       "family": "structural",
       "rep": 2,
       "params": [
-        -0.19713039696216583,
-        0.8138049840927124
+        -0.19683454930782318,
+        0.8136391639709473
       ],
       "standard_errors": [
-        0.05948324874043465,
-        0.03497118502855301
+        0.059472471475601196,
+        0.0349653959274292
       ],
-      "policy_tv": 0.0031123081591331626,
-      "value_rmse": 0.07416263486396571,
+      "policy_tv": 0.0030986074727379943,
+      "value_rmse": 0.07397979519703454,
       "regret": {
-        "baseline": 0.0002976737758406678,
-        "type_a": 0.0003090718679994442,
-        "type_b": 0.00027806499881144475,
-        "type_c": 1.113364064415077e-07,
+        "baseline": 0.000294711850366447,
+        "type_a": 0.00030600254000323623,
+        "type_b": 0.000275720829452597,
+        "type_c": 1.104799088748169e-07,
         "transferred": true
       },
-      "runtime": 6.0163140296936035,
+      "runtime": 0.4278221130371094,
       "converged": true,
       "error": null
     },
@@ -982,7 +982,7 @@
         "type_c": 1.1046932709880158e-07,
         "transferred": true
       },
-      "runtime": 11.97187089920044,
+      "runtime": 11.772456884384155,
       "converged": true,
       "error": null
     },
@@ -1007,7 +1007,7 @@
         "type_c": 1.1233234993107905e-07,
         "transferred": true
       },
-      "runtime": 0.7119808197021484,
+      "runtime": 1.0368120670318604,
       "converged": false,
       "error": null
     },
@@ -1032,7 +1032,7 @@
         "type_c": 1.5398712705668696e-07,
         "transferred": true
       },
-      "runtime": 3.5422987937927246,
+      "runtime": 4.18819522857666,
       "converged": true,
       "error": null
     },
@@ -1057,7 +1057,7 @@
         "type_c": 1.2838879151147323e-07,
         "transferred": true
       },
-      "runtime": 0.08596205711364746,
+      "runtime": 0.08417105674743652,
       "converged": true,
       "error": null
     },
@@ -1082,7 +1082,7 @@
         "type_c": 1.1047102793689391e-07,
         "transferred": true
       },
-      "runtime": 6.756644010543823,
+      "runtime": 6.702098846435547,
       "converged": false,
       "error": null
     },
@@ -1107,7 +1107,7 @@
         "type_c": 4.1674027431102536e-07,
         "transferred": true
       },
-      "runtime": 13.479002952575684,
+      "runtime": 13.213021993637085,
       "converged": true,
       "error": null
     },
@@ -1132,7 +1132,7 @@
         "type_c": 7.912845158401734e-06,
         "transferred": true
       },
-      "runtime": 1.5463240146636963,
+      "runtime": 1.5733706951141357,
       "converged": true,
       "error": null
     },
@@ -1157,7 +1157,7 @@
         "type_c": 1.5284779495481737e-06,
         "transferred": true
       },
-      "runtime": 19.901954889297485,
+      "runtime": 20.48153281211853,
       "converged": true,
       "error": null
     },
@@ -1182,7 +1182,7 @@
         "type_c": 7.723661539864427e-06,
         "transferred": true
       },
-      "runtime": 110.64284300804138,
+      "runtime": 123.41532301902771,
       "converged": false,
       "error": null
     },
@@ -1235,7 +1235,7 @@
         "type_c": 61.261853168144114,
         "transferred": false
       },
-      "runtime": 23.145092248916626,
+      "runtime": 23.291418075561523,
       "converged": true,
       "error": null
     },
@@ -1288,7 +1288,7 @@
         "type_c": 61.19247723036844,
         "transferred": false
       },
-      "runtime": 0.29599809646606445,
+      "runtime": 0.3084378242492676,
       "converged": true,
       "error": null
     }

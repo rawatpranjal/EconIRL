@@ -176,46 +176,14 @@ ROSTER = (
 
 
 DIAGNOSES = {
-    "MaxEnt-IRL": "The Ziebart tradition this environment comes from. Matches "
-                  "discounted feature counts; with two of three features "
-                  "state-only, most of its objective is insensitive to the "
-                  "choice contrasts the data carry.",
-    "MCE-IRL": "Causal maximum-entropy IRL. Two of its three reward directions "
-               "are unidentified here, because the features are state-only. "
-               "Its gradient ascent can drift far along them. In one "
-               "replication of three the policy collapsed outright. Read the "
-               "per-rep records, not just the mean.",
-    "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit "
-                    "interface. Parameters are the neural reward projected "
-                    "onto the linear features.",
-    "AIRL": "Uses reward_arg='state_action'. The recovered reward is in its "
-            "own parameterization by design, so policy TV is the right "
-            "scorecard. Even behavior is hard here. The discriminator sees "
-            "mostly corridor states.",
-    "IQ-Learn": "q_type='linear' ties its Q function to the same feature basis, "
-                "so it inherits the contrast-rank problem on top of thin "
-                "coverage.",
-    "f-IRL": "Recovers a tabular reward, one value per state-action pair. That "
-             "does not depend on the deficient feature basis at all, and it "
-             "posts the strongest behavioral score on this page.",
-    "GLADIUS": "Neural Q and expected-value networks. Tracks behavior where "
-               "data exists.",
-    "BC": "Behavioral cloning. It matches observed choices where data exists, "
-          "falls back to uniform where it does not, and recovers no reward.",
-    "NFXP": "The structural contrast, exact MLE. It reproduces the true policy "
-            "almost perfectly while reporting parameters far from the truth. "
-            "The likelihood is flat along the two state-only feature "
-            "directions, so the parameter numbers are arbitrary points on a "
-            "ridge, not estimation error.",
-    "CCP": "Structural contrast. Same flat likelihood as NFXP, plus inverted "
-           "choice probabilities estimated from a concentrated state "
-           "distribution.",
-    "MPEC": "Structural contrast. Constrained MLE on the same ridge.",
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
-            "weighting (OUFXP). Its moment system is built from the "
-            "action-contrast features, so the rank-1 design leaves two "
-            "directions to the minimum-norm solution. Behavior stays close. "
-            "Parameters are pinned only in the identified direction.",
+    "MCE-IRL": "Two of its three reward directions, the state-only step and "
+               "distance features, are unidentified here. Its gradient "
+               "ascent can drift along them, and in one replication of "
+               "three the policy collapsed. Read the per-rep records, not "
+               "just the mean.",
+    "f-IRL": "The strongest behavioral score on this page. It recovers a "
+             "tabular reward, one value per state-action pair, which does "
+             "not depend on the deficient feature basis at all.",
 }
 
 EXCLUDED = [
@@ -225,9 +193,8 @@ EXCLUDED = [
     {"name": "NNES, TD-CCP", "reason": "the structural contrast is carried by "
      "NFXP/CCP/MPEC/UFXP here. The full structural roster runs on the bus "
      "engine and abstract MDP pages"},
-    {"name": "MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "dropped "
-     "from the study's rosters by scope decision (MMP and GAIL also failed a "
-     "20-30 minute single-fit budget on the bus engine page)"},
+    {"name": "MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "research "
+     "code or too slow; not benchmarked in this study"},
 ]
 
 CELLS = (
@@ -235,9 +202,6 @@ CELLS = (
         cell_id="gridworld",
         label="Gridworld 8x8",
         description=(
-            "An agent starts at the top-left corner of an 8x8 grid and walks "
-            "toward an absorbing goal at the bottom-right, with a per-step "
-            "penalty, a terminal reward, and a distance shaping term. "
             f"`GridworldEnvironment(grid_size={ENV['grid_size']}, "
             f"step_penalty={ENV['step_penalty']}, "
             f"terminal_reward={ENV['terminal_reward']}, "
@@ -253,6 +217,11 @@ CELLS = (
         n_replications=3,
         fit_timeout=900,
         figure=FIGURE_PNG,
+        # Parameters are not separately identified here (action-contrast rank
+        # 1), so the parameter and regret-transfer columns would print
+        # arbitrary ridge points and meaningless transfers.
+        show_params=False,
+        show_regret=False,
     ),
 )
 
@@ -307,26 +276,17 @@ NARRATIVE = {
     "cells": {
         "gridworld": {
             "after": (
-                "The headline is the gap between Policy TV and Param RMSE "
-                "for the structural family. Behavior is near-perfect while "
-                "the parameter estimates are orders of magnitude from the "
-                "truth. That is not estimation error. It is "
-                "non-identification. The raw feature design has full rank, "
-                "but the action-contrast design has rank 1. The step-penalty "
-                "and distance features take the same value for every action "
-                "at a state, so they difference out of every choice "
-                "probability. Choice data can only identify the contrast "
-                "design. Any parameter vector on that two-dimensional ridge "
-                "produces the same behavior, so each estimator reports an "
-                "arbitrary ridge point. The practical lesson is to check the "
-                "rank of the action-differenced features before estimating, "
-                "not just the raw design.\n"
-                "\n"
-                "One caveat on regret for this page. Transitions are "
-                "deterministic, so the Type B intervention is a stark change "
-                "rather than a perturbation. Read Type B as a stress test of "
-                "reward transfer under completely new dynamics, not a local "
-                "robustness check."
+                "The structural rows match behavior almost perfectly, but "
+                "their parameters are not separately identified here, so "
+                "the parameter columns are omitted. The raw feature design "
+                "has full rank, while the action-contrast design has rank "
+                "1. The step-penalty and distance features take the same "
+                "value for every action at a state, so they cancel out of "
+                "every choice probability. The regret columns are omitted "
+                "for the same reason, because transferring an unidentified "
+                "reward is not a meaningful exercise. The lesson is to check "
+                "the rank of the action-differenced features before "
+                "estimating."
             ),
         },
     },
