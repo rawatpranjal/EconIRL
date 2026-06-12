@@ -1,37 +1,32 @@
 # TD-CCP
 
-TD-CCP estimates reward parameters in dynamic discrete choice models from
-panel data. It uses observed choices, states, and next states to learn the
-continuation terms that usually require a transition-density model.
+TD-CCP estimates structural reward parameters in dynamic discrete choice models
+without modeling the transition density. It learns the continuation terms that
+enter the CCP likelihood directly from observed current and next state-action
+pairs, using temporal-difference recursions. The flow utility is linear in known
+features; the estimator recovers the finite-dimensional weight vector with
+cross-fitted, locally robust standard errors.
 
-The estimator is useful when the reward is a finite set of known features, but
-the state process is awkward to model directly. The parameter-estimation step
-does not fit a transition-density model. If you later want policy values or
-counterfactuals, you still need a transition environment for that evaluation
-step.
-
-TD-CCP is not a general neural reward-recovery method. In EconIRL, the
-reported study is narrower and more precise: a finite reward parameter vector
-is recovered in a synthetic data simulation with the locally robust, cross-fitted
-estimator described in the TD-CCP paper.
+Start here when the reward target is finite-dimensional, the panel contains
+current and successor state-action information, and building a transition-density
+model is the difficult part of the problem.
 
 ## Source Papers
 
 This page draws on {ref}`Adusumilli and Eckardt (2025)
-<adusumilli-eckardt-2025>` for TD-CCP and on {ref}`Hotz and Miller (1993)
-<hotz-miller-1993>` for the CCP foundation.
+<adusumilli-eckardt-2025>` for the TD fixed-point construction and locally
+robust inference and on {ref}`Hotz and Miller (1993) <hotz-miller-1993>` for
+the CCP foundation.
 
-## When To Use It
+## Quick Decision
 
-Use TD-CCP when choices are discrete, agents are forward-looking, and you have
-panel trajectories with current and next state-action information. It is a good
-fit when transition-density modeling is the difficult part of the problem, but
-the reward can be written as a finite linear function of known features.
-
-Prefer another estimator when the state space is small and tabular likelihood
-methods are easy to run, when observed action support is sparse, or when the
-target is an unrestricted neural reward map rather than structural reward
-parameters.
+| Use TD-CCP when | Prefer another estimator when |
+| --- | --- |
+| Choices are discrete and agents are forward-looking. | The state space is small and tabular likelihood methods are easy to run. |
+| The panel contains current and next state-action pairs. | The panel does not record successor states or actions. |
+| Transition-density modeling is the difficult part. | Transitions are known or easily estimated. |
+| The reward is a finite linear function of known features. | The target is an unrestricted neural reward map (use the IRL family). |
+| Valid inference with locally robust standard errors is required. | Observed action support is very sparse at key states. |
 
 ## Minimal Fit
 
@@ -54,35 +49,31 @@ print(model.params_)
 print(model.summary())
 ```
 
-This wrapper is enough for a quick Rust-style bus replacement example. For
-custom reward features, panel objects, basis settings, cross-fitting, robust
+For custom reward features, panel objects, basis settings, cross-fitting, robust
 standard errors, or supplied transition tensors, use
 `econirl.estimation.TDCCPEstimator`.
 
-## Simulation Study
+## Evidence
 
-The current simulation study is the
-`shapeshifter_encoded_state_locally_robust` synthetic cell. It uses 81
-states, 3 actions, two encoded state coordinates, and 6 reward parameters.
-Action 0 is the baseline action, so its reward is normalized to zero.
+TD-CCP is reported on the `shapeshifter_encoded_state_locally_robust` synthetic
+cell: 81 states, 3 actions, two encoded state coordinates, and 6 reward
+parameters. The data-generating process is fully specified, so recovered
+parameters, policy, value function, Q function, and Type A, Type B, and Type C
+counterfactual outcomes are all compared against oracle objects. The
+machine-readable results file records the reported results. TD-CCP also
+appears on the [bus engine](../simulation_studies/rust_bus.md) and
+[abstract MDP sanity](../simulation_studies/abstract_mdp_1_sanity.md) pages of
+the simulation studies.
 
-The reported estimator uses:
-
-| Component | Current setting |
+| Evidence | Current state |
 | --- | --- |
-| Recursive-term method | Semigradient TD with encoded features |
-| First-stage choice model | Logit with degree-2 state features |
-| Inference | Cross-fitting with locally robust standard errors |
-| Covariance unit | Individual |
-| Monte Carlo check | 25 repeated-seed replications |
+| Evidence scope | Synthetic tabular simulation with encoded state features. |
+| Primary cell | `shapeshifter_encoded_state_locally_robust`. |
+| Machine-readable results file | [tdccp.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json). |
+| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
+| Public example | Uses `TDCCP` with `utility="linear_cost"` on the bundled bus dataset. |
 
-The results file records the locally robust moment equation, the
-correction recursion, the covariance, optimizer stationarity, and standard
-error coverage. The raw neural reward case is retained as a diagnostic only;
-it has no finite true reward parameter vector and is not part of the primary
-finite-parameter study.
-
-## Reading Guide
+## TD-CCP Guide
 
 - [Context](tdccp/context.md)
 - [Quick Start](tdccp/quick_start.md)

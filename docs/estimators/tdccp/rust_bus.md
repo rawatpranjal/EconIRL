@@ -36,12 +36,15 @@ states = [0, 10, 50, 89]
 print(model.predict_proba(states))
 ```
 
-## Boundary
+## Replication Boundary
 
-This page is a usage example, not the simulation study. The
-simulation study uses a case where the true reward, policy, value function,
-Q function, and counterfactual decisions are available for comparison.
+This page is a package smoke test on the bundled dataset, not the simulation
+study. The estimator's recovery properties are established on a synthetic cell
+whose data-generating process is fully specified; see the
+[Simulation Study](validation.md) page. The
+[bus engine simulation page](../../simulation_studies/rust_bus.md) compares
+TD-CCP against the full estimator roster on a synthetic bus engine panel.
 
-The wrapper may estimate transitions from the panel for fitted policy and
-value outputs. The structural parameter step remains separate from
-transition-density modeling.
+The structural parameter step does not use a transition model; the wrapper may
+estimate transitions from the panel for fitted policy and value outputs after
+`theta` is recovered.
