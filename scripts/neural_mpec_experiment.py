@@ -26,9 +26,10 @@ We compare three estimators on ONE anchored DGP and ONE panel:
 
 Metrics (no standard errors, by request):
   - value RMSE  vs the soft-Bellman oracle value -- behavioral, comparable to ALL
-  - reward RMSE vs the true (S,A) reward matrix   -- clean only for the IDENTIFIED
-        family (tabular + neural MPEC, both anchored). GLADIUS is model-free, so its
-        reward is only partially identified and a larger value there is expected.
+  - reward RMSE over the ESTIMATED actions {0, 1} vs the true reward (the reference
+        action 2 is anchored to zero in both truth and estimate, so it is excluded to
+        avoid a free win). Clean for the known-P methods (tabular + neural MPEC); GLADIUS
+        is model-free, so its reward sits in a different gauge and is a reference only.
 
 Identification note: in a logit DDC the reward level is identified only relative to
 a reference action. Here action 2 is a zero-reward reference (phi(s,2) == 0 in the
@@ -412,8 +413,9 @@ def main() -> None:
     g = baselines["GLADIUS"]
     print(f"| GLADIUS (model-free*) | {g.get('reward_rmse', float('nan')):.4f} "
           f"| {g.get('value_rmse', float('nan')):.4f} | n/a |")
-    print("\n*GLADIUS reward is only partially identified (model-free), so a larger "
-          "reward RMSE there is expected, not a bug. Value RMSE is comparable to all.")
+    print("\n*GLADIUS is a fair baseline here (128 wide, 3 layers, 500 epochs, anchored at "
+          "action 2). It is model-free, so its reward sits in a different gauge; its much "
+          "higher value RMSE is the honest cost of not using the known transitions.")
 
     # ------------------------------------------------------------------
     # Consistency check: does the neural reward/value RMSE shrink toward the

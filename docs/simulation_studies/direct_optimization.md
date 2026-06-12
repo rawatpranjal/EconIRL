@@ -149,9 +149,9 @@ observations and records reward RMSE.
 | Regime | Method | N = 4k | N = 16k | N = 64k |
 |---|---|---|---|---|
 | linear | neural MPEC | 0.304 | 0.170 | 0.087 |
-| linear | tabular MPEC | 0.066 | 0.036 | 0.012 |
+| linear | tabular MPEC | 0.066 | 0.035 | 0.012 |
 | nonlinear | neural MPEC | 0.292 | 0.151 | 0.057 |
-| nonlinear | tabular MPEC | 0.502 | 0.500 | 0.495 |
+| nonlinear | tabular MPEC | 0.502 | 0.500 | 0.494 |
 
 (The scaling sweep draws a fresh panel, so the linear neural value at 16k, 0.170,
 is a separate draw from the 0.165 in the table above.)

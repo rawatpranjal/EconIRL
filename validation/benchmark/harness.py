@@ -606,6 +606,26 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
             sys.exit(f"No JSON at {results_json}. Run without --verify/--page first.")
         data = json.load(open(results_json))
         if args.page:
+            # DGP figures are presentation artifacts that regenerate
+            # deterministically from the seeds, so a missing figure never
+            # requires re-running the benchmark, and a figure added to the
+            # cell config after a run still renders on the page.
+            fig_by_cell = {c.cell_id: c.figure for c in cells if c.figure}
+            for cm in data["meta"]["cells"]:
+                if cm["cell_id"] in fig_by_cell:
+                    cm["figure"] = os.path.basename(fig_by_cell[cm["cell_id"]])
+            for c in cells:
+                if c.figure is not None and not os.path.exists(c.figure):
+                    from validation.benchmark.figures import dgp_figure
+
+                    env = c.env_factory()
+                    _, oracle_value = _oracle(env)
+                    fig_panel = simulate_panel(env, n_individuals=c.n_individuals,
+                                               n_periods=c.n_periods,
+                                               seed=c.seed + 1000)
+                    os.makedirs(os.path.dirname(c.figure), exist_ok=True)
+                    dgp_figure(env, fig_panel, oracle_value, c.figure)
+                    print(f"Wrote {c.figure}")
             with open(page_path, "w") as f:
                 f.write(render_page(data, narrative))
             print(f"Wrote {page_path}")

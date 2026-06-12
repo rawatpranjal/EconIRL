@@ -30,6 +30,8 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "sim_rust_bus.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "rust_bus.md")
+FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                          "rust_bus_dgp.png")
 
 # The canonical recoverable cell: identical to the prior benchmark ladder's
 # simple_binary configuration, so this page genuinely re-homes that cell.
@@ -317,21 +319,55 @@ CELLS = (
         seed=42,
         n_replications=3,
         fit_timeout=600,
+        figure=FIGURE_PNG,
     ),
 )
 
 NARRATIVE = {
     "title": "Bus engine replacement",
     "intro": (
-        "The canonical structural benchmark. A single agent decides each period "
-        "whether to keep paying a mileage-dependent operating cost or pay a fixed "
-        "replacement cost to reset the bus engine. The data-generating process is "
-        "fully known, so the table reports the exact recovered cost parameters, "
-        "the distance between each estimator's policy and the true one, and the "
-        "welfare lost when the recovered model is carried into three "
-        "counterfactual worlds. Every estimator that accepts the package's "
-        "uniform estimate interface is run; slow ones run once instead of being "
-        "dropped."
+        "The canonical structural benchmark (Rust 1987). A single agent decides "
+        "each period whether to keep paying a mileage-dependent operating cost "
+        "or pay a fixed replacement cost to reset the bus engine. The "
+        "data-generating process is fully known, so the table reports the exact "
+        "recovered cost parameters, the distance between each estimator's "
+        "policy and the true one, and the welfare lost when the recovered model "
+        "is carried into three counterfactual worlds.\n"
+        "\n"
+        "## The data-generating process\n"
+        "\n"
+        "Mileage sits on a discrete grid $s \\in \\{0, \\ldots, S-1\\}$. Keeping "
+        "the engine (action $0$) pays a per-bin operating cost and lets mileage "
+        "drift up by $\\Delta s \\in \\{0, 1, 2\\}$; replacing it (action $1$) "
+        "pays a flat cost and resets mileage to zero:\n"
+        "\n"
+        "$$\n"
+        "u_\\theta(s, a) =\n"
+        "\\begin{cases}\n"
+        "-\\theta_{\\mathrm{oc}}\\, s & a = 0 \\ (\\text{keep}) \\\\\n"
+        "-\\theta_{\\mathrm{rc}} & a = 1 \\ (\\text{replace}),\n"
+        "\\end{cases}\n"
+        "\\qquad\n"
+        "P(s' \\mid s, 1) = \\mathbf{1}\\{s' = 0\\},\n"
+        "$$\n"
+        "\n"
+        "with $\\theta_{\\mathrm{oc}} = 0.01$ and "
+        "$\\theta_{\\mathrm{rc}} = 2.0$. The agent discounts at $\\beta$ and "
+        "faces i.i.d. logit taste shocks (scale $\\sigma = 1$), so behavior "
+        "solves the soft Bellman equation\n"
+        "\n"
+        "$$\n"
+        "V(s) = \\log \\sum_{a} \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "\\qquad \\pi^*(a \\mid s) \\propto \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "$$\n"
+        "\n"
+        "and the panel simulates $N$ buses for $T$ periods from $\\pi^*$. The "
+        "figure shows the sawtooth mileage paths (rising drift, replacement "
+        "resets) and the declining value of holding higher mileage. Every "
+        "estimator below sees the same panels; slow ones run once instead of "
+        "being dropped."
     ),
     "cells": {
         "rust_bus": {

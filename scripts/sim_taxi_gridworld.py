@@ -28,6 +28,8 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "sim_taxi_gridworld.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "taxi_gridworld.md")
+FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                          "taxi_gridworld_dgp.png")
 
 # 8x8 grid, 64 states, 5 actions. discount 0.95 (not the 0.99 default) keeps
 # the inner solves cheap on a page meant to be light; the economics is the same.
@@ -239,6 +241,7 @@ CELLS = (
         seed=7,
         n_replications=3,
         fit_timeout=900,
+        figure=FIGURE_PNG,
     ),
 )
 
@@ -247,15 +250,48 @@ NARRATIVE = {
     "intro": (
         "Gridworld navigation is the home turf of the maximum-entropy IRL "
         "tradition (Ziebart's MaxEnt and its descendants), so this page weights "
-        "the roster toward IRL methods, with NFXP, CCP, and MPEC as the "
-        "structural contrast. The environment also supplies a stress the Rust "
-        "bus does not: every trajectory starts at the same corner and walks "
+        "the roster toward IRL methods, with NFXP, CCP, MPEC, and UFXP as the "
+        "structural contrast. The environment also supplies a stress the bus "
+        "engine does not: every trajectory starts at the same corner and walks "
         "toward the goal, so states far from the start-to-goal path are visited "
         "rarely or never. Methods that rely on inverting state-by-state choice "
         "frequencies feel that thinness; methods that share strength through "
-        "features or networks do not. The horizon is deliberately short (20 "
-        "periods) because the goal is absorbing: once there, an agent generates "
-        "no further information."
+        "features or networks do not.\n"
+        "\n"
+        "## The data-generating process\n"
+        "\n"
+        "States are cells of an $N \\times N$ grid indexed $s = "
+        "\\mathrm{row} \\cdot N + \\mathrm{col}$, with five actions (left, "
+        "right, up, down, stay), deterministic moves, and an absorbing goal at "
+        "the bottom-right corner. The reward has three parts: a per-step "
+        "penalty, a terminal bonus when the chosen move reaches the goal, and "
+        "a shaping term in the Manhattan distance $d(s)$ to the goal:\n"
+        "\n"
+        "$$\n"
+        "u_\\theta(s, a) = \\theta_{\\mathrm{step}}\\, "
+        "\\mathbf{1}\\{s \\neq s_{\\mathrm{goal}}\\}\n"
+        "+ \\theta_{\\mathrm{goal}}\\, \\mathbf{1}\\{s'(s, a) = "
+        "s_{\\mathrm{goal}}\\}\n"
+        "- \\theta_{\\mathrm{dist}}\\, \\frac{d(s)}{2N},\n"
+        "$$\n"
+        "\n"
+        "with $\\theta_{\\mathrm{step}} = -0.1$, $\\theta_{\\mathrm{goal}} = "
+        "10$, $\\theta_{\\mathrm{dist}} = 0.1$. The agent discounts at "
+        "$\\beta$ and faces i.i.d. logit taste shocks (scale $\\sigma = 1$), "
+        "so behavior solves the soft Bellman equation\n"
+        "\n"
+        "$$\n"
+        "V(s) = \\log \\sum_{a} \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "\\qquad \\pi^*(a \\mid s) \\propto \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "$$\n"
+        "\n"
+        "and every trajectory starts at the top-left corner (state 0). The "
+        "figure shows the resulting paths climbing the state index toward the "
+        "absorbing goal and the value function rising with proximity to it. "
+        "The horizon is deliberately short (20 periods) because the goal is "
+        "absorbing: once there, an agent generates no further information."
     ),
     "cells": {
         "gridworld": {

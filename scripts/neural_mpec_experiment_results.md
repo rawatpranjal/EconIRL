@@ -35,44 +35,48 @@ shares (~0.30 / 0.40 / 0.31) and full state coverage.
 
 ## Result 1, one panel (16k obs)
 
+Reward RMSE is over the estimated actions {0, 1} only; the reference action is anchored to
+zero in both truth and estimate, so it is excluded (including it is a free win). Value RMSE
+is against the soft-Bellman oracle value. GLADIUS is run at the repo-standard size (128 wide,
+3 layers, 500 epochs) with the same action-2 anchor the MPEC methods receive, so it is a fair
+baseline.
+
 | estimator | reward RMSE | value RMSE | max Bellman resid |
 |---|---:|---:|---:|
-| tabular MPEC (gold) | 0.017 | 0.210 | exact |
-| neural MPEC (shallow) | 0.135 | 0.336 | 1e-5 to 4e-3 |
-| GLADIUS (under-configured, unanchored)* | 1.291 | 25.71 | n/a |
+| tabular MPEC (gold) | 0.021 | 0.210 | exact |
+| neural MPEC (shallow) | 0.165 | 0.335 | 1e-5 to 4e-3 |
+| GLADIUS (model-free) | 0.185 | 2.608 | n/a |
 
-Reward RMSE here is over the full (S, A) matrix, which includes the reference action whose
-reward is anchored to zero in both truth and estimate; over the two estimated actions only
-the neural figure is 0.165. Neural MPEC drives the Bellman residual to near zero and sits
-about 8x above tabular MPEC on reward RMSE. Sweeping `rho` over {0.1, 1, 10}, net
-width/depth, and collocation barely moves the number. The model's final in-sample NLL
-reaches the true-policy floor, so the likelihood is fully optimized and the gap is not
-optimization.
+Neural MPEC drives the Bellman residual to near zero and sits about 8x above tabular MPEC on
+reward RMSE; the `rho` sweep over {0.1, 1, 10}, net width/depth, and collocation barely move
+the number. Its final in-sample NLL reaches the true-policy floor, so the likelihood is fully
+optimized and the remaining gap is finite-sample, not optimization.
 
-*The GLADIUS row is **not a fair baseline**. It is run here under-sized (32-wide, 1 layer,
-300 epochs) and without the action-2 anchor that tabular and neural MPEC both receive. Run
-at the repo-standard size (128-wide, 3 layers) with the same anchor, GLADIUS reaches value
-RMSE ~2.6 and reward RMSE ~0.15. The like-for-like, anchored comparison lives in the
-`direct_optimization` simulation-studies page, not here. This prototype keeps GLADIUS only
-as a rough model-free reference.
+GLADIUS recovers a comparable reward (0.185) but a far worse value function (2.6 against 0.21
+and 0.34). That value gap is the honest cost of being model-free: GLADIUS never uses the
+known transitions and must learn the expected-continuation operator from data, whereas the
+two MPEC methods compute it exactly. Its reward also sits in a different, model-free gauge, so
+that number is a model-free reference, not a like-for-like structural figure.
 
 ## Result 2, why the gap is variance, not bias
 
 Push the data up and the neural reward RMSE falls at the root-N rate, converging to the
-truth. The estimator is consistent. Tabular MPEC stays about 4x to 5x lower because its
+truth: the estimator is consistent. Tabular MPEC stays about 4x to 5x lower because its
 4 linear parameters pool information across states, while the flexible per-state neural
-reward inherits the full finite-sample noise of the CCP-to-reward inverse map with no
-pooling. Textbook nonparametric-versus-parametric tradeoff, not a defect.
+reward inherits the finite-sample noise of the choice-probability-to-reward inverse map with
+no pooling. Textbook nonparametric-versus-parametric tradeoff, not a defect. (Reward RMSE
+over estimated actions {0, 1}.)
 
 | n_obs | neural reward RMSE | neural value RMSE | tabular reward RMSE | tabular value RMSE |
 |---:|---:|---:|---:|---:|
-| 4k | 0.248 | 0.683 | 0.054 | 0.235 |
-| 16k | 0.139 | 0.244 | 0.029 | 0.187 |
-| 64k | 0.071 | 0.106 | 0.010 | 0.067 |
+| 4k | 0.304 | 0.683 | 0.066 | 0.235 |
+| 16k | 0.170 | 0.244 | 0.035 | 0.187 |
+| 64k | 0.087 | 0.106 | 0.012 | 0.067 |
 
 Each 4x of data roughly halves the neural reward RMSE, the root-N signature of a consistent
-estimator, while tabular MPEC stays about 4x to 5x lower throughout (every row reproduces
-from `neural_mpec_experiment_results.json`).
+estimator, while tabular MPEC stays about 4x to 5x lower throughout. Every row reproduces
+from `neural_mpec_experiment_results.json`. (The scaling sweep draws a fresh panel, so the
+neural reward at 16k, 0.170, is a separate draw from the 0.165 in Result 1.)
 
 ## Takeaway
 
