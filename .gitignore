@@ -122,3 +122,4 @@ validation/estimators/**/*.tex
 
 # Local session handoff (assistant state)
 handoff.md
+scripts/neural_mpec_experiment_results.json
