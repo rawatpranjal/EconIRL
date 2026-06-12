@@ -181,7 +181,15 @@ _ALL_RUNNERS = {
 PROBE_ORDER = ["NFXP-SA", "NFXP-NK", "CCP", "MPEC", "UFXP",
                "TD-CCP", "NNES", "GLADIUS", "Deep-MCE-IRL"]
 
+# The probes (rendered on the page) showed the whole classical family still
+# completes at 3000 states, so the main cell runs it alongside the
+# approximation-based estimators rather than asserting it away. MPEC is the
+# costliest at ~100s/fit and gets a visible budget.
 ROSTER = (
+    RosterEntry("NFXP-SA", "structural", _run_nfxp_sa),
+    RosterEntry("NFXP-NK", "structural", _run_nfxp_nk),
+    RosterEntry("CCP", "structural", _run_ccp),
+    RosterEntry("MPEC", "structural", _run_mpec, timeout=900),
     RosterEntry("UFXP", "structural", _run_ufxp),
     RosterEntry("TD-CCP", "structural", _run_tdccp),
     RosterEntry("NNES", "structural", _run_nnes),
@@ -192,6 +200,17 @@ ROSTER = (
 
 
 DIAGNOSES = {
+    "NFXP-SA": "Rust's original successive-approximation inner loop. The "
+               "probes show it still completes here; its cost grows with the "
+               "dense tensor, which is the measured ceiling, not an asserted "
+               "one.",
+    "NFXP-NK": "The Newton-Kantorovich polyalgorithm refinement of the same "
+               "estimator.",
+    "CCP": "Hotz-Miller inversion; one fixed-point solve total, so scale "
+           "barely touches it until the dense algebra does.",
+    "MPEC": "Constrained MLE carrying one optimizer variable per state plus "
+            "the parameters - the costliest classical member here, run under "
+            "a visible per-fit budget.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
             "weighting (OUFXP), built for exactly this regime: one dense "
             "factorization before the parameter search, then a closed-form "
@@ -213,12 +232,13 @@ DIAGNOSES = {
 }
 
 EXCLUDED = [
-    {"name": "NFXP, CCP, MPEC", "reason": "shown in the feasibility probes above "
-     "with their measured outcomes rather than asserted away"},
+    {"name": "SEES", "reason": "a spline value basis with basis_dim near the "
+     "state count is its own scaling wall at thousands of states; its "
+     "showing is on the harder abstract MDP page"},
     {"name": "MCE-IRL, MaxEnt-IRL, AIRL, IQ-Learn, f-IRL and the other IRL "
      "methods", "reason": "their exact inner solvers face the same dense-tensor "
      "cost the probes document for the classical family; the IRL comparison "
-     "lives on the Rust bus and gridworld pages"},
+     "lives on the bus engine and gridworld pages"},
 ]
 
 CELLS = (
@@ -255,8 +275,12 @@ NARRATIVE = {
         "grow with the square of the state count, and an optimizer like MPEC "
         "additionally carries one variable per state. Rather than assert where "
         "that breaks, the feasibility probes below run every candidate once "
-        "under a hard time budget and report what actually happened; the main "
-        "table then benchmarks the estimators that remain practical.\n"
+        "per scale under a hard time budget and report what actually happened. "
+        "The measured answer is more interesting than the folklore: at 3000 "
+        "states the entire classical family still completes, so the main table "
+        "benchmarks it alongside the approximation-based estimators instead of "
+        "asserting it away, and the probes at the larger scale show where the "
+        "costs actually separate.\n"
         "\n"
         "## The data-generating process\n"
         "\n"
@@ -318,9 +342,15 @@ NARRATIVE = {
 # ---------------------------------------------------------------------------
 
 
-def _probe_one(name: str) -> None:
+def _probe_env(n_states: int):
+    cfg = dict(MDP)
+    cfg["num_states"] = n_states
+    return random_mdp(**cfg)
+
+
+def _probe_one(name: str, n_states: int) -> None:
     """Child-process entry: one fit, result as JSON on the last stdout line."""
-    env = _env()
+    env = _probe_env(n_states)
     panel_seed = MDP["seed"] + 1000  # same panel as replication 0 of the main run
     from econirl.simulation.synthetic import simulate_panel
 
@@ -329,35 +359,43 @@ def _probe_one(name: str) -> None:
     t0 = time.time()
     try:
         _ALL_RUNNERS[name](env, panel)
-        out = {"estimator": name, "n_states": N_STATES, "outcome": "completed",
+        out = {"estimator": name, "n_states": n_states, "outcome": "completed",
                "seconds": time.time() - t0, "error": None}
     except Exception as exc:  # noqa: BLE001 - the failure IS the result
-        out = {"estimator": name, "n_states": N_STATES, "outcome": "crashed",
+        out = {"estimator": name, "n_states": n_states, "outcome": "crashed",
                "seconds": time.time() - t0,
                "error": f"{type(exc).__name__}: {exc}"}
     print(json.dumps(out))
 
 
-def _run_probes() -> None:
-    """Run every probe serially, each in a subprocess with a hard timeout."""
+def _run_probes(n_states: int) -> None:
+    """Run every probe serially, each in a subprocess with a hard timeout.
+
+    Results for different scales accumulate in the probes JSON, so probing a
+    second scale extends the page's feasibility table instead of replacing it.
+    """
     results = []
+    if os.path.exists(PROBES_JSON):
+        results = json.load(open(PROBES_JSON))["probes"]
+        results = [r for r in results if r["n_states"] != n_states]
     for name in PROBE_ORDER:
-        print(f"probe {name} at {N_STATES} states (budget {PROBE_TIMEOUT}s)...",
+        print(f"probe {name} at {n_states} states (budget {PROBE_TIMEOUT}s)...",
               flush=True)
         t0 = time.time()
         try:
             proc = subprocess.run(
-                [sys.executable, os.path.abspath(__file__), "--probe-one", name],
+                [sys.executable, os.path.abspath(__file__), "--probe-one", name,
+                 "--probe-states", str(n_states)],
                 capture_output=True, text=True, timeout=PROBE_TIMEOUT)
             line = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
             try:
                 rec = json.loads(line)
             except json.JSONDecodeError:
-                rec = {"estimator": name, "n_states": N_STATES, "outcome": "crashed",
+                rec = {"estimator": name, "n_states": n_states, "outcome": "crashed",
                        "seconds": time.time() - t0,
                        "error": (proc.stderr.strip().splitlines() or ["no output"])[-1][:200]}
         except subprocess.TimeoutExpired:
-            rec = {"estimator": name, "n_states": N_STATES, "outcome": "timeout",
+            rec = {"estimator": name, "n_states": n_states, "outcome": "timeout",
                    "seconds": None,
                    "error": f"killed at the {PROBE_TIMEOUT:.0f}s budget"}
         results.append(rec)
@@ -367,13 +405,13 @@ def _run_probes() -> None:
 
     payload = {
         "description": (
-            "Single fits at the main cell's exact configuration (same "
-            "environment, same replication-0 panel), one subprocess per "
-            "estimator, run before the main benchmark to decide the roster "
-            "empirically."
+            "Single fits per estimator and scale (same generator and panel "
+            "configuration as the main cell, state count varying), one "
+            "subprocess per fit, run before the main benchmark to decide the "
+            "roster empirically."
         ),
         "timeout_seconds": PROBE_TIMEOUT,
-        "probes": results,
+        "probes": sorted(results, key=lambda r: (r["n_states"], r["estimator"])),
     }
     with open(PROBES_JSON, "w") as f:
         json.dump(payload, f, indent=2)
@@ -388,9 +426,13 @@ def _extra_meta() -> dict | None:
 
 if __name__ == "__main__":
     if "--probe-one" in sys.argv:
-        _probe_one(sys.argv[sys.argv.index("--probe-one") + 1])
+        _ps = (int(sys.argv[sys.argv.index("--probe-states") + 1])
+               if "--probe-states" in sys.argv else N_STATES)
+        _probe_one(sys.argv[sys.argv.index("--probe-one") + 1], _ps)
     elif "--probe" in sys.argv:
-        _run_probes()
+        _ps = (int(sys.argv[sys.argv.index("--probe-states") + 1])
+               if "--probe-states" in sys.argv else N_STATES)
+        _run_probes(_ps)
     else:
         main_cli(cells=CELLS, title="Simulation study: high-dimensional abstract MDP",
                  narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
