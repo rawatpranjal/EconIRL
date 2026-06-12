@@ -106,5 +106,10 @@ to the NFXP fixed point.
 | Type C regret | at most 0.05 | 0.000086 | pass |
 
 The estimates are not exactly equal to truth because the panel is finite. The
-study reports recovery within the listed tolerances in the frozen synthetic
-cell.
+study reports recovery within the listed tolerances in this synthetic cell.
+
+CCP also appears alongside the full structural and IRL rosters in the
+[bus engine](../../simulation_studies/rust_bus.md),
+[gridworld](../../simulation_studies/taxi_gridworld.md), and
+[abstract MDP](../../simulation_studies/abstract_mdp_1_sanity.md) simulation
+studies.

@@ -1,113 +1,111 @@
 # Under the Hood
 
-CCP replaces repeated Bellman solves with first-stage policy inversion. The
-estimator starts from empirical conditional choice probabilities, converts
-them into continuation-value terms, and maximizes a pseudo likelihood over
-augmented features.
-
-## Optimization Setup
-
-The observed panel supplies state, action, and next-state records. The
-transition law is estimated from the panel or supplied directly. Reward
-features, the discount factor, the logit shock scale, and the NPL iteration
-limit are fixed before optimization.
-
-CCP first estimates a policy from empirical conditional choice probabilities.
-Given that policy, it constructs Hotz-Miller continuation terms and then
-optimizes a multinomial logit pseudo likelihood in `theta`. In NPL mode, the
-estimated `theta` implies a new policy, and the continuation terms are rebuilt
-for the next iteration.
-
 ## Model
 
-The observed data are state, action, and next-state trajectories.
+The data are state, action, next-state triples $(s_{it}, a_{it}, s_{i,t+1})$ from a
+stationary infinite-horizon dynamic discrete choice model with linear flow utility
+$u_\theta(s, a) = \varphi(s, a)^\top \theta$, known discount factor $\beta$,
+transition kernels $P_a(s' \mid s)$, and i.i.d. logit taste shocks with scale $\sigma$.
+
+The transition law is estimated from the panel or supplied directly. The first step
+is to estimate the empirical policy from state-action counts:
 
 $$
-(s_{it}, a_{it}, s_{i,t+1})
+\hat\pi(a \mid s) = \frac{\#(s, a)}{\#(s)}.
 $$
 
-The flow payoff is linear in known features.
+## Hotz-Miller Inversion
+
+Given a policy $\hat\pi$, the policy-weighted transition matrix is:
 
 $$
-u_\theta(s, a) = \phi(s, a)^\top \theta
+F_{\hat\pi}(s, s') = \sum_a \hat\pi(a \mid s)\, P_a(s, s').
 $$
 
-CCP first estimates the observed policy.
+Under logit shocks, the emax correction for each state-action pair is:
 
-```text
-pi_hat(a | s) = count(s, a) / count(s)
-```
+$$
+e_{\hat\pi}(s, a) = \gamma_{\mathrm{Euler}} - \log \hat\pi(a \mid s),
+$$
 
-The estimator then computes the policy-weighted transition matrix.
+where $\gamma_{\mathrm{Euler}} \approx 0.5772$. The integrated value under $\hat\pi$ is:
 
-```text
-F_pi(s, s_next) = sum_a pi_hat(a | s) P_a(s, s_next)
-```
+$$
+\bar{V}_{\hat\pi} = (I - \beta F_{\hat\pi})^{-1} \sum_a \hat\pi(a \mid s)
+\bigl\{u_\theta(s, a) + e_{\hat\pi}(s, a)\bigr\}.
+$$
 
-With logit shocks, the Hotz-Miller correction is the Euler constant minus the
-log CCP.
+For linear rewards this separates into:
 
-```text
-e_pi(s, a) = gamma_euler - log pi_hat(a | s)
-```
+$$
+\bar{V}_{\hat\pi}(s) = W_\varphi(s)^\top \theta + W_e(s),
+$$
 
-For linear rewards, the continuation value separates into a term that
-multiplies the structural parameters and a term that comes from the logit
-shock correction.
+where:
 
-```text
-W_phi = inv(I - beta F_pi) sum_a pi_hat(a | s) phi(s, a)
-W_e = inv(I - beta F_pi) sum_a pi_hat(a | s) e_pi(s, a)
-```
+$$
+W_\varphi = (I - \beta F_{\hat\pi})^{-1} \sum_a \hat\pi(a \mid s)\, \varphi(s, a),
+\qquad
+W_e = (I - \beta F_{\hat\pi})^{-1} \sum_a \hat\pi(a \mid s)\, e_{\hat\pi}(s, a).
+$$
 
-The choice-specific value in each pseudo-likelihood step is an augmented
-feature logit.
+$W_\varphi$ and $W_e$ depend on $\hat\pi$ and the transitions but not on $\theta$.
+One factorization of $(I - \beta F_{\hat\pi})$ per NPL step replaces the per-evaluation
+Bellman solve that NFXP pays at every likelihood call.
 
-```text
-Q_tilde(s, a) = phi(s, a) theta
-             + beta E[W_phi(s_next)] theta
-             + beta E[W_e(s_next)]
-```
+## Pseudo-Likelihood
 
-NPL repeats two steps. Given a policy, estimate parameters by logit
-pseudo-likelihood. Given parameters, update the policy from the implied
-choice-specific values.
+The choice-specific pseudo-value combines the flow utility with the discounted
+continuation term from the inversion:
+
+$$
+\tilde{Q}_\theta(s, a; \hat\pi) = \varphi(s, a)^\top \theta
++ \beta \sum_{s'} P_a(s, s')\bigl\{W_\varphi(s')^\top \theta + W_e(s')\bigr\}.
+$$
+
+The K-step NPL estimator maximizes the pseudo log-likelihood at each iteration:
+
+$$
+\hat\theta_K = \arg\max_\theta \sum_{i,t} \log \frac{
+  \exp\!\bigl(\tilde{Q}_\theta(s_{it}, a_{it}; \hat\pi^{K-1}) / \sigma\bigr)
+}{
+  \sum_b \exp\!\bigl(\tilde{Q}_\theta(s_{it}, b; \hat\pi^{K-1}) / \sigma\bigr)
+}.
+$$
+
+After each step the policy is updated from $\hat\theta_K$ and the augmented features
+are rebuilt. Setting $K = 1$ gives the one-step Hotz-Miller estimator; iterating
+until convergence is the NPL fixed point.
 
 ## Pseudocode
 
-```text
-Input: panel, reward features, transitions, discount beta, shock scale sigma
-Estimate empirical CCPs pi_hat(a | s) from observed state-action counts
-for each configured NPL iteration:
-    build F_pi(s, s_next) = sum_a pi(a | s) P_a(s, s_next)
-    solve Hotz-Miller continuation terms W_phi and W_e
+```
+estimate empirical CCPs pi-hat(a | s) from state-action counts
+for each NPL iteration:
+    build F_pi from pi-hat and the transition tensor
+    factorize (I - beta * F_pi)   # one matrix solve per step
+    compute W_phi and W_e
     build augmented logit features from phi, W_phi, and W_e
-    maximize the pseudo likelihood over theta
-    compute Q_tilde(s, a) and update pi(a | s)
-return theta, pi, value function, standard errors, and diagnostics
+    maximize the pseudo log-likelihood over theta
+    update pi-hat from the implied choice-specific values
+return theta, policy, value function, standard errors, diagnostics
 ```
 
 ## Implementation Notes
 
-The frequency estimator uses float64 arrays so high-discount problems avoid
-JAX dtype promotion warnings. CCP probabilities are clamped before the log
-correction so exact zero empirical frequencies cannot create infinities.
+The frequency estimator uses float64 arrays so high-discount problems avoid JAX dtype
+promotion warnings. CCP probabilities are clamped before the log correction so exact
+zero empirical frequencies cannot create infinities.
 
-The linear pseudo-likelihood kernel is JIT compiled once. The augmented
-features are passed as dynamic arguments, so the same compiled kernel is reused
-across NPL iterations.
+The logit pseudo-likelihood kernel is JIT-compiled once at module level. The augmented
+features are passed as dynamic arguments, so the same compiled kernel is reused across
+all NPL iterations without recompilation.
 
-The returned `value_` follows the package soft-Bellman convention. CCP uses the
-Euler-constant correction internally for inversion, but final diagnostics
-evaluate the recovered policy under the recovered structural reward.
+The returned `value_` follows the package soft-Bellman convention (log-sum-exp without
+the Euler-gamma constant). CCP uses the Euler-constant correction internally for the
+Hotz-Miller inversion step, but final diagnostics evaluate the recovered policy under
+the recovered structural reward in the standard convention.
 
-## Score Calculation
-
-For linear rewards, each NPL step is a multinomial logit over augmented
-features. The score has the same logit form as NFXP, but the derivatives are
-taken with respect to the CCP-augmented choice-specific value rather than a
-newly solved Bellman fixed point at every likelihood evaluation.
-
-Standard errors are computed from the full Bellman-constrained likelihood
-Hessian and per-observation gradients when requested. This keeps the fitted
-summary compatible with the shared inference interface used by NFXP.
+Standard errors are computed from the full Bellman-constrained likelihood Hessian and
+per-observation gradients. This keeps the fitted summary compatible with the shared
+inference interface used by NFXP.

@@ -52,15 +52,15 @@ larger value for fixed-iteration NPL.
 ## Evidence
 
 CCP is reported on the low-dimensional action-dependent synthetic data-generating process. The
-simulation cell has known rewards, transitions, policies, values, Q functions,
+simulation cell has fully specified rewards, transitions, policies, values, Q functions,
 and Type A, Type B, and Type C counterfactual oracles. The machine-readable
-results file and generated primer results record the reported results.
+results file records the reported results.
 
 | Evidence | Current state |
 | --- | --- |
 | Evidence scope | Synthetic tabular simulation with support conditions. |
 | Primary cell | `canonical_low_action`. |
-| Machine-readable results file | [ccp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp.json). |
+| Machine-readable results file | [ccp.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `CCP` with `utility="linear_cost"`. |
 
