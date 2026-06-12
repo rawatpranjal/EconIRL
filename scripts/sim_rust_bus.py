@@ -194,49 +194,6 @@ def _run_max_margin(env, panel):
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
-def _run_mmp(env, panel):
-    from econirl.contrib.max_margin_planning import MaxMarginPlanningEstimator
-
-    est = MaxMarginPlanningEstimator(verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-
-
-def _run_gcl(env, panel):
-    from econirl.contrib.gcl import GCLConfig, GCLEstimator
-
-    est = GCLEstimator(config=GCLConfig(hidden_dims=[32, 32], cost_lr=0.001,
-                                        max_iterations=100, n_sample_trajectories=50,
-                                        verbose=False))
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-
-
-def _run_gail(env, panel):
-    from econirl.contrib.gail import GAILConfig, GAILEstimator
-
-    # Requires a reward spec (LinearReward/ActionDependentReward), not the
-    # structural LinearUtility wrapper.
-    est = GAILEstimator(GAILConfig(discriminator_type="tabular", discriminator_lr=0.05,
-                                   discriminator_steps=3, policy_step_size=0.3,
-                                   max_rounds=300, reward_transform="softplus",
-                                   convergence_tol=1e-6, verbose=False))
-    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
-
-
-def _run_deep_maxent(env, panel):
-    from econirl.contrib.deep_maxent_irl import DeepMaxEntIRLEstimator
-
-    est = DeepMaxEntIRLEstimator(hidden_dims=[32, 32], lr=1e-3, max_epochs=300,
-                                 compute_se=False, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-
-
-def _run_bayesian_irl(env, panel):
-    from econirl.contrib.bayesian_irl import BayesianIRLEstimator
-
-    est = BayesianIRLEstimator(n_samples=2000, burnin=500, compute_se=False, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-
-
 ROSTER = (
     RosterEntry("NFXP", "structural", _run_nfxp),
     RosterEntry("CCP", "structural", _run_ccp),
@@ -254,14 +211,6 @@ ROSTER = (
     RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl),
     RosterEntry("MaxMargin-IRL", "behavioral", _run_max_margin),
     RosterEntry("BC", "behavioral", _run_bc),
-    # Known-slow estimators run once each, visibly (Ran column shows 1/1),
-    # rather than being excluded. Per-fit budgets are enforced and recorded:
-    # a timeout shows up in the table as the failure it is.
-    RosterEntry("MMP", "behavioral", _run_mmp, max_reps=1, timeout=900),
-    RosterEntry("GCL", "behavioral", _run_gcl, max_reps=1, timeout=1200),
-    RosterEntry("GAIL", "behavioral", _run_gail, max_reps=1, timeout=1200),
-    RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1, timeout=1200),
-    RosterEntry("Bayesian-IRL", "behavioral", _run_bayesian_irl, max_reps=1, timeout=2400),
 )
 
 
@@ -296,21 +245,21 @@ DIAGNOSES = {
                     "features.",
     "MaxMargin-IRL": "Margin-based reward recovery (Ng-Russell tradition); no "
                      "probabilistic choice model, so no standard errors.",
-    "MMP": "Max-margin planning (Ratliff et al); structured-margin variant. Far "
-           "slower than its cousins on this problem, so it runs once under an "
-           "explicit budget.",
     "BC": "Behavioral cloning; matches observed choices but recovers no reward, so "
           "it cannot transfer to a counterfactual world.",
-    "GCL": "Guided cost learning; sampling-based, slow, run once.",
-    "GAIL": "Adversarial imitation; matches occupancy, recovers no transferable "
-            "reward. Slow, run once.",
-    "DeepMaxEnt-IRL": "Neural-network reward via feature matching. Slow, run once.",
-    "Bayesian-IRL": "MCMC over rewards; posterior mean reward. Slow, run once.",
 }
 
 EXCLUDED = [
     {"name": "AIRL-Het / AAIRL", "reason": "designed for latent-type heterogeneity; "
      "this panel has a single agent type"},
+    {"name": "MMP", "reason": "one exploratory fit needed over half an hour on "
+     "this small problem (its cousins need seconds); dropped from the roster "
+     "for cost"},
+    {"name": "GAIL", "reason": "did not finish a single fit within a 20-minute "
+     "budget here"},
+    {"name": "GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "dropped from the "
+     "page roster by scope decision to keep the comparison on the core "
+     "structural and IRL families"},
 ]
 
 CELLS = (

@@ -154,14 +154,6 @@ def _run_ufxp(env, panel):
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
-def _run_deep_maxent(env, panel):
-    from econirl.contrib.deep_maxent_irl import DeepMaxEntIRLEstimator
-
-    est = DeepMaxEntIRLEstimator(hidden_dims=[32, 32], lr=1e-3, max_epochs=300,
-                                 compute_se=False, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
-
-
 ROSTER = (
     RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl),
     RosterEntry("MCE-IRL", "behavioral", _run_mce_irl),
@@ -175,10 +167,6 @@ ROSTER = (
     RosterEntry("CCP", "structural", _run_ccp),
     RosterEntry("MPEC", "structural", _run_mpec),
     RosterEntry("UFXP", "structural", _run_ufxp),
-    # Wulfmeier et al's deep MaxEnt was introduced on exactly this kind of
-    # gridworld; slow, so it runs once, visibly.
-    RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1,
-                timeout=1800),
 )
 
 
@@ -213,8 +201,6 @@ DIAGNOSES = {
             "choice probabilities, so thin state coverage is its natural "
             "stress; unlike CCP its conditions are scored only at visited "
             "states. Random-projection weights, no standard errors.",
-    "DeepMaxEnt-IRL": "Neural-network reward via feature matching (Wulfmeier et "
-                      "al); introduced on gridworlds. Slow, run once.",
 }
 
 EXCLUDED = [
@@ -222,10 +208,11 @@ EXCLUDED = [
      "1-D state index; a 2-D grid breaks that geometry, so running it here would "
      "be a misspecification by construction"},
     {"name": "NNES, TD-CCP", "reason": "the structural contrast is carried by "
-     "NFXP/CCP/MPEC here; the full structural roster runs on the Rust bus and "
-     "abstract MDP pages"},
-    {"name": "GAIL, GCL, Bayesian-IRL", "reason": "known slow; their single-run "
-     "showing is on the Rust bus page"},
+     "NFXP/CCP/MPEC/UFXP here; the full structural roster runs on the bus "
+     "engine and abstract MDP pages"},
+    {"name": "MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "dropped "
+     "from the study's rosters by scope decision (MMP and GAIL also failed a "
+     "20-30 minute single-fit budget on the bus engine page)"},
 ]
 
 CELLS = (
