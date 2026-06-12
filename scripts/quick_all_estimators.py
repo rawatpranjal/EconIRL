@@ -199,6 +199,16 @@ def _run_bc(env, panel):
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
+def _run_ufxp(env, panel):
+    from econirl.estimation import UFXPEstimator
+
+    # Bray's unnested fixed point: the value-function dependence of the Bellman
+    # first-order conditions is removed by duals computed once before the
+    # search, so the linear-utility case is closed-form least squares.
+    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
 # family: "structural" gets parameter metrics; "behavioral" gets policy/value only.
 ROSTER = [
     ("NFXP", "structural", _run_nfxp),
@@ -207,6 +217,7 @@ ROSTER = [
     ("NNES", "structural", _run_nnes),
     ("SEES", "structural", _run_sees),
     ("TD-CCP", "structural", _run_tdccp),
+    ("UFXP", "structural", _run_ufxp),
     ("MCE-IRL", "behavioral", _run_mce_irl),
     ("MaxEnt-IRL", "behavioral", _run_maxent_irl),
     ("IQ-Learn", "behavioral", _run_iq_learn),
@@ -227,6 +238,11 @@ DIAGNOSES = {
     "SEES": "Fixed: bspline basis with basis_dim >= num_states. A fourier basis of "
             "dim 4 underfit the 8-state value function (param RMSE 0.89 -> 0.01).",
     "TD-CCP": "Neural CCP with approximate value iteration; recovers cleanly.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026). Scores projected "
+            "Bellman first-order conditions; the value function is eliminated by "
+            "duals computed once before the parameter search, making the linear "
+            "case closed-form least squares. Random-projection weights (not the "
+            "efficient OUFXP second step), no standard errors.",
     "MCE-IRL": "Causal maximum-entropy IRL; recovers behavior cleanly.",
     "MaxEnt-IRL": "Fixed: feed action-dependent features. A state-only reward is "
                   "broadcast equally across actions and cannot represent the action "
@@ -457,6 +473,54 @@ def render_page(data: dict) -> str:
         f"Generated {meta['date']} with econirl {meta['package_version']}.\n"
     )
 
+    L.append("## The data-generating process\n")
+    L.append(
+        "One Garnet-style MDP is drawn from the seed and held fixed. Each "
+        "state-action pair reaches a uniform random subset of $b$ states with "
+        "Dirichlet weights, mixed with a small self-loop mass $\\ell$:\n"
+    )
+    L.append(
+        "$$\n"
+        "P(s' \\mid s, a) \\;=\\; (1-\\ell)\\, D_{s,a}(s') \\;+\\; "
+        "\\ell\\, \\mathbf{1}\\{s'=s\\},\n"
+        f"\\qquad D_{{s,a}} \\sim \\mathrm{{Dirichlet}}(\\mathbf{{1}}_b),\\quad "
+        f"b = {m['branching']},\\ \\ell = 0.05 .\n"
+        "$$\n"
+    )
+    L.append(
+        "The reward is linear in features of the normalized state index "
+        "$x_s = s/(S-1)$. Action $0$ is a zeroed outside option (the "
+        "identification anchor); for action $1$,\n"
+    )
+    L.append(
+        "$$\n"
+        "u_\\theta(s,a) = \\theta^\\top \\varphi(s,a),\n"
+        "\\qquad \\varphi(s,1) = \\bigl(1,\\ x_s + 1\\bigr),\n"
+        "\\qquad \\theta \\sim \\mathcal{N}(0,\\ 0.25\\, I_2).\n"
+        "$$\n"
+    )
+    L.append(
+        "The agent discounts at $\\beta = "
+        f"{m['discount_factor']}$ and faces i.i.d. logit taste shocks (scale "
+        "$\\sigma = 1$), so behavior solves the soft Bellman equation\n"
+    )
+    L.append(
+        "$$\n"
+        "V(s) = \\log \\sum_{a} \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "\\qquad \\pi^*(a \\mid s) \\propto \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "$$\n"
+    )
+    L.append(
+        "and the data are $N$ independent agents simulated for $T$ periods "
+        "from $\\pi^*$ and the transition law. The figure shows what that "
+        "produces: state paths mix across the whole space, and the optimal "
+        "value function varies smoothly in the state index.\n"
+    )
+    L.append("![Simulated trajectories and the optimal value function]"
+             "(../_static/simulation_studies/abstract_mdp_1_dgp.png)\n")
+
     L.append("## Results\n")
     L.append("| Estimator | Family | Ran | Recovered params | Param RMSE | Policy TV | "
              "Regret base | Regret A | Regret B | Regret C | Time (s) |")
@@ -553,9 +617,20 @@ def main() -> None:
             sys.exit(f"No JSON at {RESULTS_JSON}. Run without --verify/--page first.")
         data = json.load(open(RESULTS_JSON))
         if args.page:
+            # The DGP figure regenerates deterministically from the seeds.
+            from validation.benchmark.figures import dgp_figure
+
+            env = random_mdp(**MDP)
+            fig_panel = simulate_panel(env, n_individuals=N_INDIVIDUALS,
+                                       n_periods=N_PERIODS, seed=MDP["seed"] + 1000)
+            _, oracle_value = _oracle(env)
+            fig_path = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                                    "abstract_mdp_1_dgp.png")
+            os.makedirs(os.path.dirname(fig_path), exist_ok=True)
+            dgp_figure(env, fig_panel, oracle_value, fig_path)
             with open(PAGE_PATH, "w") as f:
                 f.write(render_page(data))
-            print(f"Wrote {PAGE_PATH}")
+            print(f"Wrote {PAGE_PATH} (+ {os.path.basename(fig_path)})")
         else:
             print(render(data))
             print(f"\n(verified: table re-derived purely from {RESULTS_JSON})")

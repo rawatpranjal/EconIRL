@@ -143,6 +143,17 @@ def _run_bc(env, panel):
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
+def _run_ufxp(env, panel):
+    from econirl.estimation import UFXPEstimator
+
+    # Bray's unnested fixed point: duals computed once before the parameter
+    # search; the linear-utility case is closed-form least squares. Its
+    # first-order conditions are scored only at visited states, which is the
+    # interesting stress on this concentrated-coverage grid.
+    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
 def _run_deep_maxent(env, panel):
     from econirl.contrib.deep_maxent_irl import DeepMaxEntIRLEstimator
 
@@ -163,6 +174,7 @@ ROSTER = (
     RosterEntry("NFXP", "structural", _run_nfxp),
     RosterEntry("CCP", "structural", _run_ccp),
     RosterEntry("MPEC", "structural", _run_mpec),
+    RosterEntry("UFXP", "structural", _run_ufxp),
     # Wulfmeier et al's deep MaxEnt was introduced on exactly this kind of
     # gridworld; slow, so it runs once, visibly.
     RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1),
@@ -194,6 +206,12 @@ DIAGNOSES = {
            "is exactly where a concentrated state distribution (most trajectories "
            "hug the start-to-goal diagonal) can hurt it.",
     "MPEC": "Structural contrast: constrained MLE.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026): scores Bellman "
+            "first-order conditions with the value function eliminated by "
+            "pre-computed duals. Like CCP it starts from inverted empirical "
+            "choice probabilities, so thin state coverage is its natural "
+            "stress; unlike CCP its conditions are scored only at visited "
+            "states. Random-projection weights, no standard errors.",
     "DeepMaxEnt-IRL": "Neural-network reward via feature matching (Wulfmeier et "
                       "al); introduced on gridworlds. Slow, run once.",
 }

@@ -40,6 +40,8 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "sim_abstract_mdp_3.json")
 PROBES_JSON = os.path.join(_ROOT, "validation", "results", "sim_abstract_mdp_3_probes.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "abstract_mdp_3_highdim.md")
+FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                          "abstract_mdp_3_dgp.png")
 
 # 3000 states: the dense (2, S, S) transition tensor every tabular method
 # consumes is ~144 MB here and grows quadratically; this is the regime the
@@ -152,11 +154,22 @@ def _run_bc(env, panel):
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
+def _run_ufxp(env, panel):
+    from econirl.estimation import UFXPEstimator
+
+    # Bray's unnested fixed point. Exactly one dense (S, S) factorization
+    # before the parameter search, then closed-form least squares; this scale
+    # is the regime the paper targets, so the probe checks the claim here.
+    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
 _ALL_RUNNERS = {
     "NFXP-SA": _run_nfxp_sa,
     "NFXP-NK": _run_nfxp_nk,
     "CCP": _run_ccp,
     "MPEC": _run_mpec,
+    "UFXP": _run_ufxp,
     "TD-CCP": _run_tdccp,
     "NNES": _run_nnes,
     "GLADIUS": _run_gladius,
@@ -164,10 +177,11 @@ _ALL_RUNNERS = {
     "BC": _run_bc,
 }
 
-PROBE_ORDER = ["NFXP-SA", "NFXP-NK", "CCP", "MPEC",
+PROBE_ORDER = ["NFXP-SA", "NFXP-NK", "CCP", "MPEC", "UFXP",
                "TD-CCP", "NNES", "GLADIUS", "Deep-MCE-IRL"]
 
 ROSTER = (
+    RosterEntry("UFXP", "structural", _run_ufxp),
     RosterEntry("TD-CCP", "structural", _run_tdccp),
     RosterEntry("NNES", "structural", _run_nnes),
     RosterEntry("GLADIUS", "behavioral", _run_gladius),
@@ -177,6 +191,11 @@ ROSTER = (
 
 
 DIAGNOSES = {
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026), built for exactly "
+            "this regime: one dense factorization before the parameter search, "
+            "then closed-form least squares on projected Bellman first-order "
+            "conditions, with no fixed point inside the optimizer. "
+            "Random-projection weights, no standard errors.",
     "TD-CCP": "Neural CCP with approximate value iteration on sampled batches; "
               "never materializes a dense fixed point.",
     "NNES": "Neural value network plus structural MLE; the network replaces the "
@@ -220,6 +239,7 @@ CELLS = (
         n_periods=N_PERIODS,
         seed=707,
         n_replications=3,
+        figure=FIGURE_PNG,
     ),
 )
 
@@ -233,7 +253,45 @@ NARRATIVE = {
         "additionally carries one variable per state. Rather than assert where "
         "that breaks, the feasibility probes below run every candidate once "
         "under a hard time budget and report what actually happened; the main "
-        "table then benchmarks the estimators that remain practical."
+        "table then benchmarks the estimators that remain practical.\n"
+        "\n"
+        "## The data-generating process\n"
+        "\n"
+        "Same Garnet generator as the previous abstract pages, scaled up. One "
+        "MDP is drawn from the seed and held fixed: each state-action pair "
+        "reaches a uniform random subset of $b$ states with Dirichlet weights, "
+        "plus a small self-loop mass $\\ell$:\n"
+        "\n"
+        "$$\n"
+        "P(s' \\mid s, a) \\;=\\; (1-\\ell)\\, D_{s,a}(s') \\;+\\; "
+        "\\ell\\, \\mathbf{1}\\{s'=s\\},\n"
+        "\\qquad D_{s,a} \\sim \\mathrm{Dirichlet}(\\mathbf{1}_b),\\quad "
+        "b = 8,\\ \\ell = 0.05 .\n"
+        "$$\n"
+        "\n"
+        "The reward is linear in polynomial features of the normalized state "
+        "index $x_s = s/(S-1)$, with action $0$ a zeroed outside option and, "
+        "for $a \\geq 1$,\n"
+        "\n"
+        "$$\n"
+        "u_\\theta(s,a) = \\theta^\\top \\varphi(s,a),\n"
+        "\\qquad \\varphi(s,a) = \\bigl(1,\\ x_s,\\ x_s^{2} + a\\bigr),\n"
+        "\\qquad \\theta \\sim \\mathcal{N}(0,\\ 0.25\\, I_3).\n"
+        "$$\n"
+        "\n"
+        "Behavior solves the soft Bellman equation with logit shocks (scale "
+        "$\\sigma = 1$):\n"
+        "\n"
+        "$$\n"
+        "V(s) = \\log \\sum_{a} \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "\\qquad \\pi^*(a \\mid s) \\propto \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr).\n"
+        "$$\n"
+        "\n"
+        "Three reward parameters generate behavior over three thousand states: "
+        "the structure, not the state count, carries the information, which is "
+        "exactly what the feature-based estimators exploit."
     ),
     "cells": {
         "highdim_3000": {

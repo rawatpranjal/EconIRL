@@ -38,6 +38,8 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "sim_abstract_mdp_2.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "abstract_mdp_2_harder.md")
+FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                          "abstract_mdp_2_dgp.png")
 
 MDP = dict(num_states=300, num_actions=2, num_features=3, branching=5, seed=505)
 
@@ -116,6 +118,15 @@ def _run_tdccp(env, panel):
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
+def _run_ufxp(env, panel):
+    from econirl.estimation import UFXPEstimator
+
+    # Bray's unnested fixed point: duals computed once before the parameter
+    # search; the linear-utility case is closed-form least squares.
+    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
 def _run_mce_irl(env, panel):
     from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
 
@@ -132,6 +143,7 @@ _STRUCTURAL = (
     RosterEntry("NNES", "structural", _run_nnes),
     RosterEntry("SEES", "structural", _run_sees),
     RosterEntry("TD-CCP", "structural", _run_tdccp),
+    RosterEntry("UFXP", "structural", _run_ufxp),
 )
 
 ROSTER_A = _STRUCTURAL + (RosterEntry("MCE-IRL", "behavioral", _run_mce_irl),)
@@ -140,6 +152,7 @@ ROSTER_C = (
     RosterEntry("NFXP-NK", "structural", _run_nfxp_nk),
     RosterEntry("CCP", "structural", _run_ccp),
     RosterEntry("MPEC", "structural", _run_mpec),
+    RosterEntry("UFXP", "structural", _run_ufxp),
 )
 
 
@@ -162,6 +175,12 @@ DIAGNOSES = {
             "the basis can span the value function.",
     "TD-CCP": "Neural CCP with approximate value iteration and cross-fitted "
               "standard errors.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026). The Bellman "
+            "first-order conditions are scored directly; the value function is "
+            "eliminated by duals computed once before the search, so no fixed "
+            "point is ever solved inside the optimizer and the linear case is "
+            "closed-form. Random-projection weights (not the efficient OUFXP "
+            "step), no standard errors.",
     "MCE-IRL": "Behavioral reference on the harder cell. Its converged flag is "
                "conservative (gradient-norm tolerance); read it next to Policy TV.",
 }
@@ -192,6 +211,7 @@ CELLS = (
         n_periods=60,
         seed=505,
         n_replications=3,
+        figure=FIGURE_PNG,
     ),
     Cell(
         cell_id="high_discount",
@@ -241,7 +261,46 @@ NARRATIVE = {
         "happens to inference as the discount factor approaches one, and what "
         "happens to the parameters when the reward features are collinear. "
         "Each axis gets its own cell, run on the same engine and reported from "
-        "the same raw records as every other page."
+        "the same raw records as every other page.\n"
+        "\n"
+        "## The data-generating process\n"
+        "\n"
+        "The first two cells draw one Garnet-style MDP from the seed and hold "
+        "it fixed. Each state-action pair reaches a uniform random subset of "
+        "$b$ states with Dirichlet weights, mixed with a small self-loop mass "
+        "$\\ell$:\n"
+        "\n"
+        "$$\n"
+        "P(s' \\mid s, a) \\;=\\; (1-\\ell)\\, D_{s,a}(s') \\;+\\; "
+        "\\ell\\, \\mathbf{1}\\{s'=s\\},\n"
+        "\\qquad D_{s,a} \\sim \\mathrm{Dirichlet}(\\mathbf{1}_b),\\quad "
+        "b = 5,\\ \\ell = 0.05 .\n"
+        "$$\n"
+        "\n"
+        "The reward is linear in polynomial features of the normalized state "
+        "index $x_s = s/(S-1)$. Action $0$ is a zeroed outside option (the "
+        "identification anchor); for $a \\geq 1$,\n"
+        "\n"
+        "$$\n"
+        "u_\\theta(s,a) = \\theta^\\top \\varphi(s,a),\n"
+        "\\qquad \\varphi(s,a) = \\bigl(1,\\ x_s,\\ x_s^{2} + a\\bigr),\n"
+        "\\qquad \\theta \\sim \\mathcal{N}(0,\\ 0.25\\, I_3).\n"
+        "$$\n"
+        "\n"
+        "The agent discounts at $\\beta$ and faces i.i.d. logit taste shocks "
+        "(scale $\\sigma = 1$), so behavior solves the soft Bellman equation\n"
+        "\n"
+        "$$\n"
+        "V(s) = \\log \\sum_{a} \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "\\qquad \\pi^*(a \\mid s) \\propto \\exp\\Bigl(u_\\theta(s,a) + "
+        "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr),\n"
+        "$$\n"
+        "\n"
+        "and the data are $N$ independent agents simulated for $T$ periods "
+        "from $\\pi^*$ and $P$. The third cell swaps in a small handcrafted "
+        "MDP whose features are deliberately collinear; its construction is "
+        "described in that cell."
     ),
     "cells": {
         "harder_300": {

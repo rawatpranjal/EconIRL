@@ -36,9 +36,11 @@ MCEIRL = MCEIRLEstimator
 from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
 from econirl.estimation.nnes import NNESEstimator, NNESNFXPEstimator
 from econirl.estimation.sees import SEESEstimator
+from econirl.estimation.ufxp import UFXPEstimator
 TDCCP = TDCCPEstimator
 NNES = NNESEstimator
 SEES = SEESEstimator
+UFXP = UFXPEstimator
 
 # Q-learning IRL
 from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
@@ -96,6 +98,8 @@ __all__ = [
     "NNESEstimator",
     "NNESNFXPEstimator",
     "SEES",
+    "UFXP",
+    "UFXPEstimator",
     "SEESEstimator",
     # Q-learning IRL
     "GLADIUS",

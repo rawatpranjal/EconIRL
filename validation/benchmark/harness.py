@@ -79,6 +79,7 @@ class Cell:
     seed: int = 42
     n_replications: int = 3
     param_block: bool = False  # render the bias/SE/RMSE/coverage table
+    figure: str | None = None  # absolute PNG path for the 1x2 DGP figure
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +151,7 @@ def _cell_meta(cell: Cell, env) -> dict:
         "seed": cell.seed,
         "n_replications": cell.n_replications,
         "param_block": cell.param_block,
+        "figure": os.path.basename(cell.figure) if cell.figure else None,
         "parameter_names": names,
         "true_theta": true_theta,
         "diagnostics": M.feature_diagnostics(np.asarray(env.feature_matrix)),
@@ -167,6 +169,14 @@ def run_experiment(cells: tuple[Cell, ...], *, title: str, diagnoses: dict,
         env = cell.env_factory()
         cell_metas.append(_cell_meta(cell, env))
         oracle_policy, oracle_value = _oracle(env)
+        if cell.figure is not None:
+            from validation.benchmark.figures import dgp_figure
+
+            fig_panel = simulate_panel(env, n_individuals=cell.n_individuals,
+                                       n_periods=cell.n_periods,
+                                       seed=cell.seed + 1000)
+            os.makedirs(os.path.dirname(cell.figure), exist_ok=True)
+            dgp_figure(env, fig_panel, oracle_value, cell.figure)
         for entry in cell.roster:
             snippets.setdefault(entry.name, inspect.getsource(entry.run))
         for rep in range(cell.n_replications):
@@ -392,6 +402,9 @@ def render_page(data: dict, narrative: dict) -> str:
         before = narrative.get("cells", {}).get(cm["cell_id"], {}).get("before")
         if before:
             L.append(before.strip() + "\n")
+        if cm.get("figure"):
+            L.append(f"![Simulated trajectories and the optimal value function "
+                     f"for {cm['label']}](../_static/simulation_studies/{cm['figure']})\n")
         L.append("### Results\n" if not single else "## Results\n")
         L.extend(_results_table(cm, by_est))
         L.append(_TABLE_NOTE + "\n")

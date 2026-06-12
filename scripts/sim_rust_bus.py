@@ -94,6 +94,16 @@ def _run_tdccp(env, panel):
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
+def _run_ufxp(env, panel):
+    from econirl.estimation import UFXPEstimator
+
+    # Bray's unnested fixed point: the value-function dependence of the Bellman
+    # first-order conditions is removed by duals computed once before the
+    # search, so the linear-utility case is closed-form least squares.
+    est = UFXPEstimator(num_projections=64, seed=0, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
 def _run_mce_irl(env, panel):
     from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
 
@@ -178,8 +188,10 @@ def _run_deep_mce_irl(env, panel):
 def _run_max_margin(env, panel):
     from econirl.contrib.max_margin_irl import MaxMarginIRLEstimator
 
+    # Requires a reward spec (LinearReward/ActionDependentReward), not the
+    # structural LinearUtility wrapper.
     est = MaxMarginIRLEstimator(max_iterations=50, compute_hessian=False, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_mmp(env, panel):
@@ -201,11 +213,13 @@ def _run_gcl(env, panel):
 def _run_gail(env, panel):
     from econirl.contrib.gail import GAILConfig, GAILEstimator
 
+    # Requires a reward spec (LinearReward/ActionDependentReward), not the
+    # structural LinearUtility wrapper.
     est = GAILEstimator(GAILConfig(discriminator_type="tabular", discriminator_lr=0.05,
                                    discriminator_steps=3, policy_step_size=0.3,
                                    max_rounds=300, reward_transform="softplus",
                                    convergence_tol=1e-6, verbose=False))
-    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_deep_maxent(env, panel):
@@ -230,6 +244,7 @@ ROSTER = (
     RosterEntry("NNES", "structural", _run_nnes),
     RosterEntry("SEES", "structural", _run_sees),
     RosterEntry("TD-CCP", "structural", _run_tdccp),
+    RosterEntry("UFXP", "structural", _run_ufxp),
     RosterEntry("MCE-IRL", "behavioral", _run_mce_irl),
     RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl),
     RosterEntry("IQ-Learn", "behavioral", _run_iq_learn),
@@ -257,6 +272,12 @@ DIAGNOSES = {
     "SEES": "bspline basis with basis_dim >= num_states (20); a smaller basis "
             "underfits the value function and biases theta.",
     "TD-CCP": "Neural CCP with approximate value iteration.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026). Scores projected "
+            "Bellman first-order conditions; the value function is eliminated by "
+            "duals computed once before the parameter search, making the linear "
+            "case closed-form. Uses random-projection weights (not the efficient "
+            "OUFXP second step) and reports no standard errors, so expect "
+            "consistency with some efficiency loss against the MLE family.",
     "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether the "
                "gradient norm crossed the tolerance; the objective often plateaus "
                "first, so the flag can read False while the recovered policy is "
@@ -292,7 +313,7 @@ EXCLUDED = [
 CELLS = (
     Cell(
         cell_id="rust_bus",
-        label="Rust bus (20 mileage bins)",
+        label="Bus engine (20 mileage bins)",
         description=(
             "Harold Zurcher's bus-engine replacement problem (Rust 1987): a "
             "binary keep-or-replace choice over a discretized mileage state, "
@@ -312,7 +333,7 @@ CELLS = (
 )
 
 NARRATIVE = {
-    "title": "Rust bus engine replacement",
+    "title": "Bus engine replacement",
     "intro": (
         "The canonical structural benchmark. A single agent decides each period "
         "whether to keep paying a mileage-dependent operating cost or pay a fixed "
@@ -346,6 +367,6 @@ NARRATIVE = {
 
 
 if __name__ == "__main__":
-    main_cli(cells=CELLS, title="Simulation study: Rust bus engine replacement",
+    main_cli(cells=CELLS, title="Simulation study: bus engine replacement",
              narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
              results_json=RESULTS_JSON, page_path=PAGE_PATH)
