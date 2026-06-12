@@ -414,6 +414,22 @@ def render_page(data: dict, narrative: dict) -> str:
         if after:
             L.append(after.strip() + "\n")
 
+    probes = meta.get("feasibility_probes")
+    if probes:
+        L.append("## Feasibility probes\n")
+        L.append(probes["description"].strip() + "\n")
+        L.append("| Estimator | States | Outcome | Time (s) | Detail |")
+        L.append("|---|---|---|---|---|")
+        for p in probes["probes"]:
+            sec = "-" if p.get("seconds") is None else f"{p['seconds']:.1f}"
+            detail = p.get("error") or ""
+            L.append(f"| {p['estimator']} | {p['n_states']} | {p['outcome']} | "
+                     f"{sec} | {detail} |")
+        L.append("")
+        L.append(f"Each probe is a single fit in its own subprocess with a hard "
+                 f"{probes['timeout_seconds']:.0f}-second budget; `timeout` means the "
+                 "fit was killed at the budget, with no number invented for it.\n")
+
     extra = narrative.get("extra_sections")
     if extra:
         L.append(extra.strip() + "\n")
@@ -541,9 +557,7 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
                           excluded=excluded, extra_meta=extra_meta,
                           only_estimator=args.only_estimator, verbose=args.verbose)
 
-    if args.only_estimator is not None:
-        if not os.path.exists(results_json):
-            sys.exit("--only-estimator needs an existing JSON to merge into.")
+    if args.only_estimator is not None and os.path.exists(results_json):
         data = merge_estimator(json.load(open(results_json)), data, args.only_estimator)
 
     os.makedirs(os.path.dirname(results_json), exist_ok=True)

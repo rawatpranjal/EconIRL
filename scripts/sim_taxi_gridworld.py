@@ -1,0 +1,271 @@
+"""Simulation study: gridworld navigation (the MaxEnt IRL tradition).
+
+Generates ``validation/results/sim_taxi_gridworld.json`` and renders
+``docs/simulation_studies/taxi_gridworld.md`` via the shared harness. See
+``validation/benchmark/harness.py`` for the honesty contract.
+
+Usage:
+    python scripts/sim_taxi_gridworld.py [--verbose]
+    python scripts/sim_taxi_gridworld.py --page
+    python scripts/sim_taxi_gridworld.py --verify
+    python scripts/sim_taxi_gridworld.py --only-estimator NAME
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+import numpy as np  # noqa: E402
+
+from econirl.environments import GridworldEnvironment  # noqa: E402
+from validation.benchmark.harness import Cell, RosterEntry, main_cli  # noqa: E402
+from validation.benchmark.runner import _action_reward, _linear_utility  # noqa: E402
+
+RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "sim_taxi_gridworld.json")
+PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "taxi_gridworld.md")
+
+# 8x8 grid, 64 states, 5 actions. discount 0.95 (not the 0.99 default) keeps
+# the inner solves cheap on a page meant to be light; the economics is the same.
+ENV = dict(grid_size=8, step_penalty=-0.1, terminal_reward=10.0,
+           distance_weight=0.1, discount_factor=0.95)
+
+
+def _env():
+    return GridworldEnvironment(**ENV)
+
+
+# ---------------------------------------------------------------------------
+# Roster
+# ---------------------------------------------------------------------------
+
+
+def _run_nfxp(env, panel):
+    from econirl.estimation import NFXPEstimator
+
+    est = NFXPEstimator(inner_solver="hybrid", inner_tol=1e-10,
+                        inner_max_iter=100000, compute_hessian=True, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_ccp(env, panel):
+    from econirl.estimation import CCPEstimator
+
+    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_mpec(env, panel):
+    from econirl.estimation.mpec import MPECConfig, MPECEstimator
+
+    est = MPECEstimator(config=MPECConfig(solver="slsqp", max_iter=200, constraint_tol=1e-6),
+                        compute_hessian=True, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_maxent_irl(env, panel):
+    from econirl.contrib.maxent_irl import MaxEntIRLEstimator
+
+    # Action-dependent features: the reward here depends on where the action
+    # leads (terminal indicator), not on the state alone.
+    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,
+                             compute_hessian=False, verbose=False)
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_mce_irl(env, panel):
+    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
+
+    est = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,
+                                              inner_max_iter=2000, compute_se=False, verbose=False))
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_deep_mce_irl(env, panel):
+    from types import SimpleNamespace
+
+    from econirl.estimators.mceirl_neural import MCEIRLNeural
+
+    # sklearn-style .fit interface; adapted to the uniform result shape. coef_
+    # is the neural reward projected onto the linear features, so the regret
+    # transfer uses that projection, not the raw network.
+    m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),
+                     discount=float(env.problem_spec.discount_factor),
+                     max_epochs=200, verbose=False)
+    m.fit(panel, features=np.asarray(env.feature_matrix),
+          transitions=np.asarray(env.transition_matrices))
+    return SimpleNamespace(parameters=m.coef_, standard_errors=None, policy=m.policy_,
+                           value_function=m.value_, converged=bool(m.converged_))
+
+
+def _run_airl(env, panel):
+    from econirl.estimation import AIRLConfig, AIRLEstimator
+
+    est = AIRLEstimator(config=AIRLConfig(reward_type="linear", reward_arg="state_action",
+                                          reward_lr=0.01, discriminator_steps=10,
+                                          max_rounds=300, compute_se=False, verbose=False))
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_iq_learn(env, panel):
+    from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
+
+    est = IQLearnEstimator(config=IQLearnConfig(q_type="linear", divergence="chi2",
+                                                alpha=3.0, max_iter=2000, verbose=False))
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_firl(env, panel):
+    from econirl.estimation.f_irl import FIRLEstimator
+
+    est = FIRLEstimator(f_divergence="chi2", lr=0.5, max_iter=400, reward_clip=100.0,
+                        verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_gladius(env, panel):
+    from econirl.estimation import GLADIUSConfig, GLADIUSEstimator
+
+    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=300, q_hidden_dim=128,
+                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,
+                                                patience=60, compute_se=False, verbose=False))
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_bc(env, panel):
+    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator
+
+    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
+def _run_deep_maxent(env, panel):
+    from econirl.contrib.deep_maxent_irl import DeepMaxEntIRLEstimator
+
+    est = DeepMaxEntIRLEstimator(hidden_dims=[32, 32], lr=1e-3, max_epochs=300,
+                                 compute_se=False, verbose=False)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
+
+
+ROSTER = (
+    RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl),
+    RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl),
+    RosterEntry("AIRL", "behavioral", _run_airl),
+    RosterEntry("IQ-Learn", "behavioral", _run_iq_learn),
+    RosterEntry("f-IRL", "behavioral", _run_firl),
+    RosterEntry("GLADIUS", "behavioral", _run_gladius),
+    RosterEntry("BC", "behavioral", _run_bc),
+    RosterEntry("NFXP", "structural", _run_nfxp),
+    RosterEntry("CCP", "structural", _run_ccp),
+    RosterEntry("MPEC", "structural", _run_mpec),
+    # Wulfmeier et al's deep MaxEnt was introduced on exactly this kind of
+    # gridworld; slow, so it runs once, visibly.
+    RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1),
+)
+
+
+DIAGNOSES = {
+    "MaxEnt-IRL": "The Ziebart tradition this environment comes from. Fed "
+                  "action-dependent features: the terminal-reward feature depends "
+                  "on where the action leads, not on the state alone.",
+    "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether the "
+               "gradient norm crossed the tolerance; the objective often plateaus "
+               "first, so the flag can read False while the recovered policy is "
+               "essentially exact. Read it next to Policy TV.",
+    "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit interface; "
+                    "parameters are the neural reward projected onto the linear "
+                    "features.",
+    "AIRL": "reward_arg='state_action'; recovered parameters stay gauge/shaping-"
+            "unidentified by design, so policy TV is the right scorecard.",
+    "IQ-Learn": "q_type='linear' uses the feature structure; a tabular Q-table does "
+                "not propagate to states the expert never visits, and most of this "
+                "grid is rarely visited.",
+    "f-IRL": "f-divergence IRL; tracks behavior.",
+    "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
+    "BC": "Behavioral cloning; matches observed choices where data exists, but has "
+          "nothing to say at unvisited states and recovers no reward.",
+    "NFXP": "Structural contrast: full MLE with the correct linear utility.",
+    "CCP": "Structural contrast. CCP inverts estimated choice probabilities, which "
+           "is exactly where a concentrated state distribution (most trajectories "
+           "hug the start-to-goal diagonal) can hurt it.",
+    "MPEC": "Structural contrast: constrained MLE.",
+    "DeepMaxEnt-IRL": "Neural-network reward via feature matching (Wulfmeier et "
+                      "al); introduced on gridworlds. Slow, run once.",
+}
+
+EXCLUDED = [
+    {"name": "SEES", "reason": "its spline value basis is built for an ordered "
+     "1-D state index; a 2-D grid breaks that geometry, so running it here would "
+     "be a misspecification by construction"},
+    {"name": "NNES, TD-CCP", "reason": "the structural contrast is carried by "
+     "NFXP/CCP/MPEC here; the full structural roster runs on the Rust bus and "
+     "abstract MDP pages"},
+    {"name": "GAIL, GCL, Bayesian-IRL", "reason": "known slow; their single-run "
+     "showing is on the Rust bus page"},
+]
+
+CELLS = (
+    Cell(
+        cell_id="gridworld",
+        label="Gridworld 8x8",
+        description=(
+            "An agent starts at the top-left corner of an 8x8 grid and walks "
+            "toward an absorbing goal at the bottom-right, with a per-step "
+            "penalty, a terminal reward, and a distance shaping term. "
+            f"`GridworldEnvironment(grid_size={ENV['grid_size']}, "
+            f"step_penalty={ENV['step_penalty']}, "
+            f"terminal_reward={ENV['terminal_reward']}, "
+            f"distance_weight={ENV['distance_weight']}, "
+            f"discount_factor={ENV['discount_factor']})`. Transitions are "
+            "deterministic; 64 states, 5 actions (left, right, up, down, stay)."
+        ),
+        env_factory=_env,
+        roster=ROSTER,
+        n_individuals=500,
+        n_periods=20,
+        seed=7,
+        n_replications=3,
+    ),
+)
+
+NARRATIVE = {
+    "title": "Gridworld navigation",
+    "intro": (
+        "Gridworld navigation is the home turf of the maximum-entropy IRL "
+        "tradition (Ziebart's MaxEnt and its descendants), so this page weights "
+        "the roster toward IRL methods, with NFXP, CCP, and MPEC as the "
+        "structural contrast. The environment also supplies a stress the Rust "
+        "bus does not: every trajectory starts at the same corner and walks "
+        "toward the goal, so states far from the start-to-goal path are visited "
+        "rarely or never. Methods that rely on inverting state-by-state choice "
+        "frequencies feel that thinness; methods that share strength through "
+        "features or networks do not. The horizon is deliberately short (20 "
+        "periods) because the goal is absorbing: once there, an agent generates "
+        "no further information."
+    ),
+    "cells": {
+        "gridworld": {
+            "after": (
+                "One regret caveat specific to this page: transitions here are "
+                "deterministic, so the Type B intervention (replace the dynamics "
+                "with a random sparse world) is a stark change rather than a "
+                "perturbation; read Type B as a stress test of reward "
+                "transferability under completely new dynamics, not as a local "
+                "robustness check."
+            ),
+        },
+    },
+    "script": "scripts/sim_taxi_gridworld.py",
+    "results_rel": "validation/results/sim_taxi_gridworld.json",
+}
+
+
+if __name__ == "__main__":
+    main_cli(cells=CELLS, title="Simulation study: gridworld navigation",
+             narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
+             results_json=RESULTS_JSON, page_path=PAGE_PATH)
