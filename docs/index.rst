@@ -62,5 +62,5 @@ Output
    user_guide/overview
    estimators
    user_guide/api_design
-   references
    simulation_studies/index
+   references
