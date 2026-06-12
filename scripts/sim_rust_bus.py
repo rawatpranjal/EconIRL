@@ -253,14 +253,15 @@ ROSTER = (
     RosterEntry("f-IRL", "behavioral", _run_firl),
     RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl),
     RosterEntry("MaxMargin-IRL", "behavioral", _run_max_margin),
-    RosterEntry("MMP", "behavioral", _run_mmp),
     RosterEntry("BC", "behavioral", _run_bc),
     # Known-slow estimators run once each, visibly (Ran column shows 1/1),
-    # rather than being excluded.
-    RosterEntry("GCL", "behavioral", _run_gcl, max_reps=1),
-    RosterEntry("GAIL", "behavioral", _run_gail, max_reps=1),
-    RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1),
-    RosterEntry("Bayesian-IRL", "behavioral", _run_bayesian_irl, max_reps=1),
+    # rather than being excluded. Per-fit budgets are enforced and recorded:
+    # a timeout shows up in the table as the failure it is.
+    RosterEntry("MMP", "behavioral", _run_mmp, max_reps=1, timeout=900),
+    RosterEntry("GCL", "behavioral", _run_gcl, max_reps=1, timeout=1200),
+    RosterEntry("GAIL", "behavioral", _run_gail, max_reps=1, timeout=1200),
+    RosterEntry("DeepMaxEnt-IRL", "behavioral", _run_deep_maxent, max_reps=1, timeout=1200),
+    RosterEntry("Bayesian-IRL", "behavioral", _run_bayesian_irl, max_reps=1, timeout=2400),
 )
 
 
@@ -295,7 +296,9 @@ DIAGNOSES = {
                     "features.",
     "MaxMargin-IRL": "Margin-based reward recovery (Ng-Russell tradition); no "
                      "probabilistic choice model, so no standard errors.",
-    "MMP": "Max-margin planning (Ratliff et al); structured-margin variant.",
+    "MMP": "Max-margin planning (Ratliff et al); structured-margin variant. Far "
+           "slower than its cousins on this problem, so it runs once under an "
+           "explicit budget.",
     "BC": "Behavioral cloning; matches observed choices but recovers no reward, so "
           "it cannot transfer to a counterfactual world.",
     "GCL": "Guided cost learning; sampling-based, slow, run once.",
@@ -329,6 +332,7 @@ CELLS = (
         n_periods=80,
         seed=42,
         n_replications=3,
+        fit_timeout=600,
     ),
 )
 

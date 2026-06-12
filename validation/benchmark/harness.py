@@ -32,6 +32,7 @@ import datetime as _dt
 import inspect
 import json
 import os
+import signal
 import sys
 import time
 from dataclasses import dataclass
@@ -63,6 +64,7 @@ class RosterEntry:
     family: str
     run: Callable[[object, object], object]
     max_reps: int | None = None
+    timeout: int | None = None  # per-fit budget in seconds (overrides the cell's)
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,7 @@ class Cell:
     n_replications: int = 3
     param_block: bool = False  # render the bias/SE/RMSE/coverage table
     figure: str | None = None  # absolute PNG path for the 1x2 DGP figure
+    fit_timeout: int | None = None  # default per-fit budget in seconds
 
 
 # ---------------------------------------------------------------------------
@@ -103,15 +106,31 @@ def _package_version() -> str:
 
 
 def _run_one(env, panel, entry: RosterEntry, cell_id: str, rep: int,
-             oracle_policy, oracle_value) -> dict:
-    """Fit one estimator on one panel and record the raw facts."""
+             oracle_policy, oracle_value, timeout: int | None = None) -> dict:
+    """Fit one estimator on one panel and record the raw facts.
+
+    A ``timeout`` (seconds) is enforced with SIGALRM; a fit that exceeds it is
+    recorded as a TimeoutError with the budget in the message — the timeout is
+    data, not a silent drop.
+    """
     t0 = time.time()
     rec = {"estimator": entry.name, "family": entry.family, "cell": cell_id,
            "rep": rep, "params": None, "standard_errors": None,
            "policy_tv": None, "value_rmse": None, "regret": None,
            "runtime": None, "converged": None, "error": None}
     try:
-        res = entry.run(env, panel)
+        if timeout:
+            def _on_alarm(signum, frame):  # noqa: ARG001
+                raise TimeoutError(f"fit exceeded the {timeout}s budget")
+
+            old_handler = signal.signal(signal.SIGALRM, _on_alarm)
+            signal.alarm(int(timeout))
+        try:
+            res = entry.run(env, panel)
+        finally:
+            if timeout:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
         rec["runtime"] = time.time() - t0
         rec["converged"] = bool(getattr(res, "converged", True))
         pol = getattr(res, "policy", None)
@@ -162,8 +181,23 @@ def _cell_meta(cell: Cell, env) -> dict:
 
 def run_experiment(cells: tuple[Cell, ...], *, title: str, diagnoses: dict,
                    excluded: list[dict], extra_meta: dict | None = None,
-                   only_estimator: str | None = None, verbose: bool = False) -> dict:
-    """Run every cell serially and return the raw-facts dict."""
+                   only_estimator: str | None = None, verbose: bool = False,
+                   checkpoint: str | None = None) -> dict:
+    """Run every cell serially and return the raw-facts dict.
+
+    When ``checkpoint`` is set, every completed record is appended to that
+    JSONL file as it finishes, and records already present there (matched on
+    estimator/cell/rep) are reused instead of re-run — so a killed run loses
+    at most the fit in flight.
+    """
+    done: dict[tuple, dict] = {}
+    if checkpoint and os.path.exists(checkpoint):
+        with open(checkpoint) as f:
+            for line in f:
+                if line.strip():
+                    r = json.loads(line)
+                    done[(r["estimator"], r["cell"], r["rep"])] = r
+
     records, cell_metas, snippets = [], [], {}
     for cell in cells:
         env = cell.env_factory()
@@ -188,9 +222,20 @@ def run_experiment(cells: tuple[Cell, ...], *, title: str, diagnoses: dict,
                     continue
                 if entry.max_reps is not None and rep >= entry.max_reps:
                     continue
+                key = (entry.name, cell.cell_id, rep)
+                if key in done:
+                    records.append(done[key])
+                    if verbose:
+                        print(f"  [{cell.cell_id}] rep {rep} {entry.name:14s} "
+                              f"(from checkpoint)", flush=True)
+                    continue
                 rec = _run_one(env, panel, entry, cell.cell_id, rep,
-                               oracle_policy, oracle_value)
+                               oracle_policy, oracle_value,
+                               timeout=entry.timeout or cell.fit_timeout)
                 records.append(rec)
+                if checkpoint:
+                    with open(checkpoint, "a") as f:
+                        f.write(json.dumps(rec) + "\n")
                 if verbose:
                     status = rec["error"] or f"tv={rec['policy_tv']}"
                     print(f"  [{cell.cell_id}] rep {rep} {entry.name:14s} "
@@ -566,16 +611,20 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
         run_cells = tuple(dataclasses.replace(c, n_replications=args.replications)
                           for c in run_cells)
 
+    ckpt = results_json + ".checkpoint.jsonl"
+    os.makedirs(os.path.dirname(results_json), exist_ok=True)
     data = run_experiment(run_cells, title=title, diagnoses=diagnoses,
                           excluded=excluded, extra_meta=extra_meta,
-                          only_estimator=args.only_estimator, verbose=args.verbose)
+                          only_estimator=args.only_estimator, verbose=args.verbose,
+                          checkpoint=ckpt)
 
     if args.only_estimator is not None and os.path.exists(results_json):
         data = merge_estimator(json.load(open(results_json)), data, args.only_estimator)
 
-    os.makedirs(os.path.dirname(results_json), exist_ok=True)
     with open(results_json, "w") as f:
         json.dump(data, f, indent=2)
+    if os.path.exists(ckpt):
+        os.remove(ckpt)  # the run completed; the JSON is the record
 
     print(render_console(data))
     print(f"\nRaw facts: {results_json}")
