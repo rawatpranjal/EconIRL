@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "beta": 0.95,
+    "sigma": 1.0,
+    "num_states": 20,
+    "reference_action": 2,
+    "neural_config": "width 32, depth 2, rho 1.0, 4000 epochs",
+    "gladius_config": "128 wide, 3 layers, 500 epochs, anchored at action 2"
+  },
+  "cells": [
+    {
+      "cell": "linear reward",
+      "n_obs": 16000,
+      "action_shares": [
+        0.297,
+        0.397,
+        0.306
+      ],
+      "state_coverage": 20,
+      "methods": {
+        "neural MPEC": {
+          "reward_rmse": 0.16480955112174203,
+          "value_rmse": 0.34061415710071213,
+          "max_bellman_resid": 0.007575674254354681
+        },
+        "tabular MPEC": {
+          "reward_rmse": 0.021355831584817967,
+          "value_rmse": 0.20977302836169942,
+          "converged": true
+        },
+        "GLADIUS": {
+          "reward_rmse": 0.18450107240866978,
+          "value_rmse": 2.6083011822741367,
+          "converged": true,
+          "note": "model-free; reward in a different gauge (no known P)"
+        }
+      },
+      "data_scaling": [
+        {
+          "n_obs": 4000,
+          "neural_reward_rmse": 0.30379197518656703,
+          "neural_value_rmse": 0.6834013785719952,
+          "tabular_reward_rmse": 0.0662069252663886,
+          "tabular_value_rmse": 0.23445039636915033
+        },
+        {
+          "n_obs": 16000,
+          "neural_reward_rmse": 0.16959895297543806,
+          "neural_value_rmse": 0.244143315373726,
+          "tabular_reward_rmse": 0.03548769321236471,
+          "tabular_value_rmse": 0.18645268270654095
+        },
+        {
+          "n_obs": 64000,
+          "neural_reward_rmse": 0.08682278212731857,
+          "neural_value_rmse": 0.10552428664506144,
+          "tabular_reward_rmse": 0.012420238438767535,
+          "tabular_value_rmse": 0.06663082074908051
+        }
+      ]
+    },
+    {
+      "cell": "nonlinear reward",
+      "n_obs": 16000,
+      "action_shares": [
+        0.293,
+        0.399,
+        0.308
+      ],
+      "state_coverage": 20,
+      "methods": {
+        "neural MPEC": {
+          "reward_rmse": 0.17539282257013367,
+          "value_rmse": 0.39049508322494797,
+          "max_bellman_resid": 0.0012479765746249427
+        },
+        "tabular MPEC": {
+          "reward_rmse": 0.49167993013840106,
+          "value_rmse": 1.8219837036231366,
+          "converged": true
+        },
+        "GLADIUS": {
+          "reward_rmse": 0.47952832484563984,
+          "value_rmse": 4.505939712814223,
+          "converged": true,
+          "note": "model-free; reward in a different gauge (no known P)"
+        }
+      },
+      "data_scaling": [
+        {
+          "n_obs": 4000,
+          "neural_reward_rmse": 0.2923965582211959,
+          "neural_value_rmse": 0.3937913780790259,
+          "tabular_reward_rmse": 0.5020910343107341,
+          "tabular_value_rmse": 1.8218429082051293
+        },
+        {
+          "n_obs": 16000,
+          "neural_reward_rmse": 0.15138275691866887,
+          "neural_value_rmse": 0.37372566150430486,
+          "tabular_reward_rmse": 0.49970942595828954,
+          "tabular_value_rmse": 1.7641109648692386
+        },
+        {
+          "n_obs": 64000,
+          "neural_reward_rmse": 0.05706180720853163,
+          "neural_value_rmse": 0.134443032376223,
+          "tabular_reward_rmse": 0.49447973854522564,
+          "tabular_value_rmse": 1.7219923421387135
+        }
+      ]
+    }
+  ]
+}

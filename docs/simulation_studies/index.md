@@ -22,6 +22,11 @@ not, and why. Numbers are rendered from a saved results file so they never drift
 from the prose. Counterfactual regret follows the package's Type A (payoff), Type
 B (transition), and Type C (action-set) taxonomy.
 
+One sub-page, direct optimization, steps outside this arc. Rather than the full
+roster on one environment, it compares the value-lifted estimator family
+(tabular MPEC, neural MPEC, GLADIUS) on reward and value recovery under a correctly
+specified and a misspecified reward.
+
 ```{toctree}
 :maxdepth: 1
 
@@ -30,4 +35,5 @@ taxi_gridworld
 abstract_mdp_1_sanity
 abstract_mdp_2_harder
 abstract_mdp_3_highdim
+direct_optimization
 ```
