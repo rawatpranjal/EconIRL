@@ -17,6 +17,7 @@ from econirl.preprocessing.validation import (
     PanelValidationResult,
 )
 from econirl.preprocessing.running_norm import RunningNorm
+from econirl.preprocessing.diagnostics import feature_diagnostics
 
 __all__ = [
     "discretize_state",
@@ -25,4 +26,5 @@ __all__ = [
     "compute_next_states",
     "PanelValidationResult",
     "RunningNorm",
+    "feature_diagnostics",
 ]

@@ -156,9 +156,6 @@ def test_estimator_navigation_is_owned_by_estimators_page() -> None:
 
     index = (DOCS / "index.rst").read_text(encoding="utf-8")
     estimator_overview = (DOCS / "estimators.md").read_text(encoding="utf-8")
-    api_design = (DOCS / "user_guide" / "api_design.md").read_text(
-        encoding="utf-8"
-    )
     config = runpy.run_path(str(DOCS / "conf.py"))
     expected = [
         "estimators/nfxp",
@@ -188,8 +185,7 @@ def test_estimator_navigation_is_owned_by_estimators_page() -> None:
     assert "Inverse Reinforcement Learning" not in estimator_overview
     assert "```{toctree}" in estimator_overview
     assert "   references\n" in index
-    assert api_design.startswith("# API Design\n")
-    assert "Problem Setup and API Design" not in api_design
+    assert "   user_guide/your_own_data\n" in index
 
 
 def test_estimator_landing_pages_do_not_expand_sidebar_guides() -> None:

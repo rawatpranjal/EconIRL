@@ -60,8 +60,8 @@ Output
    :maxdepth: 2
 
    user_guide/overview
+   user_guide/your_own_data
    estimators
    api/index
-   user_guide/api_design
    simulation_studies/index
    references

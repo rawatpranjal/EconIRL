@@ -81,6 +81,17 @@ Reward parameterizations and the first-stage transition estimator.
    make_utility
    TransitionEstimator
 
+Data preparation
+----------------------------------------------------------
+
+Panel validation and feature-identification checks.
+
+.. autosummary::
+   :toctree: generated/
+
+   ~preprocessing.check_panel_structure
+   ~preprocessing.feature_diagnostics
+
 Datasets
 ----------------------------------------------------------
 

@@ -46,31 +46,9 @@ def value_rmse(v_est: np.ndarray | None, v_oracle: np.ndarray) -> float | None:
     return float(np.sqrt(np.mean((v_est - v_oracle) ** 2)))
 
 
-def feature_diagnostics(feature_matrix: np.ndarray) -> dict[str, float | int]:
-    """Rank and condition number of the design matrix, raw and action-differenced.
-
-    Feeds the failure-mode map. The raw stacked design (S*A, K) can have full
-    rank while parameters are still unidentified from choices: any feature
-    that is constant across actions within a state differences out of every
-    discrete-choice contrast. The action-contrast design phi(s,a) - phi(s,A)
-    is the one that drives identification from behavior, so its rank is the
-    check that actually bites (a gridworld with state-only step-penalty and
-    distance features has raw rank 3 but contrast rank 1).
-    """
-    phi = np.asarray(feature_matrix, dtype=np.float64)
-    S, A, K = phi.shape
-    design = phi.reshape(S * A, K)
-    rank = int(np.linalg.matrix_rank(design))
-    svals = np.linalg.svd(design, compute_uv=False)
-    smin = float(svals.min())
-    cond = float(svals.max() / smin) if smin > 0 else float("inf")
-    contrast = (phi - phi[:, -1:, :]).reshape(S * A, K)
-    c_rank = int(np.linalg.matrix_rank(contrast))
-    c_svals = np.linalg.svd(contrast, compute_uv=False)
-    c_pos = c_svals[c_svals > 1e-12]
-    c_cond = float(c_pos.max() / c_pos.min()) if c_pos.size else float("inf")
-    return {"num_features": K, "feature_rank": rank, "condition_number": cond,
-            "contrast_rank": c_rank, "contrast_condition_number": c_cond}
+# feature_diagnostics is now public; this re-export keeps the benchmark callers
+# (harness.py, runner.py) on a single source of truth.
+from econirl.preprocessing import feature_diagnostics  # noqa: E402,F401
 
 
 def _mc_se_mean(values: np.ndarray) -> float:

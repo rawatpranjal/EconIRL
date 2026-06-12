@@ -54,9 +54,10 @@ Output
 
 | Question | Documentation entry point |
 | --- | --- |
+| I have my own panel of decisions. | Read [using your own data](your_own_data.md). |
 | I need a tabular DDC baseline. | Use [NFXP](../estimators/nfxp.md). |
 | I need to compare methods. | Use the [estimator map](../estimators.md). |
-| I need to understand the API shape. | Read [API design](api_design.md). |
+| I need the signature of a class. | Read the [API reference](../api/index.rst). |
 | I need to understand simulation-study evidence. | Read [simulation studies](../simulation_studies/index.md). |
 
 ## Latest Updates
