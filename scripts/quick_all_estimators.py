@@ -102,7 +102,7 @@ def _run_ccp(env, panel):
 def _run_mpec(env, panel):
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
-    est = MPECEstimator(config=MPECConfig(solver="slsqp", max_iter=200, constraint_tol=1e-6),
+    est = MPECEstimator(config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
                         compute_hessian=True, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -178,7 +178,7 @@ def _run_airl(env, panel):
     # reward_arg="state_action": the default "state" marginalizes the reward
     # across actions and cannot represent the action contrast (workflow
     # diagnosis). AIRL accepts a reward spec, not a utility. Policy TV is fixed;
-    # the recovered reward is on its own scale by design.
+    # the recovered reward is in its own parameterization by design.
     est = AIRLEstimator(config=AIRLConfig(reward_type="linear", reward_arg="state_action",
                                           reward_lr=0.01, discriminator_steps=10,
                                           max_rounds=300, compute_se=False, verbose=False))
@@ -254,7 +254,8 @@ DIAGNOSES = {
     "GLADIUS": "Neural Q and expected-value networks. Tracks behavior.",
     "AIRL": "Fixed: reward_arg='state_action'. The default 'state' marginalized the "
             "reward across actions (policy TV 0.24 -> 0.02). The recovered reward "
-            "is on its own scale by design, so TV is the right scorecard.",
+            "is in its own parameterization by design, so TV is the right "
+            "scorecard.",
     "f-IRL": "f-divergence IRL. Tracks behavior.",
     "BC": "Behavioral cloning. Matches observed choices but recovers no reward, so "
           "it cannot transfer to a counterfactual world.",
@@ -533,9 +534,9 @@ def render_page(data: dict) -> str:
         ok = [r for r in recs if r["error"] is None]
         ran = f"{len(ok)}/{len(recs)}"
         # Exact recovered params: mean over successful reps when lengths agree.
-        # Vectors on a different scale (a tabular reward, a choice-probability
-        # table) are labeled, not printed: comparing them to theta entry by
-        # entry would be meaningless.
+        # Vectors in a different parameterization (a tabular reward, a
+        # choice-probability table) are labeled, not printed: comparing them
+        # to theta entry by entry would be meaningless.
         plists = [r["params"] for r in ok if r["params"] is not None]
         if plists and len({len(p) for p in plists}) == 1:
             if len(plists[0]) != true_theta.shape[0]:
@@ -621,6 +622,12 @@ def main() -> None:
             sys.exit(f"No JSON at {RESULTS_JSON}. Run without --verify/--page first.")
         data = json.load(open(RESULTS_JSON))
         if args.page:
+            # Diagnoses and the excluded list are interpretive prose, not
+            # measured facts: render them from the current script (same
+            # contract as the harness pages) so a rewritten note reaches the
+            # page without a re-run.
+            data["meta"]["diagnoses"] = DIAGNOSES
+            data["meta"]["excluded"] = EXCLUDED
             # The DGP figure regenerates deterministically from the seeds.
             from validation.benchmark.figures import dgp_figure
 

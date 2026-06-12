@@ -30,9 +30,10 @@ the structural reward in the full Bellman sense.
 GLADIUS sits in the behavioral family alongside MCE-IRL, AIRL, and IQ-Learn. It
 does not require solving a dynamic program for each parameter draw, so it scales
 to state spaces that make the structural family expensive. The cost is that the
-identified object is not in the same gauge as the data-generating reward: action-
-difference projection removes a state-dependent constant, but the remaining
-projected parameters reflect the reward only up to what the anchor pins. Full
+identified object is not in the same parameterization as the data-generating
+reward. Action-difference projection removes a state-dependent constant. The
+remaining projected parameters reflect the reward only up to what the anchor
+pins. Full
 structural counterfactual validity requires the raw Bellman reward and value
 recovery checks to pass, and those do not currently pass on the evaluation cells.
 GLADIUS is therefore most useful as a high-dimensional approximation and policy-

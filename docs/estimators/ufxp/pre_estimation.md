@@ -11,7 +11,7 @@ before fitting:
 | State coverage | Conditions are scored only at visited states; unvisited states drop out, and very thin coverage leaves few usable conditions. |
 | Action support per state | A state where one action is never taken makes the log-odds inversion degenerate at that state. |
 | Transition row sums | Transition tensors must be row-stochastic in the `(n_actions, n_states, n_states)` orientation. |
-| Reward normalization | One action's utility should anchor the gauge (the reference action). |
+| Reward normalization | One action's utility should anchor the normalization (the reference action). |
 
 ## Canonical Simulation Checks
 

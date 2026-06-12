@@ -93,7 +93,7 @@ def _run_mpec(env, panel):
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
     # One SLSQP variable per state plus the parameters: 3003 variables here.
-    est = MPECEstimator(config=MPECConfig(solver="slsqp", max_iter=200, constraint_tol=1e-6),
+    est = MPECEstimator(config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
                         compute_hessian=False, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -201,43 +201,46 @@ ROSTER = (
 
 DIAGNOSES = {
     "NFXP-SA": "Rust's original successive-approximation inner loop. The "
-               "probes show it still completes here; its cost grows with the "
-               "dense tensor, which is the measured ceiling, not an asserted "
-               "one.",
+               "probes show it still completes here. Its cost grows with the "
+               "dense tensor, and that ceiling is measured, not asserted.",
     "NFXP-NK": "The Newton-Kantorovich polyalgorithm refinement of the same "
                "estimator.",
-    "CCP": "Hotz-Miller inversion; one fixed-point solve total, so scale "
+    "CCP": "Hotz-Miller inversion. One fixed-point solve total, so scale "
            "barely touches it until the dense algebra does.",
-    "MPEC": "Constrained MLE carrying one optimizer variable per state plus "
-            "the parameters - the costliest classical member here, run under "
-            "a visible per-fit budget.",
+    "MPEC": "Constrained MLE with one optimizer variable per state plus the "
+            "parameters, 3003 variables here. The SQP solver handles that "
+            "joint problem directly and matches the nested-solver MLE at "
+            "roughly 100 seconds per fit. The package's legacy penalty "
+            "solver stops when the Bellman equation is satisfied, which is "
+            "not the same as finding the best parameters. This page uses "
+            "SQP.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
-            "weighting (OUFXP), built for exactly this regime: one dense "
+            "weighting (OUFXP), built for exactly this regime. One dense "
             "factorization before the parameter search, then a closed-form "
-            "weighted moment solve on Bellman first-order conditions, with no "
-            "fixed point inside any optimizer. MLE-efficient with standard "
-            "errors from the efficient moment variance.",
-    "TD-CCP": "Neural CCP with approximate value iteration on sampled batches; "
-              "never materializes a dense fixed point.",
-    "NNES": "Neural value network plus structural MLE; the network replaces the "
-            "inner solve.",
+            "weighted moment solve, with no fixed point inside any "
+            "optimizer. It matches maximum likelihood efficiency and "
+            "reports standard errors.",
+    "TD-CCP": "Neural CCP with approximate value iteration on sampled "
+              "batches. It never materializes a dense fixed point.",
+    "NNES": "Neural value network plus structural MLE. The network replaces "
+            "the inner solve.",
     "GLADIUS": "Neural Q and expected-value networks trained on sampled batches "
                "with a Bellman penalty.",
-    "Deep-MCE-IRL": "Neural-reward MCE-IRL; each epoch still re-solves soft value "
-                    "iteration on the dense tensor, so it sits between the "
-                    "classical and sampled families. Parameters are the neural "
-                    "reward projected onto the linear features.",
-    "BC": "Behavioral cloning, the cheap frozen baseline: counts choices where "
-          "data exists, knows nothing anywhere else, recovers no reward.",
+    "Deep-MCE-IRL": "Neural-reward MCE-IRL. Each epoch still re-solves soft "
+                    "value iteration on the dense tensor, so it sits between "
+                    "the classical and sampled families. Parameters are the "
+                    "neural reward projected onto the linear features.",
+    "BC": "Behavioral cloning, the cheap baseline. It counts choices where "
+          "data exists, knows nothing anywhere else, and recovers no reward.",
 }
 
 EXCLUDED = [
     {"name": "SEES", "reason": "a spline value basis with basis_dim near the "
-     "state count is its own scaling wall at thousands of states; its "
+     "state count is its own scaling wall at thousands of states. Its "
      "showing is on the harder abstract MDP page"},
     {"name": "MCE-IRL, MaxEnt-IRL, AIRL, IQ-Learn, f-IRL and the other IRL "
      "methods", "reason": "their exact inner solvers face the same dense-tensor "
-     "cost the probes document for the classical family; the IRL comparison "
+     "cost the probes document for the classical family. The IRL comparison "
      "lives on the bus engine and gridworld pages"},
 ]
 
@@ -252,7 +255,7 @@ CELLS = (
             f"branching=8, discount_factor=0.95, seed=707)`. The panel "
             f"({N_INDIVIDUALS} individuals x {N_PERIODS} periods) covers at most "
             f"{N_INDIVIDUALS * N_PERIODS} state visits, so most states are "
-            "rarely or never observed; estimators reach them only through the "
+            "rarely or never observed. Estimators reach them only through the "
             "reward features, not through memorized choices."
         ),
         env_factory=_env,
@@ -269,18 +272,18 @@ CELLS = (
 NARRATIVE = {
     "title": "Abstract MDP 3: high dimension",
     "intro": (
-        "The last rung of the ladder asks what survives when the state space "
-        "reaches a few thousand states. Every tabular structural solver "
-        "consumes a dense transition tensor whose memory and per-iteration cost "
-        "grow with the square of the state count, and an optimizer like MPEC "
-        "additionally carries one variable per state. Rather than assert where "
-        "that breaks, the feasibility probes below run every candidate once "
-        "per scale under a hard time budget and report what actually happened. "
-        "The measured answer is more interesting than the folklore: at 3000 "
-        "states the entire classical family still completes, so the main table "
-        "benchmarks it alongside the approximation-based estimators instead of "
-        "asserting it away, and the probes at the larger scale show where the "
-        "costs actually separate.\n"
+        "This page asks what survives when the state space reaches a few "
+        "thousand states. Every tabular structural solver consumes a dense "
+        "transition tensor whose memory and per-iteration cost grow with the "
+        "square of the state count. An optimizer like MPEC additionally "
+        "carries one variable per state. Rather than assert where that "
+        "breaks, the feasibility probes below run every candidate once per "
+        "scale under a hard time budget and report what happened. The "
+        "measured answer is more interesting than the folklore. At 3000 "
+        "states the entire classical family still completes, so the main "
+        "table benchmarks it alongside the approximation-based estimators. "
+        "The probes at the larger scale show where the costs actually "
+        "separate.\n"
         "\n"
         "## The data-generating process\n"
         "\n"
@@ -316,19 +319,19 @@ NARRATIVE = {
         "\\beta\\, \\mathbb{E}\\bigl[V(s') \\mid s,a\\bigr]\\Bigr).\n"
         "$$\n"
         "\n"
-        "Three reward parameters generate behavior over three thousand states: "
-        "the structure, not the state count, carries the information, which is "
-        "exactly what the feature-based estimators exploit."
+        "Three reward parameters generate behavior over three thousand "
+        "states. The structure, not the state count, carries the "
+        "information. That is what the feature-based estimators exploit."
     ),
     "cells": {
         "highdim_3000": {
             "after": (
-                "Behavioral cloning is the control group: it is nearly free and "
-                "matches the data where the data exists, but it carries no "
-                "reward, so it cannot say anything at unvisited states or under "
-                "the counterfactual interventions. The gap between its regret "
-                "and the reward-recovering estimators' regret is the value of "
-                "estimating structure at this scale."
+                "Behavioral cloning is the control group. It is nearly free "
+                "and matches the data where the data exists, but it carries "
+                "no reward. It can say nothing at unvisited states or under "
+                "the counterfactual interventions. The gap between its "
+                "regret and the reward-recovering estimators' regret is the "
+                "value of estimating structure at this scale."
             ),
         },
     },

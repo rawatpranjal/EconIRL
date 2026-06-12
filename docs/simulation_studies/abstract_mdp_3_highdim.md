@@ -39,7 +39,7 @@ A 3000-state Garnet MDP with stochastic sparse transitions (branching 8) and a 3
 | NFXP-SA | structural | 3/3 | 3/3 | [-0.096, 0.991, -0.126] | 0.1269 | 0.0031 | 0.0007 | 0.0007 | 0.0007 | 0.0000 | 46.9 |
 | NFXP-NK | structural | 3/3 | 3/3 | [-0.096, 0.991, -0.126] | 0.1269 | 0.0031 | 0.0007 | 0.0007 | 0.0007 | 0.0000 | 27.9 |
 | CCP | structural | 3/3 | 3/3 | [-0.108, 0.967, -0.113] | 0.1298 | 0.0136 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 1.8 |
-| MPEC | structural | 3/3 | 3/3 | [0.034, 1.058, -0.078] | 0.1831 | 0.0542 | 0.1332 | 0.1381 | 0.1341 | 0.0000 | 91.4 |
+| MPEC | structural | 3/3 | 3/3 | [-0.096, 0.991, -0.126] | 0.1269 | 0.0031 | 0.0007 | 0.0007 | 0.0007 | 0.0000 | 103.1 |
 | UFXP | structural | 3/3 | 3/3 | [-0.075, 0.875, -0.123] | 0.1455 | 0.0088 | 0.0053 | 0.0054 | 0.0055 | 0.0000 | 1.1 |
 | TD-CCP | structural | 3/3 | 3/3 | [-0.028, 1.117, -0.207] | 0.1694 | 0.0075 | 0.0036 | 0.0037 | 0.0036 | 0.0000 | 3.7 |
 | NNES | structural | 3/3 | 3/3 | [-0.097, 0.990, -0.125] | 0.1260 | 0.0031 | 0.0007 | 0.0007 | 0.0007 | 0.0000 | 19.8 |
@@ -47,7 +47,7 @@ A 3000-state Garnet MDP with stochastic sparse transitions (branching 8) and a 3
 | Deep-MCE-IRL | behavioral | 3/3 | 3/3 | [0.070, -0.038, 0.045] | - | 0.0516 | 0.2016 | 0.2014 | 0.2058 | 0.0000 | 59.8 |
 | BC | behavioral | 3/3 | 3/3 | different parameterization (6000 values) | - | 0.1069 | 0.7059 | 0.7172 | 0.7922 | 93.5663 | 0.1 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only on that same scale. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
 
 Behavioral cloning is the control group. It is nearly free and matches the data where the data exists, but it carries no reward. It can say nothing at unvisited states or under the counterfactual interventions. The gap between its regret and the reward-recovering estimators' regret is the value of estimating structure at this scale.
 
@@ -86,7 +86,7 @@ Each probe is a single fit in its own subprocess with a hard 900-second budget; 
 
 **CCP.** Hotz-Miller inversion. One fixed-point solve total, so scale barely touches it until the dense algebra does.
 
-**MPEC.** Constrained MLE carrying one optimizer variable per state plus the parameters. It is the costliest classical member here and runs under a visible per-fit budget.
+**MPEC.** Constrained MLE with one optimizer variable per state plus the parameters, 3003 variables here. The SQP solver handles that joint problem directly and matches the nested-solver MLE at roughly 100 seconds per fit. The package's legacy penalty solver stops when the Bellman equation is satisfied, which is not the same as finding the best parameters. This page uses SQP.
 
 **UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with optimal weighting (OUFXP), built for exactly this regime. One dense factorization before the parameter search, then a closed-form weighted moment solve, with no fixed point inside any optimizer. It matches maximum likelihood efficiency and reports standard errors.
 

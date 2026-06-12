@@ -28,6 +28,6 @@ reward through feature moments rather than through a likelihood alone.
 MCE-IRL is a good fit when transitions and reward features are supplied and
 the main question is reward and policy recovery. NFXP, CCP, MPEC, SEES, NNES,
 and TD-CCP target structural reward parameters through likelihood or
-estimating-equation paths and report standard errors in the structural gauge.
+estimating-equation paths and report standard errors for those parameters.
 Deep MCE-IRL keeps the causal-entropy objective but replaces the fixed tabular
 reward vector with a neural reward map.

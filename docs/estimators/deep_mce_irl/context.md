@@ -36,7 +36,7 @@ GLADIUS, AIRL, and IQ-Learn. Its defining properties are:
 - **Reward side**: a neural map rather than a linear table, so the reward is
   not identified to a unique parameter vector. The validated object is the
   anchored reward matrix and the behavior it implies.
-- **Gauge**: the reward is anchored either by fixing one action's column to
+- **Normalization**: the reward is anchored either by fixing one action's column to
   zero or by fixing an absorbing state's row to zero. Without an anchor the
   reward map is identified only up to action-independent shifts.
 - **No structural parameters**: raw network weights are not a structural

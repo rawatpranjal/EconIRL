@@ -23,7 +23,7 @@ result.
 | --- | --- |
 | Demonstrations come from a discrete dynamic decision problem. | The reward is action-dependent (use AIRL-Het or MCE-IRL). |
 | The reward target is state-only and the DGP satisfies decomposability. | You need structural standard errors or a likelihood-based estimate. |
-| Adversarial recovery is the research object. | Counterfactual analysis needs a structural gauge (use NFXP or MCE-IRL). |
+| Adversarial recovery is the research object. | Counterfactual analysis needs a reward in the same parameterization as the data-generating process (use NFXP or MCE-IRL). |
 | Transitions are available for policy update and evaluation. | Thin state coverage makes adversarial training unstable. |
 
 ## Minimal Fit

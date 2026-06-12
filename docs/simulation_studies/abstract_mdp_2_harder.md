@@ -43,14 +43,14 @@ The first cell is about cost at scale. All estimators face the same 300-state pr
 | NFXP-SA | structural | 3/3 | 3/3 | [0.431, -1.614, 0.107] | 0.0452 | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 4.4 |
 | NFXP-NK | structural | 3/3 | 3/3 | [0.431, -1.614, 0.107] | 0.0452 | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 3.5 |
 | CCP | structural | 3/3 | 3/3 | [0.429, -1.617, 0.111] | 0.0432 | 0.0037 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 2.7 |
-| MPEC | structural | 3/3 | 3/3 | [0.431, -1.614, 0.107] | 0.0460 | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 6.3 |
+| MPEC | structural | 3/3 | 3/3 | [0.431, -1.614, 0.107] | 0.0452 | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 1.1 |
 | NNES | structural | 3/3 | 3/3 | [0.431, -1.614, 0.107] | 0.0452 | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 17.0 |
 | SEES | structural | 3/3 | 0/3 | [0.543, -1.431, -0.046] | 0.1692 | 0.0040 | 0.0009 | 0.0008 | 0.0009 | 0.0000 | 2.8 |
 | TD-CCP | structural | 3/3 | 3/3 | [0.342, -1.787, 0.246] | 0.1416 | 0.0057 | 0.0024 | 0.0024 | 0.0023 | 0.0000 | 2.9 |
 | UFXP | structural | 3/3 | 3/3 | [0.422, -1.601, 0.111] | 0.0440 | 0.0031 | 0.0006 | 0.0006 | 0.0006 | 0.0000 | 0.1 |
 | MCE-IRL | behavioral | 3/3 | 0/3 | [0.431, -1.614, 0.107] | - | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 5.9 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only on that same scale. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
 
 On the solver contrast there is nothing to report at this scale. Successive approximation and the Newton-Kantorovich refinement land within a second of each other. A compiled dense contraction over 300 states is simply cheap. The textbook slowdown of the plain contraction is a statement about iteration counts. It only becomes a wall-clock story when each iteration is expensive, and the high-dimension page is where that bites. The approximation-based members (SEES, TD-CCP) trade some parameter precision for flexibility while matching the exact family's behavioral accuracy.
 
@@ -67,13 +67,13 @@ The second cell moves the discount factor to 0.99 and asks a harder question tha
 | NFXP-SA | structural | 2/2 | 2/2 | [0.403, -1.594, 0.121] | 0.0329 | 0.0027 | -0.0004 | -0.0004 | -0.0005 | 0.0000 | 4.2 |
 | NFXP-NK | structural | 10/10 | 10/10 | [0.434, -1.555, 0.080] | 0.0840 | 0.0040 | 0.0025 | 0.0024 | 0.0024 | 0.0000 | 4.3 |
 | CCP | structural | 10/10 | 10/10 | [0.433, -1.555, 0.081] | 0.0840 | 0.0042 | 0.0025 | 0.0025 | 0.0024 | 0.0000 | 3.3 |
-| MPEC | structural | 10/10 | 10/10 | [0.433, -1.554, 0.080] | 0.0845 | 0.0041 | 0.0028 | 0.0027 | 0.0026 | 0.0000 | 6.6 |
+| MPEC | structural | 10/10 | 10/10 | [0.434, -1.555, 0.080] | 0.0840 | 0.0040 | 0.0025 | 0.0024 | 0.0024 | 0.0000 | 0.6 |
 | NNES | structural | 10/10 | 10/10 | [0.434, -1.555, 0.080] | 0.0840 | 0.0040 | 0.0025 | 0.0024 | 0.0024 | 0.0000 | 16.9 |
 | SEES | structural | 10/10 | 0/10 | [0.830, -1.161, -0.304] | 0.4474 | 0.0209 | 0.1145 | 0.1125 | 0.1145 | 0.0000 | 2.1 |
 | TD-CCP | structural | 10/10 | 10/10 | [0.397, -1.671, 0.159] | 0.1189 | 0.0052 | 0.0065 | 0.0065 | 0.0061 | 0.0000 | 2.7 |
 | UFXP | structural | 10/10 | 10/10 | [0.426, -1.541, 0.083] | 0.0857 | 0.0040 | 0.0028 | 0.0027 | 0.0026 | 0.0000 | 0.1 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only on that same scale. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
 
 ### Parameter recovery
 
@@ -88,9 +88,9 @@ Param RMSE is reported for the structural family only. Those estimators share th
 | CCP | theta_0 | 0.386 | 0.433 | +0.047 | 0.110 | 0.114 | - | 10% (10 reps) |
 | CCP | theta_1 | -1.599 | -1.555 | +0.044 | 0.132 | 0.133 | - | 10% (10 reps) |
 | CCP | theta_2 | 0.132 | 0.081 | -0.051 | 0.132 | 0.135 | - | 10% (10 reps) |
-| MPEC | theta_0 | 0.386 | 0.433 | +0.046 | 0.110 | 0.114 | 0.90 +/- 0.09 | 100% (10 reps) |
-| MPEC | theta_1 | -1.599 | -1.554 | +0.045 | 0.130 | 0.131 | 0.90 +/- 0.09 | 100% (10 reps) |
-| MPEC | theta_2 | 0.132 | 0.080 | -0.052 | 0.130 | 0.134 | 0.90 +/- 0.09 | 100% (10 reps) |
+| MPEC | theta_0 | 0.386 | 0.434 | +0.048 | 0.109 | 0.114 | 0.90 +/- 0.09 | 100% (10 reps) |
+| MPEC | theta_1 | -1.599 | -1.555 | +0.045 | 0.128 | 0.130 | 0.90 +/- 0.09 | 100% (10 reps) |
+| MPEC | theta_2 | 0.132 | 0.080 | -0.052 | 0.129 | 0.133 | 0.90 +/- 0.09 | 100% (10 reps) |
 | NNES | theta_0 | 0.386 | 0.434 | +0.048 | 0.109 | 0.114 | 0.90 +/- 0.09 | 100% (10 reps) |
 | NNES | theta_1 | -1.599 | -1.555 | +0.045 | 0.129 | 0.130 | 0.90 +/- 0.09 | 100% (10 reps) |
 | NNES | theta_2 | 0.132 | 0.080 | -0.052 | 0.130 | 0.133 | 0.90 +/- 0.09 | 100% (10 reps) |
@@ -120,10 +120,10 @@ The last cell breaks identification on purpose. The third feature is exactly twi
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | NFXP-NK | structural | 20/20 | 20/20 | [-0.510, -0.046, 0.829] | 0.6770 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 3.9 |
 | CCP | structural | 20/20 | 20/20 | [-0.510, 0.326, 0.643] | 0.4367 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 2.0 |
-| MPEC | structural | 20/20 | 20/20 | [-0.510, -0.046, 0.829] | 0.6770 | 0.0032 | 0.0007 | 0.0007 | 0.0007 | 0.0000 | 6.3 |
+| MPEC | structural | 20/20 | 20/20 | [-0.510, -0.046, 0.829] | 0.6770 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.5 |
 | UFXP | structural | 20/20 | 0/20 | [-0.510, 0.322, 0.644] | 0.4393 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.1 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only on that same scale. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
 
 ### Parameter recovery
 

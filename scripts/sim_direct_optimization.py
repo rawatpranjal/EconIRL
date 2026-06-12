@@ -279,7 +279,7 @@ def run_gladius(env, panel) -> dict:
         "reward_rmse": rmse(reward_table[:, :A - 1], true_R[:, :A - 1]),
         "value_rmse": rmse(res.value_function, oracle_value(env)),
         "converged": bool(res.converged),
-        "note": "model-free; reward on a different scale (no known P)",
+        "note": "model-free; reward in its own parameterization (no known P)",
     }
 
 

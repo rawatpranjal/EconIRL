@@ -82,7 +82,7 @@ the EV network stands in for $\sum_{s'} P_a(s,s')\,V(s')$ and is learned from da
 It is run here at the repository-standard network size (128 wide, 3 layers, 500
 epochs) with the same action-2 anchor the MPEC methods receive, so it is a fair
 model-free baseline. Because it does not use the transitions, its recovered
-reward is on a different scale than the known-$P$ methods.
+reward is in a different parameterization than the known-$P$ methods.
 
 ## Setup
 
@@ -210,7 +210,7 @@ Both known-$P$ methods recover the value function far better than the model-free
 GLADIUS, with value RMSE around 0.2 to 0.4 against roughly 2.6 to 4.5. That gap
 is the cost of not using the known transitions. GLADIUS must learn the
 expected-continuation operator from data instead of computing it. Its reward is
-on a different, model-free scale because it never uses $P_a(s,s')$. Its reward
+in a different, model-free parameterization because it never uses $P_a(s,s')$. Its reward
 RMSE is shown as a model-free reference, not a like-for-like structural
 comparison with the two known-$P$ methods.
 
@@ -240,8 +240,8 @@ recovered parameters by under $10^{-3}$, with every run feasible to solver
 tolerance. The neural starts are tighter still. This is the opposite of the
 Koiso-Otani local-optima struggle, and it is the empirical complement to the
 consistency argument: on the smooth soft-Bellman likelihood the constrained
-problem has a well-behaved surface, so the single-start estimates are not artifacts
-of a lucky initialization. The warning still binds for harder problems, larger
+problem has a well-behaved surface, so the single-start estimates do not depend
+on a lucky initialization. The warning still binds for harder problems, larger
 state spaces, discount factors near one, or sharply non-convex likelihoods, which
 is exactly where this check earns its place before a single fit is trusted.
 
@@ -316,7 +316,7 @@ def run_gladius(env, panel) -> dict:
         "reward_rmse": rmse(reward_table[:, :A - 1], true_R[:, :A - 1]),
         "value_rmse": rmse(res.value_function, oracle_value(env)),
         "converged": bool(res.converged),
-        "note": "model-free; reward on a different scale (no known P)",
+        "note": "model-free; reward in its own parameterization (no known P)",
     }
 ```
 

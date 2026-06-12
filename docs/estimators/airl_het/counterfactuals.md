@@ -1,7 +1,7 @@
 # Counterfactuals
 
-AIRL-Het recovers a segment-level reward in the same gauge as the structural
-truth, provided the anchor normalization is correctly specified. Counterfactual
+AIRL-Het recovers a segment-level reward with the same parameterization as the
+structural truth, provided the anchor normalization is correctly specified. Counterfactual
 analysis reruns each segment's dynamic program under a controlled change and
 reads off the new segment policy and value. Segment-level counterfactuals can
 diverge: an intervention that raises the value of the read action may

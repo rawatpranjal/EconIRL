@@ -27,8 +27,8 @@ state-marginal matching and a state-only reward.
 
 f-IRL sits in the behavioral IRL family alongside MaxEnt-IRL, MCE-IRL, and
 GLADIUS. It recovers a tabular reward function rather than structural utility
-parameters, so recovered reward values are not in the same gauge as the
-data-generating utility and standard errors are not reported.
+parameters. The recovered reward is not in the same parameterization as the
+data-generating utility. Standard errors are not reported.
 
 Against MaxEnt-IRL and MCE-IRL the key difference is objective: those methods
 match feature expectations, while f-IRL matches state marginals directly. This

@@ -1,7 +1,7 @@
 # Pre-Estimation Checks
 
 Deep MCE-IRL inherits all MCE-IRL data requirements and adds the neural
-reward gauge problem. Check these before fitting:
+reward normalization problem. Check these before fitting:
 
 | Check | Why it matters for Deep MCE-IRL |
 | --- | --- |
@@ -10,7 +10,7 @@ reward gauge problem. Check these before fitting:
 | State coverage | The soft Bellman solve covers all states, but occupancy matching uses only observed state-action pairs. Very thin coverage starves the gradient in those regions. |
 | Action support per state | A state where one action is never taken contributes no gradient for that action. The anchor action is exempt - it has no trainable reward - so its absence from a state is safe. |
 | Anchor action validity | The `anchor_action` index must fall within `[0, n_actions)` and should correspond to an action with reasonable support. An action that is never taken is a poor anchor. |
-| Reward gauge consistency | The anchor action or absorbing state must be set consistently between the training run and any downstream comparison. Changing the gauge invalidates reward-map comparisons. |
+| Anchor consistency | The anchor action or absorbing state must be set consistently between the training run and any downstream comparison. Changing the anchor invalidates reward-map comparisons. |
 | Feature rank (projection only) | If `features=` is supplied, the feature matrix for the projected cell should be full rank with a low condition number. A rank-deficient projection cannot identify the projected parameters. |
 
 ## Primary Cell Checks
@@ -28,10 +28,11 @@ Values from the primary synthetic run (see [Simulation Study](validation.md)):
 
 ## Common Risk Patterns
 
-**Gauge mismatch** is the most common mistake. If two runs use different anchor
+**Anchor mismatch** is the most common mistake. If two runs use different anchor
 actions, or one uses an anchor action and the other uses an absorbing state,
-the reward matrices live in different gauges and cannot be compared directly.
-Fix the gauge before any cross-run comparison.
+the reward matrices use different normalizations and cannot be compared
+directly.
+Set the same anchor before any cross-run comparison.
 
 **Projection overconfidence** is the next most common mistake. The neural
 reward is projected onto a linear feature basis as a convenience. When the

@@ -39,11 +39,11 @@ $$
 For `reward_type="state"` the network takes only $x(s)$ and the output is
 broadcast to all actions.
 
-## Reward Gauge
+## Reward Normalization
 
 A neural reward map is identified only up to an action-independent additive
-function of the state (potential shaping). Fixing the gauge requires an
-external normalization. The estimator imposes this by setting one action's
+function of the state (potential shaping). Pinning the reward down requires
+an external normalization. The estimator imposes this by setting one action's
 reward column to zero for all states:
 
 $$
@@ -52,7 +52,7 @@ $$
 
 where $a_0$ is the `anchor_action` argument. Alternatively, an absorbing state
 row can be fixed to zero. Reward comparisons across runs or against oracle
-objects are meaningful only under the same gauge.
+objects are meaningful only under the same normalization.
 
 ## Occupancy Matching Objective
 

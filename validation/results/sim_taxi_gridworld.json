@@ -124,7 +124,7 @@
       "BC": "def _run_bc(env, panel):\n    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator\n\n    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"hybrid\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"slsqp\", max_iter=200, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "UFXP": "def _run_ufxp(env, panel):\n    from econirl.estimation import UFXPEstimator\n\n    # Bray's unnested fixed point with optimal weighting (OUFXP). Conditions\n    # are scored only at visited states and the optimal weights downweight\n    # thin states by their sample share, which is the interesting behavior on\n    # this concentrated-coverage grid.\n    est = UFXPEstimator(weights=\"optimal\", verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n"
     },
     "diagnoses": {
@@ -138,7 +138,7 @@
       "BC": "Behavioral cloning; matches observed choices where data exists, but has nothing to say at unvisited states and recovers no reward.",
       "NFXP": "Structural contrast: full MLE with the correct linear utility.",
       "CCP": "Structural contrast. CCP inverts estimated choice probabilities, which is exactly where a concentrated state distribution (most trajectories hug the start-to-goal diagonal) can hurt it.",
-      "MPEC": "Structural contrast: constrained MLE.",
+      "MPEC": "Structural contrast. Constrained MLE on the same ridge.",
       "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal weighting (OUFXP). Like CCP it starts from inverted empirical choice probabilities, so thin state coverage is its natural stress; its conditions are scored only at visited states and the optimal weights downweight thin states by their sample share."
     },
     "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
@@ -1685,34 +1685,6 @@
         "transferred": true
       },
       "runtime": 3.1262588500976562,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "gridworld",
-      "rep": 0,
-      "params": [
-        -10.846359252929688,
-        3.976539373397827,
-        -2.6779441833496094
-      ],
-      "standard_errors": [
-        284.28717041015625,
-        270.0771789550781,
-        11.604331970214844
-      ],
-      "policy_tv": 0.00032482253351098984,
-      "value_rmse": 147.57899181952342,
-      "regret": {
-        "baseline": 0.0018686723251875037,
-        "type_a": 0.0021131628006401115,
-        "type_b": 9.351331115646929,
-        "type_c": 0.034073028161259344,
-        "transferred": true
-      },
-      "runtime": 10.17746090888977,
       "converged": true,
       "error": null
     },
@@ -3289,34 +3261,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "gridworld",
-      "rep": 1,
-      "params": [
-        -60.65715408325195,
-        17.130935668945312,
-        -55.10523223876953
-      ],
-      "standard_errors": [
-        88.53323364257812,
-        82.62149047851562,
-        83.18315887451172
-      ],
-      "policy_tv": 0.0004643647116670188,
-      "value_rmse": 175.02019243682204,
-      "regret": {
-        "baseline": 0.005781296219410592,
-        "type_a": 0.006586950226349586,
-        "type_b": 16.547436942619427,
-        "type_c": 0.10219378682529623,
-        "transferred": true
-      },
-      "runtime": 8.153022766113281,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "gridworld",
@@ -4889,34 +4833,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "gridworld",
-      "rep": 2,
-      "params": [
-        -6.558300971984863,
-        2.7103004455566406,
-        0.7670077681541443
-      ],
-      "standard_errors": [
-        143.73631286621094,
-        136.57464599609375,
-        1.807474970817566
-      ],
-      "policy_tv": 0.00024189602355137476,
-      "value_rmse": 147.47548863527905,
-      "regret": {
-        "baseline": 0.0005851406263985837,
-        "type_a": 0.0006521657992095697,
-        "type_b": 7.750691998063971,
-        "type_c": 0.010902041973963605,
-        "transferred": true
-      },
-      "runtime": 7.067038059234619,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "gridworld",
@@ -4942,6 +4858,90 @@
       },
       "runtime": 0.053214073181152344,
       "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "gridworld",
+      "rep": 0,
+      "params": [
+        -10.020730972290039,
+        3.7631211280822754,
+        -1.7708063125610352
+      ],
+      "standard_errors": [
+        284.1068420410156,
+        269.8451232910156,
+        11.615030288696289
+      ],
+      "policy_tv": 0.0003083364661786195,
+      "value_rmse": 147.52013930849063,
+      "regret": {
+        "baseline": 0.0017379158421420016,
+        "type_a": 0.001970629605963836,
+        "type_b": 8.526459464937133,
+        "type_c": 0.030623110633513306,
+        "transferred": true
+      },
+      "runtime": 1.760901927947998,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "gridworld",
+      "rep": 1,
+      "params": [
+        -309.846435546875,
+        83.72078704833984,
+        -311.0582580566406
+      ],
+      "standard_errors": [
+        82.08673095703125,
+        87.7915267944336,
+        74.31310272216797
+      ],
+      "policy_tv": 0.0004698599963586936,
+      "value_rmse": 559.9813582486944,
+      "regret": {
+        "baseline": 0.006318064813285673,
+        "type_a": 0.007207276324066925,
+        "type_b": 16.771197144056018,
+        "type_c": 0.10911688578812573,
+        "transferred": true
+      },
+      "runtime": 0.41543078422546387,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "gridworld",
+      "rep": 2,
+      "params": [
+        -6.314932823181152,
+        2.6485378742218018,
+        1.0438817739486694
+      ],
+      "standard_errors": [
+        211.30320739746094,
+        200.72540283203125,
+        1.8073978424072266
+      ],
+      "policy_tv": 0.00028231234735972654,
+      "value_rmse": 147.4816434457831,
+      "regret": {
+        "baseline": 0.0007302943255496075,
+        "type_a": 0.0008049400293685949,
+        "type_b": 7.844041658604581,
+        "type_c": 0.01382601234421088,
+        "transferred": true
+      },
+      "runtime": 0.3784639835357666,
+      "converged": true,
       "error": null
     }
   ]

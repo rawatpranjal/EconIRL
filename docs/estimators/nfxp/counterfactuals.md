@@ -1,6 +1,6 @@
 # Counterfactuals
 
-NFXP recovers the utility parameters in the same gauge as the
+NFXP recovers the utility parameters in the same parameterization as the
 data-generating process, so counterfactual analysis is straightforward:
 change a parameter, re-solve the dynamic program once, and read off the new
 policy and value function.

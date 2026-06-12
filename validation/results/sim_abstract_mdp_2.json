@@ -226,7 +226,7 @@
       "NFXP-SA": "def _run_nfxp_sa(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"sa\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "NFXP-NK": "def _run_nfxp_nk(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"polyalgorithm\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"slsqp\", max_iter=200, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "NNES": "def _run_nnes(env, panel):\n    from econirl.estimation.nnes import NNESEstimator\n\n    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,\n                        compute_se=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "SEES": "def _run_sees(env, panel):\n    from econirl.estimation.sees import SEESEstimator\n\n    # Basis must span the value function: bspline basis_dim >= num_states.\n    est = SEESEstimator(basis_type=\"bspline\", basis_dim=int(env.num_states),\n                        warm_start_value=True, penalty_weight=10.0,\n                        compute_se=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "TD-CCP": "def _run_tdccp(env, panel):\n    from econirl.estimation import TDCCPConfig, TDCCPEstimator\n\n    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,\n                                            epochs_per_avi=15, compute_se=True,\n                                            verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
@@ -237,7 +237,7 @@
       "NFXP-SA": "Rust's original inner loop: successive approximation, a pure contraction with rate equal to the discount factor. It reaches the same maximum-likelihood answer; what changes with scale and discount is how long it takes.",
       "NFXP-NK": "The Iskhakov et al refinement: successive approximation to get near the fixed point, then Newton-Kantorovich steps. Same estimate, different bill.",
       "CCP": "Hotz-Miller inversion: estimate choice probabilities, invert once, no fixed point inside the optimizer. Its standard errors come from the outer Hessian and can fail to be finite even when the point estimate is fine; the SE-availability column makes that visible.",
-      "MPEC": "Constrained MLE: the Bellman equation enters as constraints for the SLSQP solver, with one variable per state plus the parameters.",
+      "MPEC": "Constrained MLE. The Bellman equation enters as constraints for the SLSQP solver, with one variable per state plus the parameters.",
       "NNES": "Neural value network plus structural MLE.",
       "SEES": "Sieve value function: bspline basis with basis_dim = num_states so the basis can span the value function.",
       "TD-CCP": "Neural CCP with approximate value iteration and cross-fitted standard errors.",
@@ -328,34 +328,6 @@
         "transferred": true
       },
       "runtime": 3.7115468978881836,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "harder_300",
-      "rep": 0,
-      "params": [
-        0.46371573209762573,
-        -1.5757567882537842,
-        0.0632682666182518
-      ],
-      "standard_errors": [
-        0.1322200894355774,
-        0.1548636257648468,
-        0.15423423051834106
-      ],
-      "policy_tv": 0.0027305248028757843,
-      "value_rmse": 0.011020013238988985,
-      "regret": {
-        "baseline": 0.00046622446731250916,
-        "type_a": 0.0004272752659137262,
-        "type_b": 0.0004625368325687017,
-        "type_c": 5.520819422339085e-08,
-        "transferred": true
-      },
-      "runtime": 6.517357587814331,
       "converged": true,
       "error": null
     },
@@ -584,34 +556,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "harder_300",
-      "rep": 1,
-      "params": [
-        0.40253952145576477,
-        -1.5749118328094482,
-        0.1184481531381607
-      ],
-      "standard_errors": [
-        0.13073767721652985,
-        0.1536506563425064,
-        0.15258266031742096
-      ],
-      "policy_tv": 0.002486494074113251,
-      "value_rmse": 0.0898108650895777,
-      "regret": {
-        "baseline": 0.0002890833510270232,
-        "type_a": 0.000277230406249107,
-        "type_b": 0.00028791404753713835,
-        "type_c": 3.8047260306722634e-08,
-        "transferred": true
-      },
-      "runtime": 5.75260329246521,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "harder_300",
@@ -832,34 +776,6 @@
         "transferred": true
       },
       "runtime": 2.255810022354126,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "harder_300",
-      "rep": 2,
-      "params": [
-        0.4257570803165436,
-        -1.691774606704712,
-        0.1405259519815445
-      ],
-      "standard_errors": [
-        0.13168467581272125,
-        0.15448087453842163,
-        0.15353767573833466
-      ],
-      "policy_tv": 0.005215087761097123,
-      "value_rmse": 0.09842226788735588,
-      "regret": {
-        "baseline": 0.0016707755037963878,
-        "type_a": 0.001607992147281759,
-        "type_b": 0.0015838594706483885,
-        "type_c": 2.786203317374915e-07,
-        "transferred": true
-      },
-      "runtime": 6.494038105010986,
       "converged": true,
       "error": null
     },
@@ -1088,34 +1004,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 0,
-      "params": [
-        0.40419676899909973,
-        -1.6490613222122192,
-        0.13678644597530365
-      ],
-      "standard_errors": [
-        0.1303309202194214,
-        0.15256541967391968,
-        0.15191727876663208
-      ],
-      "policy_tv": 0.002718924213414385,
-      "value_rmse": 0.13276485517702946,
-      "regret": {
-        "baseline": -0.00035151233406726355,
-        "type_a": -0.0002722725194176917,
-        "type_b": -0.00048722804846771425,
-        "type_c": 1.714342905454928e-07,
-        "transferred": true
-      },
-      "runtime": 5.947892904281616,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "high_discount",
@@ -1312,34 +1200,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 1,
-      "params": [
-        0.3925531208515167,
-        -1.5420619249343872,
-        0.1087971106171608
-      ],
-      "standard_errors": [
-        0.12951774895191193,
-        0.15201488137245178,
-        0.1510382443666458
-      ],
-      "policy_tv": 0.0022848881435441814,
-      "value_rmse": 0.09096823675073086,
-      "regret": {
-        "baseline": -0.0011005645039933365,
-        "type_a": -0.000998881038214293,
-        "type_b": -0.0011800743128610386,
-        "type_c": 3.525505888259023e-08,
-        "transferred": true
-      },
-      "runtime": 5.597732782363892,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "high_discount",
@@ -1504,34 +1364,6 @@
         "transferred": true
       },
       "runtime": 3.1829400062561035,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 2,
-      "params": [
-        0.47262629866600037,
-        -1.6383423805236816,
-        0.0873107835650444
-      ],
-      "standard_errors": [
-        0.13028423488140106,
-        0.15257516503334045,
-        0.15178976953029633
-      ],
-      "policy_tv": 0.005539555162243214,
-      "value_rmse": 0.6103077612414323,
-      "regret": {
-        "baseline": 0.006382084069897794,
-        "type_a": 0.006233594141495547,
-        "type_b": 0.0059785889223483366,
-        "type_c": 1.2822474425489567e-06,
-        "transferred": true
-      },
-      "runtime": 7.432109832763672,
       "converged": true,
       "error": null
     },
@@ -1704,34 +1536,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 3,
-      "params": [
-        0.3864598870277405,
-        -1.5775244235992432,
-        0.10567198693752289
-      ],
-      "standard_errors": [
-        0.1305363029241562,
-        0.15266825258731842,
-        0.15202690660953522
-      ],
-      "policy_tv": 0.005620792680906554,
-      "value_rmse": 1.0429396764849954,
-      "regret": {
-        "baseline": 0.0042147679037745625,
-        "type_a": 0.004226278733208582,
-        "type_b": 0.0040821155891962516,
-        "type_c": 8.632936100409094e-07,
-        "transferred": true
-      },
-      "runtime": 6.525676012039185,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "high_discount",
@@ -1896,34 +1700,6 @@
         "transferred": true
       },
       "runtime": 3.125462055206299,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 4,
-      "params": [
-        0.5776084065437317,
-        -1.36623215675354,
-        -0.0939536988735199
-      ],
-      "standard_errors": [
-        0.12894994020462036,
-        0.1511150598526001,
-        0.15025770664215088
-      ],
-      "policy_tv": 0.003909764900213376,
-      "value_rmse": 0.29262016070318675,
-      "regret": {
-        "baseline": 0.0018653986453278978,
-        "type_a": 0.001896537256405888,
-        "type_b": 0.0019173306780308557,
-        "type_c": 4.994663004488272e-07,
-        "transferred": true
-      },
-      "runtime": 6.599814176559448,
       "converged": true,
       "error": null
     },
@@ -2096,34 +1872,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 5,
-      "params": [
-        0.31338629126548767,
-        -1.610621452331543,
-        0.19344933331012726
-      ],
-      "standard_errors": [
-        0.1285734474658966,
-        0.15108925104141235,
-        0.14994856715202332
-      ],
-      "policy_tv": 0.0030165607079089187,
-      "value_rmse": 0.019197052577753042,
-      "regret": {
-        "baseline": 0.0003456097444309147,
-        "type_a": 0.00029221417629229397,
-        "type_b": 0.0002821207045664751,
-        "type_c": 1.8865343990585628e-07,
-        "transferred": true
-      },
-      "runtime": 6.653534889221191,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "high_discount",
@@ -2288,34 +2036,6 @@
         "transferred": true
       },
       "runtime": 3.544240951538086,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 6,
-      "params": [
-        0.3727882504463196,
-        -1.6135591268539429,
-        0.1593891978263855
-      ],
-      "standard_errors": [
-        0.12964223325252533,
-        0.15255557000637054,
-        0.15123292803764343
-      ],
-      "policy_tv": 0.003786541870308618,
-      "value_rmse": 0.6949690252318987,
-      "regret": {
-        "baseline": 0.0006639607665352063,
-        "type_a": 0.0007253406883317233,
-        "type_b": 0.000610403853774515,
-        "type_c": 2.9793251764441144e-07,
-        "transferred": true
-      },
-      "runtime": 6.930387020111084,
       "converged": true,
       "error": null
     },
@@ -2488,34 +2208,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 7,
-      "params": [
-        0.3548301160335541,
-        -1.5585075616836548,
-        0.1449694037437439
-      ],
-      "standard_errors": [
-        0.13060809671878815,
-        0.15327422320842743,
-        0.15240436792373657
-      ],
-      "policy_tv": 0.0033428041988645225,
-      "value_rmse": 0.13513271757296835,
-      "regret": {
-        "baseline": 0.0008333177133229936,
-        "type_a": 0.0007608371951709529,
-        "type_b": 0.0007057672380795857,
-        "type_c": 2.590823332914656e-07,
-        "transferred": true
-      },
-      "runtime": 6.7104880809783936,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "high_discount",
@@ -2680,34 +2372,6 @@
         "transferred": true
       },
       "runtime": 3.428987741470337,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 8,
-      "params": [
-        0.3840397000312805,
-        -1.697898268699646,
-        0.16787324845790863
-      ],
-      "standard_errors": [
-        0.12866269052028656,
-        0.1506553590297699,
-        0.14978045225143433
-      ],
-      "policy_tv": 0.0038989880950834354,
-      "value_rmse": 0.05076962329712382,
-      "regret": {
-        "baseline": 0.0018980846721656955,
-        "type_a": 0.0018426430976755742,
-        "type_b": 0.0016259144923776484,
-        "type_c": 4.943383574059751e-07,
-        "transferred": true
-      },
-      "runtime": 7.057491064071655,
       "converged": true,
       "error": null
     },
@@ -2880,34 +2544,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "high_discount",
-      "rep": 9,
-      "params": [
-        0.6677435040473938,
-        -1.2865043878555298,
-        -0.21474549174308777
-      ],
-      "standard_errors": [
-        0.12949945032596588,
-        0.15217091143131256,
-        0.1509999930858612
-      ],
-      "policy_tv": 0.006430656924499645,
-      "value_rmse": 0.9675773211267191,
-      "regret": {
-        "baseline": 0.01281369245061571,
-        "type_a": 0.011943530640231539,
-        "type_b": 0.012634910162515441,
-        "type_c": 1.907648544082985e-06,
-        "transferred": true
-      },
-      "runtime": 6.673552989959717,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "high_discount",
@@ -3076,34 +2712,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 0,
-      "params": [
-        -0.5151739716529846,
-        -0.04738172888755798,
-        0.8306019902229309
-      ],
-      "standard_errors": [
-        0.02140270546078682,
-        8.96179485321045,
-        4.4809160232543945
-      ],
-      "policy_tv": 0.0018333563415205035,
-      "value_rmse": 0.08591270625978968,
-      "regret": {
-        "baseline": 0.00017577384237850124,
-        "type_a": 0.00017962589418181452,
-        "type_b": 0.00017720331056673332,
-        "type_c": 3.833993626141192e-08,
-        "transferred": true
-      },
-      "runtime": 6.083609104156494,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -3184,34 +2792,6 @@
         "transferred": true
       },
       "runtime": 1.7728641033172607,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 1,
-      "params": [
-        -0.49746668338775635,
-        -0.05428546667098999,
-        0.8140466213226318
-      ],
-      "standard_errors": [
-        0.021370181813836098,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.0027535782740983877,
-      "value_rmse": 0.15196659991279474,
-      "regret": {
-        "baseline": 0.0005167716433080812,
-        "type_a": 0.0005409745572155137,
-        "type_b": 0.0005470811523743744,
-        "type_c": 1.6252964991779195e-07,
-        "transferred": true
-      },
-      "runtime": 6.251147031784058,
       "converged": true,
       "error": null
     },
@@ -3300,34 +2880,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 2,
-      "params": [
-        -0.5112186670303345,
-        -0.047126106917858124,
-        0.8293609023094177
-      ],
-      "standard_errors": [
-        0.021399393677711487,
-        8.96179485321045,
-        4.4809160232543945
-      ],
-      "policy_tv": 0.0012002589150822817,
-      "value_rmse": 0.053969099788641145,
-      "regret": {
-        "baseline": 8.362680239527186e-05,
-        "type_a": 8.534560971885879e-05,
-        "type_b": 8.668105089425876e-05,
-        "type_c": 1.714319409160337e-08,
-        "transferred": true
-      },
-      "runtime": 5.584553956985474,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -3408,34 +2960,6 @@
         "transferred": true
       },
       "runtime": 1.8529410362243652,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 3,
-      "params": [
-        -0.5607221126556396,
-        -0.039708420634269714,
-        0.8519502282142639
-      ],
-      "standard_errors": [
-        0.021387727931141853,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.006376997804544635,
-      "value_rmse": 0.2802118356905235,
-      "regret": {
-        "baseline": 0.0023923509155418846,
-        "type_a": 0.0024399315387494897,
-        "type_b": 0.0024857957464133914,
-        "type_c": 5.269052346463379e-07,
-        "transferred": true
-      },
-      "runtime": 8.125995874404907,
       "converged": true,
       "error": null
     },
@@ -3524,34 +3048,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 4,
-      "params": [
-        -0.5067930817604065,
-        -0.04873094707727432,
-        0.8238055109977722
-      ],
-      "standard_errors": [
-        0.021342482417821884,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.001755079610446647,
-      "value_rmse": 0.08941419468522331,
-      "regret": {
-        "baseline": 0.0001343513603639195,
-        "type_a": 0.0001391329983982831,
-        "type_b": 0.00012973228493985158,
-        "type_c": 3.468503533634523e-08,
-        "transferred": true
-      },
-      "runtime": 5.719695091247559,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -3632,34 +3128,6 @@
         "transferred": true
       },
       "runtime": 1.7981960773468018,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 5,
-      "params": [
-        -0.5517750382423401,
-        -0.03292426839470863,
-        0.8596792817115784
-      ],
-      "standard_errors": [
-        0.021405087783932686,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.00527483686018725,
-      "value_rmse": 0.024105609466605497,
-      "regret": {
-        "baseline": 0.001682545957655895,
-        "type_a": 0.0017371313196063581,
-        "type_b": 0.0020434462738583383,
-        "type_c": 4.718417752483495e-07,
-        "transferred": true
-      },
-      "runtime": 7.835216045379639,
       "converged": true,
       "error": null
     },
@@ -3748,34 +3216,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 6,
-      "params": [
-        -0.5080565810203552,
-        -0.04830888286232948,
-        0.8245903849601746
-      ],
-      "standard_errors": [
-        0.013375935144722462,
-        228274.328125,
-        114137.171875
-      ],
-      "policy_tv": 0.001800223299165125,
-      "value_rmse": 0.09070105187662808,
-      "regret": {
-        "baseline": 0.0001394477227241966,
-        "type_a": 0.0001440845115257798,
-        "type_b": 0.00013415926421520217,
-        "type_c": 3.491129785667824e-08,
-        "transferred": true
-      },
-      "runtime": 5.7506959438323975,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -3856,34 +3296,6 @@
         "transferred": true
       },
       "runtime": 1.8083069324493408,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 7,
-      "params": [
-        -0.5085265040397644,
-        -0.034506577998399734,
-        0.8439058661460876
-      ],
-      "standard_errors": [
-        0.021442944183945656,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.004865239496856699,
-      "value_rmse": 0.27154167169249777,
-      "regret": {
-        "baseline": 0.0017407321607090483,
-        "type_a": 0.0018319262944440963,
-        "type_b": 0.001873407591535981,
-        "type_c": 5.869356447314592e-07,
-        "transferred": true
-      },
-      "runtime": 6.665390968322754,
       "converged": true,
       "error": null
     },
@@ -3972,34 +3384,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 8,
-      "params": [
-        -0.49586865305900574,
-        -0.04144105315208435,
-        0.8317906856536865
-      ],
-      "standard_errors": [
-        0.011660792864859104,
-        305569.09375,
-        152784.5625
-      ],
-      "policy_tv": 0.003795898473958616,
-      "value_rmse": 0.20511211494357823,
-      "regret": {
-        "baseline": 0.0007747039995937858,
-        "type_a": 0.0008110081090944014,
-        "type_b": 0.0007849912156109087,
-        "type_c": 2.414344459492126e-07,
-        "transferred": true
-      },
-      "runtime": 5.598133087158203,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -4080,34 +3464,6 @@
         "transferred": true
       },
       "runtime": 1.8387420177459717,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 9,
-      "params": [
-        -0.4811897873878479,
-        -0.05691932886838913,
-        0.8054335713386536
-      ],
-      "standard_errors": [
-        0.0213114432990551,
-        8.96179485321045,
-        4.4809160232543945
-      ],
-      "policy_tv": 0.0028857025315642253,
-      "value_rmse": 0.09504220679311552,
-      "regret": {
-        "baseline": 0.0005986288284098711,
-        "type_a": 0.0006259701387688138,
-        "type_b": 0.0007087720771084975,
-        "type_c": 1.9272414349751577e-07,
-        "transferred": true
-      },
-      "runtime": 5.873932123184204,
       "converged": true,
       "error": null
     },
@@ -4196,34 +3552,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 10,
-      "params": [
-        -0.537157416343689,
-        -0.041550200432538986,
-        0.8423042297363281
-      ],
-      "standard_errors": [
-        0.021420300006866455,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.003721081183780126,
-      "value_rmse": 0.14580520574241235,
-      "regret": {
-        "baseline": 0.0008202547890845545,
-        "type_a": 0.0008365304897895374,
-        "type_b": 0.0008789578308812225,
-        "type_c": 1.830705591286672e-07,
-        "transferred": true
-      },
-      "runtime": 7.251757860183716,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -4304,34 +3632,6 @@
         "transferred": true
       },
       "runtime": 1.9494330883026123,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 11,
-      "params": [
-        -0.5422508120536804,
-        -0.049226533621549606,
-        0.8334731459617615
-      ],
-      "standard_errors": [
-        0.02151009440422058,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.007773671965598618,
-      "value_rmse": 0.3820014657486566,
-      "regret": {
-        "baseline": 0.0026135413598130813,
-        "type_a": 0.002688322233882377,
-        "type_b": 0.0025139108210412557,
-        "type_c": 6.407354479472025e-07,
-        "transferred": true
-      },
-      "runtime": 5.8110573291778564,
       "converged": true,
       "error": null
     },
@@ -4420,34 +3720,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 12,
-      "params": [
-        -0.5097217559814453,
-        -0.04808339104056358,
-        0.8253657817840576
-      ],
-      "standard_errors": [
-        0.02142518386244774,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.0019683146062488906,
-      "value_rmse": 0.09830724904999284,
-      "regret": {
-        "baseline": 0.00016644728078455965,
-        "type_a": 0.00017167973541383144,
-        "type_b": 0.0001600575823844795,
-        "type_c": 4.0974225415605016e-08,
-        "transferred": true
-      },
-      "runtime": 5.863807201385498,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -4528,34 +3800,6 @@
         "transferred": true
       },
       "runtime": 2.002516984939575,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 13,
-      "params": [
-        -0.4804753065109253,
-        -0.04653119668364525,
-        0.819288969039917
-      ],
-      "standard_errors": [
-        0.021357031539082527,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.0036096035358314164,
-      "value_rmse": 0.17994038844193094,
-      "regret": {
-        "baseline": 0.0005635020965439816,
-        "type_a": 0.0005807600363164167,
-        "type_b": 0.0005435617979014101,
-        "type_c": 1.4248114490016673e-07,
-        "transferred": true
-      },
-      "runtime": 6.932796239852905,
       "converged": true,
       "error": null
     },
@@ -4644,34 +3888,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 14,
-      "params": [
-        -0.5032580494880676,
-        -0.0491153821349144,
-        0.8226331472396851
-      ],
-      "standard_errors": [
-        0.021368855610489845,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.0012649599296843562,
-      "value_rmse": 0.06600401577381972,
-      "regret": {
-        "baseline": 7.48607256340745e-05,
-        "type_a": 7.788411959410621e-05,
-        "type_b": 7.359208335019618e-05,
-        "type_c": 1.986748806181422e-08,
-        "transferred": true
-      },
-      "runtime": 5.736303806304932,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -4752,34 +3968,6 @@
         "transferred": true
       },
       "runtime": 2.590496063232422,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 15,
-      "params": [
-        -0.5073208808898926,
-        -0.04295583441853523,
-        0.8316195607185364
-      ],
-      "standard_errors": [
-        0.021375393494963646,
-        8.96179485321045,
-        4.4809160232543945
-      ],
-      "policy_tv": 0.0013110874924420403,
-      "value_rmse": 0.05381423171527269,
-      "regret": {
-        "baseline": 0.00013220894050857128,
-        "type_a": 0.0001387853476121256,
-        "type_b": 0.00015358976007531994,
-        "type_c": 4.271561069596379e-08,
-        "transferred": true
-      },
-      "runtime": 6.70724892616272,
       "converged": true,
       "error": null
     },
@@ -4868,34 +4056,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 16,
-      "params": [
-        -0.5224453210830688,
-        -0.042725708335638046,
-        0.8370454907417297
-      ],
-      "standard_errors": [
-        0.02131757140159607,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.002116133175454608,
-      "value_rmse": 0.05110918481253256,
-      "regret": {
-        "baseline": 0.0002753738402073454,
-        "type_a": 0.00028176029470470084,
-        "type_b": 0.0003174769942637744,
-        "type_c": 6.570605030527981e-08,
-        "transferred": true
-      },
-      "runtime": 6.167691946029663,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -4976,34 +4136,6 @@
         "transferred": true
       },
       "runtime": 1.8347430229187012,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 17,
-      "params": [
-        -0.5134192705154419,
-        -0.04833735525608063,
-        0.8269304037094116
-      ],
-      "standard_errors": [
-        0.02706080488860607,
-        276732.5625,
-        138366.296875
-      ],
-      "policy_tv": 0.002478413329322691,
-      "value_rmse": 0.12262011037178391,
-      "regret": {
-        "baseline": 0.0002656006730263858,
-        "type_a": 0.0002734564602720007,
-        "type_b": 0.00025580560368379984,
-        "type_c": 6.476376349600665e-08,
-        "transferred": true
-      },
-      "runtime": 5.759382009506226,
       "converged": true,
       "error": null
     },
@@ -5092,34 +4224,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 18,
-      "params": [
-        -0.4760877788066864,
-        -0.05558507516980171,
-        0.8086020946502686
-      ],
-      "standard_errors": [
-        0.021394511684775352,
-        8.96179485321045,
-        4.4809160232543945
-      ],
-      "policy_tv": 0.002368473163303113,
-      "value_rmse": 0.021326196312219457,
-      "regret": {
-        "baseline": 0.00034292380370710377,
-        "type_a": 0.0003530510830914445,
-        "type_b": 0.0004131720987181661,
-        "type_c": 9.192489297703885e-08,
-        "transferred": true
-      },
-      "runtime": 6.9232470989227295,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -5204,34 +4308,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rank_deficient",
-      "rep": 19,
-      "params": [
-        -0.47723132371902466,
-        -0.04703492671251297,
-        0.8177608847618103
-      ],
-      "standard_errors": [
-        0.021428482607007027,
-        8.96179485321045,
-        4.480916500091553
-      ],
-      "policy_tv": 0.003923796071807985,
-      "value_rmse": 0.19422574423027356,
-      "regret": {
-        "baseline": 0.0006733244381752283,
-        "type_a": 0.0006929726217553185,
-        "type_b": 0.0006516900408541222,
-        "type_c": 1.6769681190115565e-07,
-        "transferred": true
-      },
-      "runtime": 6.180207252502441,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "UFXP",
       "family": "structural",
       "cell": "rank_deficient",
@@ -5257,6 +4333,930 @@
       },
       "runtime": 0.05095696449279785,
       "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 0,
+      "params": [
+        0.4656406342983246,
+        -1.5742242336273193,
+        0.06158275157213211
+      ],
+      "standard_errors": [
+        0.13173872232437134,
+        0.15439468622207642,
+        0.15368910133838654
+      ],
+      "policy_tv": 0.0027672025752355145,
+      "value_rmse": 0.014563579422791354,
+      "regret": {
+        "baseline": 0.0004714175500238745,
+        "type_a": 0.0004329006549439638,
+        "type_b": 0.000467928936201516,
+        "type_c": 5.65681386304458e-08,
+        "transferred": true
+      },
+      "runtime": 1.964798927307129,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 1,
+      "params": [
+        0.39992547035217285,
+        -1.5786409378051758,
+        0.12207834422588348
+      ],
+      "standard_errors": [
+        0.13128617405891418,
+        0.15428252518177032,
+        0.1532421112060547
+      ],
+      "policy_tv": 0.002573439468788188,
+      "value_rmse": 0.09314596836376117,
+      "regret": {
+        "baseline": 0.0003055813085302619,
+        "type_a": 0.0002930845931343841,
+        "type_b": 0.00030404767237547523,
+        "type_c": 4.049380852033882e-08,
+        "transferred": true
+      },
+      "runtime": 0.6135690212249756,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "harder_300",
+      "rep": 2,
+      "params": [
+        0.42707857489585876,
+        -1.689621090888977,
+        0.13857418298721313
+      ],
+      "standard_errors": [
+        0.13211463391780853,
+        0.15493294596672058,
+        0.15403932332992554
+      ],
+      "policy_tv": 0.00519556504853342,
+      "value_rmse": 0.09644937196954204,
+      "regret": {
+        "baseline": 0.0016529356767406944,
+        "type_a": 0.0015895180420884515,
+        "type_b": 0.0015678929596219388,
+        "type_c": 2.7430886700262e-07,
+        "transferred": true
+      },
+      "runtime": 0.5891599655151367,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 0,
+      "params": [
+        0.4057690501213074,
+        -1.6462332010269165,
+        0.13422276079654694
+      ],
+      "standard_errors": [
+        0.1303655058145523,
+        0.1525665521621704,
+        0.15194281935691833
+      ],
+      "policy_tv": 0.002695891174025719,
+      "value_rmse": 0.11246857460030135,
+      "regret": {
+        "baseline": -0.0004005803788430499,
+        "type_a": -0.00032546563515089514,
+        "type_b": -0.0005286131798410974,
+        "type_c": 1.5787901593118811e-07,
+        "transferred": true
+      },
+      "runtime": 0.6516640186309814,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 1,
+      "params": [
+        0.39973893761634827,
+        -1.5425105094909668,
+        0.10763799399137497
+      ],
+      "standard_errors": [
+        0.12984894216060638,
+        0.15238040685653687,
+        0.15143407881259918
+      ],
+      "policy_tv": 0.0027251056726290404,
+      "value_rmse": 0.33993109062558274,
+      "regret": {
+        "baseline": -0.0004566777224416483,
+        "type_a": -0.00040217051767637896,
+        "type_b": -0.0005095574847175278,
+        "type_c": 9.944135166254885e-08,
+        "transferred": true
+      },
+      "runtime": 0.6342520713806152,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 2,
+      "params": [
+        0.4683227241039276,
+        -1.6406455039978027,
+        0.09013958275318146
+      ],
+      "standard_errors": [
+        0.13059164583683014,
+        0.15297262370586395,
+        0.1521787792444229
+      ],
+      "policy_tv": 0.00537463672398186,
+      "value_rmse": 0.5325355575404486,
+      "regret": {
+        "baseline": 0.005860340022385094,
+        "type_a": 0.005695939808554394,
+        "type_b": 0.005475018370257687,
+        "type_c": 1.1719356752770383e-06,
+        "transferred": true
+      },
+      "runtime": 0.6153171062469482,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 3,
+      "params": [
+        0.3931941092014313,
+        -1.5773216485977173,
+        0.10526212304830551
+      ],
+      "standard_errors": [
+        0.13052545487880707,
+        0.15265457332134247,
+        0.1520169973373413
+      ],
+      "policy_tv": 0.0041199126332276065,
+      "value_rmse": 0.7626709720872658,
+      "regret": {
+        "baseline": 0.001100264461977979,
+        "type_a": 0.0011892186286544262,
+        "type_b": 0.0010205686322657726,
+        "type_c": 3.907384146473048e-07,
+        "transferred": true
+      },
+      "runtime": 0.6495621204376221,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 4,
+      "params": [
+        0.5756397247314453,
+        -1.3695272207260132,
+        -0.09073693305253983
+      ],
+      "standard_errors": [
+        0.12998248636722565,
+        0.15222281217575073,
+        0.15147143602371216
+      ],
+      "policy_tv": 0.00392027595805921,
+      "value_rmse": 0.3231476389476087,
+      "regret": {
+        "baseline": 0.0018721646915207475,
+        "type_a": 0.0019059983992666578,
+        "type_b": 0.0019314457064146463,
+        "type_c": 4.984911424637189e-07,
+        "transferred": true
+      },
+      "runtime": 0.6287600994110107,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 5,
+      "params": [
+        0.30951839685440063,
+        -1.6122167110443115,
+        0.19531117379665375
+      ],
+      "standard_errors": [
+        0.12835600972175598,
+        0.1508156806230545,
+        0.14967568218708038
+      ],
+      "policy_tv": 0.003112276364545344,
+      "value_rmse": 0.08148474303248464,
+      "regret": {
+        "baseline": 0.0003528085270325193,
+        "type_a": 0.00032267596328403904,
+        "type_b": 0.0002844446724186227,
+        "type_c": 2.0848988045822216e-07,
+        "transferred": true
+      },
+      "runtime": 0.7437100410461426,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 6,
+      "params": [
+        0.3738850951194763,
+        -1.6157032251358032,
+        0.16091686487197876
+      ],
+      "standard_errors": [
+        0.1289813369512558,
+        0.15182437002658844,
+        0.15044920146465302
+      ],
+      "policy_tv": 0.004284349879694681,
+      "value_rmse": 0.7904333759977599,
+      "regret": {
+        "baseline": 0.0015053382671346089,
+        "type_a": 0.001544932376772827,
+        "type_b": 0.0014370052557127846,
+        "type_c": 4.2831755029415455e-07,
+        "transferred": true
+      },
+      "runtime": 0.6441919803619385,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 7,
+      "params": [
+        0.36029043793678284,
+        -1.557309865951538,
+        0.14281292259693146
+      ],
+      "standard_errors": [
+        0.13072599470615387,
+        0.15337924659252167,
+        0.15253525972366333
+      ],
+      "policy_tv": 0.0034891186891746885,
+      "value_rmse": 0.28144316030179595,
+      "regret": {
+        "baseline": 0.0012000056554482955,
+        "type_a": 0.0010881444553728905,
+        "type_b": 0.0010888836456153636,
+        "type_c": 2.8587499688809125e-07,
+        "transferred": true
+      },
+      "runtime": 0.6420371532440186,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 8,
+      "params": [
+        0.3891332447528839,
+        -1.6964658498764038,
+        0.16582386195659637
+      ],
+      "standard_errors": [
+        0.12905141711235046,
+        0.15109023451805115,
+        0.15024536848068237
+      ],
+      "policy_tv": 0.0038761421810866023,
+      "value_rmse": 0.1903382375608317,
+      "regret": {
+        "baseline": 0.002025852479245996,
+        "type_a": 0.002006940411259795,
+        "type_b": 0.0017172357291306835,
+        "type_c": 5.58354183081327e-07,
+        "transferred": true
+      },
+      "runtime": 0.6308631896972656,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "high_discount",
+      "rep": 9,
+      "params": [
+        0.668146550655365,
+        -1.2889362573623657,
+        -0.21288779377937317
+      ],
+      "standard_errors": [
+        0.12923556566238403,
+        0.15187396109104156,
+        0.15068331360816956
+      ],
+      "policy_tv": 0.0061949402964898235,
+      "value_rmse": 0.891915833835058,
+      "regret": {
+        "baseline": 0.01186929512752012,
+        "type_a": 0.011037019725023517,
+        "type_b": 0.011735467771558945,
+        "type_c": 1.764886501202982e-06,
+        "transferred": true
+      },
+      "runtime": 0.6348307132720947,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 0,
+      "params": [
+        -0.5171169638633728,
+        -0.04735104367136955,
+        0.8306633234024048
+      ],
+      "standard_errors": [
+        0.02140156738460064,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.002274905997812306,
+      "value_rmse": 0.1081329139050628,
+      "regret": {
+        "baseline": 0.0002519787298485776,
+        "type_a": 0.0002578502463395246,
+        "type_b": 0.00024996468629479566,
+        "type_c": 5.6540663518684065e-08,
+        "transferred": true
+      },
+      "runtime": 1.3514111042022705,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 1,
+      "params": [
+        -0.4969569146633148,
+        -0.05427701026201248,
+        0.814063549041748
+      ],
+      "standard_errors": [
+        0.021375544369220734,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.002636165816234898,
+      "value_rmse": 0.14557245568493438,
+      "regret": {
+        "baseline": 0.00048518073486348196,
+        "type_a": 0.0005080386230945543,
+        "type_b": 0.0005160691316846247,
+        "type_c": 1.5314977303611821e-07,
+        "transferred": true
+      },
+      "runtime": 0.5028049945831299,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 2,
+      "params": [
+        -0.5122048258781433,
+        -0.04717376083135605,
+        0.8292655944824219
+      ],
+      "standard_errors": [
+        0.02139853499829769,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0014438666858271314,
+      "value_rmse": 0.06745907103256409,
+      "regret": {
+        "baseline": 0.00011104748399830718,
+        "type_a": 0.00011345526323796199,
+        "type_b": 0.00011241195646675739,
+        "type_c": 2.3534540813880026e-08,
+        "transferred": true
+      },
+      "runtime": 0.4245309829711914,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 3,
+      "params": [
+        -0.5604071617126465,
+        -0.03969712555408478,
+        0.8519728183746338
+      ],
+      "standard_errors": [
+        0.02138737216591835,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.006312560837370422,
+      "value_rmse": 0.2760708500326995,
+      "regret": {
+        "baseline": 0.0023526357403647977,
+        "type_a": 0.0023993405729545517,
+        "type_b": 0.002448820565461982,
+        "type_c": 5.182650540657003e-07,
+        "transferred": true
+      },
+      "runtime": 0.4410209655761719,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 4,
+      "params": [
+        -0.5062097311019897,
+        -0.04878037050366402,
+        0.8237066268920898
+      ],
+      "standard_errors": [
+        0.021341143175959587,
+        8.96179485321045,
+        4.480916976928711
+      ],
+      "policy_tv": 0.0016481929603214616,
+      "value_rmse": 0.08413622047659249,
+      "regret": {
+        "baseline": 0.0001189123687939436,
+        "type_a": 0.00012319436113310546,
+        "type_b": 0.00011493476324163621,
+        "type_c": 3.0672686043949924e-08,
+        "transferred": true
+      },
+      "runtime": 0.4218916893005371,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 5,
+      "params": [
+        -0.5526933073997498,
+        -0.03297436982393265,
+        0.8595790863037109
+      ],
+      "standard_errors": [
+        0.021405886858701706,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.00527575017719209,
+      "value_rmse": 0.03458170462593521,
+      "regret": {
+        "baseline": 0.0016921956215658568,
+        "type_a": 0.0017449241414887273,
+        "type_b": 0.002047218815091449,
+        "type_c": 4.662051090486498e-07,
+        "transferred": true
+      },
+      "runtime": 0.4120500087738037,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 6,
+      "params": [
+        -0.5076360106468201,
+        -0.0484064519405365,
+        0.8243952393531799
+      ],
+      "standard_errors": [
+        0.021415717899799347,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0017627763706441278,
+      "value_rmse": 0.08905352989047365,
+      "regret": {
+        "baseline": 0.00013398285548616787,
+        "type_a": 0.0001385134163613127,
+        "type_b": 0.0001289744433844789,
+        "type_c": 3.373731012274325e-08,
+        "transferred": true
+      },
+      "runtime": 0.4153108596801758,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 7,
+      "params": [
+        -0.5079743266105652,
+        -0.03456561639904976,
+        0.8437877893447876
+      ],
+      "standard_errors": [
+        0.021445324644446373,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.00493624968702915,
+      "value_rmse": 0.27615371210882833,
+      "regret": {
+        "baseline": 0.0017740518112084947,
+        "type_a": 0.0018668368925359206,
+        "type_b": 0.0019040331515477818,
+        "type_c": 5.972168337137707e-07,
+        "transferred": true
+      },
+      "runtime": 0.42127013206481934,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 8,
+      "params": [
+        -0.4946258068084717,
+        -0.04136085510253906,
+        0.8319510817527771
+      ],
+      "standard_errors": [
+        0.021351099014282227,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.004140178937912429,
+      "value_rmse": 0.22298911259066478,
+      "regret": {
+        "baseline": 0.0009015458652060626,
+        "type_a": 0.00094341839948123,
+        "type_b": 0.0009093002166639194,
+        "type_c": 2.7964718056068095e-07,
+        "transferred": true
+      },
+      "runtime": 0.4102020263671875,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 9,
+      "params": [
+        -0.48062148690223694,
+        -0.05689401552081108,
+        0.8054841756820679
+      ],
+      "standard_errors": [
+        0.021313564851880074,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.0028610755687236682,
+      "value_rmse": 0.08737788081555269,
+      "regret": {
+        "baseline": 0.0005748155715472834,
+        "type_a": 0.0006007537307547363,
+        "type_b": 0.0006842678332818014,
+        "type_c": 1.842504187109689e-07,
+        "transferred": true
+      },
+      "runtime": 0.4246530532836914,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 10,
+      "params": [
+        -0.5373202562332153,
+        -0.04155558720231056,
+        0.8422934412956238
+      ],
+      "standard_errors": [
+        0.021419839933514595,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0037440472880292852,
+      "value_rmse": 0.14793722984102944,
+      "regret": {
+        "baseline": 0.0008310282607276484,
+        "type_a": 0.0008475101229070424,
+        "type_b": 0.0008889406872796111,
+        "type_c": 1.8532222309630623e-07,
+        "transferred": true
+      },
+      "runtime": 0.4254007339477539,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 11,
+      "params": [
+        -0.54219651222229,
+        -0.04922313615679741,
+        0.8334799408912659
+      ],
+      "standard_errors": [
+        0.02151086926460266,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0077585156220193255,
+      "value_rmse": 0.38123954084428174,
+      "regret": {
+        "baseline": 0.0026035979492364044,
+        "type_a": 0.002678069212527598,
+        "type_b": 0.002504403515392126,
+        "type_c": 6.382113618299048e-07,
+        "transferred": true
+      },
+      "runtime": 0.427278995513916,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 12,
+      "params": [
+        -0.509476363658905,
+        -0.048079490661621094,
+        0.8253735899925232
+      ],
+      "standard_errors": [
+        0.021427061408758163,
+        8.96179485321045,
+        4.480916976928711
+      ],
+      "policy_tv": 0.001907538357674634,
+      "value_rmse": 0.09522872130495587,
+      "regret": {
+        "baseline": 0.00015635413149324795,
+        "type_a": 0.00016125406461975063,
+        "type_b": 0.0001503596816236021,
+        "type_c": 3.833158538800166e-08,
+        "transferred": true
+      },
+      "runtime": 0.43686604499816895,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 13,
+      "params": [
+        -0.48036521673202515,
+        -0.046515241265296936,
+        0.8193208575248718
+      ],
+      "standard_errors": [
+        0.021348949521780014,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.003645794110199257,
+      "value_rmse": 0.18183221558805962,
+      "regret": {
+        "baseline": 0.0005745732484574249,
+        "type_a": 0.0005922264754648164,
+        "type_b": 0.0005541629329752377,
+        "type_c": 1.454984396459064e-07,
+        "transferred": true
+      },
+      "runtime": 0.4186849594116211,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 14,
+      "params": [
+        -0.502133309841156,
+        -0.04917639121413231,
+        0.8225111365318298
+      ],
+      "standard_errors": [
+        0.021364271640777588,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.001036988616783972,
+      "value_rmse": 0.05462410655958192,
+      "regret": {
+        "baseline": 5.245859051510449e-05,
+        "type_a": 5.46667590993195e-05,
+        "type_b": 5.2083580230575144e-05,
+        "type_c": 1.3730750944103691e-08,
+        "transferred": true
+      },
+      "runtime": 0.42249011993408203,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 15,
+      "params": [
+        -0.5075178146362305,
+        -0.04298428073525429,
+        0.8315626978874207
+      ],
+      "standard_errors": [
+        0.02138201706111431,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0012846338955918041,
+      "value_rmse": 0.050452840767799885,
+      "regret": {
+        "baseline": 0.00012563034888727405,
+        "type_a": 0.00013183310578949675,
+        "type_b": 0.00014674265657950127,
+        "type_c": 4.041312306629916e-08,
+        "transferred": true
+      },
+      "runtime": 0.4258701801300049,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 16,
+      "params": [
+        -0.5222432017326355,
+        -0.042726412415504456,
+        0.8370440602302551
+      ],
+      "standard_errors": [
+        0.021315719932317734,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.0020983594304786416,
+      "value_rmse": 0.04872430012289224,
+      "regret": {
+        "baseline": 0.000270745185422576,
+        "type_a": 0.0002771123053819768,
+        "type_b": 0.00031320635375620376,
+        "type_c": 6.497076438344648e-08,
+        "transferred": true
+      },
+      "runtime": 0.419658899307251,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 17,
+      "params": [
+        -0.5149495601654053,
+        -0.048266515135765076,
+        0.8270720839500427
+      ],
+      "standard_errors": [
+        0.021395215764641762,
+        8.96179485321045,
+        4.480916500091553
+      ],
+      "policy_tv": 0.002796600618262644,
+      "value_rmse": 0.1384858551667659,
+      "regret": {
+        "baseline": 0.000337683252514393,
+        "type_a": 0.00034773705079030705,
+        "type_b": 0.000325080977509783,
+        "type_c": 8.301387297510477e-08,
+        "transferred": true
+      },
+      "runtime": 0.4185447692871094,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 18,
+      "params": [
+        -0.47668179869651794,
+        -0.0556996688246727,
+        0.8083729147911072
+      ],
+      "standard_errors": [
+        0.02138540893793106,
+        8.96179485321045,
+        4.4809160232543945
+      ],
+      "policy_tv": 0.0023890783840543055,
+      "value_rmse": 0.011563354868005667,
+      "regret": {
+        "baseline": 0.00034459555690809636,
+        "type_a": 0.00035550425269629003,
+        "type_b": 0.00041828127164387813,
+        "type_c": 9.506237034309422e-08,
+        "transferred": true
+      },
+      "runtime": 0.42259693145751953,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rank_deficient",
+      "rep": 19,
+      "params": [
+        -0.4772285223007202,
+        -0.04702433571219444,
+        0.8177820444107056
+      ],
+      "standard_errors": [
+        0.021430425345897675,
+        8.96179485321045,
+        4.480916976928711
+      ],
+      "policy_tv": 0.003931214987437372,
+      "value_rmse": 0.1946334962849571,
+      "regret": {
+        "baseline": 0.0006756238693913207,
+        "type_a": 0.0006953653431027023,
+        "type_b": 0.0006538497732862478,
+        "type_c": 1.6835466073316807e-07,
+        "transferred": true
+      },
+      "runtime": 0.41602396965026855,
+      "converged": true,
       "error": null
     }
   ]

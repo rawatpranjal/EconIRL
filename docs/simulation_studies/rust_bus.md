@@ -37,7 +37,7 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 3/3 | 3/3 | [0.012, 2.011] | 0.0130 | 0.0075 | 0.0007 | 0.0008 | 0.0005 | 0.0000 | 4.2 |
 | CCP | structural | 3/3 | 3/3 | [0.011, 2.008] | 0.0125 | 0.0078 | 0.0005 | 0.0006 | 0.0004 | 0.0000 | 3.2 |
-| MPEC | structural | 3/3 | 3/3 | [0.011, 2.010] | 0.0130 | 0.0074 | 0.0007 | 0.0007 | 0.0005 | 0.0000 | 11.4 |
+| MPEC | structural | 3/3 | 3/3 | [0.012, 2.011] | 0.0130 | 0.0075 | 0.0007 | 0.0008 | 0.0005 | 0.0000 | 0.8 |
 | NNES | structural | 3/3 | 3/3 | [0.012, 2.011] | 0.0130 | 0.0075 | 0.0007 | 0.0008 | 0.0005 | 0.0000 | 22.6 |
 | SEES | structural | 3/3 | 0/3 | [0.011, 2.010] | 0.0128 | 0.0074 | 0.0007 | 0.0007 | 0.0004 | 0.0000 | 2.9 |
 | TD-CCP | structural | 3/3 | 3/3 | [0.012, 2.013] | 0.0118 | 0.0090 | 0.0010 | 0.0011 | 0.0007 | 0.0000 | 3.9 |
@@ -50,9 +50,9 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 | Deep-MCE-IRL | behavioral | 3/3 | 3/3 | [-0.082, 0.568] | - | 0.0092 | 3.3450 | 3.2419 | 1.6305 | 0.0005 | 14.0 |
 | MaxMargin-IRL | behavioral | 3/3 | 3/3 | [0.244, 0.970] | - | 0.6341 | 5.0624 | 5.0810 | 19.6480 | 10.1756 | 0.5 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only on that same scale. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
 
-The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the cost parameters on the same scale as the truth, so Param RMSE applies to it alone. The IRL family is scored on behavior and regret. Its reward parameters are on a different scale, because reward is only partially identified from behavior. Estimators that recover a transferable reward adapt under the interventions. Policy-only methods keep their old policy, which is why their Type C regret is large.
+The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the cost parameters on the same scale as the truth, so Param RMSE applies to it alone. The IRL family is scored on behavior and regret. Its reward parameters are in a different parameterization, because reward is only partially identified from behavior. Estimators that recover a transferable reward adapt under the interventions. Policy-only methods keep their old policy, which is why their Type C regret is large.
 
 ## Notes per estimator
 
@@ -78,7 +78,7 @@ The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the c
 
 **GLADIUS.** Neural Q and expected-value networks; tracks behavior.
 
-**AIRL.** Uses reward_arg='state_action'. The recovered reward is on its own scale by design, so policy TV is the right scorecard.
+**AIRL.** Uses reward_arg='state_action'. The recovered reward is in its own parameterization by design, so policy TV is the right scorecard.
 
 **Deep-MCE-IRL.** Neural-reward MCE-IRL via its sklearn-style fit interface; parameters are the neural reward projected onto the linear features.
 

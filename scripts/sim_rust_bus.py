@@ -66,7 +66,7 @@ def _run_ccp(env, panel):
 def _run_mpec(env, panel):
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
-    est = MPECEstimator(config=MPECConfig(solver="slsqp", max_iter=200, constraint_tol=1e-6),
+    est = MPECEstimator(config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
                         compute_hessian=True, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -155,7 +155,7 @@ def _run_airl(env, panel):
     from econirl.estimation import AIRLConfig, AIRLEstimator
 
     # reward_arg="state_action": the default "state" marginalizes the reward
-    # across actions. Recovered parameters stay gauge/shaping-unidentified by
+    # across actions. The recovered reward is in its own parameterization by
     # design, so policy TV is the right scorecard.
     est = AIRLEstimator(config=AIRLConfig(reward_type="linear", reward_arg="state_action",
                                           reward_lr=0.01, discriminator_steps=10,
@@ -231,62 +231,55 @@ DIAGNOSES = {
     "CCP": "Hotz-Miller conditional choice probabilities; recovers cleanly.",
     "MPEC": "Constrained MLE; recovers cleanly.",
     "NNES": "Neural value network plus structural MLE.",
-    "SEES": "Solver-limited here, not model-limited: the spline value basis "
-            "represents the true value function exactly, but the cost "
-            "coefficients live on very different scales (a tiny per-bin "
-            "operating cost against a large flat replacement cost), which "
-            "stretches the optimization landscape so the default iteration "
-            "limit stopped the search mid-descent. With a larger budget and an "
-            "extra data-driven start it reaches the same estimates as the "
-            "other structural methods.",
+    "SEES": "Solver-limited here, not model-limited. The spline basis "
+            "represents the true value function exactly, but the two cost "
+            "coefficients live on very different scales. That stretches the "
+            "optimization landscape, and the default iteration limit stopped "
+            "the search mid-descent. With a larger budget and an extra "
+            "data-driven start it matches the other structural methods.",
     "TD-CCP": "Neural CCP with approximate value iteration.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
-            "optimal weighting (OUFXP). Bellman first-order conditions are scored "
-            "with the value function eliminated before any parameter search, so "
-            "the linear case is closed form; the optimal weights make it as "
-            "asymptotically efficient as maximum likelihood, and standard errors "
-            "come from the efficient moment variance.",
-    "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether the "
-               "gradient norm crossed the tolerance; the objective often plateaus "
-               "first, so the flag can read False while the recovered policy is "
-               "essentially exact. Read it next to Policy TV.",
+            "optimal weighting (OUFXP). The value function is eliminated before "
+            "any parameter search, so the linear case is closed form. The "
+            "optimal weights make it as efficient as maximum likelihood, and "
+            "the standard errors come from the same theory.",
+    "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether "
+               "the gradient norm crossed the tolerance. The objective often "
+               "plateaus first, so the flag can read False while the recovered "
+               "policy is essentially exact. Read it next to Policy TV.",
     "MaxEnt-IRL": "Fed action-dependent features. Its gradient loop previously "
                   "took a fixed scalar step, which overshoots when feature "
-                  "columns differ in scale by an order of magnitude (mileage "
-                  "cost vs a unit replacement indicator); the loop now takes "
-                  "adaptive per-parameter steps, the same scheme its causal "
-                  "cousin MCE-IRL uses. A small residual gap to MCE-IRL "
-                  "remains because trajectory-entropy feature matching is not "
-                  "the causal choice model that generated the data.",
-    "IQ-Learn": "q_type='linear' uses the feature structure; a tabular Q-table does "
-                "not propagate to unvisited states.",
+                  "columns differ in scale by an order of magnitude. The loop "
+                  "now takes adaptive per-parameter steps, the same scheme "
+                  "MCE-IRL uses. A small residual gap to MCE-IRL remains "
+                  "because trajectory-entropy matching is not the causal "
+                  "choice model that generated the data.",
+    "IQ-Learn": "q_type='linear' uses the feature structure. A tabular Q-table "
+                "does not propagate to unvisited states.",
     "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
-    "AIRL": "reward_arg='state_action'; recovered parameters stay gauge/shaping-"
-            "unidentified by design, so policy TV is the right scorecard.",
-    "f-IRL": "Uses the forward-KL divergence (bounded density-ratio gradient; "
-             "the chi-squared variant's unbounded gradient is unstable on "
-             "near-deterministic experts) with a reward clip matched to the "
-             "problem's cost scale. It recovers a tabular reward, one value "
-             "per state-action pair, which tracks behavior well but lives "
-             "outside the two-feature cost gauge - so it cannot be re-solved "
-             "under the interventions and is scored with its frozen policy, "
-             "which is why its Type C regret is large.",
+    "AIRL": "Uses reward_arg='state_action'. The recovered reward is in its "
+            "own parameterization by design, so policy TV is the right "
+            "scorecard.",
+    "f-IRL": "Uses the forward-KL divergence with a reward clip matched to the "
+             "cost scale. The chi-squared variant is unstable on "
+             "near-deterministic experts. It recovers a tabular reward, one "
+             "value per state-action pair. That tracks behavior well but "
+             "cannot be re-solved under the interventions, so it is scored "
+             "with its original policy and its Type C regret is large.",
     "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit interface; "
                     "parameters are the neural reward projected onto the linear "
                     "features.",
-    "MaxMargin-IRL": "An honest structural failure, not a tuning problem: "
-                     "max-margin apprenticeship learning recovers a reward "
-                     "direction under a unit-norm normalization with no link "
-                     "to the choice model's noise scale, so the policy it "
-                     "implies is far sharper than the truth, and the extreme "
-                     "asymmetry between the per-bin operating cost and the "
-                     "flat replacement cost makes the replacement feature "
-                     "dominate the margin. The resulting policy distance is "
-                     "structural to the method on this problem.",
-    "BC": "Behavioral cloning; matches observed choices but recovers no reward "
-          "at all - its parameter vector is just the smoothed keep/replace "
-          "frequency per mileage bin - so it cannot transfer to a "
-          "counterfactual world and its Type C regret is large.",
+    "MaxMargin-IRL": "A structural failure, not a tuning problem. Max-margin "
+                     "apprenticeship learning recovers a reward direction "
+                     "under a unit-norm constraint, with no link to the "
+                     "choice model's noise scale. The policy it implies is "
+                     "far sharper than the truth. The flat replacement cost "
+                     "also dominates the margin against the small per-bin "
+                     "operating cost. The policy distance is inherent to the "
+                     "method on this problem.",
+    "BC": "Matches observed choices but recovers no reward. Its parameters are "
+          "the smoothed keep/replace frequencies per mileage bin. It cannot "
+          "transfer to a counterfactual world, so its Type C regret is large.",
 }
 
 EXCLUDED = [
@@ -301,10 +294,10 @@ EXCLUDED = [
      "page roster by scope decision to keep the comparison on the core "
      "structural and IRL families"},
     {"name": "f-IRL, BC", "reason": "dropped from this page's display by scope "
-     "decision: both recover objects outside the two-parameter cost gauge (a "
-     "tabular reward and a choice-probability table respectively), so their "
-     "rows invite meaningless parameter comparisons here; their raw records "
-     "remain in the results file"},
+     "decision. Both recover objects in a different parameterization, a "
+     "tabular reward and a choice-probability table. Their rows would invite "
+     "meaningless parameter comparisons here. Their raw records remain in the "
+     "results file"},
 ]
 
 CELLS = (
@@ -346,7 +339,7 @@ NARRATIVE = {
         "\n"
         "Mileage sits on a discrete grid $s \\in \\{0, \\ldots, S-1\\}$. Keeping "
         "the engine (action $0$) pays a per-bin operating cost and lets mileage "
-        "drift up by $\\Delta s \\in \\{0, 1, 2\\}$; replacing it (action $1$) "
+        "drift up by $\\Delta s \\in \\{0, 1, 2\\}$. Replacing it (action $1$) "
         "pays a flat cost and resets the engine:\n"
         "\n"
         "$$\n"
@@ -361,9 +354,9 @@ NARRATIVE = {
         "\n"
         "where replacement resets the engine and the same one-period drift "
         "$p = (p_0, p_1, p_2)$ then applies from zero, so the post-replacement "
-        "state lands on $\\{0, 1, 2\\}$ rather than exactly on zero. "
+        "state lands on $\\{0, 1, 2\\}$ rather than exactly on zero.\n"
         "\n"
-        "with $\\theta_{\\mathrm{oc}} = 0.01$ and "
+        "The true parameters are $\\theta_{\\mathrm{oc}} = 0.01$ and "
         "$\\theta_{\\mathrm{rc}} = 2.0$. The agent discounts at $\\beta$ and "
         "faces i.i.d. logit taste shocks (scale $\\sigma = 1$), so behavior "
         "solves the soft Bellman equation\n"
@@ -383,16 +376,15 @@ NARRATIVE = {
     "cells": {
         "rust_bus": {
             "after": (
-                "Reading the table: the structural family (NFXP, CCP, MPEC, NNES, "
-                "SEES, TD-CCP) recovers the cost parameters in the same gauge as "
-                "the truth, so Param RMSE applies to it alone. The IRL family is "
-                "scored on behavior and regret; reward parameters from these "
-                "methods live in a different gauge (reward is only partially "
-                "identified from behavior), so parameter-level comparisons "
-                "across the divide would be meaningless. Estimators that recover "
-                "a reward in the linear feature gauge adapt under the Type A/B/C "
-                "interventions; policy-only methods keep their frozen policy, "
-                "which is exactly why their Type C regret is large."
+                "The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, "
+                "UFXP) recovers the cost parameters on the same scale as the "
+                "truth, so Param RMSE applies to it alone. The IRL family is "
+                "scored on behavior and regret. Its reward parameters are in "
+                "a different parameterization, because reward is only partially "
+                "identified from behavior. Estimators that recover a "
+                "transferable reward adapt under the interventions. "
+                "Policy-only methods keep their old policy, which is why "
+                "their Type C regret is large."
             ),
         },
     },

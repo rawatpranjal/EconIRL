@@ -1,8 +1,8 @@
 # Counterfactuals
 
 GLADIUS projects implied rewards onto structural features via action-difference
-regression. The projected parameters live in a partially identified gauge: the
-action-difference projection removes a state-dependent additive constant but
+regression. The projected parameters are only partially identified. The
+action-difference projection removes a state-dependent additive constant. It
 does not guarantee that the recovered reward matches the data-generating reward
 in an absolute sense.
 

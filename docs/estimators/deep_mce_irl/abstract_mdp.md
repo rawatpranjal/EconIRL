@@ -52,7 +52,7 @@ The `reward_` attribute holds the anchored neural reward matrix $R(s, a)$.
 Action 0 has zero reward everywhere by construction (the anchor). The
 remaining columns represent the relative value of actions 1 and 2 versus
 action 0 at each state. Because the reward is anchored, the matrix can be
-compared against an oracle reward computed under the same gauge.
+compared against an oracle reward computed with the same anchor.
 
 The `policy_` and `value_` attributes come from solving the soft Bellman
 equation at the final learned reward, so they are the policy and value the

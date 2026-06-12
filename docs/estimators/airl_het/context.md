@@ -31,8 +31,8 @@ AIRL-Het sits at the intersection of adversarial IRL and structural DDC. Like
 MCE-IRL, GLADIUS, and base AIRL it estimates reward through a behavioral
 objective rather than a likelihood, so standard errors for the reward parameters
 are not available. Unlike them, its anchor normalization lets the recovered
-reward support structural counterfactuals in the same gauge as the truth,
-provided the anchor design is credible.
+reward support structural counterfactuals with the same parameterization as the
+truth, provided the anchor design is credible.
 
 Against base AIRL, AIRL-Het adds two things: anchor identification for
 action-dependent settings, and segment-specific reward and policy objects for

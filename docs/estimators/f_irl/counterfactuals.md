@@ -2,8 +2,8 @@
 
 f-IRL recovers a tabular state reward rather than structural utility parameters,
 so counterfactual analysis works differently from structural estimators. The
-recovered reward is not in the same linear-feature gauge as the data-generating
-utility and cannot be re-solved under a reward shift in the structural sense.
+recovered reward is not in the same parameterization as the data-generating
+utility. It cannot be re-solved under a reward shift in the structural sense.
 Instead, the post-fit policy is used directly for behavioral prediction.
 
 The validation checks whether the recovered policy still performs well in each
@@ -47,4 +47,4 @@ types tested. This is not the same as structural re-solving: the reward was not
 updated to reflect the new world, and the policy was not re-derived from first
 principles. For interventions that substantially change the optimal action
 distribution, a structural estimator (NFXP, CCP, UFXP) with a linear utility
-gauge will produce more reliable counterfactual predictions.
+specification will produce more reliable counterfactual predictions.

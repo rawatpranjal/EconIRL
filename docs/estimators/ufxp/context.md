@@ -28,9 +28,9 @@ estimator collapses to a single closed-form solve.
 
 ## Where UFXP Fits
 
-UFXP sits with NFXP, CCP, and MPEC in the structural family: it recovers the
-utility parameters in the same gauge as the data-generating process, supports
-counterfactual re-solving, and reports standard errors. Like CCP it starts
+UFXP sits with NFXP, CCP, and MPEC in the structural family. It recovers the
+utility parameters in the same parameterization as the data-generating
+process, supports counterfactual re-solving, and reports standard errors. Like CCP it starts
 from inverted empirical choice probabilities, so it shares CCP's sensitivity
 to thin state coverage; unlike CCP it scores all of Bellman's restrictions
 with efficient weights rather than inverting once, and its optimal weighting

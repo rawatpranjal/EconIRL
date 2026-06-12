@@ -432,7 +432,8 @@ def _param_block(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
 _TABLE_NOTE = (
     "Param RMSE is reported for the structural family only. Those estimators "
     "share the parameterization of the true model, so the comparison is "
-    "meaningful. Recovered params are printed only on that same scale. A "
+    "meaningful. Recovered params are printed only in that same "
+    "parameterization. A "
     "tabular reward or a choice-probability table is labeled instead of "
     "printed. Policy TV is the total-variation distance from the "
     "true-parameter policy. Conv is the estimator's own convergence flag. A "

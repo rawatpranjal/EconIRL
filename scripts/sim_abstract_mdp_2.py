@@ -87,7 +87,7 @@ def _run_ccp(env, panel):
 def _run_mpec(env, panel):
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
-    est = MPECEstimator(config=MPECConfig(solver="slsqp", max_iter=200, constraint_tol=1e-6),
+    est = MPECEstimator(config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
                         compute_hessian=True, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -166,43 +166,45 @@ ROSTER_C = (
 
 
 DIAGNOSES = {
-    "NFXP-SA": "Rust's original inner loop: successive approximation, a pure "
-               "contraction with rate equal to the discount factor. It reaches "
-               "the same maximum-likelihood answer; what changes with scale and "
-               "discount is how long it takes.",
-    "NFXP-NK": "The Iskhakov et al refinement: successive approximation to get "
-               "near the fixed point, then Newton-Kantorovich steps. Same "
-               "estimate, different bill.",
-    "CCP": "Hotz-Miller inversion: estimate choice probabilities, invert once, no "
-           "fixed point inside the optimizer. Its standard errors come from the "
-           "outer Hessian and can fail to be finite even when the point estimate "
-           "is fine; the SE-availability column makes that visible.",
-    "MPEC": "Constrained MLE: the Bellman equation enters as constraints for the "
-            "SLSQP solver, with one variable per state plus the parameters.",
+    "NFXP-SA": "Rust's original inner loop. Successive approximation, a pure "
+               "contraction with rate equal to the discount factor. It "
+               "reaches the same maximum-likelihood answer. What changes "
+               "with scale and discount is how long it takes.",
+    "NFXP-NK": "The Iskhakov et al refinement. Successive approximation to "
+               "get near the fixed point, then Newton-Kantorovich steps. "
+               "Same estimate, different bill.",
+    "CCP": "Hotz-Miller inversion. Estimate choice probabilities, invert "
+           "once, no fixed point inside the optimizer. Its standard errors "
+           "come from the outer Hessian and can fail to be finite even when "
+           "the point estimate is fine. The SE avail column makes that "
+           "visible.",
+    "MPEC": "Constrained MLE. The Bellman equation enters as constraints for "
+            "the SLSQP solver, with one variable per state plus the "
+            "parameters.",
     "NNES": "Neural value network plus structural MLE.",
-    "SEES": "Sieve value function: bspline basis with basis_dim = num_states so "
-            "the basis can span the value function.",
+    "SEES": "Sieve value function. A bspline basis with basis_dim = "
+            "num_states, so the basis can span the value function.",
     "TD-CCP": "Neural CCP with approximate value iteration and cross-fitted "
               "standard errors.",
-    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
-            "optimal weighting (OUFXP). The Bellman first-order conditions are "
-            "scored directly; the value function is eliminated before the "
-            "search, so no fixed point is ever solved inside an optimizer and "
-            "the linear case is closed form. As asymptotically efficient as "
-            "maximum likelihood, with standard errors from the efficient "
-            "moment variance, so it enters the coverage table on equal terms.",
-    "MCE-IRL": "Behavioral reference on the harder cell. Its converged flag is "
-               "conservative (gradient-norm tolerance); read it next to Policy TV.",
+    "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the "
+            "paper's optimal weighting (OUFXP). The value function is "
+            "eliminated before the search, so no fixed point is ever solved "
+            "inside an optimizer and the linear case is closed form. It "
+            "matches maximum likelihood efficiency and reports standard "
+            "errors, so it enters the coverage table on equal terms.",
+    "MCE-IRL": "Behavioral reference on the harder cell. Its converged flag "
+               "is conservative, a gradient-norm tolerance. Read it next to "
+               "Policy TV.",
 }
 
 EXCLUDED = [
     {"name": "MaxEnt-IRL, IQ-Learn, AIRL, f-IRL, GLADIUS, Deep-MCE-IRL, BC",
-     "reason": "this page's question is structural: parameter recovery, inference "
-     "quality, and identification as the problem hardens. The IRL family is "
-     "compared on the Rust bus and gridworld pages; MCE-IRL stays here as the "
-     "behavioral reference"},
+     "reason": "this page's question is structural. Parameter recovery, "
+     "inference quality, and identification as the problem hardens. The IRL "
+     "family is compared on the bus engine and gridworld pages. MCE-IRL "
+     "stays here as the behavioral reference"},
     {"name": "GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL",
-     "reason": "known slow; their single-run showing is on the Rust bus page"},
+     "reason": "known slow. Their single-run showing is on the bus engine page"},
 ]
 
 CELLS = (
@@ -269,12 +271,12 @@ NARRATIVE = {
     "intro": (
         "The sanity-check page showed every estimator recovering an easy "
         "problem. This page hardens the problem along three separate axes and "
-        "watches the structural family specifically, because the questions are "
-        "structural: what happens to runtime as the state space grows, what "
-        "happens to inference as the discount factor approaches one, and what "
-        "happens to the parameters when the reward features are collinear. "
-        "Each axis gets its own cell, run on the same engine and reported from "
-        "the same raw records as every other page.\n"
+        "watches the structural family specifically. What happens to runtime "
+        "as the state space grows? What happens to inference as the discount "
+        "factor approaches one? What happens to the parameters when the "
+        "reward features are collinear? Each axis gets its own cell, run on "
+        "the same engine and reported from the same raw records as every "
+        "other page.\n"
         "\n"
         "## The data-generating process\n"
         "\n"
@@ -291,8 +293,8 @@ NARRATIVE = {
         "$$\n"
         "\n"
         "The reward is linear in polynomial features of the normalized state "
-        "index $x_s = s/(S-1)$. Action $0$ is a zeroed outside option (the "
-        "identification anchor); for $a \\geq 1$,\n"
+        "index $x_s = s/(S-1)$. Action $0$ is a zeroed outside option, the "
+        "identification anchor. For $a \\geq 1$,\n"
         "\n"
         "$$\n"
         "u_\\theta(s,a) = \\theta^\\top \\varphi(s,a),\n"
@@ -312,65 +314,67 @@ NARRATIVE = {
         "\n"
         "and the data are $N$ independent agents simulated for $T$ periods "
         "from $\\pi^*$ and $P$. The third cell swaps in a small handcrafted "
-        "MDP whose features are deliberately collinear; its construction is "
+        "MDP whose features are deliberately collinear. Its construction is "
         "described in that cell."
     ),
     "cells": {
         "harder_300": {
             "before": (
-                "The first cell is about cost at scale. All estimators face the "
-                "same 300-state problem; the runtime column is the result. The "
-                "two NFXP rows are the same estimator with two inner solvers, "
-                "Rust's original successive approximation against the "
-                "Newton-Kantorovich polyalgorithm, so the refinement's value is "
-                "measured on this page rather than asserted."
+                "The first cell is about cost at scale. All estimators face "
+                "the same 300-state problem, and the runtime column is the "
+                "result. The two NFXP rows are the same estimator with two "
+                "inner solvers, Rust's original successive approximation "
+                "against the Newton-Kantorovich polyalgorithm. The "
+                "refinement's value is measured on this page rather than "
+                "asserted."
             ),
             "after": (
-                "The measured answer on the solver contrast is that there is "
-                "none to report at this scale: successive approximation and "
-                "the Newton-Kantorovich refinement land within a second of "
-                "each other, because a compiled dense contraction over 300 "
-                "states is simply cheap. The textbook slowdown of the plain "
-                "contraction is a statement about iteration counts, and it "
-                "only becomes a wall-clock story when each iteration is "
-                "expensive; the high-dimension page is where that bites. The "
-                "approximation-based members (SEES, TD-CCP) trade some "
-                "parameter precision for their flexibility while matching the "
-                "exact family's behavioral accuracy."
+                "On the solver contrast there is nothing to report at this "
+                "scale. Successive approximation and the Newton-Kantorovich "
+                "refinement land within a second of each other. A compiled "
+                "dense contraction over 300 states is simply cheap. The "
+                "textbook slowdown of the plain contraction is a statement "
+                "about iteration counts. It only becomes a wall-clock story "
+                "when each iteration is expensive, and the high-dimension "
+                "page is where that bites. The approximation-based members "
+                "(SEES, TD-CCP) trade some parameter precision for "
+                "flexibility while matching the exact family's behavioral "
+                "accuracy."
             ),
         },
         "high_discount": {
             "before": (
-                "The second cell moves the discount factor to 0.99 and asks a "
-                "harder question than point recovery: is the reported "
+                "The second cell moves the discount factor to 0.99 and asks "
+                "a harder question than point recovery. Is the reported "
                 "uncertainty usable? The parameter table reports bias, the "
-                "spread of estimates across replications, RMSE, and the share "
-                "of nominal 95% intervals that actually cover the truth, "
-                "together with how often each estimator produced finite "
-                "standard errors at all. (On runtime, the discount move barely "
-                "registers here: even the plain contraction stays around four "
-                "seconds at 300 states, so the cell's content is inference, "
-                "not speed. NFXP-SA runs 2 of 10 replications as a runtime "
-                "spot-check only; its inference is the same MLE as NFXP-NK, "
-                "which runs all 10.)"
+                "spread of estimates across replications, RMSE, and the "
+                "share of nominal 95% intervals that actually cover the "
+                "truth, together with how often each estimator produced "
+                "finite standard errors at all. On runtime the discount move "
+                "barely registers. Even the plain contraction stays around "
+                "four seconds at 300 states, so this cell is about "
+                "inference, not speed. NFXP-SA runs 2 of 10 replications as "
+                "a runtime spot-check. Its inference is the same MLE as "
+                "NFXP-NK, which runs all 10."
             ),
             "after": (
-                "The SE-availability column is the cell's headline: one "
-                "estimator routinely fails to deliver usable standard errors "
-                "here while recovering good point estimates, and without that "
-                "column the blank coverage entries would read as a formatting "
-                "gap rather than the inference failure they are."
+                "The SE avail column is the headline. One estimator "
+                "routinely fails to deliver usable standard errors here "
+                "while recovering good point estimates. Without that column, "
+                "the blank coverage entries would read as a formatting gap "
+                "rather than an inference failure."
             ),
         },
         "rank_deficient": {
             "before": (
-                "The last cell breaks identification on purpose. With the third "
-                "feature exactly twice the second, the design matrix has rank 2 "
-                "and the individual coordinates theta_1 and theta_2 are not "
-                "separately identified, only their combination. The interesting "
-                "output is not the (meaningless) per-coordinate bias but the "
-                "design diagnostics above the table and how each estimator's "
-                "intervals behave when the question has no answer."
+                "The last cell breaks identification on purpose. The third "
+                "feature is exactly twice the second, so the design matrix "
+                "has rank 2. The coordinates theta_1 and theta_2 are not "
+                "separately identified, only their combination. The "
+                "interesting output is not the per-coordinate bias, which is "
+                "meaningless here. It is the design diagnostics above the "
+                "table, and how each estimator's intervals behave when the "
+                "question has no answer."
             ),
         },
     },

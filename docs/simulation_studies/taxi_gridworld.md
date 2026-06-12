@@ -39,10 +39,10 @@ An agent starts at the top-left corner of an 8x8 grid and walks toward an absorb
 | BC | behavioral | 3/3 | 3/3 | different parameterization (320 values) | - | 0.1298 | 2.1161 | 2.1524 | 48.9540 | 24.3452 | 0.2 |
 | NFXP | structural | 3/3 | 3/3 | [-15615.134, -3419.303, -9623.201] | 10826.8304 | 0.0004 | 0.0029 | 0.0033 | 15.1643 | 0.0512 | 12.0 |
 | CCP | structural | 3/3 | 3/3 | [-88.773, 87.366, -136.175] | 106.1060 | 0.0081 | 0.0028 | 0.0032 | 14.1712 | 0.0495 | 3.1 |
-| MPEC | structural | 3/3 | 3/3 | [-26.021, 7.939, -19.005] | 20.1388 | 0.0003 | 0.0027 | 0.0031 | 11.2165 | 0.0491 | 8.5 |
+| MPEC | structural | 3/3 | 3/3 | [-108.727, 30.044, -103.928] | 89.8227 | 0.0004 | 0.0029 | 0.0033 | 11.0472 | 0.0512 | 0.9 |
 | UFXP | structural | 3/3 | 0/3 | [-2.333, 2.456, 3.726] | 6.1309 | 0.0388 | 30.4731 | 30.5956 | 23.6958 | 27.0447 | 0.1 |
 
-Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only on that same scale. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
+Param RMSE is reported for the structural family only. Those estimators share the parameterization of the true model, so the comparison is meaningful. Recovered params are printed only in that same parameterization. A tabular reward or a choice-probability table is labeled instead of printed. Policy TV is the total-variation distance from the true-parameter policy. Conv is the estimator's own convergence flag. A conservative flag can read False while the policy is accurate, so read it next to Policy TV. Regret is welfare loss, lower is better. Base is the observed world. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Structural estimators re-solve the model and adapt. Behavioral estimators keep their old policy.
 
 The headline is the gap between Policy TV and Param RMSE for the structural family. Behavior is near-perfect while the parameter estimates are orders of magnitude from the truth. That is not estimation error. It is non-identification. The raw feature design has full rank, but the action-contrast design has rank 1. The step-penalty and distance features take the same value for every action at a state, so they difference out of every choice probability. Choice data can only identify the contrast design. Any parameter vector on that two-dimensional ridge produces the same behavior, so each estimator reports an arbitrary ridge point. The practical lesson is to check the rank of the action-differenced features before estimating, not just the raw design.
 
@@ -56,7 +56,7 @@ One caveat on regret for this page. Transitions are deterministic, so the Type B
 
 **Deep-MCE-IRL.** Neural-reward MCE-IRL via its sklearn-style fit interface. Parameters are the neural reward projected onto the linear features.
 
-**AIRL.** Uses reward_arg='state_action'. The recovered reward is on its own scale by design, so policy TV is the right scorecard. Even behavior is hard here. The discriminator sees mostly corridor states.
+**AIRL.** Uses reward_arg='state_action'. The recovered reward is in its own parameterization by design, so policy TV is the right scorecard. Even behavior is hard here. The discriminator sees mostly corridor states.
 
 **IQ-Learn.** q_type='linear' ties its Q function to the same feature basis, so it inherits the contrast-rank problem on top of thin coverage.
 

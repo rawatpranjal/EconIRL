@@ -29,9 +29,9 @@ On the primary synthetic cell the welfare regret of Deep MCE-IRL's
 counterfactual policies is below 0.002 in every family (Type A 0.00164,
 Type B 0.00148, Type C 0.00191; see the
 [machine-readable results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json)
-and the [Simulation Study](validation.md) page). Because the learned reward
-lives in the same discrete state-action gauge as the oracle, it re-solves
-cleanly under all three intervention types.
+and the [Simulation Study](validation.md) page). The learned reward is defined
+on the same discrete state-action space as the oracle and uses the same
+anchor, so it re-solves cleanly under all three intervention types.
 
 ## Limitations
 
@@ -39,7 +39,7 @@ The neural reward map is anchored but not structurally identified. Across
 environments with different transition dynamics or state spaces, the reward
 values are not directly comparable in the way structural parameters are. Use
 counterfactual re-solving only when the environment being perturbed shares the
-same state space and gauge as the estimation environment.
+same state space and anchor as the estimation environment.
 
 Raw neural network weights should not be transferred or compared across
 separate fits. The reward matrix output by `model.reward_` is the correct

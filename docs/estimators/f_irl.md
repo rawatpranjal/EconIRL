@@ -23,7 +23,7 @@ state-marginal matching via f-divergence minimization.
 | State marginal matching is the study question. | You want a feature-matching IRL baseline (use MaxEnt-IRL or MCE-IRL). |
 | Transitions are known or pre-estimated. | The expert data is too sparse to estimate a reliable state marginal. |
 | You want multiple f-divergence choices (forward KL, reverse KL, JS, chi-squared, TV). | You need standard errors on the recovered parameters. |
-| An imitation or behavioral baseline with divergence control is needed. | Counterfactual re-solving under a structural gauge is the primary goal. |
+| An imitation or behavioral baseline with divergence control is needed. | Counterfactual re-solving in a structural model is the primary goal. |
 
 ## Minimal Fit
 

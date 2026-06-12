@@ -25,7 +25,7 @@ the recovered reward invariant to dynamics changes.
 ## Where AIRL Fits
 
 AIRL sits in the behavioral IRL family alongside MCE-IRL, f-IRL, and GLADIUS.
-It does not recover structural parameters in the same gauge as the
+It does not recover structural parameters in the same parameterization as the
 data-generating process, and it does not report standard errors. Its score is
 behavioral: how close is the recovered policy to the oracle policy, and how
 much welfare does it lose in counterfactual worlds.

@@ -47,7 +47,7 @@ in double digits.
 
 AIRL-Het (Lee, Sudhir, and Wang 2026) adds two design elements to recover
 action-dependent rewards in dynamic discrete choice: an anchor action whose
-reward is pinned to zero to fix the reward gauge, and an absorbing-state row
+reward is pinned to zero to fix the reward normalization, and an absorbing-state row
 pinned to zero to fix the level. These anchors turn the adversarial game into
 one that can identify an action-dependent reward surface. The implementation is
 in `econirl.estimation.adversarial.airl_het`, documented separately.

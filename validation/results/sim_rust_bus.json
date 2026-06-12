@@ -138,7 +138,7 @@
     "snippets": {
       "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"hybrid\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"slsqp\", max_iter=200, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "NNES": "def _run_nnes(env, panel):\n    from econirl.estimation.nnes import NNESEstimator\n\n    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,\n                        compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "SEES": "def _run_sees(env, panel):\n    from econirl.estimation.sees import SEESEstimator\n\n    # Basis must span the value function: bspline basis_dim >= num_states (20).\n    # The cost coefficients live on very different scales here (per-bin\n    # operating cost vs a flat replacement cost), which stretches the\n    # optimization landscape: the default 500 L-BFGS iterations stop\n    # mid-descent. More iterations plus a data-driven extra start reach the\n    # optimum the basis already represents exactly.\n    est = SEESEstimator(basis_type=\"bspline\", basis_dim=20, warm_start_value=True,\n                        penalty_weight=10.0, max_iter=3000, num_theta_starts=3,\n                        compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "TD-CCP": "def _run_tdccp(env, panel):\n    from econirl.estimation import TDCCPConfig, TDCCPEstimator\n\n    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,\n                                            epochs_per_avi=15, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
@@ -223,32 +223,6 @@
         "transferred": true
       },
       "runtime": 2.711682081222534,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rust_bus",
-      "rep": 0,
-      "params": [
-        0.01236733328551054,
-        2.0328481197357178
-      ],
-      "standard_errors": [
-        0.001063935924321413,
-        0.024188145995140076
-      ],
-      "policy_tv": 0.010015441032190655,
-      "value_rmse": 0.2852512148042354,
-      "regret": {
-        "baseline": 0.0010412071477714502,
-        "type_a": 0.0010923503038311466,
-        "type_b": 0.0007570042231707097,
-        "type_c": 3.7775593734190593e-05,
-        "transferred": true
-      },
-      "runtime": 10.990921020507812,
       "converged": true,
       "error": null
     },
@@ -612,32 +586,6 @@
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rust_bus",
-      "rep": 1,
-      "params": [
-        0.010621943511068821,
-        1.9870165586471558
-      ],
-      "standard_errors": [
-        0.0010322959860786796,
-        0.02364189922809601
-      ],
-      "policy_tv": 0.004926769947470729,
-      "value_rmse": 0.012682023799926577,
-      "regret": {
-        "baseline": 0.0005579175305898687,
-        "type_a": 0.000571045039631235,
-        "type_b": 0.00040098355813045217,
-        "type_c": 3.2201686723798417e-06,
-        "transferred": true
-      },
-      "runtime": 6.850493907928467,
-      "converged": true,
-      "error": null
-    },
-    {
       "estimator": "NNES",
       "family": "structural",
       "cell": "rust_bus",
@@ -993,32 +941,6 @@
         "transferred": true
       },
       "runtime": 2.649600028991699,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "rust_bus",
-      "rep": 2,
-      "params": [
-        0.011467842385172844,
-        2.009211301803589
-      ],
-      "standard_errors": [
-        0.001040345523506403,
-        0.023911412805318832
-      ],
-      "policy_tv": 0.007195166472936403,
-      "value_rmse": 0.14436637668590532,
-      "regret": {
-        "baseline": 0.0005480547190968021,
-        "type_a": 0.0005784652532510037,
-        "type_b": 0.00021297986126977975,
-        "type_c": 1.4471125181492184e-05,
-        "transferred": true
-      },
-      "runtime": 16.371949911117554,
       "converged": true,
       "error": null
     },
@@ -1866,6 +1788,84 @@
         "transferred": false
       },
       "runtime": 24.053874015808105,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.012426283210515976,
+        2.034050226211548
+      ],
+      "standard_errors": [
+        0.0010646681766957045,
+        0.024188576266169548
+      ],
+      "policy_tv": 0.010231691526313159,
+      "value_rmse": 0.29342092014116006,
+      "regret": {
+        "baseline": 0.0010913125101605914,
+        "type_a": 0.001144321871627163,
+        "type_b": 0.0008075088534867936,
+        "type_c": 3.986350722562371e-05,
+        "transferred": true
+      },
+      "runtime": 1.6701407432556152,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.010699471458792686,
+        1.988714337348938
+      ],
+      "standard_errors": [
+        0.001033711712807417,
+        0.023653307929635048
+      ],
+      "policy_tv": 0.00516262478178889,
+      "value_rmse": 0.023138600304144784,
+      "regret": {
+        "baseline": 0.0005516143687487318,
+        "type_a": 0.000566388165040177,
+        "type_b": 0.0003679256627160399,
+        "type_c": 3.905771647216838e-06,
+        "transferred": true
+      },
+      "runtime": 0.39687609672546387,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.011486525647342205,
+        2.0097029209136963
+      ],
+      "standard_errors": [
+        0.0010406840592622757,
+        0.02391497604548931
+      ],
+      "policy_tv": 0.007251903948033582,
+      "value_rmse": 0.14729886533840553,
+      "regret": {
+        "baseline": 0.0005530652202265784,
+        "type_a": 0.0005838832797295801,
+        "type_b": 0.00021652299544272502,
+        "type_c": 1.482665224750157e-05,
+        "transferred": true
+      },
+      "runtime": 0.39617919921875,
       "converged": true,
       "error": null
     }
