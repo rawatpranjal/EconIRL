@@ -99,6 +99,31 @@ def test_ufxp_seed_determinism() -> None:
     assert np.allclose(np.asarray(c.parameters), np.asarray(d.parameters))
 
 
+def test_ufxp_sklearn_wrapper() -> None:
+    # The high-level UFXP class mirrors NFXP/CCP: DataFrame in, params_ out.
+    import pandas as pd
+
+    from econirl import UFXP
+
+    env = RustBusEnvironment(num_mileage_bins=10, operating_cost=0.01,
+                             replacement_cost=2.0, discount_factor=0.9)
+    panel = simulate_panel(env, n_individuals=300, n_periods=60, seed=21)
+    rows = []
+    for i, traj in enumerate(panel.trajectories):
+        for s, a in zip(np.asarray(traj.states), np.asarray(traj.actions)):
+            rows.append({"bus_id": i, "mileage": int(s), "replaced": int(a)})
+    df = pd.DataFrame(rows)
+
+    model = UFXP(n_states=10, discount=0.9)
+    model.fit(df, state="mileage", action="replaced", id="bus_id")
+
+    assert model.converged_
+    assert model.params_ is not None and len(model.params_) == 2
+    assert all(np.isfinite(v) for v in model.params_.values())
+    assert model.se_ is not None and all(np.isfinite(v) for v in model.se_.values())
+    assert model.policy_.shape == (10, 2)
+
+
 def test_ufxp_dual_identity() -> None:
     # lambda' u = w' V with V = (I - beta F_P)^{-1} u, for arbitrary w, u.
     rng = np.random.default_rng(0)

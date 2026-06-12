@@ -1,0 +1,375 @@
+{
+  "estimator": "UFXP",
+  "paper_target": "Unnested fixed point estimation from Bellman first-order conditions (Bray; Oguz and Bray 2026), optimally weighted",
+  "primary_cell_id": "canonical_low_action",
+  "release_status": "Certified",
+  "result": {
+    "cell": {
+      "cell_id": "canonical_low_action",
+      "description": "Universal DGP preset: low-dimensional action-dependent structural benchmark.",
+      "dgp_config": {
+        "discount_factor": 0.95,
+        "exit_action": 2,
+        "feature_scale": 1.0,
+        "heterogeneity": "none",
+        "high_reward_features": 24,
+        "high_state_dim": 12,
+        "initial_state_mode": "uniform_regular",
+        "num_actions": 3,
+        "num_regular_states": 20,
+        "num_segments": 2,
+        "reward_dim": "low",
+        "reward_mode": "action_dependent",
+        "scale_parameter": 1.0,
+        "seed": 42,
+        "state_mode": "low_dim",
+        "transition_noise": 0.05
+      },
+      "simulation_config": {
+        "n_individuals": 2000,
+        "n_periods": 80,
+        "seed": 42,
+        "show_progress": false
+      }
+    },
+    "compatibility": {
+      "compatible": true,
+      "errors": [],
+      "estimator": "UFXP",
+      "warnings": []
+    },
+    "diagnostics": {
+      "action_shares": [
+        0.3451625,
+        0.329925,
+        0.3249125
+      ],
+      "anchor_valid": true,
+      "condition_number": 4.512181117222974,
+      "errors": [],
+      "feature_rank": 4,
+      "is_action_dependent": true,
+      "max_transition_row_error": 2.421438694000244e-08,
+      "min_action_share": 0.3249125,
+      "min_positive_ccp": 0.15275590551181104,
+      "num_features": 4,
+      "num_states": 21,
+      "observed_states": 21,
+      "single_action_states": 0,
+      "state_action_coverage": 1.0,
+      "warnings": []
+    },
+    "estimator": "UFXP",
+    "exception": null,
+    "gates": [
+      {
+        "name": "converged",
+        "operator": "is",
+        "passed": true,
+        "threshold": true,
+        "value": true
+      },
+      {
+        "name": "standard_errors_finite",
+        "operator": "is",
+        "passed": true,
+        "threshold": true,
+        "value": true
+      },
+      {
+        "name": "parameter_cosine",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.98,
+        "value": 0.9991292617368593
+      },
+      {
+        "name": "parameter_relative_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.15,
+        "value": 0.059834597812516675
+      },
+      {
+        "name": "policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.005007390741650495
+      },
+      {
+        "name": "value_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.01701824227718203
+      },
+      {
+        "name": "q_rmse",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.01930826151648128
+      },
+      {
+        "name": "type_a_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.00016050078723686697
+      },
+      {
+        "name": "type_b_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.00029990388056133817
+      },
+      {
+        "name": "type_c_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 7.812692432849413e-05
+      }
+    ],
+    "metrics": {
+      "anchor_projected_reward_normalized_rmse": 0.01271951574407682,
+      "anchor_projected_reward_rmse": 0.010451111745515863,
+      "counterfactuals": {
+        "type_a": {
+          "policy": {
+            "kl": 5.628380155011867e-05,
+            "l1": 0.008910846327161152,
+            "linf": 0.01555998851384488,
+            "tv": 0.004455423163580576
+          },
+          "regret": 0.00016050078723686697,
+          "value_rmse": 0.0001771266714624178
+        },
+        "type_b": {
+          "policy": {
+            "kl": 6.25993220573178e-05,
+            "l1": 0.009638752683577247,
+            "linf": 0.015103723772845912,
+            "tv": 0.004819376341788624
+          },
+          "regret": 0.00029990388056133817,
+          "value_rmse": 0.0003055074862534228
+        },
+        "type_c": {
+          "policy": {
+            "kl": 3.1771934145147694e-05,
+            "l1": 0.006679573458602227,
+            "linf": 0.013554229329284073,
+            "tv": 0.0033397867293011134
+          },
+          "regret": 7.812692432849413e-05,
+          "value_rmse": 0.00010451244502933221
+        }
+      },
+      "parameters": {
+        "cosine_similarity": 0.9991292617368593,
+        "max_abs_error": 0.02685867357417626,
+        "relative_rmse": 0.059834597812516675,
+        "rmse": 0.016386378301979577
+      },
+      "policy": {
+        "kl": 6.974008027865748e-05,
+        "l1": 0.01001478148330099,
+        "linf": 0.016228738399732823,
+        "tv": 0.005007390741650495
+      },
+      "projected_reward_normalized_rmse": 0.01271951574407682,
+      "projected_reward_rmse": 0.008327645171727514,
+      "q_normalized_rmse": 0.04268329635979944,
+      "q_rmse": 0.01930826151648128,
+      "raw_bellman_reward_normalized_rmse": null,
+      "raw_bellman_reward_rmse": null,
+      "reward_normalized_rmse": 0.01271951574407682,
+      "reward_rmse": 0.008327645171727514,
+      "value_normalized_rmse": 0.009024815961274102,
+      "value_rmse": 0.01701824227718203
+    },
+    "simulation": {
+      "n_individuals": 2000,
+      "n_periods": 80,
+      "seed": 42,
+      "show_progress": false
+    },
+    "summary": {
+      "converged": true,
+      "convergence_message": "closed-form OUFXP over 21 supported states (optimal weights), objective 0.000e+00",
+      "estimation_time": 0.644207239151001,
+      "goodness_of_fit": {
+        "aic": 349759.57424186694,
+        "bic": 349799.5059582438,
+        "log_likelihood": -174875.78712093347,
+        "num_observations": 160000,
+        "num_parameters": 4,
+        "prediction_accuracy": 0.3451625,
+        "pseudo_r_squared": null
+      },
+      "log_likelihood": -174875.78712093347,
+      "metadata": {
+        "design_rank": 4,
+        "num_projections": null,
+        "supported_state_share": 1.0,
+        "ufxp_objective": 0.0,
+        "weights": "optimal"
+      },
+      "method": "UFXP",
+      "num_individuals": 2000,
+      "num_iterations": 1,
+      "num_observations": 160000,
+      "parameter_names": [
+        "action_0_intercept",
+        "action_0_progress",
+        "action_1_intercept",
+        "action_1_progress"
+      ],
+      "parameters": [
+        0.08506491476514423,
+        0.5268586735741763,
+        -0.011210296022612757,
+        -0.2019843610278525
+      ],
+      "policy": [
+        [
+          0.3728315699996152,
+          0.32809999094103104,
+          0.2990684390593538
+        ],
+        [
+          0.3850272627152702,
+          0.32591676925562557,
+          0.2890559680291042
+        ],
+        [
+          0.3967624438074495,
+          0.3237778556454553,
+          0.27945970054709507
+        ],
+        [
+          0.4080514833643687,
+          0.32126238881492425,
+          0.27068612782070706
+        ],
+        [
+          0.41887901931109234,
+          0.3182369478089041,
+          0.26288403288000367
+        ],
+        [
+          0.4293297034066763,
+          0.31463028080962496,
+          0.2560400157836988
+        ],
+        [
+          0.4395745781120235,
+          0.3104379955659956,
+          0.24998742632198095
+        ],
+        [
+          0.449846679631134,
+          0.3057217937482873,
+          0.2444315266205788
+        ],
+        [
+          0.4604105784555905,
+          0.30060057317346056,
+          0.23898884837094883
+        ],
+        [
+          0.4715262163369889,
+          0.29523478474022946,
+          0.23323899892278158
+        ],
+        [
+          0.4834057644794371,
+          0.28980672723672907,
+          0.22678750828383373
+        ],
+        [
+          0.49616388402891015,
+          0.28450001763912586,
+          0.21933609833196407
+        ],
+        [
+          0.5097669240556127,
+          0.27948129411496575,
+          0.21075178182942156
+        ],
+        [
+          0.5239934949368773,
+          0.2748863398756603,
+          0.20112016518746242
+        ],
+        [
+          0.5384229133562696,
+          0.2708114923309919,
+          0.19076559431273846
+        ],
+        [
+          0.5524631260990165,
+          0.2673100124160006,
+          0.1802268614849828
+        ],
+        [
+          0.5654137003883566,
+          0.26439262731571095,
+          0.17019367229593255
+        ],
+        [
+          0.576539630230042,
+          0.262031190576331,
+          0.16142917919362704
+        ],
+        [
+          0.5851177017068574,
+          0.2601654142765735,
+          0.15471688401656913
+        ],
+        [
+          0.5904190461718308,
+          0.25871169297657576,
+          0.1508692608515934
+        ],
+        [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ]
+      ],
+      "standard_errors": [
+        0.029458978719807835,
+        0.03603180848205696,
+        0.03672409286314244,
+        0.052523548862664145
+      ],
+      "value_function": [
+        22.08071632152147,
+        22.114768431532287,
+        22.148530663784683,
+        22.18042881217096,
+        22.20967576657966,
+        22.236055017975968,
+        22.25997814000986,
+        22.282453546924486,
+        22.304971870588066,
+        22.329325087598217,
+        22.357375269672072,
+        22.390783512940725,
+        22.430707710342357,
+        22.477486195715787,
+        22.530343342449722,
+        22.58717236298551,
+        22.644451724496804,
+        22.697322234334948,
+        22.73979186989297,
+        22.764975122295677,
+        21.972245771581182
+      ]
+    }
+  }
+}

@@ -96,3 +96,11 @@ usage examples.
 (cao-2021)=
 - Cao, H., Cohen, S. B., and Szpruch, L. (2021). "Identifiability in Inverse
   Reinforcement Learning." *Advances in Neural Information Processing Systems*.
+
+(bray-2019)=
+- Bray, R. L. "Unnesting the Fixed Point in the Estimation of Dynamic
+  Programs." Working paper, SSRN 3307175.
+
+(oguz-bray-2026)=
+- Oguz, E., and Bray, R. L. (2026). "Training Neural Networks Embedded in
+  Dynamic Discrete Choice Models." Working paper, arXiv 2604.09736.

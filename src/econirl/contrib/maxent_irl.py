@@ -88,7 +88,7 @@ class MaxEntIRLEstimator(BaseEstimator):
         inner_max_iter: int = 1000,
         outer_tol: float = 1e-6,
         outer_max_iter: int = 200,
-        learning_rate: float = 1.0,
+        learning_rate: float = 0.05,
         compute_hessian: bool = True,
         verbose: bool = False,
     ):
@@ -335,7 +335,18 @@ class MaxEntIRLEstimator(BaseEstimator):
         upper_jax = jnp.asarray(upper, dtype=jnp.float64)
 
         params = jnp.array(initial_params, dtype=jnp.float64)
-        lr = 0.1
+        # Adam with gradient clipping (mirrors MCEIRLEstimator): a fixed scalar
+        # step cannot handle features whose column scales differ by an order of
+        # magnitude (e.g. a mileage cost spanning 0..-19 against a unit
+        # replacement indicator) - one coordinate overshoots and the iterate
+        # parks at a non-stationary point. Per-coordinate second-moment
+        # normalization makes the step scale-free. The constructor's
+        # learning_rate is honored (it was previously stored but unused).
+        lr = float(self._learning_rate)
+        adam_m = jnp.zeros_like(params)
+        adam_v = jnp.zeros_like(params)
+        adam_b1, adam_b2, adam_eps = 0.9, 0.999, 1e-8
+        grad_clip = 1.0
         best_nll = float("inf")
 
         from tqdm import tqdm as _tqdm
@@ -363,8 +374,15 @@ class MaxEntIRLEstimator(BaseEstimator):
             if gnorm < self._outer_tol:
                 break
 
-            # Projected gradient step with bounds
-            params = jnp.clip(params - lr * grad, lower_jax, upper_jax)
+            # Projected Adam step with gradient clipping and bounds
+            if gnorm > grad_clip:
+                grad = grad * (grad_clip / gnorm)
+            adam_m = adam_b1 * adam_m + (1.0 - adam_b1) * grad
+            adam_v = adam_b2 * adam_v + (1.0 - adam_b2) * grad**2
+            m_hat = adam_m / (1.0 - adam_b1 ** (it + 1))
+            v_hat = adam_v / (1.0 - adam_b2 ** (it + 1))
+            params = jnp.clip(params - lr * m_hat / (jnp.sqrt(v_hat) + adam_eps),
+                              lower_jax, upper_jax)
             best_nll = min(best_nll, nll)
 
         pbar.close()

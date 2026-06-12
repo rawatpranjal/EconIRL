@@ -267,8 +267,12 @@ def train_neural_mpec(
     floor = float(-np.log(np.clip(
         np.asarray(oracle_pol)[np.asarray(obs_states), np.asarray(obs_actions)],
         1e-12, 1.0)).mean())
+    A = env.num_actions
     return {
-        "reward_rmse": rmse(u_all, true_R),
+        # Reward RMSE over the ESTIMATED actions only. The reference action (last index)
+        # is anchored to zero in both truth and estimate, so including it is a free win
+        # that deflates the headline; it is excluded.
+        "reward_rmse": rmse(u_all[:, :A - 1], true_R[:, :A - 1]),
         "value_rmse": rmse(V_all, oracle_V),
         "max_bellman_resid": float(np.abs(np.asarray(resid)).max()),
         "final_nll": final_nll,
@@ -297,34 +301,44 @@ def run_tabular_mpec(env, panel) -> dict:
     res = est.estimate(panel, util, env.problem_spec, env.transition_matrices)
     est_R = np.einsum("sak,k->sa", np.asarray(env.feature_matrix),
                       np.asarray(res.parameters))
+    true_R = np.asarray(env.true_reward_matrix)
     _, oracle_V = oracle_policy_value(env)
+    A = env.num_actions
     return {
-        "reward_rmse": rmse(est_R, np.asarray(env.true_reward_matrix)),
+        "reward_rmse": rmse(est_R[:, :A - 1], true_R[:, :A - 1]),  # estimated actions only
         "value_rmse": rmse(res.value_function, oracle_V),
         "converged": bool(res.converged),
     }
 
 
 def run_gladius(env, panel) -> dict:
+    # Fair baseline: repo-standard net size (128 wide, 3 layers, 500 epochs) WITH the
+    # same action-2 anchor the MPEC methods receive. GLADIUS is still model-free (it
+    # never uses the known transitions), so its reward sits in a different gauge -- that
+    # is the honest contrast, not a crippled config.
     from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
     from econirl.preferences.linear import LinearUtility
 
+    S, A = env.num_states, env.num_actions
     util = LinearUtility(feature_matrix=env.feature_matrix,
                          parameter_names=env.parameter_names)
     est = GLADIUSEstimator(
         config=GLADIUSConfig(
-            q_hidden_dim=32, q_num_layers=1, v_hidden_dim=32, v_num_layers=1,
-            max_epochs=300, batch_size=256, compute_se=False, verbose=False,
+            q_hidden_dim=128, v_hidden_dim=128, q_num_layers=3, v_num_layers=3,
+            max_epochs=500, batch_size=512,
+            anchor_action=2, anchor_rewards=tuple(0.0 for _ in range(S)),
+            anchor_bellman_mode="anchor_moment", compute_se=False, verbose=False,
         )
     )
     res = est.estimate(panel, util, env.problem_spec, env.transition_matrices)
     reward_table = np.asarray(res.metadata.get("reward_table"), dtype=np.float64)
+    true_R = np.asarray(env.true_reward_matrix)
     _, oracle_V = oracle_policy_value(env)
     return {
-        "reward_rmse": rmse(reward_table, np.asarray(env.true_reward_matrix)),
+        "reward_rmse": rmse(reward_table[:, :A - 1], true_R[:, :A - 1]),  # estimated actions
         "value_rmse": rmse(res.value_function, oracle_V),
         "converged": bool(res.converged),
-        "note": "model-free; reward only partially identified",
+        "note": "model-free; reward in a different gauge (no known P)",
     }
 
 

@@ -81,8 +81,14 @@ def _run_sees(env, panel):
     from econirl.estimation.sees import SEESEstimator
 
     # Basis must span the value function: bspline basis_dim >= num_states (20).
+    # The cost coefficients live on very different scales here (per-bin
+    # operating cost vs a flat replacement cost), which stretches the
+    # optimization landscape: the default 500 L-BFGS iterations stop
+    # mid-descent. More iterations plus a data-driven extra start reach the
+    # optimum the basis already represents exactly.
     est = SEESEstimator(basis_type="bspline", basis_dim=20, warm_start_value=True,
-                        penalty_weight=10.0, compute_se=False, verbose=False)
+                        penalty_weight=10.0, max_iter=3000, num_theta_starts=3,
+                        compute_se=False, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -116,9 +122,11 @@ def _run_maxent_irl(env, panel):
     from econirl.contrib.maxent_irl import MaxEntIRLEstimator
 
     # Feed the action-dependent features: a state-only reward cannot represent
-    # the action contrast that drives the keep/replace choice.
+    # the action contrast that drives the keep/replace choice. learning_rate
+    # drives the Adam step (a fixed scalar step overshoots the mileage-cost
+    # coordinate, whose feature column is ~19x the replacement indicator's).
     est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,
-                             compute_hessian=False, verbose=False)
+                             learning_rate=0.05, compute_hessian=False, verbose=False)
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
@@ -156,7 +164,11 @@ def _run_airl(env, panel):
 def _run_firl(env, panel):
     from econirl.estimation.f_irl import FIRLEstimator
 
-    est = FIRLEstimator(f_divergence="chi2", lr=0.5, max_iter=400, reward_clip=100.0,
+    # fkl is the estimator's validated divergence for state-action cells: its
+    # log density-ratio gradient is bounded, where the chi2 ratio gradient is
+    # unbounded and saturates the reward clip on near-deterministic experts.
+    # reward_clip=10 matches the natural cost scale (the estimator default).
+    est = FIRLEstimator(f_divergence="fkl", lr=0.2, max_iter=400, reward_clip=10.0,
                         verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -219,8 +231,14 @@ DIAGNOSES = {
     "CCP": "Hotz-Miller conditional choice probabilities; recovers cleanly.",
     "MPEC": "Constrained MLE; recovers cleanly.",
     "NNES": "Neural value network plus structural MLE.",
-    "SEES": "bspline basis with basis_dim >= num_states (20); a smaller basis "
-            "underfits the value function and biases theta.",
+    "SEES": "Solver-limited here, not model-limited: the spline value basis "
+            "represents the true value function exactly, but the cost "
+            "coefficients live on very different scales (a tiny per-bin "
+            "operating cost against a large flat replacement cost), which "
+            "stretches the optimization landscape so the default iteration "
+            "limit stopped the search mid-descent. With a larger budget and an "
+            "extra data-driven start it reaches the same estimates as the "
+            "other structural methods.",
     "TD-CCP": "Neural CCP with approximate value iteration.",
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's "
             "optimal weighting (OUFXP). Bellman first-order conditions are scored "
@@ -232,19 +250,36 @@ DIAGNOSES = {
                "gradient norm crossed the tolerance; the objective often plateaus "
                "first, so the flag can read False while the recovered policy is "
                "essentially exact. Read it next to Policy TV.",
-    "MaxEnt-IRL": "Fed action-dependent features; a state-only reward is broadcast "
-                  "equally across actions and cannot represent the action contrast.",
+    "MaxEnt-IRL": "Fed action-dependent features. Its gradient loop previously "
+                  "took a fixed scalar step, which overshoots when feature "
+                  "columns differ in scale by an order of magnitude (mileage "
+                  "cost vs a unit replacement indicator); the loop now takes "
+                  "adaptive per-parameter steps, the same scheme its causal "
+                  "cousin MCE-IRL uses. A small residual gap to MCE-IRL "
+                  "remains because trajectory-entropy feature matching is not "
+                  "the causal choice model that generated the data.",
     "IQ-Learn": "q_type='linear' uses the feature structure; a tabular Q-table does "
                 "not propagate to unvisited states.",
     "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
     "AIRL": "reward_arg='state_action'; recovered parameters stay gauge/shaping-"
             "unidentified by design, so policy TV is the right scorecard.",
-    "f-IRL": "f-divergence IRL; tracks behavior.",
+    "f-IRL": "Uses the forward-KL divergence, whose density-ratio gradient is "
+             "bounded; the chi-squared variant's unbounded ratio gradient "
+             "saturates the reward clip on a near-deterministic expert and "
+             "falls back to a flat reward. The reward clip matches the "
+             "problem's natural cost scale.",
     "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit interface; "
                     "parameters are the neural reward projected onto the linear "
                     "features.",
-    "MaxMargin-IRL": "Margin-based reward recovery (Ng-Russell tradition); no "
-                     "probabilistic choice model, so no standard errors.",
+    "MaxMargin-IRL": "An honest structural failure, not a tuning problem: "
+                     "max-margin apprenticeship learning recovers a reward "
+                     "direction under a unit-norm normalization with no link "
+                     "to the choice model's noise scale, so the policy it "
+                     "implies is far sharper than the truth, and the extreme "
+                     "asymmetry between the per-bin operating cost and the "
+                     "flat replacement cost makes the replacement feature "
+                     "dominate the margin. The resulting policy distance is "
+                     "structural to the method on this problem.",
     "BC": "Behavioral cloning; matches observed choices but recovers no reward, so "
           "it cannot transfer to a counterfactual world.",
 }

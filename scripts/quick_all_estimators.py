@@ -146,9 +146,10 @@ def _run_maxent_irl(env, panel):
 
     # Feed the action-dependent features: a state-only reward is broadcast
     # equally across actions and cannot represent the action contrast that
-    # drives choice here (workflow diagnosis).
+    # drives choice here (workflow diagnosis). Adaptive per-parameter steps
+    # (Adam) handle mixed feature scales.
     est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,
-                             compute_hessian=False, verbose=False)
+                             learning_rate=0.05, compute_hessian=False, verbose=False)
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
@@ -187,7 +188,9 @@ def _run_airl(env, panel):
 def _run_firl(env, panel):
     from econirl.estimation.f_irl import FIRLEstimator
 
-    est = FIRLEstimator(f_divergence="chi2", lr=0.5, max_iter=400, reward_clip=100.0,
+    # fkl (bounded gradient) with the estimator's default reward clip; the
+    # chi2 ratio gradient is unbounded on near-deterministic experts.
+    est = FIRLEstimator(f_divergence="fkl", lr=0.2, max_iter=400, reward_clip=10.0,
                         verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 

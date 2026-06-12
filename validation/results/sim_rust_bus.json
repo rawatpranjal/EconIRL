@@ -1,0 +1,1873 @@
+{
+  "meta": {
+    "title": "Simulation study: bus engine replacement",
+    "date": "2026-06-12",
+    "package_version": "0.0.4",
+    "cells": [
+      {
+        "cell_id": "rust_bus",
+        "label": "Bus engine (20 mileage bins)",
+        "description": "Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-replace choice over a discretized mileage state, with linear operating and replacement costs. `RustBusEnvironment(num_mileage_bins=20, operating_cost=0.01, replacement_cost=2.0, discount_factor=0.95)`.",
+        "num_states": 20,
+        "num_actions": 2,
+        "discount_factor": 0.95,
+        "n_individuals": 500,
+        "n_periods": 80,
+        "seed": 42,
+        "n_replications": 3,
+        "param_block": false,
+        "figure": null,
+        "parameter_names": [
+          "operating_cost",
+          "replacement_cost"
+        ],
+        "true_theta": [
+          0.009999999776482582,
+          2.0
+        ],
+        "diagnostics": {
+          "num_features": 2,
+          "feature_rank": 2,
+          "condition_number": 11.113055385446435
+        },
+        "roster": [
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "NNES",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "SEES",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "TD-CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "UFXP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "MaxEnt-IRL",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "IQ-Learn",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "GLADIUS",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "AIRL",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "f-IRL",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "Deep-MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "MaxMargin-IRL",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "BC",
+            "family": "behavioral",
+            "max_reps": null
+          }
+        ]
+      }
+    ],
+    "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
+    "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
+    "excluded": [
+      {
+        "name": "AIRL-Het / AAIRL",
+        "reason": "designed for latent-type heterogeneity; this panel has a single agent type"
+      },
+      {
+        "name": "MMP",
+        "reason": "one exploratory fit needed over half an hour on this small problem (its cousins need seconds); dropped from the roster for cost"
+      },
+      {
+        "name": "GAIL",
+        "reason": "did not finish a single fit within a 20-minute budget here"
+      },
+      {
+        "name": "GCL, DeepMaxEnt-IRL, Bayesian-IRL",
+        "reason": "dropped from the page roster by scope decision to keep the comparison on the core structural and IRL families"
+      }
+    ],
+    "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).",
+    "snippets": {
+      "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(inner_solver=\"hybrid\", inner_tol=1e-10,\n                        inner_max_iter=100000, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    est = MPECEstimator(config=MPECConfig(solver=\"slsqp\", max_iter=200, constraint_tol=1e-6),\n                        compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "NNES": "def _run_nnes(env, panel):\n    from econirl.estimation.nnes import NNESEstimator\n\n    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,\n                        compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "SEES": "def _run_sees(env, panel):\n    from econirl.estimation.sees import SEESEstimator\n\n    # Basis must span the value function: bspline basis_dim >= num_states (20).\n    est = SEESEstimator(basis_type=\"bspline\", basis_dim=20, warm_start_value=True,\n                        penalty_weight=10.0, compute_se=False, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "TD-CCP": "def _run_tdccp(env, panel):\n    from econirl.estimation import TDCCPConfig, TDCCPEstimator\n\n    est = TDCCPEstimator(config=TDCCPConfig(hidden_dim=64, avi_iterations=15,\n                                            epochs_per_avi=15, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "UFXP": "def _run_ufxp(env, panel):\n    from econirl.estimation import UFXPEstimator\n\n    # Bray's unnested fixed point with the paper's optimal weighting (OUFXP):\n    # closed form for linear utility, MLE-efficient, with standard errors from\n    # the efficient moment variance.\n    est = UFXPEstimator(weights=\"optimal\", verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,\n                                              inner_max_iter=2000, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "MaxEnt-IRL": "def _run_maxent_irl(env, panel):\n    from econirl.contrib.maxent_irl import MaxEntIRLEstimator\n\n    # Feed the action-dependent features: a state-only reward cannot represent\n    # the action contrast that drives the keep/replace choice.\n    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,\n                             compute_hessian=False, verbose=False)\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "IQ-Learn": "def _run_iq_learn(env, panel):\n    from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator\n\n    # q_type=\"linear\" uses the feature structure; a tabular Q does not\n    # propagate to unvisited states.\n    est = IQLearnEstimator(config=IQLearnConfig(q_type=\"linear\", divergence=\"chi2\",\n                                                alpha=3.0, max_iter=2000, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "GLADIUS": "def _run_gladius(env, panel):\n    from econirl.estimation import GLADIUSConfig, GLADIUSEstimator\n\n    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=300, q_hidden_dim=128,\n                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,\n                                                patience=60, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "AIRL": "def _run_airl(env, panel):\n    from econirl.estimation import AIRLConfig, AIRLEstimator\n\n    # reward_arg=\"state_action\": the default \"state\" marginalizes the reward\n    # across actions. Recovered parameters stay gauge/shaping-unidentified by\n    # design, so policy TV is the right scorecard.\n    est = AIRLEstimator(config=AIRLConfig(reward_type=\"linear\", reward_arg=\"state_action\",\n                                          reward_lr=0.01, discriminator_steps=10,\n                                          max_rounds=300, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "f-IRL": "def _run_firl(env, panel):\n    from econirl.estimation.f_irl import FIRLEstimator\n\n    est = FIRLEstimator(f_divergence=\"chi2\", lr=0.5, max_iter=400, reward_clip=100.0,\n                        verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "Deep-MCE-IRL": "def _run_deep_mce_irl(env, panel):\n    from types import SimpleNamespace\n\n    from econirl.estimators.mceirl_neural import MCEIRLNeural\n\n    # sklearn-style .fit interface; adapted to the uniform result shape. coef_\n    # is the neural reward projected onto the linear features, so the regret\n    # transfer uses that projection, not the raw network.\n    m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),\n                     discount=float(env.problem_spec.discount_factor),\n                     max_epochs=200, verbose=False)\n    m.fit(panel, features=np.asarray(env.feature_matrix),\n          transitions=np.asarray(env.transition_matrices))\n    return SimpleNamespace(parameters=m.coef_, standard_errors=None, policy=m.policy_,\n                           value_function=m.value_, converged=bool(m.converged_))\n",
+      "MaxMargin-IRL": "def _run_max_margin(env, panel):\n    from econirl.contrib.max_margin_irl import MaxMarginIRLEstimator\n\n    # Requires a reward spec (LinearReward/ActionDependentReward), not the\n    # structural LinearUtility wrapper.\n    est = MaxMarginIRLEstimator(max_iterations=50, compute_hessian=False, verbose=False)\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "BC": "def _run_bc(env, panel):\n    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator\n\n    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n"
+    },
+    "diagnoses": {
+      "NFXP": "Reference structural estimator; recovers cleanly.",
+      "CCP": "Hotz-Miller conditional choice probabilities; recovers cleanly.",
+      "MPEC": "Constrained MLE; recovers cleanly.",
+      "NNES": "Neural value network plus structural MLE.",
+      "SEES": "bspline basis with basis_dim >= num_states (20); a smaller basis underfits the value function and biases theta.",
+      "TD-CCP": "Neural CCP with approximate value iteration.",
+      "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting (OUFXP). Bellman first-order conditions are scored with the value function eliminated before any parameter search, so the linear case is closed form; the optimal weights make it as asymptotically efficient as maximum likelihood, and standard errors come from the efficient moment variance.",
+      "MCE-IRL": "Causal maximum-entropy IRL. Its converged flag reports whether the gradient norm crossed the tolerance; the objective often plateaus first, so the flag can read False while the recovered policy is essentially exact. Read it next to Policy TV.",
+      "MaxEnt-IRL": "Fed action-dependent features; a state-only reward is broadcast equally across actions and cannot represent the action contrast.",
+      "IQ-Learn": "q_type='linear' uses the feature structure; a tabular Q-table does not propagate to unvisited states.",
+      "GLADIUS": "Neural Q and expected-value networks; tracks behavior.",
+      "AIRL": "reward_arg='state_action'; recovered parameters stay gauge/shaping-unidentified by design, so policy TV is the right scorecard.",
+      "f-IRL": "f-divergence IRL; tracks behavior.",
+      "Deep-MCE-IRL": "Neural-reward MCE-IRL via its sklearn-style fit interface; parameters are the neural reward projected onto the linear features.",
+      "MaxMargin-IRL": "Margin-based reward recovery (Ng-Russell tradition); no probabilistic choice model, so no standard errors.",
+      "BC": "Behavioral cloning; matches observed choices but recovers no reward, so it cannot transfer to a counterfactual world."
+    },
+    "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
+  },
+  "records": [
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.012426253331471883,
+        2.0340494130411164
+      ],
+      "standard_errors": [
+        0.00106468191370368,
+        0.024188898503780365
+      ],
+      "policy_tv": 0.010231597662740238,
+      "value_rmse": 0.2934162719844924,
+      "regret": {
+        "baseline": 0.0010912867945707116,
+        "type_a": 0.001144295218812319,
+        "type_b": 0.0008074792245018614,
+        "type_c": 3.9862295154735605e-05,
+        "transferred": true
+      },
+      "runtime": 4.856313943862915,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.012255366891622543,
+        2.0327141284942627
+      ],
+      "standard_errors": [
+        0.0010604742860080127,
+        0.024136805347051638
+      ],
+      "policy_tv": 0.01046794701560292,
+      "value_rmse": 0.27617450709021085,
+      "regret": {
+        "baseline": 0.0009480096295142459,
+        "type_a": 0.0009931184758460443,
+        "type_b": 0.0007318961847799788,
+        "type_c": 3.3552013552373694e-05,
+        "transferred": true
+      },
+      "runtime": 2.711682081222534,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.01236733328551054,
+        2.0328481197357178
+      ],
+      "standard_errors": [
+        0.001063935924321413,
+        0.024188145995140076
+      ],
+      "policy_tv": 0.010015441032190655,
+      "value_rmse": 0.2852512148042354,
+      "regret": {
+        "baseline": 0.0010412071477714502,
+        "type_a": 0.0010923503038311466,
+        "type_b": 0.0007570042231707097,
+        "type_c": 3.7775593734190593e-05,
+        "transferred": true
+      },
+      "runtime": 10.990921020507812,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.012426292523741722,
+        2.034050464630127
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.010231721049246958,
+      "value_rmse": 0.29342244538410434,
+      "regret": {
+        "baseline": 0.001091320528877171,
+        "type_a": 0.0011443300094526876,
+        "type_b": 0.0008075184334328522,
+        "type_c": 3.986389172272453e-05,
+        "transferred": true
+      },
+      "runtime": 21.82578706741333,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        -0.02844167078316169,
+        1.0496181400972737
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.12987740395258607,
+      "value_rmse": 8.007448128418611,
+      "regret": {
+        "baseline": 1.290307288829466,
+        "type_a": 1.3378093692016702,
+        "type_b": 0.7796555279810484,
+        "type_c": 0.0004019992874102485,
+        "transferred": true
+      },
+      "runtime": 0.7015669345855713,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.01310211843554512,
+        2.044390559341342
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.012980352351474388,
+      "value_rmse": 0.3765595999578212,
+      "regret": {
+        "baseline": 0.0017489665687955291,
+        "type_a": 0.0018302506886076486,
+        "type_b": 0.0013538758517549487,
+        "type_c": 7.020575181271305e-05,
+        "transferred": true
+      },
+      "runtime": 3.7597451210021973,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.012426283210515976,
+        2.034050226211548
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.010231690557463122,
+      "value_rmse": 0.29342101887612143,
+      "regret": {
+        "baseline": 0.0010913125101605914,
+        "type_a": 0.001144321871627163,
+        "type_b": 0.0008075088534867936,
+        "type_c": 3.986350722562371e-05,
+        "transferred": true
+      },
+      "runtime": 7.244932174682617,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MaxEnt-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.4787610173225403,
+        2.9676520824432373
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.6456242998452947,
+      "value_rmse": 17.691498854099493,
+      "regret": {
+        "baseline": 2.7254897443600927,
+        "type_a": 2.744380062340027,
+        "type_b": 19.03850947891315,
+        "type_c": 14.857409738641778,
+        "transferred": true
+      },
+      "runtime": 19.279974937438965,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "IQ-Learn",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        -0.01296472642570734,
+        1.532941460609436
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.04011673275636965,
+      "value_rmse": 1.3342784068068674,
+      "regret": {
+        "baseline": 0.290825346441385,
+        "type_a": 0.3237041943934522,
+        "type_b": 0.16075607380757817,
+        "type_c": 0.000341407105433289,
+        "transferred": true
+      },
+      "runtime": 1.3159973621368408,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.033009547099674345,
+        2.0686671255274383
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.007065497178880165,
+      "value_rmse": 0.4182050736131202,
+      "regret": {
+        "baseline": 0.08934807073051898,
+        "type_a": 0.09198176164916272,
+        "type_b": 0.07257113069959265,
+        "type_c": 0.06826101309779431,
+        "transferred": true
+      },
+      "runtime": 33.641063928604126,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.021079566088080363,
+        2.051459955922124
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.05413074729041465,
+      "value_rmse": 0.9636655684258617,
+      "regret": {
+        "baseline": 0.024887899427508353,
+        "type_a": 0.025876749529911924,
+        "type_b": 0.013770917673081806,
+        "type_c": 0.0028901384396271546,
+        "transferred": true
+      },
+      "runtime": 127.03062701225281,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "f-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.3241785163296099,
+      "value_rmse": 12.258074064818391,
+      "regret": {
+        "baseline": 8.225072692865401,
+        "type_a": 8.251495539534785,
+        "type_b": 8.046473313699382,
+        "type_c": 104.39459983527624,
+        "transferred": false
+      },
+      "runtime": 25.312520027160645,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "Deep-MCE-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        -0.08156333118677139,
+        0.5686981081962585
+      ],
+      "standard_errors": null,
+      "policy_tv": 0.007498872760624287,
+      "value_rmse": 24.225181145980276,
+      "regret": {
+        "baseline": 3.3388323499898354,
+        "type_a": 3.235968895318039,
+        "type_b": 1.6272907879914613,
+        "type_c": 0.0004606771118706998,
+        "transferred": true
+      },
+      "runtime": 14.263194799423218,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MaxMargin-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.25114381313323975,
+        0.9679498076438904
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.638504322309701,
+      "value_rmse": 0.3608000294121473,
+      "regret": {
+        "baseline": 5.149497474917913,
+        "type_a": 5.168281544128762,
+        "type_b": 20.14753141734875,
+        "type_c": 10.411417367791792,
+        "transferred": true
+      },
+      "runtime": 0.5250270366668701,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "BC",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.876355767250061,
+        0.12364425510168076,
+        0.8832623362541199,
+        0.11673767864704132,
+        0.8688574433326721,
+        0.13114255666732788,
+        0.8677389025688171,
+        0.13226111233234406,
+        0.8509179949760437,
+        0.1490820050239563,
+        0.8385012745857239,
+        0.16149871051311493,
+        0.8441445231437683,
+        0.1558554619550705,
+        0.8227777481079102,
+        0.17722222208976746,
+        0.8415094614028931,
+        0.15849056839942932,
+        0.7977867126464844,
+        0.20221327245235443,
+        0.8073654174804688,
+        0.19263456761837006,
+        0.8123667240142822,
+        0.18763326108455658,
+        0.8173374533653259,
+        0.18266253173351288,
+        0.7822222113609314,
+        0.2177777737379074,
+        0.7749999761581421,
+        0.22499999403953552,
+        0.8240740895271301,
+        0.17592592537403107,
+        0.7764706015586853,
+        0.2235294133424759,
+        0.7333333492279053,
+        0.2666666805744171,
+        0.65625,
+        0.34375,
+        0.7358490824699402,
+        0.2641509473323822
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.02007964494176436,
+      "value_rmse": 1.6188752065243985,
+      "regret": {
+        "baseline": 0.005578427380809048,
+        "type_a": 0.006523637883288691,
+        "type_b": 0.32606102228694833,
+        "type_c": 23.697415095099252,
+        "transferred": false
+      },
+      "runtime": 0.2533299922943115,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.010699474070816214,
+        1.9887144066985003
+      ],
+      "standard_errors": [
+        0.001033711712807417,
+        0.023653307929635048
+      ],
+      "policy_tv": 0.005162629727644761,
+      "value_rmse": 0.023139011495649068,
+      "regret": {
+        "baseline": 0.0005516117007429155,
+        "type_a": 0.0005663875952122144,
+        "type_b": 0.00036792209357028316,
+        "type_c": 3.905794973890764e-06,
+        "transferred": true
+      },
+      "runtime": 3.5158209800720215,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.010260477662086487,
+        1.9857457876205444
+      ],
+      "standard_errors": [
+        0.0010202752739972348,
+        0.023553956387202715
+      ],
+      "policy_tv": 0.0053216779137268706,
+      "value_rmse": 0.021774934948596402,
+      "regret": {
+        "baseline": 0.000339994873725491,
+        "type_a": 0.0003443728671332913,
+        "type_b": 0.00030829931804321475,
+        "type_c": 7.530185486270824e-07,
+        "transferred": true
+      },
+      "runtime": 4.268358945846558,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.010621943511068821,
+        1.9870165586471558
+      ],
+      "standard_errors": [
+        0.0010322959860786796,
+        0.02364189922809601
+      ],
+      "policy_tv": 0.004926769947470729,
+      "value_rmse": 0.012682023799926577,
+      "regret": {
+        "baseline": 0.0005579175305898687,
+        "type_a": 0.000571045039631235,
+        "type_b": 0.00040098355813045217,
+        "type_c": 3.2201686723798417e-06,
+        "transferred": true
+      },
+      "runtime": 6.850493907928467,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.010699491947889328,
+        1.9887149333953857
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005162668686522573,
+      "value_rmse": 0.02314187364161841,
+      "regret": {
+        "baseline": 0.0005516067954320913,
+        "type_a": 0.000566383032244433,
+        "type_b": 0.00036791172978944964,
+        "type_c": 3.905929606862202e-06,
+        "transferred": true
+      },
+      "runtime": 23.371865034103394,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        -0.028323381772335728,
+        0.9313880762035227
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.12354388936081215,
+      "value_rmse": 8.189917478981533,
+      "regret": {
+        "baseline": 1.293132598387841,
+        "type_a": 1.330070858376426,
+        "type_b": 1.0641880566617061,
+        "type_c": 0.0004022320809276003,
+        "transferred": true
+      },
+      "runtime": 0.7608671188354492,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.011253068729585826,
+        1.995639922664998
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.007434759206139544,
+      "value_rmse": 0.0869526134582391,
+      "regret": {
+        "baseline": 0.0007934127620210507,
+        "type_a": 0.0008254036959669531,
+        "type_b": 0.0003821371832410936,
+        "type_c": 1.1608314235855843e-05,
+        "transferred": true
+      },
+      "runtime": 4.071871042251587,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.0106995003297925,
+        1.9887150526046753
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005162701671121624,
+      "value_rmse": 0.02314287782920654,
+      "regret": {
+        "baseline": 0.0005516090796149342,
+        "type_a": 0.0005663835756535285,
+        "type_b": 0.00036791083504361666,
+        "type_c": 3.906022169042345e-06,
+        "transferred": true
+      },
+      "runtime": 9.984195232391357,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MaxEnt-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.4529096186161041,
+        3.000845432281494
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.6370898812076817,
+      "value_rmse": 17.43282177723282,
+      "regret": {
+        "baseline": 2.5458450927224026,
+        "type_a": 2.5642692618426133,
+        "type_b": 17.634803120300933,
+        "type_c": 14.216863169885642,
+        "transferred": true
+      },
+      "runtime": 20.286646842956543,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "IQ-Learn",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        -0.017905615270137787,
+        1.5068472623825073
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.043704953233473835,
+      "value_rmse": 1.2963107766020279,
+      "regret": {
+        "baseline": 0.6632675740461087,
+        "type_a": 0.731358649942464,
+        "type_b": 0.17749761726957236,
+        "type_c": 0.00037210149971800277,
+        "transferred": true
+      },
+      "runtime": 2.862715005874634,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.0341546957376787,
+        2.0328156464502
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.011269166244364885,
+      "value_rmse": 0.45419071673647077,
+      "regret": {
+        "baseline": 0.10952561547798001,
+        "type_a": 0.11246001322902566,
+        "type_b": 0.09608023987773273,
+        "type_c": 0.09200089634885011,
+        "transferred": true
+      },
+      "runtime": 35.622159004211426,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.01993603526543721,
+        2.0230594100889467
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.05113145010517178,
+      "value_rmse": 0.7955276870074011,
+      "regret": {
+        "baseline": 0.02447087038711615,
+        "type_a": 0.025390855482742447,
+        "type_b": 0.013593037692075982,
+        "type_c": 0.0020808190855974296,
+        "transferred": true
+      },
+      "runtime": 128.48484802246094,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "f-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.3241785163296099,
+      "value_rmse": 12.258074064818391,
+      "regret": {
+        "baseline": 8.225072692865401,
+        "type_a": 8.251495539534785,
+        "type_b": 8.046473313699382,
+        "type_c": 104.39459983527624,
+        "transferred": false
+      },
+      "runtime": 25.037075996398926,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "Deep-MCE-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        -0.08211804926395416,
+        0.5980452299118042
+      ],
+      "standard_errors": null,
+      "policy_tv": 0.010197809796064657,
+      "value_rmse": 24.42772146463974,
+      "regret": {
+        "baseline": 3.333955770370908,
+        "type_a": 3.2303574327576614,
+        "type_b": 1.5603374641546368,
+        "type_c": 0.0004593867332647328,
+        "transferred": true
+      },
+      "runtime": 12.952509880065918,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MaxMargin-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.24753916263580322,
+        0.968877911567688
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.6362964999381883,
+      "value_rmse": 0.3304104366804318,
+      "regret": {
+        "baseline": 5.104276686879052,
+        "type_a": 5.122973309482694,
+        "type_b": 19.892834812107516,
+        "type_c": 10.289613635803239,
+        "transferred": true
+      },
+      "runtime": 0.41964197158813477,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "BC",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.8794717788696289,
+        0.1205282136797905,
+        0.87413090467453,
+        0.12586909532546997,
+        0.8698868155479431,
+        0.13011321425437927,
+        0.8587353229522705,
+        0.1412646621465683,
+        0.8504316806793213,
+        0.14956830441951752,
+        0.8458064794540405,
+        0.15419355034828186,
+        0.8392311334609985,
+        0.16076889634132385,
+        0.8243094086647034,
+        0.17569060623645782,
+        0.8119451403617859,
+        0.1880548894405365,
+        0.8410526514053345,
+        0.15894736349582672,
+        0.8561253547668457,
+        0.1438746452331543,
+        0.8226690888404846,
+        0.1773308962583542,
+        0.7827298045158386,
+        0.21727019548416138,
+        0.8075471520423889,
+        0.1924528330564499,
+        0.7966101765632629,
+        0.20338982343673706,
+        0.6608695387840271,
+        0.3391304314136505,
+        0.7529411911964417,
+        0.24705882370471954,
+        0.7954545617103577,
+        0.20454545319080353,
+        0.8214285969734192,
+        0.1785714328289032,
+        0.7368420958518982,
+        0.2631579041481018
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.02047551423590648,
+      "value_rmse": 1.6188752065243985,
+      "regret": {
+        "baseline": 0.005191332339888666,
+        "type_a": 0.006131105058799768,
+        "type_b": 0.5320542495078728,
+        "type_c": 24.068298216907863,
+        "transferred": false
+      },
+      "runtime": 0.22741293907165527,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.01148653898920406,
+        2.009703280841904
+      ],
+      "standard_errors": [
+        0.0010406840592622757,
+        0.02391497604548931
+      ],
+      "policy_tv": 0.007251948392556743,
+      "value_rmse": 0.14730071279011073,
+      "regret": {
+        "baseline": 0.000553065910522621,
+        "type_a": 0.0005838841477838752,
+        "type_b": 0.0002165251141579283,
+        "type_c": 1.4826831010950059e-05,
+        "transferred": true
+      },
+      "runtime": 4.254534721374512,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.011125212535262108,
+        2.0058915615081787
+      ],
+      "standard_errors": [
+        0.0010320197427444108,
+        0.023842429787940305
+      ],
+      "policy_tv": 0.007519048985684644,
+      "value_rmse": 0.10759776306810272,
+      "regret": {
+        "baseline": 0.00034894678202701535,
+        "type_a": 0.00036810272569298697,
+        "type_b": 0.00013146485618253934,
+        "type_c": 8.273859776419812e-06,
+        "transferred": true
+      },
+      "runtime": 2.649600028991699,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.011467842385172844,
+        2.009211301803589
+      ],
+      "standard_errors": [
+        0.001040345523506403,
+        0.023911412805318832
+      ],
+      "policy_tv": 0.007195166472936403,
+      "value_rmse": 0.14436637668590532,
+      "regret": {
+        "baseline": 0.0005480547190968021,
+        "type_a": 0.0005784652532510037,
+        "type_b": 0.00021297986126977975,
+        "type_c": 1.4471125181492184e-05,
+        "transferred": true
+      },
+      "runtime": 16.371949911117554,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NNES",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.011486522853374481,
+        2.0097029209136963
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.007251893497705655,
+      "value_rmse": 0.14729835315831158,
+      "regret": {
+        "baseline": 0.0005530626794241211,
+        "type_a": 0.0005838806073599212,
+        "type_b": 0.0002165221144141416,
+        "type_c": 1.4826579706861409e-05,
+        "transferred": true
+      },
+      "runtime": 22.70963191986084,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "SEES",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        -0.024950762144064654,
+        1.0591389714402482
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.11453485733945094,
+      "value_rmse": 7.529140037772248,
+      "regret": {
+        "baseline": 0.9924089307805533,
+        "type_a": 1.0380162845540968,
+        "type_b": 0.7912159108518042,
+        "type_c": 0.0003918154333137913,
+        "transferred": true
+      },
+      "runtime": 0.7192890644073486,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "TD-CCP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.011164890450316142,
+        1.999600747955293
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006497754243349868,
+      "value_rmse": 0.0918533471729911,
+      "regret": {
+        "baseline": 0.0005511311955839204,
+        "type_a": 0.0005762790362042747,
+        "type_b": 0.000234824709703485,
+        "type_c": 9.550294538751558e-06,
+        "transferred": true
+      },
+      "runtime": 3.9130940437316895,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.011486521922051907,
+        2.0097029209136963
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.007251888223957342,
+      "value_rmse": 0.1472982950752783,
+      "regret": {
+        "baseline": 0.0005530619542108983,
+        "type_a": 0.0005838798452464378,
+        "type_b": 0.0002165218674854419,
+        "type_c": 1.4826562702241475e-05,
+        "transferred": true
+      },
+      "runtime": 8.689878940582275,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MaxEnt-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.08549533039331436,
+        3.0384275913238525
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.24342271295536883,
+      "value_rmse": 7.6851565199661165,
+      "regret": {
+        "baseline": 0.3699073140342164,
+        "type_a": 0.37446066141727097,
+        "type_b": 0.5916439727724505,
+        "type_c": 3.023752422522568,
+        "transferred": true
+      },
+      "runtime": 19.37494206428528,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "IQ-Learn",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        -0.015750378370285034,
+        1.516775131225586
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.04212257471191221,
+      "value_rmse": 1.3125569425635266,
+      "regret": {
+        "baseline": 0.4657290586753833,
+        "type_a": 0.520517844672463,
+        "type_b": 0.17066252757750489,
+        "type_c": 0.0003603945837344913,
+        "transferred": true
+      },
+      "runtime": 1.4048969745635986,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.02025481678286499,
+        1.9914418744935305
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.010296041004577716,
+      "value_rmse": 0.3582446100315215,
+      "regret": {
+        "baseline": 0.03291049921906519,
+        "type_a": 0.03397632808596063,
+        "type_b": 0.020500060111413143,
+        "type_c": 0.002456353206004014,
+        "transferred": true
+      },
+      "runtime": 28.791996717453003,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.020388914032408098,
+        2.0260423355795067
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.05317525943940739,
+      "value_rmse": 0.8351307221386669,
+      "regret": {
+        "baseline": 0.02603029678350577,
+        "type_a": 0.027004537588015465,
+        "type_b": 0.014617895510041556,
+        "type_c": 0.002411007332038473,
+        "transferred": true
+      },
+      "runtime": 142.0743489265442,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "f-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.3241785163296099,
+      "value_rmse": 12.258074064818391,
+      "regret": {
+        "baseline": 8.225072692865401,
+        "type_a": 8.251495539534785,
+        "type_b": 8.046473313699382,
+        "type_c": 104.39459983527624,
+        "transferred": false
+      },
+      "runtime": 27.580868005752563,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "Deep-MCE-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        -0.08256115764379501,
+        0.5361151099205017
+      ],
+      "standard_errors": null,
+      "policy_tv": 0.009875494644454256,
+      "value_rmse": 24.575070273926254,
+      "regret": {
+        "baseline": 3.3623343596409336,
+        "type_a": 3.259322386663647,
+        "type_b": 1.7038129410549683,
+        "type_c": 0.00046271098951589096,
+        "transferred": true
+      },
+      "runtime": 14.723498821258545,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MaxMargin-IRL",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.2339882105588913,
+        0.9722394347190857
+      ],
+      "standard_errors": [
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.6274850793926333,
+      "value_rmse": 0.22990422315781922,
+      "regret": {
+        "baseline": 4.933321054658047,
+        "type_a": 4.951676903083182,
+        "type_b": 18.903607332621192,
+        "type_c": 9.825699590131169,
+        "transferred": true
+      },
+      "runtime": 0.5339860916137695,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "BC",
+      "family": "behavioral",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.8762607574462891,
+        0.12373923510313034,
+        0.8774765729904175,
+        0.12252339720726013,
+        0.8695454001426697,
+        0.13045461475849152,
+        0.8607301712036133,
+        0.1392698436975479,
+        0.8535279631614685,
+        0.1464720219373703,
+        0.8528339266777039,
+        0.14716605842113495,
+        0.8382838368415833,
+        0.16171617805957794,
+        0.8387631177902222,
+        0.16123688220977783,
+        0.8245487213134766,
+        0.17545126378536224,
+        0.8219316005706787,
+        0.17806841433048248,
+        0.8014184236526489,
+        0.19858156144618988,
+        0.7765726447105408,
+        0.22342732548713684,
+        0.800000011920929,
+        0.20000000298023224,
+        0.7669491767883301,
+        0.2330508530139923,
+        0.7402597665786743,
+        0.25974026322364807,
+        0.8198198080062866,
+        0.18018017709255219,
+        0.762499988079071,
+        0.23749999701976776,
+        0.8301886916160583,
+        0.16981132328510284,
+        0.800000011920929,
+        0.20000000298023224,
+        0.7954545617103577,
+        0.20454545319080353
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.016868587134647794,
+      "value_rmse": 1.6188752065243985,
+      "regret": {
+        "baseline": 0.0026950015167634955,
+        "type_a": 0.0035856449780782285,
+        "type_b": 0.22907656027517853,
+        "type_c": 23.9062663156596,
+        "transferred": false
+      },
+      "runtime": 0.26894307136535645,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 0,
+      "params": [
+        0.012335174590652531,
+        2.03254840246517
+      ],
+      "standard_errors": [
+        0.0010547061420025261,
+        0.024198182081158627
+      ],
+      "policy_tv": 0.009868777143814494,
+      "value_rmse": 0.2818554247827593,
+      "regret": {
+        "baseline": 0.0010139032824187932,
+        "type_a": 0.0010636021887386882,
+        "type_b": 0.0007411934068014547,
+        "type_c": 3.6587939311383266e-05,
+        "transferred": true
+      },
+      "runtime": 0.6161520481109619,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 1,
+      "params": [
+        0.010507701516338324,
+        1.988353485013728
+      ],
+      "standard_errors": [
+        0.0010374910214208451,
+        0.023785212184731504
+      ],
+      "policy_tv": 0.004140792205833399,
+      "value_rmse": 0.008035421563162856,
+      "regret": {
+        "baseline": 0.00041150509828402626,
+        "type_a": 0.00042075879935787874,
+        "type_b": 0.00030280204870059,
+        "type_c": 2.1611287874812035e-06,
+        "transferred": true
+      },
+      "runtime": 0.04005289077758789,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "UFXP",
+      "family": "structural",
+      "cell": "rust_bus",
+      "rep": 2,
+      "params": [
+        0.011250154149523107,
+        2.007233223730556
+      ],
+      "standard_errors": [
+        0.001014671967839306,
+        0.023632720876834264
+      ],
+      "policy_tv": 0.006189002885064706,
+      "value_rmse": 0.12133853664957459,
+      "regret": {
+        "baseline": 0.0004136050376202238,
+        "type_a": 0.00043650122167671057,
+        "type_b": 0.00015766958486129745,
+        "type_c": 1.0293875433609045e-05,
+        "transferred": true
+      },
+      "runtime": 0.039595842361450195,
+      "converged": true,
+      "error": null
+    }
+  ]
+}

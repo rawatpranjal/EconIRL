@@ -2320,6 +2320,23 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
         type_b_support="valid",
         type_c_support="valid",
     ),
+    "UFXP": EstimatorContract(
+        name="UFXP",
+        code_path="src/econirl/estimation/ufxp.py",
+        documentation_paths=("docs/estimators/ufxp.md",),
+        required_reward_modes=("action_dependent",),
+        required_state_modes=("low_dim",),
+        requires_transitions=True,
+        recovers=("theta", "reward", "policy", "value"),
+        type_a_support="valid",
+        type_b_support="valid",
+        type_c_support="valid",
+        notes=(
+            "Unnested fixed point (Bray; Oguz-Bray 2026): Bellman FOCs with the "
+            "value function eliminated by pre-computed duals; closed form for "
+            "linear utility under the optimal (OUFXP) weighting."
+        ),
+    ),
     "MCE-IRL": EstimatorContract(
         name="MCE-IRL",
         code_path="src/econirl/estimation/mce_irl.py",
@@ -2811,6 +2828,14 @@ def make_estimator(
             compute_hessian=not smoke,
             verbose=verbose,
         )
+    if estimator_name == "UFXP":
+        from econirl.estimation.ufxp import UFXPEstimator
+
+        return UFXPEstimator(
+            weights="optimal",
+            compute_hessian=not smoke,
+            verbose=verbose,
+        )
     if estimator_name == "MPEC":
         from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
@@ -3141,6 +3166,35 @@ def recovery_gates(
                 ">=",
                 5.0,
             ),
+            _bool_gate("standard_errors_finite", se_available, True),
+            _numeric_gate(
+                "parameter_cosine",
+                metrics["parameters"].cosine_similarity,
+                ">=",
+                0.98,
+            ),
+            _numeric_gate(
+                "parameter_relative_rmse",
+                metrics["parameters"].relative_rmse,
+                "<=",
+                0.15,
+            ),
+            _numeric_gate("policy_tv", metrics["policy"].tv, "<=", 0.03),
+            _numeric_gate("value_rmse", metrics["value_rmse"], "<=", 0.10),
+            _numeric_gate("q_rmse", metrics["q_rmse"], "<=", 0.10),
+        ]
+        for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
+            checks.append(
+                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
+            )
+        return checks
+
+    if estimator_name == "UFXP":
+        se_available = summary.standard_errors is not None and bool(
+            jnp.all(jnp.isfinite(jnp.asarray(summary.standard_errors)))
+        )
+        checks = [
+            _bool_gate("converged", bool(summary.converged), True),
             _bool_gate("standard_errors_finite", se_available, True),
             _numeric_gate(
                 "parameter_cosine",
