@@ -1,5 +1,7 @@
 """Tests for the Trivago hotel search DDC dataset loader."""
 
+import os
+
 import pytest
 import jax.numpy as jnp
 import numpy as np
@@ -23,6 +25,11 @@ from econirl.datasets.trivago_search import (
 
 DATA_PATH = "/Volumes/Expansion/datasets/trivago-2019/train.csv"
 N_TEST_SESSIONS = 100
+
+pytestmark = pytest.mark.skipif(
+    not os.path.exists(DATA_PATH),
+    reason=f"Trivago dataset not present at {DATA_PATH}",
+)
 
 
 @pytest.fixture(scope="module")

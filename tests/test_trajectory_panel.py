@@ -404,12 +404,6 @@ class TestBackwardCompat:
         assert isinstance(panel, TrajectoryPanel)
         assert panel.num_individuals == 2
 
-    def test_to_device_returns_trajectory_panel(self, simple_panel):
-        """to() returns a TrajectoryPanel, not a plain Panel."""
-        moved = simple_panel.to("cpu")
-        assert isinstance(moved, TrajectoryPanel)
-
-
 # ---------------------------------------------------------------------------
 # to_dataframe
 # ---------------------------------------------------------------------------

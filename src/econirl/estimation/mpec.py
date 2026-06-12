@@ -35,6 +35,7 @@ Reference:
 from __future__ import annotations
 
 import time
+import warnings
 from dataclasses import dataclass
 
 import jax
@@ -71,7 +72,10 @@ class MPECConfig:
             JAX-provided objective gradients and Bellman constraint
             Jacobians. "sqp_jax" is an experimental JAX-native KKT solver.
             "augmented_lagrangian" / "slsqp" are legacy aliases for the
-            penalty-based AL solver (less reliable at high beta).
+            penalty-based AL solver (less reliable at high beta). "slsqp" is
+            deprecated and emits a DeprecationWarning: it is NOT scipy SLSQP, and
+            its converged flag checks only Bellman feasibility, not optimality.
+            Use "sqp" for real constrained MLE.
         outer_max_iter: Maximum SQP / AL outer iterations.
         tol: KKT stationarity tolerance (SQP) or inner L-BFGS-B tol (AL).
         constraint_tol: Maximum Bellman constraint violation at convergence.
@@ -99,6 +103,15 @@ class MPECConfig:
             self.max_iter = self.inner_max_iter
         if self.inner_tol is not None:
             self.tol = self.inner_tol
+        if self.solver == "slsqp":
+            warnings.warn(
+                "MPECConfig(solver='slsqp') is a legacy alias for the "
+                "augmented-Lagrangian penalty solver, not scipy SLSQP. Its "
+                "converged flag checks only Bellman feasibility, not "
+                "optimality. Use solver='sqp' for real constrained MLE.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
 
 class MPECEstimator(BaseEstimator):

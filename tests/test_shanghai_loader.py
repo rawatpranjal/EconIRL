@@ -1,5 +1,7 @@
 """Tests for the Shanghai taxi route-choice dataset loader."""
 
+import os
+
 import pytest
 import jax.numpy as jnp
 import numpy as np
@@ -18,6 +20,11 @@ from econirl.datasets.shanghai_route import (
 
 
 DATA_DIR = "/Volumes/Expansion/datasets/shanghai_taxi_rcm_airl/data"
+
+pytestmark = pytest.mark.skipif(
+    not os.path.exists(DATA_DIR),
+    reason=f"Shanghai dataset not present at {DATA_DIR}",
+)
 
 
 @pytest.fixture(scope="module")

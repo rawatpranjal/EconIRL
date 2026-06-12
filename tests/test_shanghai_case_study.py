@@ -1,5 +1,7 @@
 """Regression tests for Shanghai route-choice case study."""
 
+import os
+
 import numpy as np
 import jax.numpy as jnp
 import pytest
@@ -13,6 +15,11 @@ from econirl.preferences.linear import LinearUtility
 
 
 DATA_DIR = "/Volumes/Expansion/datasets/shanghai_taxi_rcm_airl/data"
+
+pytestmark = pytest.mark.skipif(
+    not os.path.exists(DATA_DIR),
+    reason=f"Shanghai dataset not present at {DATA_DIR}",
+)
 
 FEATURE_NAMES = [
     "length", "residential", "primary", "secondary",

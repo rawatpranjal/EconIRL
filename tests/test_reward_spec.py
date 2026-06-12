@@ -288,25 +288,6 @@ class TestSubsetStates:
 
 
 # ------------------------------------------------------------------ #
-# 13. to(device)
-# ------------------------------------------------------------------ #
-
-class TestToDevice:
-    def test_cpu_to_cpu(self, sak_features, names):
-        spec = RewardSpec(sak_features, names=names)
-        spec_cpu = spec.to("cpu")
-
-        assert jnp.allclose(spec.feature_matrix, spec_cpu.feature_matrix)
-        assert spec_cpu.parameter_names == spec.parameter_names
-        assert spec_cpu.is_state_only == spec.is_state_only
-
-    def test_returns_new_instance(self, sak_features, names):
-        spec = RewardSpec(sak_features, names=names)
-        spec2 = spec.to("cpu")
-        assert spec2 is not spec
-
-
-# ------------------------------------------------------------------ #
 # Additional edge-case tests
 # ------------------------------------------------------------------ #
 

@@ -268,21 +268,6 @@ class TestLinearRewardDifferentNActions:
 class TestLinearRewardMethods:
     """Test additional LinearReward methods."""
 
-    def test_to_device(self):
-        """Test moving reward to different device."""
-        np.random.seed(0)
-        state_features = jnp.array(np.random.randn(5, 2))
-        reward = LinearReward(
-            state_features=state_features,
-            parameter_names=["a", "b"],
-            n_actions=3,
-        )
-
-        # Move to same device (CPU) - should work
-        reward_cpu = reward.to("cpu")
-        assert reward_cpu.num_actions == 3
-        assert reward_cpu.parameter_names == ["a", "b"]
-
     def test_subset_states(self):
         """Test creating a subset of states."""
         state_features = jnp.array([

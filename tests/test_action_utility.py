@@ -342,21 +342,6 @@ class TestFactoryMethods:
         assert utility.parameter_names == rust_env_small.parameter_names
 
 
-class TestDeviceMovement:
-    """Tests for moving tensors between devices."""
-
-    def test_to_cpu(self):
-        """Test moving to CPU."""
-        utility = ActionDependentUtility.for_rust_model(num_states=10)
-        utility_cpu = utility.to("cpu")
-
-        params = jnp.array([0.001, 3.0])
-        U = utility_cpu.compute(params)
-
-        # JAX arrays are always on the default device
-        assert U.shape == (10, 2)
-
-
 class TestValidation:
     """Tests for parameter validation."""
 

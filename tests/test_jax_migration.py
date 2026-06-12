@@ -133,6 +133,7 @@ class TestSolverConsistency:
 
     def test_optimistix_hybrid_agree(self, rust_setup):
         """Optimistix fixed-point and hybrid iteration converge to same V."""
+        pytest.importorskip("optimistix")
         op, U, problem = rust_setup
         hy = hybrid_iteration(op, U, tol=1e-10, max_iter=100000, switch_tol=1e-3)
         V_optx = optimistix_solve(problem, op.transitions, U, tol=1e-10, max_steps=100000)
