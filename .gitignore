@@ -52,6 +52,12 @@ AGENTS.md
 **/AGENTS.md
 /internal_docs/
 /roadmap.md
+/SYSTEM.md
+/style.md
+/status.md
+/plan.md
+/decisions.md
+/docs/plans/
 
 # Secrets and local environment
 .env
