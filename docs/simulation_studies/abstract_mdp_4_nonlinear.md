@@ -47,8 +47,9 @@ A linear utility fits $\theta_0 \varphi_0 + \theta_1 \varphi_1$ and has no term 
 | GLADIUS | neural | 3/3 | 3/3 | 0.0379 | yes | 1.1613 | 1.1506 | 0.8980 | 0.5868 | 12.8 |
 | AIRL | neural | 3/3 | 0/3 | 0.0218 | no | 0.0351 | 0.0735 | 0.4341 | 71.3552 | 114.3 |
 | Deep MCE-IRL | neural | 3/3 | 3/3 | 0.0217 | no | 0.0391 | 0.0717 | 0.4152 | 70.9284 | 26.0 |
+| Neural UFXP | neural | 3/3 | 3/3 | 0.0204 | no | 0.0281 | 0.0566 | 0.3667 | 69.8855 | 1.1 |
 
-The interaction costs two ways. The structural estimators land together: NFXP, CCP, MPEC, NNES, SEES, TD-CCP, and UFXP all sit near a policy distance of 0.10, the residual a linear utility leaves, and their re-solved reward loses close to one unit of welfare. The maximum-entropy IRL methods sit there too. The methods with a richer reward or policy class learn the product and match the choices to about 0.02: the neural-reward Deep MCE-IRL and AIRL, and f-IRL with a free tabular reward. The benchmark re-solves only linear-in-feature rewards, so under the interventions these methods are scored on their fixed policy, not on a re-solve of what they learned. GLADIUS matches the choices but projects its reward back onto the linear features, so even its baseline regret is as large as the linear family's. BC clones the choices and estimates no reward at all.
+The interaction costs two ways. The structural estimators land together: NFXP, CCP, MPEC, NNES, SEES, TD-CCP, and UFXP all sit near a policy distance of 0.10, the residual a linear utility leaves, and their re-solved reward loses close to one unit of welfare. The maximum-entropy IRL methods sit there too. The methods with a richer reward or policy class learn the product and match the choices to about 0.02: the neural-reward Deep MCE-IRL and AIRL, f-IRL with a free tabular reward, and Neural UFXP, which trains a network utility through the same unnested fixed point the linear UFXP uses. The benchmark re-solves only linear-in-feature rewards, so under the interventions these methods are scored on their fixed policy, not on a re-solve of what they learned. GLADIUS matches the choices but projects its reward back onto the linear features, so even its baseline regret is as large as the linear family's. BC clones the choices and estimates no reward at all.
 
 Reward marks what the method fits: a linear utility, a reward or value network, a free tabular reward (one value per state-action pair), or no reward at all (a cloned policy). Policy TV is the distance between estimated and true choice probabilities, lower is better. The value level is omitted: the reward is identified only up to transformations that leave behavior unchanged, so a value error across families would not compare like with like. Conv is the estimator's own convergence flag; it does not track recovery here. A cautious flag can read False while the policy is accurate, which is exactly the AIRL case below.
 
@@ -56,13 +57,15 @@ Regret base is welfare lost in the observed environment. Types A, B, and C are w
 
 ## Notes per estimator
 
-**UFXP.** This is the linear special case. The paper that introduces UFXP, Oguz and Bray (2026), trains a neural utility through the same unnested fixed point; that variant would learn the interaction but is not yet implemented here, so this row shows the linear form.
+**UFXP.** The linear special case. It cannot form the product, so it sits with the linear family. The paper that introduces UFXP, Oguz and Bray (2026), trains a neural utility through the same unnested fixed point; that is the Neural UFXP row below.
 
 **f-IRL.** Learns a free tabular reward, one value per state-action pair, not a linear utility. That is why it tracks the choices on a nonlinear reward. The benchmark re-solves only linear-in-feature rewards, so this tabular reward is not transferred and its counterfactual stays on the fixed policy.
 
 **BC.** Clones the observed choice frequencies. It matches behavior with no reward, so it has nothing to carry to a counterfactual.
 
 **GLADIUS.** Learns the behavior through a value network (policy TV 0.04), then projects the reward back onto the linear features. Its regret is scored on that projected linear reward, not on the neural policy the policy TV measures, and the projection cannot hold the interaction, so even its baseline regret is as large as the linear family's.
+
+**Neural UFXP.** The same unnested fixed point as UFXP, but the utility is a network trained on the projected first-order conditions, with no Bellman solve in the loop. It learns the interaction and matches the choices where the linear UFXP cannot.
 
 ## Reproduce
 

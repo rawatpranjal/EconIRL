@@ -54,6 +54,7 @@ estimators; they are also importable as ``NeuralGLADIUS`` and ``NeuralAIRL``.
    IQLearn
    GLADIUS
    AIRL
+   NeuralUFXP
 
 Environments and simulation
 ----------------------------------------------------------

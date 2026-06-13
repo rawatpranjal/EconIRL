@@ -68,6 +68,7 @@ from econirl.estimators import GLADIUS, NeuralGLADIUS
 from econirl.estimators import AIRL, NeuralAIRL
 from econirl.estimation import IQLearnEstimator as IQLearn
 from econirl.estimators import MCEIRLNeural
+from econirl.estimators import NeuralUFXP
 
 # Sklearn-style Utilities
 from econirl.utilities import Utility, LinearCost, make_utility
@@ -115,6 +116,7 @@ __all__ = [
     "NeuralGLADIUS",
     "NeuralAIRL",
     "MCEIRLNeural",
+    "NeuralUFXP",
     # Core types (new)
     "RewardSpec",
     "TrajectoryPanel",

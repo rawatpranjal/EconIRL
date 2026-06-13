@@ -277,6 +277,21 @@ def _run_deep_mce_irl(env, panel):
                            value_function=m.value_, converged=bool(m.converged_))
 
 
+def _run_neural_ufxp(env, panel):
+    # Neural-utility UFXP: trains a network utility through the unnested dual,
+    # no Bellman solve in the loop. Learns the interaction the linear UFXP cannot.
+    from types import SimpleNamespace
+
+    from econirl.estimators import NeuralUFXP
+
+    m = NeuralUFXP(discount=float(env.problem_spec.discount_factor),
+                   num_projections=64, max_epochs=2000, lr=1e-2, seed=0).fit(
+        panel, features=np.asarray(env.feature_matrix),
+        transitions=np.asarray(env.transition_matrices))
+    return SimpleNamespace(parameters=None, standard_errors=None, policy=m.policy_,
+                           value_function=m.value_, converged=bool(m.converged_))
+
+
 # name, family, reward kind, runner. reward "linear" fits theta . phi; "neural"
 # learns a reward or value network.
 ROSTER = [
@@ -295,6 +310,7 @@ ROSTER = [
     ("GLADIUS", "behavioral", "neural", _run_gladius),
     ("AIRL", "behavioral", "neural", _run_airl),
     ("Deep MCE-IRL", "behavioral", "neural", _run_deep_mce_irl),
+    ("Neural UFXP", "structural", "neural", _run_neural_ufxp),
 ]
 
 # One-line diagnosis per estimator.
@@ -312,10 +328,14 @@ DIAGNOSES: dict[str, str] = {
                "neural policy the policy TV measures, and the projection cannot "
                "hold the interaction, so even its baseline regret is as large as "
                "the linear family's.",
-    "UFXP": "This is the linear special case. The paper that introduces UFXP, "
-            "Oguz and Bray (2026), trains a neural utility through the same "
-            "unnested fixed point; that variant would learn the interaction but "
-            "is not yet implemented here, so this row shows the linear form.",
+    "UFXP": "The linear special case. It cannot form the product, so it sits "
+            "with the linear family. The paper that introduces UFXP, Oguz and "
+            "Bray (2026), trains a neural utility through the same unnested fixed "
+            "point; that is the Neural UFXP row below.",
+    "Neural UFXP": "The same unnested fixed point as UFXP, but the utility is a "
+                   "network trained on the projected first-order conditions, with "
+                   "no Bellman solve in the loop. It learns the interaction and "
+                   "matches the choices where the linear UFXP cannot.",
 }
 
 
@@ -593,8 +613,10 @@ def render_page(data: dict) -> str:
         "their re-solved reward loses close to one unit of welfare. The "
         "maximum-entropy IRL methods sit there too. The methods with a richer "
         "reward or policy class learn the product and match the choices to "
-        "about 0.02: the neural-reward Deep MCE-IRL and AIRL, and f-IRL with a "
-        "free tabular reward. The benchmark re-solves only linear-in-feature "
+        "about 0.02: the neural-reward Deep MCE-IRL and AIRL, f-IRL with a "
+        "free tabular reward, and Neural UFXP, which trains a network utility "
+        "through the same unnested fixed point the linear UFXP uses. The "
+        "benchmark re-solves only linear-in-feature "
         "rewards, so under the interventions these methods are scored on their "
         "fixed policy, not on a re-solve of what they learned. GLADIUS matches "
         "the choices but projects its reward back onto the linear features, so "

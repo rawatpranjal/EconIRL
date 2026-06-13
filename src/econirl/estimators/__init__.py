@@ -77,6 +77,11 @@ try:
 except ImportError:
     MCEIRLNeural = None
 
+try:
+    from econirl.estimators.ufxp_neural import NeuralUFXP
+except ImportError:
+    NeuralUFXP = None
+
 __all__ = [
     "NFXP",
     "NNES",
@@ -92,5 +97,6 @@ __all__ = [
     "NeuralGLADIUS",
     "NeuralAIRL",
     "MCEIRLNeural",
+    "NeuralUFXP",
     "EstimatorProtocol",
 ]

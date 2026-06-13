@@ -52,8 +52,11 @@ errors.
 
 Scope of this implementation:
 
-- Linear utility (``LinearUtility`` / the uniform benchmark path). The paper's
-  neural-utility training loop is out of scope here.
+- Linear utility (``LinearUtility`` / the uniform benchmark path), closed form.
+  The paper's neural-utility training loop is implemented separately in
+  ``econirl.estimators.ufxp_neural.NeuralUFXP``, which reuses this module's
+  ``_ufxp_precompute`` / ``_ufxp_random_duals`` and replaces the closed-form
+  solve with a gradient loop over a network utility.
 
 First-order conditions are used only at states observed at least
 ``ccp_min_count`` times; unvisited states still enter ``V_P`` through the
@@ -65,6 +68,7 @@ downweighted by their sample share and unvisited states drop out entirely.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 
 import jax.numpy as jnp
 import numpy as np
@@ -72,6 +76,84 @@ import numpy as np
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.preferences.base import UtilityFunction
+
+
+@dataclass
+class _UFXPPre:
+    """Theta-independent precompute shared by linear UFXP and neural UFXP.
+
+    Everything here is a function of the data, transitions, and discount only,
+    so it is computed once and reused across every objective evaluation -- the
+    unnesting that lets a neural utility train with no Bellman solve in the loop.
+    """
+
+    F: np.ndarray          # (A, S, S) transitions
+    A: int
+    S: int
+    phi: np.ndarray        # (S, A, K) reward features
+    K: int
+    beta: float
+    sigma: float
+    P: np.ndarray          # (S, A) empirical CCPs (uniform at unsupported states)
+    supported: np.ndarray  # (S,) bool
+    ref: int               # reference action for the CCP inversion
+    logratio: np.ndarray   # (S, A-1) inverse-CCP map
+    ent: np.ndarray        # (S,) policy-value entropy correction
+    F_P: np.ndarray        # (S, S) CCP-weighted transition
+    phi_P: np.ndarray      # (S, K) CCP-weighted features
+    dF: np.ndarray         # (A-1, S, S) differenced transitions
+    dphi: np.ndarray       # (S, A-1, K) differenced features
+    state_counts: np.ndarray  # (S, 1)
+    states: np.ndarray
+    actions: np.ndarray
+
+
+def _ufxp_precompute(panel, utility, transitions, problem, ccp_min_count,
+                     ccp_smoothing) -> _UFXPPre:
+    """Frequency CCPs and the differenced/weighted transitions and features."""
+    F = np.asarray(transitions, dtype=np.float64)  # (A, S, S)
+    A, S, _ = F.shape
+    phi = np.asarray(utility.feature_matrix, dtype=np.float64)  # (S, A, K)
+    K = phi.shape[2]
+    beta = float(problem.discount_factor)
+    sigma = float(problem.scale_parameter)
+
+    states = np.asarray(panel.get_all_states(), dtype=np.int64)
+    actions = np.asarray(panel.get_all_actions(), dtype=np.int64)
+    counts = np.zeros((S, A), dtype=np.float64)
+    np.add.at(counts, (states, actions), 1.0)
+    state_counts = counts.sum(axis=1, keepdims=True)
+    P = (counts + ccp_smoothing) / np.where(
+        state_counts > 0, state_counts + A * ccp_smoothing, 1.0)
+    supported = (state_counts[:, 0] >= ccp_min_count)
+    P[~supported] = 1.0 / A
+
+    ref = A - 1
+    log_p = np.log(np.clip(P, 1e-300, 1.0))
+    logratio = sigma * (log_p[:, :ref] - log_p[:, ref:ref + 1])  # (S, A-1)
+    ent = -sigma * (P * log_p).sum(axis=1)  # (S,)
+    F_P = np.einsum("sa,asx->sx", P, F)  # (S, S)
+    phi_P = np.einsum("sa,sak->sk", P, phi)  # (S, K)
+    dF = F[:ref] - F[ref:ref + 1]  # (A-1, S, S)
+    dphi = phi[:, :ref, :] - phi[:, ref:ref + 1, :]  # (S, A-1, K)
+    return _UFXPPre(F, A, S, phi, K, beta, sigma, P, supported, ref,
+                    logratio, ent, F_P, phi_P, dF, dphi, state_counts,
+                    states, actions)
+
+
+def _ufxp_random_duals(pre: _UFXPPre, num_projections: int, seed: int):
+    """The m random projections and their precomputed duals (Proposition 2).
+
+    ``lam = (I - beta F_P')^{-1} W`` is the only linear solve; it is independent
+    of the utility, so the same ``lam`` scores every theta (linear) or every
+    network step (neural).
+    """
+    rng = np.random.default_rng(seed)
+    Z = rng.standard_normal((num_projections, pre.S, pre.A - 1))
+    Z[:, ~pre.supported, :] = 0.0  # score only observed FOCs
+    W = -pre.beta * np.einsum("asx,msa->xm", pre.dF, Z)  # (S, m)
+    lam = np.linalg.solve(np.eye(pre.S) - pre.beta * pre.F_P.T, W)  # (S, m)
+    return Z, lam
 
 
 class UFXPEstimator(BaseEstimator):
@@ -138,42 +220,19 @@ class UFXPEstimator(BaseEstimator):
         **kwargs,
     ) -> EstimationResult:
         t0 = time.time()
-        F = np.asarray(transitions, dtype=np.float64)  # (A, S, S)
-        A, S, _ = F.shape
-        phi = np.asarray(utility.feature_matrix, dtype=np.float64)  # (S, A, K)
-        K = phi.shape[2]
-        beta = float(problem.discount_factor)
-        sigma = float(problem.scale_parameter)
+        # Theta-independent precompute, shared with the neural UFXP backend.
+        pre = _ufxp_precompute(panel, utility, transitions, problem,
+                               self._ccp_min_count, self._ccp_smoothing)
+        F, A, S, phi, K = pre.F, pre.A, pre.S, pre.phi, pre.K
+        beta, sigma = pre.beta, pre.sigma
+        P, supported, ref = pre.P, pre.supported, pre.ref
+        logratio, ent = pre.logratio, pre.ent
+        F_P, phi_P, dF, dphi = pre.F_P, pre.phi_P, pre.dF, pre.dphi
+        state_counts, states, actions = pre.state_counts, pre.states, pre.actions
         m = self._num_projections
         if self._weights == "random" and m <= K:
             raise ValueError(f"num_projections ({m}) must exceed the parameter "
                              f"count ({K})")
-
-        # --- Pre-computation (independent of theta) -----------------------
-        # Frequency CCPs with smoothing; uniform at unsupported states.
-        states = np.asarray(panel.get_all_states(), dtype=np.int64)
-        actions = np.asarray(panel.get_all_actions(), dtype=np.int64)
-        counts = np.zeros((S, A), dtype=np.float64)
-        np.add.at(counts, (states, actions), 1.0)
-        state_counts = counts.sum(axis=1, keepdims=True)
-        P = (counts + self._ccp_smoothing) / np.where(
-            state_counts > 0, state_counts + A * self._ccp_smoothing, 1.0)
-        supported = (state_counts[:, 0] >= self._ccp_min_count)
-        P[~supported] = 1.0 / A
-
-        ref = A - 1  # reference action for the CCP inversion
-        log_p = np.log(np.clip(P, 1e-300, 1.0))
-        # Inverse CCP map under logit: c_a - c_ref = sigma * log(P_a / P_ref).
-        logratio = sigma * (log_p[:, :ref] - log_p[:, ref:ref + 1])  # (S, A-1)
-        # Policy-value flow correction: -sigma * sum_a P_a log P_a (the
-        # package's gamma-free soft-Bellman convention).
-        ent = -sigma * (P * log_p).sum(axis=1)  # (S,)
-        # CCP-weighted transition and features.
-        F_P = np.einsum("sa,asx->sx", P, F)  # (S, S)
-        phi_P = np.einsum("sa,sak->sk", P, phi)  # (S, K)
-
-        dF = F[:ref] - F[ref:ref + 1]  # (A-1, S, S)
-        dphi = phi[:, :ref, :] - phi[:, ref:ref + 1, :]  # (S, A-1, K)
         hessian = None
 
         if self._weights == "optimal":
@@ -223,15 +282,8 @@ class UFXPEstimator(BaseEstimator):
         else:
             # --- Plain UFXP: m random projections, dual trick --------------
             # Projections are zeroed at unsupported states so only observed
-            # FOCs are scored.
-            rng = np.random.default_rng(self._seed)
-            Z = rng.standard_normal((m, S, A - 1))
-            Z[:, ~supported, :] = 0.0
-
-            # Duals: one factorization of (I - beta F_P'), m right-hand sides.
-            # w_i = -beta * sum_{a != ref} (F_a - F_A)' Z_i[:, a]
-            W = -beta * np.einsum("asx,msa->xm", dF, Z)  # (S, m)
-            lam = np.linalg.solve(np.eye(S) - beta * F_P.T, W)  # (S, m)
+            # FOCs are scored; the duals lam are precomputed (Proposition 2).
+            Z, lam = _ufxp_random_duals(pre, m, self._seed)
 
             # residual_i(theta) = b_i + c_i' theta with
             #   b_i = <Z_i, logratio> + lambda_i' ent

@@ -51,7 +51,8 @@
       "BC": "def _run_bc(env, panel):\n    from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator\n\n    est = BehavioralCloningEstimator(smoothing=1.0, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "GLADIUS": "def _run_gladius(env, panel):\n    # Neural Q and value networks; the policy comes from the learned Q, so it can\n    # represent the interaction-driven behavior.\n    from econirl.estimation import GLADIUSConfig, GLADIUSEstimator\n\n    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=500, q_hidden_dim=128,\n                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,\n                                                patience=60, compute_se=False, verbose=False))\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
       "AIRL": "def _run_airl(env, panel):\n    # Neural reward; reward_arg=\"state_action\" keeps the action contrast.\n    from econirl.estimation import AIRLConfig, AIRLEstimator\n\n    est = AIRLEstimator(config=AIRLConfig(reward_type=\"neural\", reward_arg=\"state_action\",\n                                          reward_lr=0.01, discriminator_steps=10,\n                                          max_rounds=300, compute_se=False, verbose=False))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
-      "Deep MCE-IRL": "def _run_deep_mce_irl(env, panel):\n    # Neural reward over the features plus action; can represent the product.\n    from types import SimpleNamespace\n\n    from econirl.estimators import MCEIRLNeural\n\n    m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),\n                     discount=float(env.problem_spec.discount_factor),\n                     reward_type=\"state_action\", max_epochs=400, verbose=False)\n    m.fit(panel, features=np.asarray(env.feature_matrix),\n          transitions=np.asarray(env.transition_matrices))\n    return SimpleNamespace(parameters=None, standard_errors=None, policy=m.policy_,\n                           value_function=m.value_, converged=bool(m.converged_))\n"
+      "Deep MCE-IRL": "def _run_deep_mce_irl(env, panel):\n    # Neural reward over the features plus action; can represent the product.\n    from types import SimpleNamespace\n\n    from econirl.estimators import MCEIRLNeural\n\n    m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),\n                     discount=float(env.problem_spec.discount_factor),\n                     reward_type=\"state_action\", max_epochs=400, verbose=False)\n    m.fit(panel, features=np.asarray(env.feature_matrix),\n          transitions=np.asarray(env.transition_matrices))\n    return SimpleNamespace(parameters=None, standard_errors=None, policy=m.policy_,\n                           value_function=m.value_, converged=bool(m.converged_))\n",
+      "Neural UFXP": "def _run_neural_ufxp(env, panel):\n    # Neural-utility UFXP: trains a network utility through the unnested dual,\n    # no Bellman solve in the loop. Learns the interaction the linear UFXP cannot.\n    from types import SimpleNamespace\n\n    from econirl.estimators import NeuralUFXP\n\n    m = NeuralUFXP(discount=float(env.problem_spec.discount_factor),\n                   num_projections=64, max_epochs=2000, lr=1e-2, seed=0).fit(\n        panel, features=np.asarray(env.feature_matrix),\n        transitions=np.asarray(env.transition_matrices))\n    return SimpleNamespace(parameters=None, standard_errors=None, policy=m.policy_,\n                           value_function=m.value_, converged=bool(m.converged_))\n"
     },
     "diagnoses": {
       "BC": "Clones the observed choice frequencies. It matches behavior with no reward, so it has nothing to carry to a counterfactual.",
@@ -869,6 +870,60 @@
         "transferred": false
       },
       "runtime": 24.553898096084595,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "Neural UFXP",
+      "family": "structural",
+      "reward": "neural",
+      "rep": 0,
+      "policy_tv": 0.02228187883581118,
+      "value_rmse": 135.1527393363402,
+      "regret": {
+        "baseline": 0.02773177279893126,
+        "type_a": 0.04950682754193556,
+        "type_b": 0.3530704921944682,
+        "type_c": 69.98914327289062,
+        "transferred": false
+      },
+      "runtime": 1.5925319194793701,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "Neural UFXP",
+      "family": "structural",
+      "reward": "neural",
+      "rep": 1,
+      "policy_tv": 0.019713200034304174,
+      "value_rmse": 57.343066564443035,
+      "regret": {
+        "baseline": 0.030772848441519583,
+        "type_a": 0.06425975275192443,
+        "type_b": 0.3493874147641907,
+        "type_c": 70.53282684762054,
+        "transferred": false
+      },
+      "runtime": 0.711021900177002,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "Neural UFXP",
+      "family": "structural",
+      "reward": "neural",
+      "rep": 2,
+      "policy_tv": 0.019099644974915685,
+      "value_rmse": 5.143309358751734,
+      "regret": {
+        "baseline": 0.025646735342580905,
+        "type_a": 0.05608072783218493,
+        "type_b": 0.3976634152559928,
+        "type_c": 69.13448208816104,
+        "transferred": false
+      },
+      "runtime": 0.8708269596099854,
       "converged": true,
       "error": null
     }
