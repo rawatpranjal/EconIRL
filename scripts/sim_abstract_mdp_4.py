@@ -290,7 +290,7 @@ ROSTER = [
     ("MCE-IRL", "behavioral", "linear", _run_mce_irl),
     ("MaxEnt-IRL", "behavioral", "linear", _run_maxent_irl),
     ("IQ-Learn", "behavioral", "linear", _run_iq_learn),
-    ("f-IRL", "behavioral", "linear", _run_firl),
+    ("f-IRL", "behavioral", "tabular", _run_firl),
     ("BC", "behavioral", "none", _run_bc),
     ("GLADIUS", "behavioral", "neural", _run_gladius),
     ("AIRL", "behavioral", "neural", _run_airl),
@@ -301,13 +301,21 @@ ROSTER = [
 DIAGNOSES: dict[str, str] = {
     "BC": "Clones the observed choice frequencies. It matches behavior with no "
           "reward, so it has nothing to carry to a counterfactual.",
-    "f-IRL": "Matches the state-visitation marginals. It tracks the choices, but "
-             "the recovered reward does not hold up under a re-solve, so its "
-             "counterfactual stays on the fixed policy.",
-    "GLADIUS": "Learns the behavior through a value network, then projects the "
-               "reward back onto the linear features. The projection cannot hold "
-               "the interaction, so its counterfactual regret is as large as the "
-               "linear family's.",
+    "f-IRL": "Learns a free tabular reward, one value per state-action pair, not "
+             "a linear utility. That is why it tracks the choices on a nonlinear "
+             "reward. The benchmark re-solves only linear-in-feature rewards, so "
+             "this tabular reward is not transferred and its counterfactual "
+             "stays on the fixed policy.",
+    "GLADIUS": "Learns the behavior through a value network (policy TV 0.04), "
+               "then projects the reward back onto the linear features. Its "
+               "regret is scored on that projected linear reward, not on the "
+               "neural policy the policy TV measures, and the projection cannot "
+               "hold the interaction, so even its baseline regret is as large as "
+               "the linear family's.",
+    "UFXP": "This is the linear special case. The paper that introduces UFXP, "
+            "Oguz and Bray (2026), trains a neural utility through the same "
+            "unnested fixed point; that variant would learn the interaction but "
+            "is not yet implemented here, so this row shows the linear form.",
 }
 
 
@@ -325,6 +333,9 @@ def _to_list(x):
 def run(n_replications: int, verbose: bool, only: str | None = None) -> dict:
     env = _env()
     oracle_policy, oracle_value = _oracle(env)
+    # The oracle's own fixed policy cannot adapt either; its Type C is the
+    # reference for any non-transferring method's Type C.
+    oracle_fixed_c = float(estimator_regret(env, None, oracle_policy).type_c)
 
     records = []
     roster = [e for e in ROSTER if only is None or e[0] == only]
@@ -370,6 +381,7 @@ def run(n_replications: int, verbose: bool, only: str | None = None) -> dict:
             "dgp": {"num_states": NUM_STATES, "num_actions": NUM_ACTIONS,
                     "discount_factor": DISCOUNT, "theta": list(THETA), "gamma": GAMMA,
                     "branching": BRANCHING, "seed": SEED},
+            "regret_oracle_fixed_c": oracle_fixed_c,
             "n_individuals": N_INDIVIDUALS,
             "n_periods": N_PERIODS,
             "oracle": "true-reward policy/value via SoftBellmanOperator + value_iteration",
@@ -429,6 +441,15 @@ def _agg_regret(recs, key):
     return float(np.mean(vals)) if vals else None
 
 
+def _transfer(recs):
+    """Did the method re-solve a recovered reward (yes) or hold a fixed policy (no)?"""
+    flags = [r["regret"].get("transferred") for r in recs
+             if r["error"] is None and r.get("regret") is not None]
+    if not flags:
+        return "-"
+    return "yes" if all(flags) else ("no" if not any(flags) else "mixed")
+
+
 def _grouped(data):
     by_est, order = {}, []
     for r in data["records"]:
@@ -481,16 +502,19 @@ def render_page(data: dict) -> str:
     L.append(
         "The reward has an interaction effect. The true utility multiplies two "
         "features. The estimators receive the two features but never their "
-        "product, so a linear utility is misspecified by construction. It is a "
-        "fair omission, the kind an applied model makes every day. The question "
-        "is what it costs. The table reports the distance from the true choices "
-        "and the counterfactual regret.\n"
+        "product, so a linear utility is misspecified by construction. The "
+        "omitted term is deliberately strong here, larger than the main effects, "
+        "so the cost is visible. The question is what that cost is. The table "
+        "reports the distance from the true choices and the counterfactual "
+        "regret.\n"
     )
     L.append(
         f"Environment: a {d['num_states']}-state, {d['num_actions']}-action MDP "
-        f"with sparse random transitions. {meta['n_individuals']} x "
-        f"{meta['n_periods']} observations, {meta['n_replications']} replications. "
-        f"Generated {meta['date']} with econirl {meta['package_version']}.\n"
+        f"with sparse random transitions, drawn once at seed {d['seed']}. "
+        f"{meta['n_individuals']} x {meta['n_periods']} observations; the "
+        f"{meta['n_replications']} replications resample the panel from that one "
+        f"environment. Generated {meta['date']} with econirl "
+        f"{meta['package_version']}.\n"
     )
 
     L.append("## The data-generating process\n")
@@ -529,24 +553,28 @@ def render_page(data: dict) -> str:
     L.append(
         "A linear utility fits $\\theta_0 \\varphi_0 + \\theta_1 \\varphi_1$ and "
         "has no term for the product. The neural-reward methods learn a reward "
-        "or value network over the same two features and can form it. The agent "
-        f"discounts at $\\beta = {d['discount_factor']}$ and faces logit taste "
-        "shocks, so behavior solves the soft Bellman equation. The figure shows "
-        "the simulated paths and the optimal value function.\n"
+        "or value network over the same two features and can form it. The "
+        "interaction weight is set above the main effects on purpose, to make "
+        "the misspecification show. A weaker interaction shrinks the gap, and at "
+        "$\\gamma = 0$ the linear utility is correct and recovers the reward. "
+        f"The agent discounts at $\\beta = {d['discount_factor']}$ and faces "
+        "logit taste shocks, so behavior solves the soft Bellman equation. The "
+        "figure shows the simulated paths and the optimal value function.\n"
     )
     L.append("![Simulated trajectories and the optimal value function]"
              "(../_static/simulation_studies/abstract_mdp_4_dgp.png)\n")
 
     L.append("## Results\n")
-    L.append("| Estimator | Reward | Ran | Conv | Policy TV | "
+    L.append("| Estimator | Reward | Ran | Conv | Policy TV | Transfer | "
              "Regret base | Regret A | Regret B | Regret C | Time (s) |")
-    L.append("|---|---|---|---|---|---|---|---|---|---|")
+    L.append("|---|---|---|---|---|---|---|---|---|---|---|")
     for name, reward in order:
         recs = by_est[name]
         ok = [r for r in recs if r["error"] is None]
         ran = f"{len(ok)}/{len(recs)}"
         conv = f"{sum(1 for r in ok if r['converged'])}/{len(ok)}" if ok else "-"
         tv = _fmt(_agg(ok, "policy_tv"))
+        xfer = _transfer(recs)
         rb = _fmt(_agg_regret(recs, "baseline"))
         ra = _fmt(_agg_regret(recs, "type_a"))
         rbb = _fmt(_agg_regret(recs, "type_b"))
@@ -555,7 +583,7 @@ def render_page(data: dict) -> str:
         rt = f"{np.mean(rts):.1f}" if rts else "-"
         crashed = [r for r in recs if r["error"] is not None]
         note = f" (crashed {len(crashed)}/{len(recs)})" if crashed else ""
-        L.append(f"| {name}{note} | {reward} | {ran} | {conv} | {tv} | "
+        L.append(f"| {name}{note} | {reward} | {ran} | {conv} | {tv} | {xfer} | "
                  f"{rb} | {ra} | {rbb} | {rc} | {rt} |")
     L.append("")
     L.append(
@@ -563,25 +591,42 @@ def render_page(data: dict) -> str:
         "together: NFXP, CCP, MPEC, NNES, SEES, TD-CCP, and UFXP all sit near a "
         "policy distance of 0.10, the residual a linear utility leaves, and "
         "their re-solved reward loses close to one unit of welfare. The "
-        "maximum-entropy IRL methods sit there too. The neural-reward methods "
-        "learn the product: Deep MCE-IRL and AIRL match the choices to about "
-        "0.02 and keep the baseline welfare, though without a transferable "
-        "reward they hold a fixed policy. GLADIUS matches the choices but "
-        "projects its reward back onto the linear features, so its "
-        "counterfactual regret is as large as the linear family's. BC and "
-        "f-IRL match the choices without estimating a reward.\n"
+        "maximum-entropy IRL methods sit there too. The methods with a richer "
+        "reward or policy class learn the product and match the choices to "
+        "about 0.02: the neural-reward Deep MCE-IRL and AIRL, and f-IRL with a "
+        "free tabular reward. The benchmark re-solves only linear-in-feature "
+        "rewards, so under the interventions these methods are scored on their "
+        "fixed policy, not on a re-solve of what they learned. GLADIUS matches "
+        "the choices but projects its reward back onto the linear features, so "
+        "even its baseline regret is as large as the linear family's. BC clones "
+        "the choices and estimates no reward at all.\n"
     )
-    L.append("Reward marks whether the method fits a linear utility, learns a "
-             "reward or value network, or clones the choices with no reward. "
+    L.append("Reward marks what the method fits: a linear utility, a reward or "
+             "value network, a free tabular reward (one value per state-action "
+             "pair), or no reward at all (a cloned policy). "
              "Policy TV is the distance between estimated and true choice "
              "probabilities, lower is better. The value level is omitted: the "
              "reward is identified only up to transformations that leave "
              "behavior unchanged, so a value error across families would not "
-             "compare like with like. Regret base is welfare lost in the "
-             "observed environment. Types A, B, and C are welfare lost after a "
-             "change: Type A shifts a payoff, Type B changes the transitions, "
-             "Type C penalizes an action. Estimators with a recovered reward "
-             "re-solve it and adapt. Those without one keep their fixed policy.\n")
+             "compare like with like. Conv is the estimator's own convergence "
+             "flag; it does not track recovery here. A cautious flag can read "
+             "False while the policy is accurate, which is exactly the AIRL "
+             "case below.\n")
+    oc = meta.get("regret_oracle_fixed_c")
+    oc_str = f"about {oc:.0f}" if oc is not None else "about 71"
+    L.append("Regret base is welfare lost in the observed environment. Types A, "
+             "B, and C are welfare lost after a change: Type A shifts a payoff, "
+             "Type B changes the transitions, Type C penalizes an action. "
+             "Transfer says whether the method re-solved a recovered reward "
+             "(yes) or held a fixed policy (no). The benchmark re-solves only "
+             "linear-in-feature rewards, so a method that learns a neural or "
+             "tabular reward shows no here even though its reward could transfer "
+             "in principle; this is a limit of the test, not of the method. The "
+             "two modes are not comparable on Types A, B, and C: a fixed policy "
+             "cannot adapt to any change, so it pays the same large Type C the "
+             f"oracle's own fixed policy pays ({oc_str}). That figure marks no "
+             "re-solve, not a worse estimate. Read the counterfactual columns "
+             "within a transfer mode, not across.\n")
 
     diagnoses = meta.get("diagnoses", {})
     notes = [f"**{name}.** {diagnoses[name]}" for name, _r in order if diagnoses.get(name)]

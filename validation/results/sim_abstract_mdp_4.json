@@ -16,6 +16,7 @@
       "branching": 4,
       "seed": 404
     },
+    "regret_oracle_fixed_c": 70.5193133194522,
     "n_individuals": 300,
     "n_periods": 50,
     "oracle": "true-reward policy/value via SoftBellmanOperator + value_iteration",
@@ -54,8 +55,9 @@
     },
     "diagnoses": {
       "BC": "Clones the observed choice frequencies. It matches behavior with no reward, so it has nothing to carry to a counterfactual.",
-      "f-IRL": "Matches the state-visitation marginals. It tracks the choices, but the recovered reward does not hold up under a re-solve, so its counterfactual stays on the fixed policy.",
-      "GLADIUS": "Learns the behavior through a value network, then projects the reward back onto the linear features. The projection cannot hold the interaction, so its counterfactual regret is as large as the linear family's."
+      "f-IRL": "Learns a free tabular reward, one value per state-action pair, not a linear utility. That is why it tracks the choices on a nonlinear reward. The benchmark re-solves only linear-in-feature rewards, so this tabular reward is not transferred and its counterfactual stays on the fixed policy.",
+      "GLADIUS": "Learns the behavior through a value network (policy TV 0.04), then projects the reward back onto the linear features. Its regret is scored on that projected linear reward, not on the neural policy the policy TV measures, and the projection cannot hold the interaction, so even its baseline regret is as large as the linear family's.",
+      "UFXP": "This is the linear special case. The paper that introduces UFXP, Oguz and Bray (2026), trains a neural utility through the same unnested fixed point; that variant would learn the interaction but is not yet implemented here, so this row shows the linear form."
     },
     "honesty": "Every number in the table is recomputed from the records below. Crashes carry the verbatim exception. There is no parameter table: the true reward is not linear in the two features the estimators see, so there is no shared parameterization to compare against."
   },
@@ -74,7 +76,7 @@
         "type_c": 0.6545985979466904,
         "transferred": true
       },
-      "runtime": 2.7125377655029297,
+      "runtime": 3.0330350399017334,
       "converged": true,
       "error": null
     },
@@ -92,7 +94,7 @@
         "type_c": 0.6414061061719686,
         "transferred": true
       },
-      "runtime": 1.7820212841033936,
+      "runtime": 2.4845149517059326,
       "converged": true,
       "error": null
     },
@@ -110,7 +112,7 @@
         "type_c": 0.6545985780891488,
         "transferred": true
       },
-      "runtime": 0.31791210174560547,
+      "runtime": 0.3543219566345215,
       "converged": true,
       "error": null
     },
@@ -128,7 +130,7 @@
         "type_c": 0.6545934969547568,
         "transferred": true
       },
-      "runtime": 11.451799869537354,
+      "runtime": 16.096214056015015,
       "converged": true,
       "error": null
     },
@@ -146,7 +148,7 @@
         "type_c": 0.6501776599332271,
         "transferred": true
       },
-      "runtime": 0.9060251712799072,
+      "runtime": 1.459501028060913,
       "converged": true,
       "error": null
     },
@@ -164,7 +166,7 @@
         "type_c": 0.625880563542496,
         "transferred": true
       },
-      "runtime": 3.1851987838745117,
+      "runtime": 6.394509792327881,
       "converged": true,
       "error": null
     },
@@ -182,7 +184,7 @@
         "type_c": 0.6350973000051916,
         "transferred": true
       },
-      "runtime": 0.24361705780029297,
+      "runtime": 0.3264429569244385,
       "converged": true,
       "error": null
     },
@@ -200,7 +202,7 @@
         "type_c": 0.6545985903994993,
         "transferred": true
       },
-      "runtime": 7.306840896606445,
+      "runtime": 10.82340693473816,
       "converged": false,
       "error": null
     },
@@ -218,7 +220,7 @@
         "type_c": 0.6568797932392582,
         "transferred": true
       },
-      "runtime": 7.313355207443237,
+      "runtime": 11.118113040924072,
       "converged": true,
       "error": null
     },
@@ -236,14 +238,14 @@
         "type_c": 0.6754773722431405,
         "transferred": true
       },
-      "runtime": 1.3622329235076904,
+      "runtime": 1.345635175704956,
       "converged": true,
       "error": null
     },
     {
       "estimator": "f-IRL",
       "family": "behavioral",
-      "reward": "linear",
+      "reward": "tabular",
       "rep": 0,
       "policy_tv": 0.020501493313174565,
       "value_rmse": 20.2106094606289,
@@ -254,7 +256,7 @@
         "type_c": 71.69579022480997,
         "transferred": false
       },
-      "runtime": 20.83974003791809,
+      "runtime": 21.331894874572754,
       "converged": true,
       "error": null
     },
@@ -272,7 +274,7 @@
         "type_c": 71.25145862581135,
         "transferred": false
       },
-      "runtime": 0.12562179565429688,
+      "runtime": 0.12416934967041016,
       "converged": true,
       "error": null
     },
@@ -290,7 +292,7 @@
         "type_c": 0.5912647524578053,
         "transferred": true
       },
-      "runtime": 12.167963743209839,
+      "runtime": 12.89828896522522,
       "converged": true,
       "error": null
     },
@@ -308,7 +310,7 @@
         "type_c": 71.39574847350849,
         "transferred": false
       },
-      "runtime": 107.45157408714294,
+      "runtime": 123.81425619125366,
       "converged": false,
       "error": null
     },
@@ -326,7 +328,7 @@
         "type_c": 71.6213817891182,
         "transferred": false
       },
-      "runtime": 24.834237813949585,
+      "runtime": 28.410078048706055,
       "converged": true,
       "error": null
     },
@@ -344,7 +346,7 @@
         "type_c": 0.6459165975029674,
         "transferred": true
       },
-      "runtime": 2.62666916847229,
+      "runtime": 2.663454055786133,
       "converged": true,
       "error": null
     },
@@ -362,7 +364,7 @@
         "type_c": 0.6322125777047256,
         "transferred": true
       },
-      "runtime": 1.9337852001190186,
+      "runtime": 3.1013259887695312,
       "converged": true,
       "error": null
     },
@@ -380,7 +382,7 @@
         "type_c": 0.6459165966978143,
         "transferred": true
       },
-      "runtime": 0.3874950408935547,
+      "runtime": 0.45940303802490234,
       "converged": true,
       "error": null
     },
@@ -398,7 +400,7 @@
         "type_c": 0.6459105139848923,
         "transferred": true
       },
-      "runtime": 11.126734018325806,
+      "runtime": 11.461914300918579,
       "converged": true,
       "error": null
     },
@@ -416,7 +418,7 @@
         "type_c": 0.6417740616493874,
         "transferred": true
       },
-      "runtime": 1.066985845565796,
+      "runtime": 1.0631120204925537,
       "converged": false,
       "error": null
     },
@@ -434,7 +436,7 @@
         "type_c": 0.6185488699374356,
         "transferred": true
       },
-      "runtime": 4.114011287689209,
+      "runtime": 3.614516019821167,
       "converged": true,
       "error": null
     },
@@ -452,7 +454,7 @@
         "type_c": 0.6305077424080479,
         "transferred": true
       },
-      "runtime": 0.30700016021728516,
+      "runtime": 0.3311958312988281,
       "converged": true,
       "error": null
     },
@@ -470,7 +472,7 @@
         "type_c": 0.6459165966978143,
         "transferred": true
       },
-      "runtime": 7.498461008071899,
+      "runtime": 8.140493869781494,
       "converged": false,
       "error": null
     },
@@ -488,7 +490,7 @@
         "type_c": 0.6586910230171245,
         "transferred": true
       },
-      "runtime": 7.497180938720703,
+      "runtime": 7.746473073959351,
       "converged": true,
       "error": null
     },
@@ -506,14 +508,14 @@
         "type_c": 0.6729232090011185,
         "transferred": true
       },
-      "runtime": 1.4810280799865723,
+      "runtime": 1.702091932296753,
       "converged": true,
       "error": null
     },
     {
       "estimator": "f-IRL",
       "family": "behavioral",
-      "reward": "linear",
+      "reward": "tabular",
       "rep": 1,
       "policy_tv": 0.01960165785099963,
       "value_rmse": 20.135885998123776,
@@ -524,7 +526,7 @@
         "type_c": 71.3801585873261,
         "transferred": false
       },
-      "runtime": 23.532913208007812,
+      "runtime": 25.070941925048828,
       "converged": true,
       "error": null
     },
@@ -542,7 +544,7 @@
         "type_c": 71.15462519131606,
         "transferred": false
       },
-      "runtime": 0.15326523780822754,
+      "runtime": 0.17087626457214355,
       "converged": true,
       "error": null
     },
@@ -560,7 +562,7 @@
         "type_c": 0.5728262993549738,
         "transferred": true
       },
-      "runtime": 12.88250207901001,
+      "runtime": 12.514080047607422,
       "converged": true,
       "error": null
     },
@@ -578,7 +580,7 @@
         "type_c": 71.84698568546341,
         "transferred": false
       },
-      "runtime": 111.91600799560547,
+      "runtime": 110.76175379753113,
       "converged": false,
       "error": null
     },
@@ -596,7 +598,7 @@
         "type_c": 71.88965850997575,
         "transferred": false
       },
-      "runtime": 24.832141160964966,
+      "runtime": 24.950783014297485,
       "converged": true,
       "error": null
     },
@@ -614,7 +616,7 @@
         "type_c": 0.6291606546954306,
         "transferred": true
       },
-      "runtime": 2.7069997787475586,
+      "runtime": 2.6425130367279053,
       "converged": true,
       "error": null
     },
@@ -632,7 +634,7 @@
         "type_c": 0.6161553249869257,
         "transferred": true
       },
-      "runtime": 1.960273027420044,
+      "runtime": 2.0234298706054688,
       "converged": true,
       "error": null
     },
@@ -650,7 +652,7 @@
         "type_c": 0.6291606354018547,
         "transferred": true
       },
-      "runtime": 0.3869450092315674,
+      "runtime": 0.40397000312805176,
       "converged": true,
       "error": null
     },
@@ -668,7 +670,7 @@
         "type_c": 0.6291605307296066,
         "transferred": true
       },
-      "runtime": 11.56558632850647,
+      "runtime": 12.88624620437622,
       "converged": true,
       "error": null
     },
@@ -686,7 +688,7 @@
         "type_c": 0.6252050437396046,
         "transferred": true
       },
-      "runtime": 1.0799479484558105,
+      "runtime": 1.107809066772461,
       "converged": false,
       "error": null
     },
@@ -704,7 +706,7 @@
         "type_c": 0.5984536581122969,
         "transferred": true
       },
-      "runtime": 3.616551160812378,
+      "runtime": 3.6132562160491943,
       "converged": true,
       "error": null
     },
@@ -722,7 +724,7 @@
         "type_c": 0.6209952250652563,
         "transferred": true
       },
-      "runtime": 0.32289576530456543,
+      "runtime": 0.30176568031311035,
       "converged": true,
       "error": null
     },
@@ -740,7 +742,7 @@
         "type_c": 0.6291606354018547,
         "transferred": true
       },
-      "runtime": 6.7583818435668945,
+      "runtime": 6.465341806411743,
       "converged": false,
       "error": null
     },
@@ -758,7 +760,7 @@
         "type_c": 0.628575311031003,
         "transferred": true
       },
-      "runtime": 7.5966737270355225,
+      "runtime": 7.389539003372192,
       "converged": true,
       "error": null
     },
@@ -776,14 +778,14 @@
         "type_c": 0.653048352291639,
         "transferred": true
       },
-      "runtime": 1.5339782238006592,
+      "runtime": 1.456993818283081,
       "converged": true,
       "error": null
     },
     {
       "estimator": "f-IRL",
       "family": "behavioral",
-      "reward": "linear",
+      "reward": "tabular",
       "rep": 2,
       "policy_tv": 0.0183765232094699,
       "value_rmse": 20.25927371414368,
@@ -794,7 +796,7 @@
         "type_c": 70.34605210335087,
         "transferred": false
       },
-      "runtime": 24.726226806640625,
+      "runtime": 22.98775339126587,
       "converged": true,
       "error": null
     },
@@ -812,7 +814,7 @@
         "type_c": 70.14893277261999,
         "transferred": false
       },
-      "runtime": 0.15470600128173828,
+      "runtime": 0.14726591110229492,
       "converged": true,
       "error": null
     },
@@ -830,7 +832,7 @@
         "type_c": 0.596277389109015,
         "transferred": true
       },
-      "runtime": 13.038944721221924,
+      "runtime": 13.062518119812012,
       "converged": true,
       "error": null
     },
@@ -848,7 +850,7 @@
         "type_c": 70.82293348205685,
         "transferred": false
       },
-      "runtime": 111.95451378822327,
+      "runtime": 108.46894693374634,
       "converged": false,
       "error": null
     },
@@ -866,7 +868,7 @@
         "type_c": 69.27419519448746,
         "transferred": false
       },
-      "runtime": 26.534074306488037,
+      "runtime": 24.553898096084595,
       "converged": true,
       "error": null
     }
