@@ -37,7 +37,7 @@ DGP), and the neural reward net hard-pins u_theta(s, 2) == 0. Without that ancho
 reward RMSE would be meaningless even with a perfectly recovered policy.
 
 Run:  python scripts/neural_mpec_experiment.py
-Writes scripts/neural_mpec_experiment_results.json and prints a markdown table.
+Writes outputs/neural_mpec_experiment_results.json and prints a markdown table.
 """
 
 from __future__ import annotations
@@ -442,7 +442,9 @@ def main() -> None:
         print(f"| {len(ss)} | {nm['reward_rmse']:.4f} | {nm['value_rmse']:.4f} "
               f"| {tb['reward_rmse']:.4f} | {tb['value_rmse']:.4f} |")
 
-    out = Path(__file__).with_name("neural_mpec_experiment_results.json")
+    out_dir = Path(__file__).resolve().parent.parent / "outputs"
+    out_dir.mkdir(exist_ok=True)
+    out = out_dir / "neural_mpec_experiment_results.json"
     out.write_text(json.dumps({
         "dgp": {"num_states": S, "num_actions": A,
                 "discount_factor": float(env.problem_spec.discount_factor),
