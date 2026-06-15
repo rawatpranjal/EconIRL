@@ -87,8 +87,11 @@ src/econirl/datasets/lsw_synthetic_data.csv
 # JSS deep-run outputs (downloaded fresh from RunPod, not committed)
 experiments/jss_deep_run/results/
 
-# Retired root research workspaces (papers/ now lives under docs/research/)
-/experiments/
+# Local research experiments: one-off drivers + sweeps. Home + README tracked so
+# the convention is visible; contents stay local (one level deep so scripts keep
+# their ../src, ../docs, ../examples relative paths). papers/ now under docs/research/.
+/experiments/*
+!/experiments/README.md
 
 # Cache
 cache/
