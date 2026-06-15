@@ -33,6 +33,7 @@ exclude_patterns = [
     ".DS_Store",
     "**.ipynb_checkpoints",
     "archive/**",
+    "research/**",  # local research archive (papers, literature, internal docs); never built
     "estimators/sees.md",
     "estimators/sees/**",
     # Auto-generated partials are pulled in via {include}, not built as pages.

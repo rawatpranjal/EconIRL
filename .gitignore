@@ -50,21 +50,28 @@ CLAUDE.md
 AGENTS.md
 **/CLAUDE.md
 **/AGENTS.md
-/internal_docs/
-# Planning skeleton lives under project/ (roadmap, status, plan, decisions, style,
-# SYSTEM, handoff, archived plans). Local-only; never part of the public package repo.
+# Research archive (papers, literature, internal AI/maintainer docs). Lives under
+# docs/ so all documents sit in one tree, but it is local-only and Sphinx-excluded:
+# never built into the public site, never committed. See docs/research/README.md.
+/docs/research/
+
+# Planning skeleton + local research programs live under project/ (roadmap, status,
+# plan, decisions, style, SYSTEM, handoff, archived plans, autolab/autoresearch).
+# Local-only; never part of the public package repo.
 /project/
+
+# Generated outputs and retired code: the home + its README are tracked so the
+# convention is visible, but the contents stay local (regenerated or archived).
+/outputs/*
+!/outputs/README.md
+/legacy/*
+!/legacy/README.md
 
 # Secrets and local environment
 .env
 .env.*
 *.pem
 *.key
-
-# AutoLab runtime artifacts
-autolab/results/
-autolab/experiment_log.jsonl
-autolab/FINDINGS.md
 
 # Large data files
 data/raw/
@@ -80,8 +87,7 @@ src/econirl/datasets/lsw_synthetic_data.csv
 # JSS deep-run outputs (downloaded fresh from RunPod, not committed)
 experiments/jss_deep_run/results/
 
-# Retired root research workspaces
-/papers/
+# Retired root research workspaces (papers/ now lives under docs/research/)
 /experiments/
 
 # Cache
@@ -114,7 +120,7 @@ notes/
 *.toc
 *.vrb
 texput.log
-papers/econirl_package_jss/apikeyrunpod.txt
+docs/research/papers/econirl_package_jss/apikeyrunpod.txt
 
 # Local scratch and editor backups
 *.tmp

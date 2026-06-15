@@ -93,7 +93,7 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         "algorithm sketch": re.compile(
             r"\balgorithm sketch\b", flags=re.IGNORECASE
         ),
-        # Register banned 2026-06-12 (internal_docs/style.md, public prose
+        # Register banned 2026-06-12 (docs/research/internal_docs/style.md, public prose
         # register): internal honesty-contract vocabulary that leaked onto
         # the live RTD pages.
         "gauge": re.compile(r"\bgauges?\b", flags=re.IGNORECASE),
