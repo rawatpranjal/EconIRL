@@ -51,13 +51,9 @@ AGENTS.md
 **/CLAUDE.md
 **/AGENTS.md
 /internal_docs/
-/roadmap.md
-/SYSTEM.md
-/style.md
-/status.md
-/plan.md
-/decisions.md
-/docs/plans/
+# Planning skeleton lives under project/ (roadmap, status, plan, decisions, style,
+# SYSTEM, handoff, archived plans). Local-only; never part of the public package repo.
+/project/
 
 # Secrets and local environment
 .env
@@ -130,8 +126,7 @@ papers/econirl_package_jss/apikeyrunpod.txt
 validation/estimators/**/*.json
 validation/estimators/**/*.tex
 
-# Local session handoff (assistant state)
-handoff.md
+# (handoff.md now lives under project/ and is ignored via /project/ above)
 
 # Assistant audit reports (assistant state)
 bullshit-detector_*.md
