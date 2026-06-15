@@ -4211,7 +4211,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cell-id", default="canonical_low_action")
     parser.add_argument("--estimator")
-    parser.add_argument("--output-dir", default="outputs/known_truth")
+    parser.add_argument("--output-dir", default="validation/artifacts/known_truth")
     parser.add_argument("--oracles", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--show-progress", action="store_true")
