@@ -20,4 +20,7 @@ in `scripts/`.
 - `scripts/sim_*.py`, `quick_all_estimators.py` — those **generate public docs
   pages**, are maintained, and stay in `scripts/`.
 - `scripts/download_*` — data fetchers, also maintained tooling.
-- generated results — those go to `outputs/`. Code here, artifacts there.
+
+A one-off's result dump sits next to its driver here (both local). Published
+figures and tables are different: those flow through the RTD docs pipeline
+(`docs/_static`, `docs/_generated`, `validation/results`), not through here.

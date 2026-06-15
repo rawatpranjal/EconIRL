@@ -60,10 +60,10 @@ AGENTS.md
 # Local-only; never part of the public package repo.
 /project/
 
-# Generated outputs and retired code: the home + its README are tracked so the
-# convention is visible, but the contents stay local (regenerated or archived).
-/outputs/*
-!/outputs/README.md
+# Retired code (legacy/): the home + its README are tracked so the convention is
+# visible, but the contents stay local. No outputs/ home in this repo: generated
+# figures and tables flow through the RTD pipeline (docs/_static, docs/_generated,
+# validation/results); one-off experiment results sit beside their driver in experiments/.
 /legacy/*
 !/legacy/README.md
 
