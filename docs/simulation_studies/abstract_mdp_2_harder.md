@@ -50,7 +50,7 @@ The first cell is about cost at scale. All estimators face the same 300-state pr
 | UFXP | structural | 3/3 | 3/3 | [0.422, -1.601, 0.111] | 0.0440 | 0.0031 | 0.0006 | 0.0006 | 0.0006 | 0.0000 | 0.1 |
 | MCE-IRL | behavioral | 3/3 | 0/3 | [0.431, -1.614, 0.107] | - | 0.0035 | 0.0008 | 0.0008 | 0.0008 | 0.0000 | 5.9 |
 
-Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
+Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 The two NFXP rows land within a second of each other, so the textbook solver gap does not bite at 300 states. The high-dimension page is where it starts to. The approximation-based members (SEES, TD-CCP) give up some parameter precision relative to the exact family while staying close on behavior.
 
@@ -73,7 +73,7 @@ The second cell moves the discount factor to 0.99 and asks whether the reported 
 | TD-CCP | structural | 10/10 | 10/10 | [0.397, -1.671, 0.159] | 0.1189 | 0.0052 | 0.0065 | 0.0065 | 0.0061 | 0.0000 | 2.7 |
 | UFXP | structural | 10/10 | 10/10 | [0.426, -1.541, 0.083] | 0.0857 | 0.0040 | 0.0028 | 0.0027 | 0.0026 | 0.0000 | 0.1 |
 
-Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
+Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 ### Parameter recovery
 
@@ -123,7 +123,7 @@ The last cell breaks identification on purpose. The third feature is exactly twi
 | MPEC | structural | 20/20 | 20/20 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.5 |
 | UFXP | structural | 20/20 | 0/20 | 0.0032 | 0.0007 | 0.0007 | 0.0008 | 0.0000 | 0.1 |
 
-Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
+Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 ## Notes per estimator
 
@@ -133,7 +133,7 @@ Policy TV is the distance between estimated and true choice probabilities, lower
 
 **UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with optimal weighting. As efficient as maximum likelihood, with standard errors, so it enters the coverage table on equal terms.
 
-**MCE-IRL.** Behavioral reference. Its converged flag is a conservative gradient-norm check, so read it next to Policy TV.
+**MCE-IRL.** Behavioral reference. Its convergence indicator is a conservative gradient-norm check, so read it next to Policy TV.
 
 ## Reproduce
 

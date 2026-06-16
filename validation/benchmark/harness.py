@@ -457,9 +457,9 @@ def _table_note(cell_meta: dict) -> str:
                      "shares the parameterization of the true model.")
     parts.append("Policy TV is the distance between estimated and true "
                  "choice probabilities, lower is better.")
-    parts.append("Conv is the estimator's own convergence flag. A cautious "
-                 "flag can read False while the recovered policy is "
-                 "accurate.")
+    parts.append("Conv is the estimator's own convergence indicator. A "
+                 "cautious estimator can report False while the recovered "
+                 "policy is accurate.")
     if cell_meta.get("show_regret", True):
         parts.append("Regret base is welfare lost in the observed "
                      "environment. Types A, B, and C are welfare lost after "

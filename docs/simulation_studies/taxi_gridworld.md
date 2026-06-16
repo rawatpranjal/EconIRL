@@ -42,7 +42,7 @@ and every trajectory starts at the top-left corner (state 0). The figure shows t
 | MPEC | structural | 3/3 | 3/3 | 0.0004 | 0.9 |
 | UFXP | structural | 3/3 | 0/3 | 0.0388 | 0.1 |
 
-Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate.
+Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate.
 
 The structural rows match behavior almost perfectly, but their parameters are not separately identified here, so the parameter columns are omitted. The raw feature design has full rank, while the action-contrast design has rank 1. The step-penalty and distance features take the same value for every action at a state, so they cancel out of every choice probability. The regret columns are omitted for the same reason, because transferring an unidentified reward is not a meaningful exercise. The lesson is to check the rank of the action-differenced features before estimating.
 

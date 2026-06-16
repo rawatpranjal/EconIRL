@@ -49,7 +49,7 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 | AIRL | behavioral | 3/3 | 0/3 | [0.020, 2.034] | - | 0.0528 | 0.0251 | 0.0261 | 0.0140 | 0.0025 | 132.5 |
 | Deep-MCE-IRL | behavioral | 3/3 | 3/3 | [-0.082, 0.568] | - | 0.0092 | 3.3450 | 3.2419 | 1.6305 | 0.0005 | 14.0 |
 
-Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
+Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the cost parameters on the same scale as the truth, so Param RMSE applies to it alone. The IRL family is scored on behavior and regret. Its reward parameters are in a different parameterization, because reward is only partially identified from behavior. Estimators that recover a transferable reward adapt under the interventions. Policy-only methods keep their old policy, which is why their Type C regret is large.
 
@@ -57,7 +57,7 @@ The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the c
 
 **UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting. The value function is eliminated before any parameter search, so the linear case is closed form and as efficient as maximum likelihood.
 
-**MCE-IRL.** Its converged flag reports whether the gradient norm crossed the tolerance. The objective often plateaus first, so the flag can read False while the policy is essentially exact.
+**MCE-IRL.** Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus first, so it can read False while the policy is essentially exact.
 
 **MaxEnt-IRL.** It trails MCE-IRL because trajectory-entropy matching is not the causal choice model that generated the data.
 

@@ -230,9 +230,9 @@ DIAGNOSES = {
             "optimal weighting. The value function is eliminated before any "
             "parameter search, so the linear case is closed form and as "
             "efficient as maximum likelihood.",
-    "MCE-IRL": "Its converged flag reports whether the gradient norm crossed "
-               "the tolerance. The objective often plateaus first, so the "
-               "flag can read False while the policy is essentially exact.",
+    "MCE-IRL": "Its convergence indicator reports whether the gradient norm crossed "
+               "the tolerance. The objective often plateaus first, so it "
+               "can read False while the policy is essentially exact.",
     "MaxEnt-IRL": "It trails MCE-IRL because trajectory-entropy matching is "
                   "not the causal choice model that generated the data.",
     "IQ-Learn": "Uses the linear feature structure. A tabular Q-table would "

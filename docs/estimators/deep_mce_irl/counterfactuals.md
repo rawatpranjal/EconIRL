@@ -28,7 +28,7 @@ $$
 On the primary synthetic cell the welfare regret of Deep MCE-IRL's
 counterfactual policies is below 0.002 in every family (Type A 0.00164,
 Type B 0.00148, Type C 0.00191; see the
-[machine-readable results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json)
+[results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json)
 and the [Simulation Study](validation.md) page). The learned reward is defined
 on the same discrete state-action space as the oracle and uses the same
 anchor, so it re-solves cleanly under all three intervention types.

@@ -33,7 +33,7 @@ These results hold in the paper-faithful primary cell (state marginal matching,
 state-only reward). They reflect the quality of the recovered policy rather than
 the ability to re-solve a structural reward under each intervention.
 
-The full machine-readable record is in
+The full record is in
 [f_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/f_irl.json).
 The diagnostic action-dependent cell is not included in counterfactual evidence,
 because that cell fails the reward-range check and the resulting policy is not a

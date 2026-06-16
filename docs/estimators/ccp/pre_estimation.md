@@ -18,7 +18,7 @@ starts. Run these checks before treating a result as structural evidence.
 
 The CCP results file records these pre-estimation checks.
 See the [simulation study page](validation.md) for the generator script,
-machine-readable JSON results file.
+JSON results file.
 
 | Check | Value | Status |
 | --- | ---: | --- |

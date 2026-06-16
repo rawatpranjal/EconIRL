@@ -51,7 +51,7 @@ and the data are $N$ independent agents simulated for $T$ periods from $\pi^*$ a
 | f-IRL | behavioral | 3/3 | 3/3 | different parameterization (16 values) | - | 0.0091 | 0.0034 | 0.0462 | 0.0736 | 61.4508 | 22.0 |
 | BC | behavioral | 3/3 | 3/3 | different parameterization (16 values) | - | 0.0088 | 0.0026 | 0.0423 | 0.0676 | 61.4560 | 0.2 |
 
-Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence flag. A cautious flag can read False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
+Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
 Configs are modest quick-run defaults, not tuned.
 
