@@ -17,7 +17,7 @@ Routing summary (verified):
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 PATHS = ("estimate", "fit_features")
 FAMILIES = ("structural", "behavioral")
@@ -113,8 +113,11 @@ CAPABILITIES: dict[str, EstimatorCapability] = {
         # Neural, model-free (fit(features=); transitions unused).
         _neural_model_free("NeuralAIRL", "model-free", True),
         _neural_model_free("NeuralGLADIUS", "model-free", True),
-        # Aliases (same class objects as the Neural* entries above).
-        _neural_model_free("AIRL", "model-free", True),
-        _neural_model_free("GLADIUS", "model-free", True),
     )
 }
+
+# AIRL and GLADIUS are aliases of the same classes (econirl.AIRL is NeuralAIRL,
+# econirl.GLADIUS is NeuralGLADIUS). Derive their entries from the canonical ones
+# so the records can never drift apart.
+CAPABILITIES["AIRL"] = replace(CAPABILITIES["NeuralAIRL"], name="AIRL")
+CAPABILITIES["GLADIUS"] = replace(CAPABILITIES["NeuralGLADIUS"], name="GLADIUS")

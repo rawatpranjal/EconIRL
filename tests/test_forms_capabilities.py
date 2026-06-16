@@ -7,26 +7,33 @@ import pytest
 import econirl
 from econirl.forms import CAPABILITIES, EstimatorCapability, Form, FormSpec
 
-# The one public estimator that does not live under econirl.estimators.* (legacy
-# module). Every other public estimator class is exported from econirl.estimators.
-_NON_ESTIMATORS_MODULE_PUBLIC = {"IQLearn"}
+# Public classes that expose a fit/estimate API but are NOT registry choice
+# estimators: a transition-matrix utility, and the two deprecated legacy
+# estimate()-only aliases of NFXP/CCP. Anything else with such an API must be
+# registered (this is what makes the drift guard module-agnostic).
+_NOT_REGISTRY_ESTIMATORS = {"TransitionEstimator", "NFXPEstimator", "CCPEstimator"}
 
 
-def _estimators_module_classes() -> set[str]:
-    """Public names whose class is defined under econirl.estimators.*"""
+def _public_choice_estimators() -> set[str]:
+    """Every public class with a fit/estimate API, minus the explicit deny-list.
+
+    Module-agnostic on purpose: a new estimator added anywhere (estimators/ or
+    estimation/) is caught, not just ones under econirl.estimators.
+    """
     out = set()
     for name in econirl.__all__:
         obj = getattr(econirl, name)
-        if isinstance(obj, type) and obj.__module__.startswith("econirl.estimators"):
+        if not isinstance(obj, type) or name in _NOT_REGISTRY_ESTIMATORS:
+            continue
+        if callable(getattr(obj, "fit", None)) or callable(getattr(obj, "estimate", None)):
             out.add(name)
     return out
 
 
 def test_capabilities_cover_exactly_public_estimators():
     """Drift guard: add/remove a public estimator and this fails until the
-    registry is updated. Catches both missing entries and orphans."""
-    expected = _estimators_module_classes() | _NON_ESTIMATORS_MODULE_PUBLIC
-    assert set(CAPABILITIES) == expected
+    registry is updated. Catches both missing entries and orphans, in any module."""
+    assert set(CAPABILITIES) == _public_choice_estimators()
 
 
 def test_registered_names_are_public_classes():
@@ -77,9 +84,14 @@ def test_support_matrix_matches_verified_rows():
 
 
 def test_aliases_match_canonical():
-    assert CAPABILITIES["GLADIUS"].path == CAPABILITIES["NeuralGLADIUS"].path
-    assert CAPABILITIES["GLADIUS"].model_free == CAPABILITIES["NeuralGLADIUS"].model_free
-    assert CAPABILITIES["AIRL"].model_free == CAPABILITIES["NeuralAIRL"].model_free
+    import dataclasses
+
+    # Every field except the name must equal the canonical record.
+    def _fields_minus_name(c):
+        return {k: v for k, v in dataclasses.asdict(c).items() if k != "name"}
+
+    assert _fields_minus_name(CAPABILITIES["GLADIUS"]) == _fields_minus_name(CAPABILITIES["NeuralGLADIUS"])
+    assert _fields_minus_name(CAPABILITIES["AIRL"]) == _fields_minus_name(CAPABILITIES["NeuralAIRL"])
 
 
 def test_formspec_finite_theta_and_validation():

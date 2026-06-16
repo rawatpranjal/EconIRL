@@ -43,6 +43,11 @@ class FormSpec:
             raise ValueError(
                 f"reward_form must be one of {REWARD_FORMS}, got {self.reward_form!r}"
             )
+        if self.num_states <= 0 or self.num_actions <= 0:
+            raise ValueError(
+                f"num_states and num_actions must be positive, got "
+                f"{self.num_states} and {self.num_actions}"
+            )
 
     @property
     def has_finite_theta(self) -> bool:
