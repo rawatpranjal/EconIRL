@@ -22,7 +22,7 @@ Data source:
 """
 
 from pathlib import Path
-from typing import Optional, List, Literal
+from typing import Optional, Literal
 
 import numpy as np
 import pandas as pd
