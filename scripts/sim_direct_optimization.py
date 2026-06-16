@@ -241,7 +241,7 @@ def run_tabular_mpec(env, panel, est_features, est_names, initial_params=None) -
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
     util = LinearUtility(feature_matrix=jnp.asarray(est_features), parameter_names=est_names)
-    est = MPECEstimator(config=MPECConfig(solver="slsqp", outer_max_iter=200,
+    est = MPECEstimator(config=MPECConfig(solver="sqp", outer_max_iter=200,
                                           constraint_tol=1e-6),
                         compute_hessian=False, verbose=False)
     # initial_params=None keeps the estimator's default start; passing a vector lets

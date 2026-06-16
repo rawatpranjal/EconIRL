@@ -34,15 +34,16 @@ the optimization.
 **Tabular MPEC** (Su and Judd, 2012) uses a linear reward
 $u_\theta(s,a) = \phi(s,a)^\top \theta$ and known transitions. It treats the value
 vector $V$ as a free variable alongside $\theta$ and imposes the soft Bellman
-equation as a hard equality constraint, solved by SLSQP:
+equation as a hard equality constraint, solved by sequential quadratic
+programming (SQP):
 
 $$
 \max_{\theta,\,V} \ \sum_{it} \log \pi_{\theta,V}(a_{it}\mid s_{it})
 \quad \text{s.t.} \quad V - TV = 0.
 $$
 
-Because $V$ is a finite vector, the constraint can be enforced exactly at every
-state.
+Because $V$ is a finite vector, the constraint is enforced to solver tolerance at
+every state.
 
 **Neural MPEC** replaces the linear reward with a network $u_\theta(s,a)$ and the
 value vector with a network $V_\phi(s)$, keeping the transitions known. Once $V$
@@ -125,7 +126,7 @@ GLADIUS enforces a model-free consistency condition that is not comparable.
 | Estimator | Reward RMSE | Value RMSE | Max Bellman residual |
 |---|---|---|---|
 | neural MPEC | 0.165 | 0.341 | 0.0076 |
-| tabular MPEC | 0.021 | 0.210 | exact (hard constraint) |
+| tabular MPEC | 0.021 | 0.212 | to tolerance (hard constraint) |
 | GLADIUS | 0.185 | 2.608 | model-free |
 
 **Nonlinear reward.**
@@ -133,7 +134,7 @@ GLADIUS enforces a model-free consistency condition that is not comparable.
 | Estimator | Reward RMSE | Value RMSE | Max Bellman residual |
 |---|---|---|---|
 | neural MPEC | 0.175 | 0.390 | 0.0012 |
-| tabular MPEC | 0.492 | 1.822 | exact (hard constraint) |
+| tabular MPEC | 0.492 | 1.818 | to tolerance (hard constraint) |
 | GLADIUS | 0.480 | 4.506 | model-free |
 
 The neural MPEC residual is on the order of $10^{-3}$ in both cells, so the soft
@@ -149,7 +150,7 @@ observations and records reward RMSE.
 | Regime | Method | N = 4k | N = 16k | N = 64k |
 |---|---|---|---|---|
 | linear | neural MPEC | 0.304 | 0.170 | 0.087 |
-| linear | tabular MPEC | 0.066 | 0.035 | 0.012 |
+| linear | tabular MPEC | 0.066 | 0.035 | 0.013 |
 | nonlinear | neural MPEC | 0.292 | 0.151 | 0.057 |
 | nonlinear | tabular MPEC | 0.502 | 0.500 | 0.494 |
 
@@ -195,7 +196,7 @@ Bellman condition is imposed (hard constraint versus soft penalty).
 
 Under a correct linear specification the parametric tabular MPEC is the most
 efficient method, with the lowest reward RMSE (0.021 versus 0.165) and the lowest
-value RMSE (0.210 versus 0.341). Pooling the reward into four parameters beats
+value RMSE (0.212 versus 0.341). Pooling the reward into four parameters beats
 estimating a flexible per-state reward when the four parameters are the right ones.
 Neural MPEC is still consistent, its reward RMSE falling at root-$N$, but it pays a
 variance price for flexibility it does not need here.
@@ -230,14 +231,14 @@ begins feasible. Neural MPEC is run from $K=10$ random network initializations.
 
 | Method | Reward RMSE: mean ± std (min / max) | Optimization diagnostic |
 |---|---|---|
-| linear MPEC | 0.0209 ± 0.0005 (0.0204 / 0.0215) | 10/10 converged, max constraint violation 9.9e-7, max parameter std across starts 5.7e-4 |
+| linear MPEC | 0.0209 ± 0.0000 (0.0209 / 0.0209) | 10/10 converged, max constraint violation 1.2e-8, max parameter std across starts 1.1e-5 |
 | neural MPEC | 0.1648 ± 0.0001 (0.1645 / 0.1650) | max Bellman residual 1.6e-2 across the 10 starts |
 
 Both methods are effectively start-independent on this data-generating process.
 The ten linear-MPEC starts are scattered across reward space. They all converge to
-the same maximum-likelihood point. The reward RMSE varies by about $10^{-3}$ and
-the recovered parameters by under $10^{-3}$, and every run is feasible to solver
-tolerance. The neural starts are tighter still. This is the opposite of the
+the same maximum-likelihood point. The reward RMSE varies by about $10^{-6}$ and
+the recovered parameters by about $10^{-5}$, and every run is feasible to solver
+tolerance. The neural starts cluster tightly too, within about $10^{-4}$. This is the opposite of the
 Koiso-Otani local-optima struggle. It is the empirical complement to the
 consistency argument. On the smooth soft-Bellman likelihood the constrained
 problem has a well-behaved surface, so the single-start estimates do not depend on
@@ -282,7 +283,7 @@ def run_tabular_mpec(env, panel, est_features, est_names) -> dict:
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
     util = LinearUtility(feature_matrix=jnp.asarray(est_features), parameter_names=est_names)
-    est = MPECEstimator(config=MPECConfig(solver="slsqp", outer_max_iter=200,
+    est = MPECEstimator(config=MPECConfig(solver="sqp", outer_max_iter=200,
                                           constraint_tol=1e-6),
                         compute_hessian=False, verbose=False)
     res = est.estimate(panel, util, env.problem_spec, env.transition_matrices)

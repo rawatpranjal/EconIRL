@@ -24,22 +24,22 @@
           "max_bellman_resid": 0.007575674254354681
         },
         "tabular MPEC": {
-          "reward_rmse": 0.021355831584817967,
-          "value_rmse": 0.20977302836169942,
+          "reward_rmse": 0.020894465719692716,
+          "value_rmse": 0.21229035502323815,
           "converged": true,
           "theta_hat": [
-            0.43447160720825195,
-            -0.611686646938324,
-            0.19509412348270416,
-            -0.37817177176475525
+            0.43177491426467896,
+            -0.608895480632782,
+            0.19502055644989014,
+            -0.3745947778224945
           ],
-          "constraint_violation": 9.083385954511414e-07
+          "constraint_violation": 1.5133849728954374e-10
         },
         "GLADIUS": {
           "reward_rmse": 0.18450107240866978,
           "value_rmse": 2.6083011822741367,
           "converged": true,
-          "note": "model-free; reward in a different gauge (no known P)"
+          "note": "model-free; reward in its own parameterization (no known P)"
         }
       },
       "data_scaling": [
@@ -47,22 +47,22 @@
           "n_obs": 4000,
           "neural_reward_rmse": 0.30379197518656703,
           "neural_value_rmse": 0.6834013785719952,
-          "tabular_reward_rmse": 0.0662069252663886,
-          "tabular_value_rmse": 0.23445039636915033
+          "tabular_reward_rmse": 0.06612793057450793,
+          "tabular_value_rmse": 0.2295504132322517
         },
         {
           "n_obs": 16000,
           "neural_reward_rmse": 0.16959895297543806,
           "neural_value_rmse": 0.244143315373726,
-          "tabular_reward_rmse": 0.03548769321236471,
-          "tabular_value_rmse": 0.18645268270654095
+          "tabular_reward_rmse": 0.03534010180838823,
+          "tabular_value_rmse": 0.17833251220224935
         },
         {
           "n_obs": 64000,
           "neural_reward_rmse": 0.08682278212731857,
           "neural_value_rmse": 0.10552428664506144,
-          "tabular_reward_rmse": 0.012420238438767535,
-          "tabular_value_rmse": 0.06663082074908051
+          "tabular_reward_rmse": 0.012806787276327775,
+          "tabular_value_rmse": 0.06990390005588652
         }
       ]
     },
@@ -82,22 +82,22 @@
           "max_bellman_resid": 0.0012479765746249427
         },
         "tabular MPEC": {
-          "reward_rmse": 0.49167993013840106,
-          "value_rmse": 1.8219837036231366,
+          "reward_rmse": 0.4915549174533604,
+          "value_rmse": 1.8177234445525066,
           "converged": true,
           "theta_hat": [
-            0.1909259408712387,
-            -0.10768463462591171,
-            0.3909374177455902,
-            -0.8282411098480225
+            0.19068963825702667,
+            -0.10811395943164825,
+            0.39030662178993225,
+            -0.8284081816673279
           ],
-          "constraint_violation": 7.636384502518467e-07
+          "constraint_violation": 4.853504265156516e-10
         },
         "GLADIUS": {
           "reward_rmse": 0.47952832484563984,
           "value_rmse": 4.505939712814223,
           "converged": true,
-          "note": "model-free; reward in a different gauge (no known P)"
+          "note": "model-free; reward in its own parameterization (no known P)"
         }
       },
       "data_scaling": [
@@ -105,22 +105,22 @@
           "n_obs": 4000,
           "neural_reward_rmse": 0.2923965582211959,
           "neural_value_rmse": 0.3937913780790259,
-          "tabular_reward_rmse": 0.5020910343107341,
-          "tabular_value_rmse": 1.8218429082051293
+          "tabular_reward_rmse": 0.5020959599812744,
+          "tabular_value_rmse": 1.818207431156516
         },
         {
           "n_obs": 16000,
           "neural_reward_rmse": 0.15138275691866887,
           "neural_value_rmse": 0.37372566150430486,
-          "tabular_reward_rmse": 0.49970942595828954,
-          "tabular_value_rmse": 1.7641109648692386
+          "tabular_reward_rmse": 0.49959826168142396,
+          "tabular_value_rmse": 1.7606720570585384
         },
         {
           "n_obs": 64000,
           "neural_reward_rmse": 0.05706180720853163,
           "neural_value_rmse": 0.134443032376223,
-          "tabular_reward_rmse": 0.49447973854522564,
-          "tabular_value_rmse": 1.7219923421387135
+          "tabular_reward_rmse": 0.4944820668287188,
+          "tabular_value_rmse": 1.7181178243611461
         }
       ]
     }
@@ -131,122 +131,122 @@
     "n_starts": 10,
     "theta_init_scale": 0.5,
     "linear_mpec": {
-      "reward_rmse_mean": 0.02091089902742244,
-      "reward_rmse_std": 0.0004622047223429281,
-      "reward_rmse_min": 0.02043624282777575,
-      "reward_rmse_max": 0.02149813326580403,
+      "reward_rmse_mean": 0.0208942897156939,
+      "reward_rmse_std": 1.0503836469400625e-06,
+      "reward_rmse_min": 0.020892370441268245,
+      "reward_rmse_max": 0.020896281965631924,
       "n_converged": 10,
-      "max_constraint_violation": 9.937088307765407e-07,
-      "theta_max_component_std": 0.000569555926121011,
+      "max_constraint_violation": 1.1917265396732546e-08,
+      "theta_max_component_std": 1.1266018954125857e-05,
       "starts": [
         {
-          "reward_rmse": 0.020707375770484284,
+          "reward_rmse": 0.020893175394405085,
           "converged": true,
-          "constraint_violation": 9.735602404248311e-07,
+          "constraint_violation": 1.1496602780880494e-08,
           "theta_hat": [
-            0.43476858735084534,
-            -0.6133595705032349,
-            0.19401542842388153,
-            -0.3801036775112152
+            0.43177610635757446,
+            -0.6089024543762207,
+            0.1950175166130066,
+            -0.37459051609039307
           ]
         },
         {
-          "reward_rmse": 0.021441663134697798,
+          "reward_rmse": 0.020894477117909937,
           "converged": true,
-          "constraint_violation": 9.654633643663146e-07,
+          "constraint_violation": 3.9753089708938205e-10,
           "theta_hat": [
-            0.43557897210121155,
-            -0.6132214665412903,
-            0.19484908878803253,
-            -0.37955397367477417
+            0.4317747950553894,
+            -0.6088953018188477,
+            0.19502070546150208,
+            -0.37459471821784973
           ]
         },
         {
-          "reward_rmse": 0.020476479142695393,
+          "reward_rmse": 0.020896281965631924,
           "converged": true,
-          "constraint_violation": 6.857330241416548e-07,
+          "constraint_violation": 1.1917265396732546e-08,
           "theta_hat": [
-            0.43457871675491333,
-            -0.6135438680648804,
-            0.19370387494564056,
-            -0.3802882730960846
+            0.4317694902420044,
+            -0.6088787317276001,
+            0.19503183662891388,
+            -0.3746073842048645
           ]
         },
         {
-          "reward_rmse": 0.02043624282777575,
+          "reward_rmse": 0.02089428290507904,
           "converged": true,
-          "constraint_violation": 9.156914586583298e-07,
+          "constraint_violation": 2.1450219378493784e-10,
           "theta_hat": [
-            0.4344843924045563,
-            -0.6134847402572632,
-            0.19366177916526794,
-            -0.3801838755607605
+            0.43177470564842224,
+            -0.608896017074585,
+            0.19502024352550507,
+            -0.374593585729599
           ]
         },
         {
-          "reward_rmse": 0.020758554706901015,
+          "reward_rmse": 0.02089345862314335,
           "converged": true,
-          "constraint_violation": 7.151229866053654e-07,
+          "constraint_violation": 4.6143000531628786e-10,
           "theta_hat": [
-            0.4349009394645691,
-            -0.6134597063064575,
-            0.19403278827667236,
-            -0.3802049160003662
+            0.43177133798599243,
+            -0.6088898777961731,
+            0.19502127170562744,
+            -0.37459829449653625
           ]
         },
         {
-          "reward_rmse": 0.020441273782296873,
+          "reward_rmse": 0.020892370441268245,
           "converged": true,
-          "constraint_violation": 7.292581649664953e-07,
+          "constraint_violation": 5.7254254670624505e-09,
           "theta_hat": [
-            0.4344470798969269,
-            -0.613389790058136,
-            0.19371284544467926,
-            -0.3802230954170227
+            0.431759238243103,
+            -0.6088801622390747,
+            0.19502432644367218,
+            -0.37457627058029175
           ]
         },
         {
-          "reward_rmse": 0.02149813326580403,
+          "reward_rmse": 0.020894117108151367,
           "converged": true,
-          "constraint_violation": 8.839672922533737e-07,
+          "constraint_violation": 6.3806737671257e-12,
           "theta_hat": [
-            0.4354953467845917,
-            -0.6128937005996704,
-            0.19494521617889404,
-            -0.37955424189567566
+            0.4317743182182312,
+            -0.6088958978652954,
+            0.19502000510692596,
+            -0.37459295988082886
           ]
         },
         {
-          "reward_rmse": 0.021426076521691116,
+          "reward_rmse": 0.020895198944129084,
           "converged": true,
-          "constraint_violation": 5.483522080851344e-07,
+          "constraint_violation": 6.501554850046887e-09,
           "theta_hat": [
-            0.4353816509246826,
-            -0.6128897070884705,
-            0.19496630132198334,
-            -0.379545122385025
+            0.43176260590553284,
+            -0.6088817119598389,
+            0.1950220763683319,
+            -0.3745660185813904
           ]
         },
         {
-          "reward_rmse": 0.020441965012106007,
+          "reward_rmse": 0.0208945436399022,
           "converged": true,
-          "constraint_violation": 9.937088307765407e-07,
+          "constraint_violation": 6.113793915574206e-10,
           "theta_hat": [
-            0.43450912833213806,
-            -0.6134999394416809,
-            0.193670392036438,
-            -0.3802647292613983
+            0.43177610635757446,
+            -0.608896791934967,
+            0.19502076506614685,
+            -0.37459707260131836
           ]
         },
         {
-          "reward_rmse": 0.0214812261097721,
+          "reward_rmse": 0.02089499101731879,
           "converged": true,
-          "constraint_violation": 5.817259207674397e-07,
+          "constraint_violation": 3.868652953542551e-09,
           "theta_hat": [
-            0.4355275332927704,
-            -0.6129804253578186,
-            0.1949695497751236,
-            -0.3796960115432739
+            0.43177419900894165,
+            -0.6088926196098328,
+            0.19502365589141846,
+            -0.3745978772640228
           ]
         }
       ]
