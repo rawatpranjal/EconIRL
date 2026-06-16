@@ -103,20 +103,22 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         "teaching arc": re.compile(r"\bteaching arc\b", flags=re.IGNORECASE),
         "through-line": re.compile(r"\bthrough-?line\b", flags=re.IGNORECASE),
         # Style-guide bans not previously enforced (roadmap D1, 2026-06-15).
+        # \s+ (not a literal space) so a phrase split across a line break is
+        # still caught — Markdown collapses the newline when rendering.
         "machine-readable": re.compile(
-            r"\bmachine[- ]readable\b", flags=re.IGNORECASE
+            r"\bmachine[-\s]readable\b", flags=re.IGNORECASE
         ),
         "convergence flag": re.compile(
-            r"\bconverg(?:ed|ence) flag\b", flags=re.IGNORECASE
+            r"\bconverg(?:ed|ence)\s+flag\b", flags=re.IGNORECASE
         ),
         "summary exposes": re.compile(
-            r"\bsummary exposes\b", flags=re.IGNORECASE
+            r"\bsummary\s+exposes\b", flags=re.IGNORECASE
         ),
         "fitted summary reports": re.compile(
-            r"\bfitted summary reports\b", flags=re.IGNORECASE
+            r"\bfitted\s+summary\s+reports\b", flags=re.IGNORECASE
         ),
         "evidence scope": re.compile(
-            r"\bevidence scope\b", flags=re.IGNORECASE
+            r"\bevidence\s+scope\b", flags=re.IGNORECASE
         ),
     }
 
