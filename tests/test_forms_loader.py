@@ -60,9 +60,14 @@ def test_make_form_factored_linear():
     assert isinstance(tp, dict) and len(tp) > 0
 
 
-def test_make_form_graph_raises():
-    with pytest.raises(ValueError, match="graph"):
-        make_form("graph", reward_form="linear")
+def test_make_form_graph_linear():
+    # F2 is implemented: graph-linear should succeed, not raise.
+    form = make_form("graph", reward_form="linear", num_nodes=10, num_actions=3, seed=0)
+    assert isinstance(form, Form)
+    assert form.spec.topology == "graph"
+    assert form.spec.reward_form == "linear"
+    tp = form.env.true_parameters
+    assert isinstance(tp, dict) and len(tp) > 0
 
 
 def test_make_form_unknown_topology_raises():

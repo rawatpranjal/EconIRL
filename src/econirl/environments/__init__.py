@@ -13,6 +13,7 @@ from econirl.environments.instacart import InstacartEnvironment
 from econirl.environments.multi_component_bus import MultiComponentBusEnvironment
 from econirl.environments.objectworld import ObjectworldEnvironment
 from econirl.environments.random_mdp import random_mdp
+from econirl.environments.road_network import road_network
 from econirl.environments.rdw_scrappage import RDWScrapageEnvironment
 from econirl.environments.rust_bus import RustBusEnvironment
 from econirl.environments.scania import ScaniaComponentEnvironment
@@ -42,4 +43,5 @@ __all__ = [
     "ShapeshifterEnvironment",
     "SupermarketEnvironment",
     "random_mdp",
+    "road_network",
 ]
