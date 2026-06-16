@@ -22,10 +22,12 @@ Data source:
 """
 
 from pathlib import Path
-from typing import Optional, List, Literal
+from typing import Optional, Literal
 
 import numpy as np
 import pandas as pd
+
+from econirl.datasets._traj_helpers import discretize_coords, to_trajectories
 
 
 def load_eth_ucy(
@@ -76,10 +78,10 @@ def load_eth_ucy(
         df = df[df['scene'] == scene]
 
     if discretize:
-        df = _discretize_coords(df, grid_size)
+        df = discretize_coords(df, grid_size, ("x", "y"))
 
     if as_trajectories:
-        return _to_trajectories(df, discretize)
+        return to_trajectories(df, discretize, "pedestrian_id", "frame", ("x", "y"))
 
     return df
 
@@ -154,41 +156,6 @@ def _generate_eth_ucy_sample(
                     y += speed * dy / dist + np.random.normal(0, 0.05)
 
     return pd.DataFrame(records)
-
-
-def _discretize_coords(df: pd.DataFrame, grid_size: int) -> pd.DataFrame:
-    """Convert world coordinates to discrete grid cells."""
-    df = df.copy()
-
-    x_min, x_max = df['x'].min(), df['x'].max()
-    y_min, y_max = df['y'].min(), df['y'].max()
-
-    x_bins = np.linspace(x_min, x_max, grid_size + 1)
-    y_bins = np.linspace(y_min, y_max, grid_size + 1)
-
-    x_idx = np.clip(np.digitize(df['x'], x_bins) - 1, 0, grid_size - 1)
-    y_idx = np.clip(np.digitize(df['y'], y_bins) - 1, 0, grid_size - 1)
-
-    df['state'] = y_idx * grid_size + x_idx
-
-    return df
-
-
-def _to_trajectories(df: pd.DataFrame, has_states: bool) -> List[np.ndarray]:
-    """Convert DataFrame to list of trajectory arrays."""
-    trajectories = []
-
-    for ped_id in df['pedestrian_id'].unique():
-        ped_data = df[df['pedestrian_id'] == ped_id].sort_values('frame')
-
-        if has_states:
-            traj = ped_data['state'].values
-        else:
-            traj = ped_data[['x', 'y']].values
-
-        trajectories.append(traj)
-
-    return trajectories
 
 
 def get_eth_ucy_info() -> dict:

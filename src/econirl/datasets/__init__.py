@@ -40,16 +40,6 @@ from econirl.datasets.keane_wolpin import load_keane_wolpin, get_keane_wolpin_in
 from econirl.datasets.rdw_scrappage import load_rdw_scrappage, get_rdw_scrappage_info
 from econirl.datasets.scania import load_scania, get_scania_info
 
-# Curated datasets for the JSS paper. The naming scheme groups each
-# canonical setting into a small (classical-tabular) and a big
-# (neural-required) variant, plus the LSW heterogeneity panel.
-from econirl.datasets.rust_big import load_rust_big, get_rust_big_info
-from econirl.datasets.ziebart_big import load_ziebart_big, get_ziebart_big_info
-from econirl.datasets.lsw_synthetic import (
-    load_lsw_synthetic,
-    get_lsw_synthetic_info,
-)
-
 # Hybrid datasets (real data + synthetic fallback)
 from econirl.datasets.citibike_route import load_citibike_route, get_citibike_route_info
 from econirl.datasets.citibike_usage import load_citibike_usage, get_citibike_usage_info
@@ -61,7 +51,6 @@ from econirl.datasets.stanford_drone import load_stanford_drone, get_stanford_dr
 from econirl.datasets.eth_ucy import load_eth_ucy, get_eth_ucy_info
 
 # Real-world DDC/IRL datasets
-from econirl.datasets.foursquare import load_foursquare, get_foursquare_info
 from econirl.datasets.ngsim import load_ngsim, get_ngsim_info
 from econirl.datasets.taxi_gridworld import load_taxi_gridworld, get_taxi_gridworld_info
 from econirl.datasets.shanghai_route import (
@@ -127,8 +116,6 @@ __all__ = [
     "load_eth_ucy",
     "get_eth_ucy_info",
     # Real-world DDC/IRL Datasets
-    "load_foursquare",
-    "get_foursquare_info",
     "load_ngsim",
     "get_ngsim_info",
     # Benchmark Datasets
@@ -149,15 +136,9 @@ __all__ = [
     "build_trivago_features",
     "build_trivago_transitions",
     "get_trivago_info",
-    # Curated datasets for the JSS paper
+    # Curated dataset aliases
     "load_rust_small",
-    "load_rust_big",
-    "get_rust_big_info",
     "load_ziebart_small",
-    "load_ziebart_big",
-    "get_ziebart_big_info",
-    "load_lsw_synthetic",
-    "get_lsw_synthetic_info",
     # Shape-shifter for code-vs-paper alignment benchmarks
     "load_shapeshifter",
     "get_shapeshifter_info",

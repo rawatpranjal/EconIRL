@@ -1337,6 +1337,3 @@ class NNESEstimator(BaseEstimator):
                 "final_ccps": ccps,
             },
         )
-
-# Backward compatibility alias for the old Bellman-residual variant
-NNESBellmanEstimator = NNESNFXPEstimator

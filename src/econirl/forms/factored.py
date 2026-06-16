@@ -57,7 +57,6 @@ def factored(
             reward_form="linear",
             num_states=env.num_states,
             num_actions=env.num_actions,
-            has_transitions=True,
             name=f"factored-linear-K{K}-M{M}",
         )
         return Form(spec=spec, env=env)
@@ -81,7 +80,6 @@ def factored(
             reward_form="neural",
             num_states=env.num_states,
             num_actions=env.num_actions,
-            has_transitions=True,
             name=f"factored-neural-K{K}-M{M}",
         )
         return Form(spec=spec, env=env)

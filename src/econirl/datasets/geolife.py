@@ -17,10 +17,12 @@ Data source:
 """
 
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 import pandas as pd
+
+from econirl.datasets._traj_helpers import discretize_coords, to_trajectories
 
 
 def load_geolife(
@@ -79,10 +81,10 @@ def load_geolife(
         df = df.drop(columns=['mode'])
 
     if discretize:
-        df = _discretize_gps(df, grid_size)
+        df = discretize_coords(df, grid_size, ("longitude", "latitude"))
 
     if as_trajectories:
-        return _to_trajectories(df, discretize)
+        return to_trajectories(df, discretize, "trajectory_id", "timestamp", ("longitude", "latitude"))
 
     return df
 
@@ -149,41 +151,6 @@ def _generate_geolife_sample(
                 lat = np.clip(lat, lat_min, lat_max)
 
     return pd.DataFrame(records)
-
-
-def _discretize_gps(df: pd.DataFrame, grid_size: int) -> pd.DataFrame:
-    """Convert GPS coordinates to discrete grid cells."""
-    df = df.copy()
-
-    lon_min, lon_max = df['longitude'].min(), df['longitude'].max()
-    lat_min, lat_max = df['latitude'].min(), df['latitude'].max()
-
-    lon_bins = np.linspace(lon_min, lon_max, grid_size + 1)
-    lat_bins = np.linspace(lat_min, lat_max, grid_size + 1)
-
-    lon_idx = np.clip(np.digitize(df['longitude'], lon_bins) - 1, 0, grid_size - 1)
-    lat_idx = np.clip(np.digitize(df['latitude'], lat_bins) - 1, 0, grid_size - 1)
-
-    df['state'] = lat_idx * grid_size + lon_idx
-
-    return df
-
-
-def _to_trajectories(df: pd.DataFrame, has_states: bool) -> List[np.ndarray]:
-    """Convert DataFrame to list of trajectory arrays."""
-    trajectories = []
-
-    for traj_id in df['trajectory_id'].unique():
-        traj_data = df[df['trajectory_id'] == traj_id].sort_values('timestamp')
-
-        if has_states:
-            traj = traj_data['state'].values
-        else:
-            traj = traj_data[['longitude', 'latitude']].values
-
-        trajectories.append(traj)
-
-    return trajectories
 
 
 def get_geolife_info() -> dict:

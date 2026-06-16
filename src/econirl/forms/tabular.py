@@ -63,7 +63,6 @@ def tabular(
             reward_form="linear",
             num_states=env.num_states,
             num_actions=env.num_actions,
-            has_transitions=True,
             name=f"tabular-linear-S{env.num_states}-A{env.num_actions}",
         )
         return Form(spec=spec, env=env)
@@ -83,7 +82,6 @@ def tabular(
             reward_form="neural",
             num_states=env.num_states,
             num_actions=env.num_actions,
-            has_transitions=True,
             name=f"tabular-neural-S{env.num_states}-A{env.num_actions}",
         )
         return Form(spec=spec, env=env)

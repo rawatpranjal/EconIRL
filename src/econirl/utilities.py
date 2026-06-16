@@ -288,38 +288,6 @@ class CallableUtility(Utility):
         return np.asarray(result)
 
 
-def make_utility(
-    fn: Callable[[ArrayLike, ArrayLike, NDArray[np.floating]], ArrayLike],
-    n_params: int,
-    param_names: list[str] | None = None,
-    param_bounds: tuple[ArrayLike, ArrayLike] | None = None,
-    param_init: ArrayLike | None = None,
-) -> CallableUtility:
-    """Factory function to create a Utility from a callable.
-
-    This is a convenience function equivalent to constructing CallableUtility
-    directly.
-
-    Args:
-        fn: Utility function with signature (state, action, params) -> utility.
-        n_params: Number of parameters.
-        param_names: Names of parameters. If None, uses ["theta_0", "theta_1", ...].
-        param_bounds: Optional (lower, upper) bounds tuple.
-        param_init: Optional initial parameter values.
-
-    Returns:
-        CallableUtility wrapping the provided function.
-
-    Example:
-        >>> def my_utility(state, action, params):
-        ...     return -params[0] * state
-        >>>
-        >>> utility = make_utility(my_utility, n_params=1, param_names=["cost"])
-    """
-    return CallableUtility(
-        fn=fn,
-        n_params=n_params,
-        param_names=param_names,
-        param_bounds=param_bounds,
-        param_init=param_init,
-    )
+# make_utility() was a factory whose body just forwarded to CallableUtility with
+# the identical signature. The alias is behavior-preserving.
+make_utility = CallableUtility

@@ -13,7 +13,6 @@ from econirl.environments.base import DDCEnvironment
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.base import BaseUtilityFunction
 from econirl.preferences.linear import LinearUtility
-from econirl.preferences.reward import LinearReward
 
 # Estimator classes that need ActionDependentReward
 _ACTION_DEPENDENT_NAMES = {
@@ -21,10 +20,6 @@ _ACTION_DEPENDENT_NAMES = {
     "AIRLEstimator",
     "FIRLEstimator",
 }
-
-# Estimator classes that need LinearReward (state-only features)
-_LINEAR_REWARD_NAMES: set[str] = set()
-
 
 def project_state_features(env: DDCEnvironment) -> jnp.ndarray:
     """Project 3D feature matrix to 2D state-only features.
@@ -60,14 +55,6 @@ def build_utility_for_estimator(
         return ActionDependentReward(
             feature_matrix=env.feature_matrix,
             parameter_names=env.parameter_names,
-        )
-
-    if class_name in _LINEAR_REWARD_NAMES:
-        state_features = project_state_features(env)
-        return LinearReward(
-            state_features=state_features,
-            parameter_names=env.parameter_names,
-            n_actions=env.num_actions,
         )
 
     # Default: LinearUtility (NFXP, CCP, TD-CCP, GLADIUS, NNES, SEES)

@@ -54,7 +54,6 @@ def grid(
             reward_form="linear",
             num_states=env.num_states,
             num_actions=env.num_actions,
-            has_transitions=True,
             name=f"grid-linear-{grid_size}x{grid_size}",
         )
         return Form(spec=spec, env=env)
@@ -68,7 +67,6 @@ def grid(
             reward_form="nonlinear",
             num_states=env.num_states,
             num_actions=env.num_actions,
-            has_transitions=True,
             name=f"grid-nonlinear-{grid_size}x{grid_size}",
         )
         return Form(spec=spec, env=env)
@@ -92,7 +90,6 @@ def grid(
             reward_form="neural",
             num_states=env.num_states,
             num_actions=env.num_actions,
-            has_transitions=True,
             name=f"grid-neural-{grid_size}x{grid_size}",
         )
         return Form(spec=spec, env=env)

@@ -222,7 +222,6 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
 
 
 def _run_estimate(
-    name: str,
     estimator: Any,
     cap: EstimatorCapability,
     panel,
@@ -244,23 +243,18 @@ def _run_estimate(
 
 
 def _run_fit_features(
-    name: str,
     estimator: Any,
-    cap: EstimatorCapability,
     panel,
     form: Form,
 ) -> Any:
-    """Run a ``path="fit_features"`` estimator and return the fitted object."""
+    """Run a ``path="fit_features"`` estimator and return the fitted object.
+
+    Model-free and model-based estimators take the same ``fit`` call; the
+    model-free ones accept ``transitions`` and ignore it internally.
+    """
     features = np.asarray(form.env.feature_matrix)
     transitions = np.asarray(form.env.transition_matrices)
-
-    if cap.model_free:
-        # Model-free: transitions accepted by the API but not used; pass them
-        # anyway (harmless, avoids conditional logic at call sites).
-        return estimator.fit(panel, features=features, transitions=transitions)
-    else:
-        # Model-based: transitions required.
-        return estimator.fit(panel, features=features, transitions=transitions)
+    return estimator.fit(panel, features=features, transitions=transitions)
 
 
 # ---------------------------------------------------------------------------
@@ -357,9 +351,9 @@ def run_form(
 
         try:
             if cap.path == "estimate":
-                res = _run_estimate(name, est, cap, panel, form)
+                res = _run_estimate(est, cap, panel, form)
             else:
-                res = _run_fit_features(name, est, cap, panel, form)
+                res = _run_fit_features(est, panel, form)
             result.results[name] = res
         except Exception as exc:  # noqa: BLE001 - failure is a data point
             result.skipped.append({
