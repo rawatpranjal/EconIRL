@@ -109,11 +109,6 @@ class Trajectory:
         """Return the number of time periods in this trajectory."""
         return len(self.states)
 
-    @property
-    def num_periods(self) -> int:
-        """Number of time periods observed."""
-        return len(self.states)
-
 
 @dataclass
 class Panel:

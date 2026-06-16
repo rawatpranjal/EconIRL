@@ -33,7 +33,6 @@ dependencies = [
     "optax>=0.2",
     "jaxopt>=0.8",
     "optimistix>=0.0.7",
-    "lineax>=0.0.5",
     "gymnasium>=0.29",
     "numpy>=1.24",
     "pandas>=2.0",
