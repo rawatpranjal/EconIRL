@@ -16,7 +16,7 @@ features, not the oracle dynamic objects.
 
 The full result generator is
 [`ccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/ccp/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`ccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp.json).
 To rerun it from the repository root:
 

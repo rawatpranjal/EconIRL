@@ -39,6 +39,6 @@ length `n_states` containing the correct known rewards for the anchor action.
 
 Policy TV can be good even when raw Bellman reward or value recovery fails.
 Inspect the `projected_reward_normalized_rmse` and `raw_bellman_reward_normalized_rmse`
-fields in the machine-readable results file alongside policy TV before drawing
+fields in the results file alongside policy TV before drawing
 any structural conclusions. A good imitation policy is a necessary but not
 sufficient condition for structural counterfactual validity.

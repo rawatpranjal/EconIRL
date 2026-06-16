@@ -8,7 +8,7 @@ objects, so every recovery claim is checked against fully specified truth.
 
 The full result generator is
 [`mpec_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mpec/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`mpec_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mpec.json).
 
 ```bash

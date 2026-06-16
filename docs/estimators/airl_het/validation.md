@@ -8,7 +8,7 @@ every recovery metric is checked against the truth.
 
 The full result generator is
 [`run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/aairl/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`aairl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/aairl.json).
 
 ```bash

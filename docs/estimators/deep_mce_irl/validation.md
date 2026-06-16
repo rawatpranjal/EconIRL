@@ -8,7 +8,7 @@ reward matrix, policy, value function, Q function, and counterfactual objects.
 
 The full result generator is
 [`run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/deep_mce_irl/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`deep_mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json).
 
 ```bash

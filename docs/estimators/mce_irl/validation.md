@@ -18,7 +18,7 @@ evaluation.
 
 The full result generator is
 [`mce_irl_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`mce_irl_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json).
 To rerun it from the repository root:
 

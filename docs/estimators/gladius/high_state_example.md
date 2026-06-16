@@ -62,6 +62,6 @@ caution with current GLADIUS results.
 
 This page illustrates the evaluation setup, not a full historical replication.
 The estimator's recovery properties on this cell are established in the
-[Simulation Study](validation.md) page. The machine-readable results file
+[Simulation Study](validation.md) page. The results file
 [`gladius.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json)
 contains all numeric results.
