@@ -13,6 +13,7 @@ known, both recovery and failure are measurable.
 | [Abstract MDP 3: High Dimensional Case](abstract_mdp_3_highdim.md) | The same generator at large scale. | 3000 states x 2 actions | Ten estimators across families. | How compute costs separate as the state space grows. |
 | [Abstract MDP 4: Interaction effect](abstract_mdp_4_nonlinear.md) | A reward that multiplies two features the estimators do not model. | 24 states x 3 actions | All. | What an omitted interaction costs: a small behavioral miss, a larger counterfactual one. |
 | [Direct optimization](direct_optimization.md) | Estimation under correct and misspecified rewards. | varies | MPEC, neural MPEC, GLADIUS. | How this family degrades under reward misspecification. |
+| [Route choice](route_choice.md) | Synthetic road network (25 nodes, random geometric graph). | 25 states x 4 actions | Structural (NFXP, CCP, MPEC), MCE-IRL, NeuralGLADIUS. | Structural parameter recovery and behavioral fidelity on a graph topology. |
 
 The findings in one line. On easy problems most estimators match the choice
 probabilities. On harder problems many do not, and the gap in behavior is the
@@ -50,4 +51,5 @@ abstract_mdp_2_harder
 abstract_mdp_3_highdim
 abstract_mdp_4_nonlinear
 direct_optimization
+route_choice
 ```
