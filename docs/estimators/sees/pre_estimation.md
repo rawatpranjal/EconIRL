@@ -18,7 +18,7 @@ these checks before treating a SEES result as structural evidence.
 
 These rows come from the generated SEES results file. See
 [Simulation Study](validation.md) for the generator script, rendered table
-source, and machine-readable JSON.
+source, and JSON.
 
 | Check | Low-dimensional | High-dimensional primary |
 | --- | ---: | ---: |

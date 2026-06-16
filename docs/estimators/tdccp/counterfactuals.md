@@ -22,7 +22,7 @@ The simulation harness checks three common counterfactual types.
 ## Reported Results
 
 These rows come from the
-[machine-readable results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json)
+[results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json)
 and the [Simulation Study](validation.md) page.
 
 | Counterfactual | Policy TV | Value RMSE | Regret |

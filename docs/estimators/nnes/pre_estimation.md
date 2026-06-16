@@ -21,7 +21,7 @@ Run these checks before treating a NNES result as structural evidence.
 
 These rows come from the generated NNES results file. See
 [Simulation Study](validation.md) for the generator script, rendered table
-source, and machine-readable JSON.
+source, and JSON.
 
 | Check | Low-dimensional | High-dimensional primary |
 | --- | ---: | ---: |

@@ -28,7 +28,7 @@ oracle objects for three intervention families:
 
 These rows come from the same results file used on the
 [Simulation Study](validation.md) page (see also the
-[machine-readable results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp.json)).
+[results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp.json)).
 
 | Counterfactual | Policy TV | Policy KL | Value RMSE | Regret |
 | --- | ---: | ---: | ---: | ---: |
