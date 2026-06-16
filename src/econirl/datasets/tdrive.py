@@ -25,6 +25,8 @@ from typing import Optional, List
 import numpy as np
 import pandas as pd
 
+from econirl.datasets._traj_helpers import discretize_coords, to_trajectories
+
 
 def load_tdrive(
     n_taxis: Optional[int] = None,
@@ -76,10 +78,10 @@ def load_tdrive(
         df = df[df['taxi_id'].isin(taxi_ids)]
 
     if discretize:
-        df = _discretize_gps(df, grid_size)
+        df = discretize_coords(df, grid_size, ("longitude", "latitude"))
 
     if as_trajectories:
-        return _to_trajectories(df, discretize)
+        return to_trajectories(df, discretize, "taxi_id", "timestamp", ("longitude", "latitude"))
 
     return df
 
@@ -132,48 +134,6 @@ def _generate_tdrive_sample(
                 lon = max(lon - step, lon_min)
 
     return pd.DataFrame(records)
-
-
-def _discretize_gps(df: pd.DataFrame, grid_size: int) -> pd.DataFrame:
-    """Convert GPS coordinates to discrete grid cells."""
-    df = df.copy()
-
-    # Compute grid bounds from data
-    lon_min, lon_max = df['longitude'].min(), df['longitude'].max()
-    lat_min, lat_max = df['latitude'].min(), df['latitude'].max()
-
-    # Discretize
-    lon_bins = np.linspace(lon_min, lon_max, grid_size + 1)
-    lat_bins = np.linspace(lat_min, lat_max, grid_size + 1)
-
-    lon_idx = np.digitize(df['longitude'], lon_bins) - 1
-    lat_idx = np.digitize(df['latitude'], lat_bins) - 1
-
-    # Clip to valid range
-    lon_idx = np.clip(lon_idx, 0, grid_size - 1)
-    lat_idx = np.clip(lat_idx, 0, grid_size - 1)
-
-    # Encode as single state index
-    df['state'] = lat_idx * grid_size + lon_idx
-
-    return df
-
-
-def _to_trajectories(df: pd.DataFrame, has_states: bool) -> List[np.ndarray]:
-    """Convert DataFrame to list of trajectory arrays."""
-    trajectories = []
-
-    for taxi_id in df['taxi_id'].unique():
-        taxi_data = df[df['taxi_id'] == taxi_id].sort_values('timestamp')
-
-        if has_states:
-            traj = taxi_data['state'].values
-        else:
-            traj = taxi_data[['longitude', 'latitude']].values
-
-        trajectories.append(traj)
-
-    return trajectories
 
 
 def get_tdrive_info() -> dict:

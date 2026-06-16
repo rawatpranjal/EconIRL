@@ -23,6 +23,8 @@ from typing import Optional, List, Literal
 import numpy as np
 import pandas as pd
 
+from econirl.datasets._traj_helpers import discretize_coords, to_trajectories
+
 
 def load_stanford_drone(
     scene: Optional[Literal["bookstore", "coupa", "deathCircle", "gates", "hyang", "little", "nexus", "quad"]] = None,
@@ -78,10 +80,10 @@ def load_stanford_drone(
         df = df[df['agent_type'] == agent_type]
 
     if discretize:
-        df = _discretize_coords(df, grid_size)
+        df = discretize_coords(df, grid_size, ("x", "y"))
 
     if as_trajectories:
-        return _to_trajectories(df, discretize)
+        return to_trajectories(df, discretize, "track_id", "frame", ("x", "y"))
 
     return df
 
@@ -154,41 +156,6 @@ def _generate_sdd_sample(
                 y = np.clip(y, 0, height)
 
     return pd.DataFrame(records)
-
-
-def _discretize_coords(df: pd.DataFrame, grid_size: int) -> pd.DataFrame:
-    """Convert pixel coordinates to discrete grid cells."""
-    df = df.copy()
-
-    x_min, x_max = df['x'].min(), df['x'].max()
-    y_min, y_max = df['y'].min(), df['y'].max()
-
-    x_bins = np.linspace(x_min, x_max, grid_size + 1)
-    y_bins = np.linspace(y_min, y_max, grid_size + 1)
-
-    x_idx = np.clip(np.digitize(df['x'], x_bins) - 1, 0, grid_size - 1)
-    y_idx = np.clip(np.digitize(df['y'], y_bins) - 1, 0, grid_size - 1)
-
-    df['state'] = y_idx * grid_size + x_idx
-
-    return df
-
-
-def _to_trajectories(df: pd.DataFrame, has_states: bool) -> List[np.ndarray]:
-    """Convert DataFrame to list of trajectory arrays."""
-    trajectories = []
-
-    for track_id in df['track_id'].unique():
-        track_data = df[df['track_id'] == track_id].sort_values('frame')
-
-        if has_states:
-            traj = track_data['state'].values
-        else:
-            traj = track_data[['x', 'y']].values
-
-        trajectories.append(traj)
-
-    return trajectories
 
 
 def get_stanford_drone_info() -> dict:
