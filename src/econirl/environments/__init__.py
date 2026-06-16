@@ -21,6 +21,7 @@ from econirl.environments.shapeshifter import (
     ShapeshifterConfig,
     ShapeshifterEnvironment,
 )
+from econirl.environments.storable_goods import storable_goods
 from econirl.environments.supermarket import SupermarketEnvironment
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "SupermarketEnvironment",
     "random_mdp",
     "road_network",
+    "storable_goods",
 ]

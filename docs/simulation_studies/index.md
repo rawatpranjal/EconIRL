@@ -14,6 +14,7 @@ known, both recovery and failure are measurable.
 | [Abstract MDP 4: Interaction effect](abstract_mdp_4_nonlinear.md) | A reward that multiplies two features the estimators do not model. | 24 states x 3 actions | All. | What an omitted interaction costs: a small behavioral miss, a larger counterfactual one. |
 | [Direct optimization](direct_optimization.md) | Estimation under correct and misspecified rewards. | varies | MPEC, neural MPEC, GLADIUS. | How this family degrades under reward misspecification. |
 | [Route choice](route_choice.md) | Synthetic road network (25 nodes, random geometric graph). | 25 states x 4 actions | Structural (NFXP, CCP, MPEC), MCE-IRL, NeuralGLADIUS. | Structural parameter recovery and behavioral fidelity on a graph topology. |
+| [Stockpiling](stockpiling.md) | Consumer stockpiling of a storable good (Hendel-Nevo). | 20 states x 2 actions | Structural (NFXP, CCP, MPEC), MCE-IRL, NeuralGLADIUS. | Structural recovery on a price-driven inventory model where the optimal policy stockpiles on sale. |
 
 The findings in one line. On easy problems most estimators match the choice
 probabilities. On harder problems many do not, and the gap in behavior is the
@@ -52,4 +53,5 @@ abstract_mdp_3_highdim
 abstract_mdp_4_nonlinear
 direct_optimization
 route_choice
+stockpiling
 ```
