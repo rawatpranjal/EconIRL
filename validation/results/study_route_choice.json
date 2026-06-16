@@ -1,0 +1,367 @@
+{
+  "meta": {
+    "title": "Simulation study: route choice on a road network",
+    "date": "2026-06-16",
+    "package_version": "0.0.6",
+    "cells": [
+      {
+        "cell_id": "route_choice",
+        "label": "Route choice (25 nodes, 4 actions)",
+        "description": "Synthetic route-choice problem on a random geometric graph. 25 nodes placed uniformly in the unit square; edges within Euclidean radius 0.25, plus a spanning tree for connectivity. An agent at node $s$ picks among 4 nearest neighbours; actions beyond node degree self-loop. Reward is linear in three edge features: negative edge length, destination amenity, and negative shortest-path distance to a fixed goal. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, seed=0)``.",
+        "num_states": 25,
+        "num_actions": 4,
+        "discount_factor": 0.95,
+        "n_individuals": 200,
+        "n_periods": 35,
+        "seed": 42,
+        "n_replications": 2,
+        "param_block": true,
+        "show_params": true,
+        "show_regret": true,
+        "figure": "route_choice_dgp.png",
+        "parameter_names": [
+          "edge_cost",
+          "amenity",
+          "goal"
+        ],
+        "true_theta": [
+          1.0,
+          0.5,
+          1.0
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 13.407260420676721,
+          "contrast_rank": 3,
+          "contrast_condition_number": 7.653762356022703
+        },
+        "roster": [
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null
+          },
+          {
+            "name": "NeuralGLADIUS",
+            "family": "behavioral",
+            "max_reps": null
+          }
+        ]
+      }
+    ],
+    "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
+    "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
+    "excluded": [
+      {
+        "name": "IQ-Learn, f-IRL",
+        "reason": "not separately identified from choices on this problem; reward is only partially identified from behavior"
+      },
+      {
+        "name": "NNES, SEES, TD-CCP, UFXP",
+        "reason": "correct structural estimators but slower on a 25-node graph; NFXP and CCP already cover the structural family"
+      },
+      {
+        "name": "MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL",
+        "reason": "trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here"
+      }
+    ],
+    "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).",
+    "snippets": {
+      "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(\n        inner_solver=\"hybrid\", inner_tol=1e-10,\n        inner_max_iter=100_000, compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    # solver=\"sqp\" is the real constrained MLE; \"slsqp\" is a legacy alias for\n    # the augmented-Lagrangian penalty solver and does not check optimality.\n    est = MPECEstimator(\n        config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),\n        compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(\n        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,\n        compute_se=False, verbose=False,\n    ))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
+      "NeuralGLADIUS": "def _run_neural_gladius(env, panel):\n    from types import SimpleNamespace\n\n    from econirl.estimators import NeuralGLADIUS\n\n    ps = env.problem_spec\n    m = NeuralGLADIUS(\n        n_actions=int(env.num_actions),\n        discount=float(ps.discount_factor),\n        max_epochs=200,\n        verbose=False,\n    )\n    m.fit(\n        panel,\n        features=np.asarray(env.feature_matrix),\n        transitions=np.asarray(env.transition_matrices),\n    )\n    return SimpleNamespace(\n        parameters=None,\n        standard_errors=None,\n        policy=m.policy_,\n        value_function=getattr(m, \"value_\", None),\n        converged=bool(getattr(m, \"converged_\", True)),\n    )\n"
+    },
+    "diagnoses": {
+      "NFXP": "Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum; all three parameters are identified from the edge-feature contrast.",
+      "CCP": "CCP uses a first-step nonparametric policy estimate to avoid the inner Bellman loop. One policy-iteration step corrects the bias from the nonparametric first stage.",
+      "MPEC": "Mathematical programming with equilibrium constraints. MPEC is not in the CAPABILITIES registry (so run_form does not surface it automatically) but runs correctly via the direct .estimate() path. Uses solver='sqp' for real constrained MLE; the legacy 'slsqp' alias checks only Bellman feasibility.",
+      "MCE-IRL": "Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate.",
+      "NeuralGLADIUS": "Model-free neural policy learner. Uses only the feature matrix and the observed panel; it does not use transition matrices. Capped at 200 epochs here for short compute."
+    },
+    "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
+  },
+  "records": [
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 0,
+      "params": [
+        1.12262348702863,
+        0.49670513006979655,
+        0.9932613402875569
+      ],
+      "standard_errors": [
+        0.16129013895988464,
+        0.025753702968358994,
+        0.051198456436395645
+      ],
+      "policy_tv": 0.0035779616535840364,
+      "value_rmse": 0.10000356118773925,
+      "regret": {
+        "baseline": 0.0008198545459641464,
+        "type_a": 0.0007828848656283309,
+        "type_b": 0.0010239300516892735,
+        "type_c": 0.0011456925681538638,
+        "transferred": true
+      },
+      "runtime": 4.111637115478516,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 0,
+      "params": [
+        1.1069785356521606,
+        0.4743184745311737,
+        0.9397772550582886
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.011662658141107476,
+      "value_rmse": 0.8497481212936658,
+      "regret": {
+        "baseline": 0.0028360370834341737,
+        "type_a": 0.0026527350859103698,
+        "type_b": 0.009464288821972913,
+        "type_c": 0.009247853382786499,
+        "transferred": true
+      },
+      "runtime": 3.111881971359253,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 0,
+      "params": [
+        1.1226234436035156,
+        0.4967051148414612,
+        0.9932613372802734
+      ],
+      "standard_errors": [
+        0.16129015386104584,
+        0.025753701105713844,
+        0.05119845271110535
+      ],
+      "policy_tv": 0.003577961371419828,
+      "value_rmse": 0.1000033066858521,
+      "regret": {
+        "baseline": 0.0008198551319153278,
+        "type_a": 0.0007828850807107199,
+        "type_b": 0.0010239299352908472,
+        "type_c": 0.0011456935813520886,
+        "transferred": true
+      },
+      "runtime": 0.3227803707122803,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 0,
+      "params": [
+        1.1226234436035156,
+        0.4967051148414612,
+        0.9932612776756287
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00357796754201489,
+      "value_rmse": 0.10000269749247297,
+      "regret": {
+        "baseline": 0.0008198559807888845,
+        "type_a": 0.0007828852925844426,
+        "type_b": 0.001023931407462248,
+        "type_c": 0.0011456957815586945,
+        "transferred": true
+      },
+      "runtime": 6.753982782363892,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NeuralGLADIUS",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 0,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.2660435565336338,
+      "value_rmse": 11.103083308330195,
+      "regret": {
+        "baseline": 4.227880727225471,
+        "type_a": 4.231194518181734,
+        "type_b": 3.3519470169021517,
+        "type_c": 46.63541557812453,
+        "transferred": false
+      },
+      "runtime": 6.563239097595215,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 1,
+      "params": [
+        1.240633463058755,
+        0.5190725010417877,
+        1.0046820036270532
+      ],
+      "standard_errors": [
+        0.17322002351284027,
+        0.024746624752879143,
+        0.04949481412768364
+      ],
+      "policy_tv": 0.00988869627208555,
+      "value_rmse": 0.2830818748360424,
+      "regret": {
+        "baseline": 0.00805000863494402,
+        "type_a": 0.005467419252939839,
+        "type_b": 0.0076977838557182226,
+        "type_c": 0.003933997615906076,
+        "transferred": true
+      },
+      "runtime": 2.4243087768554688,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 1,
+      "params": [
+        1.2271605730056763,
+        0.502231776714325,
+        0.9655818343162537
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.013552657054727944,
+      "value_rmse": 0.4956599907216595,
+      "regret": {
+        "baseline": 0.008748081218319863,
+        "type_a": 0.005773812164384698,
+        "type_b": 0.007668813928565357,
+        "type_c": 0.008322461771850673,
+        "transferred": true
+      },
+      "runtime": 1.431121826171875,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 1,
+      "params": [
+        1.2406339645385742,
+        0.5190725922584534,
+        1.0046820640563965
+      ],
+      "standard_errors": [
+        0.17322000861167908,
+        0.024746766313910484,
+        0.04949510842561722
+      ],
+      "policy_tv": 0.009888730056438193,
+      "value_rmse": 0.2830823263618569,
+      "regret": {
+        "baseline": 0.008050065508435851,
+        "type_a": 0.005467454531930736,
+        "type_b": 0.0076978363181374135,
+        "type_c": 0.003934019266628433,
+        "transferred": true
+      },
+      "runtime": 0.2402970790863037,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 1,
+      "params": [
+        1.2406734228134155,
+        0.5190679430961609,
+        1.0046736001968384
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00988894865688711,
+      "value_rmse": 0.28304361565188885,
+      "regret": {
+        "baseline": 0.008050747817942712,
+        "type_a": 0.005468118747447543,
+        "type_b": 0.007698190780289684,
+        "type_c": 0.0039351773874913495,
+        "transferred": true
+      },
+      "runtime": 4.139533042907715,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NeuralGLADIUS",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 1,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.2623365895259315,
+      "value_rmse": 11.052783619545314,
+      "regret": {
+        "baseline": 4.132294360208883,
+        "type_a": 4.12061172699179,
+        "type_b": 3.421386144635284,
+        "type_c": 45.22573711053652,
+        "transferred": false
+      },
+      "runtime": 7.018312931060791,
+      "converged": true,
+      "error": null
+    }
+  ]
+}
