@@ -245,9 +245,8 @@ S.CELLS = tuple(
     dataclasses.replace(c, figure=None) for c in S.CELLS
 )
 S.NARRATIVE = dict(S.NARRATIVE)
-import sys; sys.argv = ["driver.py", "--replications", "1"]
 from validation.benchmark.harness import main_cli
-main_cli(
+_kw = dict(
     cells=S.CELLS,
     title="Simulation study: route choice on a road network",
     narrative=S.NARRATIVE,
@@ -256,6 +255,11 @@ main_cli(
     results_json=S.RESULTS_JSON,
     page_path=S.PAGE_PATH,
 )
+# Two-step contract: a plain run writes the JSON; --page renders the page from it.
+sys.argv = ["driver.py", "--replications", "1"]
+main_cli(**_kw)
+sys.argv = ["driver.py", "--page"]
+main_cli(**_kw)
 """
     )
     result = subprocess.run(
