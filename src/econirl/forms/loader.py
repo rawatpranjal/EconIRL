@@ -129,9 +129,9 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
 
     if name == "SEES":
         from econirl.estimation.sees import SEESEstimator
-        # Basis must span the value function: use num_states as a safe upper
-        # bound, capped at 16 for speed.
-        basis_dim = min(num_states, 16)
+        # The basis must span the value function (basis_dim >= num_states), so
+        # the basis dimension tracks the state count rather than a fixed cap.
+        basis_dim = num_states
         return SEESEstimator(
             basis_type="bspline", basis_dim=basis_dim,
             warm_start_value=True, penalty_weight=10.0,
@@ -311,10 +311,6 @@ def run_form(
 
     result = RunResult()
 
-    # Track which canonical names have been run to detect when an alias's
-    # canonical counterpart was already processed.
-    _ran_canonicals: set[str] = set()
-
     for name in roster:
         cap = CAPABILITIES[name]
 
@@ -365,7 +361,6 @@ def run_form(
             else:
                 res = _run_fit_features(name, est, cap, panel, form)
             result.results[name] = res
-            _ran_canonicals.add(name)
         except Exception as exc:  # noqa: BLE001 - failure is a data point
             result.skipped.append({
                 "name": name,

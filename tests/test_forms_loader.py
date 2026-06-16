@@ -172,8 +172,9 @@ def test_known_truth_recovery_nfxp_ccp():
     """NFXP and CCP must both converge and recover theta within loose tolerance.
 
     The MDP is tiny (8 states, 2 actions) so both should finish quickly even
-    in the slow-mark tier.  The tolerance is intentionally loose (~1.5 RMSE
-    on normalized params) to avoid flaky failures from finite-sample noise.
+    in the slow-mark tier.  The 0.2 RMSE tolerance is comfortably above the
+    ~0.03 actual recovery but well below a failed estimate (all-zeros ~0.57,
+    sign-flipped ~1.1), so it genuinely guards recovery.
     """
     form = make_form(
         "tabular", reward_form="linear",
@@ -211,9 +212,10 @@ def test_known_truth_recovery_nfxp_ccp():
             f"{est_name}: shape mismatch {recovered.shape} vs {true_theta.shape}"
         )
 
-        # Loose tolerance: correct signs and rough magnitude (RMSE < 1.5)
+        # Recovery must be genuine. Actual RMSE is ~0.03; 0.2 still catches a
+        # regression to garbage (all-zeros ~0.57, sign-flipped ~1.1 both fail).
         rmse = float(np.sqrt(np.mean((recovered - true_theta) ** 2)))
-        assert rmse < 1.5, (
+        assert rmse < 0.2, (
             f"{est_name}: RMSE={rmse:.4f} vs true_theta={true_theta}, "
             f"recovered={recovered}"
         )
