@@ -42,7 +42,7 @@ Output
 9.265894274079756e-09
 ```
 
-The fitted summary exposes structural parameters, standard errors, a policy,
+After fitting, the summary provides structural parameters, standard errors, a policy,
 a value function, a likelihood, and constrained-optimizer diagnostics.
 
 | Attribute | Meaning |

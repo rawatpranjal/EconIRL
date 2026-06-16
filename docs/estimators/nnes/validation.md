@@ -33,12 +33,12 @@ four-dimensional extension and high-discount anchoring checks.
 The EconIRL results file is not a literal replication of that Monte Carlo. It is a
 package simulation study: the DGP is held fixed, the oracle objects are known
 before estimation, the high-dimensional primary cell has encoded states and 32
-reward parameters, and every reported result is tied to machine-readable
+reward parameters, and every reported result is tied to
 numerical checks.
 
 The full result generator is
 [`nnes_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nnes/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`nnes_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nnes.json).
 To rerun it from the repository root:
 

@@ -174,7 +174,7 @@ DIAGNOSES = {
     "UFXP": "Unnested fixed point (Bray; Oguz and Bray 2026) with optimal "
             "weighting. As efficient as maximum likelihood, with standard "
             "errors, so it enters the coverage table on equal terms.",
-    "MCE-IRL": "Behavioral reference. Its converged flag is a conservative "
+    "MCE-IRL": "Behavioral reference. Its convergence indicator is a conservative "
                "gradient-norm check, so read it next to Policy TV.",
 }
 

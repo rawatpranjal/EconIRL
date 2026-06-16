@@ -68,9 +68,9 @@ Type C counterfactual oracle objects.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic serialized-content simulation with two latent segments. |
+| Scope | Synthetic serialized-content simulation with two latent segments. |
 | Primary cell | `airl_het_paper_identification`. |
-| Machine-readable results file | [aairl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/aairl.json). |
+| Results file | [aairl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/aairl.json). |
 | Counterfactual checks | Type A, Type B, and Type C reported per segment in the results file. |
 | Coverage note | 58 of 61 states are observed; three states are outside the simulation support. |
 

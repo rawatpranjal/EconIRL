@@ -17,7 +17,7 @@ the encoded reward basis, not the oracle dynamic objects.
 
 The full result generator is
 [`sees_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/sees/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`sees_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/sees.json).
 To rerun it from the repository root:
 
@@ -124,7 +124,7 @@ structural starts. It simulates the same Rust bus panel, fits NFXP as the
 finite-sample structural reference, then runs all five SEES solution modes
 from random initial parameters with `num_theta_starts=4`.
 
-The gate compares SEES to the NFXP estimate on the same panel. It does not
+The check compares SEES to the NFXP estimate on the same panel. It does not
 compare directly to the population truth, because finite stochastic panels do
 not make the sample MLE exactly equal to the DGP parameters.
 
@@ -144,5 +144,5 @@ Generated results files:
 | `policy` | 9/9 | 0.006692 | 0.000200 | 0.031827 | 0.033279 | 7.661e-04 | 5.564e-03 | 0/9 |
 | `collocation` | 9/9 | 0.000859 | 0.000046 | 0.005762 | 0.005820 | 3.365e-04 | 1.062e-03 | 0/9 |
 
-The optimizer flag is the JAXopt gradient flag. The recovery gate is
+The optimizer flag is the JAXopt gradient flag. The recovery check is
 based on the finite-sample recovery metrics and Bellman residuals above.

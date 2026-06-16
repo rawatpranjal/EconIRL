@@ -47,15 +47,15 @@ print(model.summary())
 UFXP is reported on the low-dimensional action-dependent synthetic
 data-generating process. The simulation cell has known rewards, transitions,
 policies, values, Q functions, and Type A, Type B, and Type C counterfactual
-oracles. The machine-readable results file records the reported results. UFXP
+oracles. The results file records the reported results. UFXP
 also runs on every page of the [simulation studies](../simulation_studies/index.md)
 alongside the rest of the structural family.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic tabular simulation. |
+| Scope | Synthetic tabular simulation. |
 | Primary cell | `canonical_low_action`. |
-| Machine-readable results file | [ufxp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ufxp.json). |
+| Results file | [ufxp_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ufxp.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `UFXP` with `utility="linear_cost"`. |
 

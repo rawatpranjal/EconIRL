@@ -8,7 +8,7 @@ every recovery claim is checked against the truth. The primary cell is
 
 The full result generator is
 [`run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/iq_learn/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`iq_learn.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/iq_learn.json).
 
 ```bash

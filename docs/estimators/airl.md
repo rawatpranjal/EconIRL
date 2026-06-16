@@ -58,13 +58,13 @@ original paper's identification setting.
 
 AIRL is reported on a state-only synthetic cell designed to match the original
 AIRL identification conditions. A second action-dependent cell is also run and
-fails every gate; it is a documented boundary case, not a validated use case.
+fails every check; it is a documented boundary case, not a validated use case.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic tabular simulation. |
+| Scope | Synthetic tabular simulation. |
 | Primary cell | `airl_paper_identification` (state-only). |
-| Machine-readable results file | [airl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/airl.json). |
+| Results file | [airl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/airl.json). |
 | Behavioral checks | Reward NRMSE, policy TV, value NRMSE, Q NRMSE, Type A/B/C regret. |
 | Diagnostic cell | `airl_anchor_action_dependent` fails all gates. |
 

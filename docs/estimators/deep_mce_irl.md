@@ -53,16 +53,16 @@ Deep MCE-IRL is reported on a synthetic cell with a fixed nonlinear neural
 reward, known stochastic transitions, and an anchor action that normalizes
 the reward. The cell has 32 states, 3 actions, 160,000 observations, and
 known policy, value, Q, and counterfactual oracle objects, so every recovery
-claim is checked against the truth. The machine-readable results file records
+claim is checked against the truth. The results file records
 the reported results. Deep MCE-IRL also runs on the bus engine and gridworld
 pages of the [simulation studies](../simulation_studies/index.md) alongside
 the rest of the IRL roster.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic tabular simulation with fixed neural reward. |
+| Scope | Synthetic tabular simulation with fixed neural reward. |
 | Primary cell | `deep_mce_neural_reward`. |
-| Machine-readable results file | [deep_mce_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json). |
+| Results file | [deep_mce_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `MCEIRLNeural` with `reward_type="state_action"`. |
 

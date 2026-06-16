@@ -631,8 +631,8 @@ def render_page(data: dict) -> str:
              "reward is identified only up to transformations that leave "
              "behavior unchanged, so a value error across families would not "
              "compare like with like. Conv is the estimator's own convergence "
-             "flag; it does not track recovery here. A cautious flag can read "
-             "False while the policy is accurate, which is exactly the AIRL "
+             "indicator; it does not track recovery here. A cautious estimator "
+             "can report False while the policy is accurate, which is exactly the AIRL "
              "case below.\n")
     oc = meta.get("regret_oracle_fixed_c")
     oc_str = f"about {oc:.0f}" if oc is not None else "about 71"

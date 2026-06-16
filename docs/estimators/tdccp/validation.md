@@ -8,7 +8,7 @@ dynamic objects, counterfactual behavior, and valid standard errors.
 
 The result generator is
 [`tdccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/tdccp/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`tdccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json).
 
 ```bash

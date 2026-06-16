@@ -8,7 +8,7 @@ against the truth.
 
 The full result generator is
 [`ufxp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/ufxp/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`ufxp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ufxp.json).
 
 ```bash

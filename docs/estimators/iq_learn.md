@@ -61,9 +61,9 @@ structural counterfactual evidence.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic tabular simulation. |
+| Scope | Synthetic tabular simulation. |
 | Primary cell | `canonical_low_action`. |
-| Machine-readable results file | [iq_learn.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/iq_learn.json). |
+| Results file | [iq_learn.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/iq_learn.json). |
 | Imitation and regret checks | Pass on the primary cell (policy TV, Type A, Type B, Type C regret). |
 | Structural recovery checks | Fail on all tested cells (reward, value, Q NRMSE). |
 

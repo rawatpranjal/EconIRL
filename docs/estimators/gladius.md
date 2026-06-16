@@ -70,11 +70,11 @@ counterfactual-valid.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic high-dimensional-state simulation. |
+| Scope | Synthetic high-dimensional-state simulation. |
 | Primary cell | `gladius_paper_high_state` (21 states, 64 state features, 3 actions). |
 | Scaled cell | `gladius_paper_high_state_scaled` (21 states, 128 state features, 3 actions). |
-| Machine-readable results file (primary) | [gladius.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json). |
-| Machine-readable results file (scaled) | [gladius_scaled.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_scaled.json). |
+| Results file (primary) | [gladius.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json). |
+| Results file (scaled) | [gladius_scaled.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_scaled.json). |
 | Counterfactual checks | Type A, B, and C regret reported; full structural certification not reached. |
 | Public example | Uses `GLADIUS` (sklearn API) and `GLADIUSEstimator` (lower level). |
 

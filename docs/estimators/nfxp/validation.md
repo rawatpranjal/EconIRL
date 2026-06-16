@@ -8,7 +8,7 @@ function, policy, and counterfactual oracles are not observed.
 
 The full result generator is
 [`nfxp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`nfxp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp.json).
 To rerun it from the repository root:
 
@@ -20,7 +20,7 @@ Read the tables as a sequence. The design table states the synthetic cell.
 The fit summary reports how the estimator ran. Parameter recovery compares
 estimated reward parameters to truth. Recovery metrics compare the recovered
 reward, value, Q function, and policy to the true objects. Numerical checks
-are the pass-fail gates recorded by the runner.
+are the pass-fail checks recorded by the runner.
 
 ## Design
 

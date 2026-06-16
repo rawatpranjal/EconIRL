@@ -38,11 +38,11 @@ shows markedly lower regret, consistent with its better projected-reward
 recovery.
 
 These numbers are useful diagnostics but are not sufficient for structural
-validity. Reaching structural counterfactual validity requires the full gate
+validity. Reaching structural counterfactual validity requires the full check
 bundle - projected reward, raw Bellman reward, value, Q, and counterfactual
-regret - to pass together. The raw Bellman reward and value gates
+regret - to pass together. The raw Bellman reward and value checks
 currently fail on both cells. See the [Simulation Study](validation.md) for the
-full gate table and the machine-readable results files for exact metric values:
+full check table and the results files for exact metric values:
 [gladius.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json)
 and
 [gladius_scaled.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_scaled.json).

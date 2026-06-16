@@ -5,7 +5,7 @@ evidence column states the current public scope.
 
 For a side-by-side decision table, see [Comparing Estimators](estimators/comparison.md).
 
-| Estimator | Best for | Evidence scope |
+| Estimator | Best for | Scope |
 | --- | --- | --- |
 | [NFXP](estimators/nfxp.md) | Exact tabular dynamic discrete choice. | Synthetic tabular simulation. |
 | [CCP](estimators/ccp.md) | Hotz-Miller and NPL-style tabular DDC. | Synthetic tabular simulation with support conditions. |

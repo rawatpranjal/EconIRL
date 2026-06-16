@@ -47,8 +47,8 @@ def test_estimator_simulation_study_pages_have_study_openings() -> None:
     phrases but kept two concrete requirements that are verifiable and
     meaningful:
 
-    1. A link to ``validation/results/`` — the machine-readable result file
-       that backs every numerical claim.
+    1. A link to ``validation/results/`` — the result file that backs every
+       numerical claim.
     2. A ``PYTHONPATH=src:.`` reproduce command — so the result can be re-run
        from source.
 
@@ -102,6 +102,24 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         "frozen policy": re.compile(r"\bfrozen\b", flags=re.IGNORECASE),
         "teaching arc": re.compile(r"\bteaching arc\b", flags=re.IGNORECASE),
         "through-line": re.compile(r"\bthrough-?line\b", flags=re.IGNORECASE),
+        # Style-guide bans not previously enforced (roadmap D1, 2026-06-15).
+        # \s+ (not a literal space) so a phrase split across a line break is
+        # still caught — Markdown collapses the newline when rendering.
+        "machine-readable": re.compile(
+            r"\bmachine[-\s]readable\b", flags=re.IGNORECASE
+        ),
+        "convergence flag": re.compile(
+            r"\bconverg(?:ed|ence)\s+flag\b", flags=re.IGNORECASE
+        ),
+        "summary exposes": re.compile(
+            r"\bsummary\s+exposes\b", flags=re.IGNORECASE
+        ),
+        "fitted summary reports": re.compile(
+            r"\bfitted\s+summary\s+reports\b", flags=re.IGNORECASE
+        ),
+        "evidence scope": re.compile(
+            r"\bevidence\s+scope\b", flags=re.IGNORECASE
+        ),
     }
 
     offenders = []
@@ -364,6 +382,7 @@ def _public_doc_sources() -> list[Path]:
         DOCS / "index.rst",
         DOCS / "estimators.md",
         DOCS / "references.md",
+        DOCS / "api" / "index.rst",
         DOCS / "estimators",
         DOCS / "user_guide",
         DOCS / "simulation_studies",

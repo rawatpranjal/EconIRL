@@ -14,9 +14,10 @@ known, both recovery and failure are measurable.
 | [Abstract MDP 4: Interaction effect](abstract_mdp_4_nonlinear.md) | A reward that multiplies two features the estimators do not model. | 24 states x 3 actions | All. | What an omitted interaction costs: a small behavioral miss, a larger counterfactual one. |
 | [Direct optimization](direct_optimization.md) | Estimation under correct and misspecified rewards. | varies | MPEC, neural MPEC, GLADIUS. | How this family degrades under reward misspecification. |
 
-The findings in one line. Almost every estimator matches the choice
-probabilities. The differences show up in parameter recovery, in
-counterfactuals, and in compute cost.
+The findings in one line. On easy problems most estimators match the choice
+probabilities. On harder problems many do not, and the gap in behavior is the
+point. The differences also show up in parameter recovery, in counterfactuals,
+and in compute cost.
 
 ## Reading the tables
 
@@ -28,9 +29,9 @@ truth. Lower is better.
 
 Regret measures welfare lost when the recovered model is used in a changed
 environment. Type A shifts a payoff. Type B changes the dynamics. Type C
-penalizes an action. Structural estimators re-solve the model and adapt.
-Behavioral estimators keep their old policy, so their Type C regret is
-large.
+penalizes an action. Estimators that recover a transferable reward re-solve the
+model and adapt. Policy-only methods keep their old policy, so their Type C
+regret is large.
 
 Parameter recovery is reported only for structural estimators. IRL methods
 recover a reward that produces the same behavior but in a different

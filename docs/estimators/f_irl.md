@@ -51,15 +51,15 @@ print(summary.metadata["occupancy_l1"])
 
 f-IRL is reported on the paper-faithful state-marginal synthetic cell: 8 states,
 3 actions, state-only reward, deterministic transitions, and a fully specified
-data-generating process. The machine-readable results file records the reported
+data-generating process. The results file records the reported
 results and the action-dependent diagnostic cell. f-IRL also appears on the bus
 engine and gridworld pages of the [simulation studies](../simulation_studies/index.md).
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic tabular simulation. |
+| Scope | Synthetic tabular simulation. |
 | Primary cell | `f_irl_paper_state_marginal` (state marginal, state reward). |
-| Machine-readable results file | [f_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/f_irl.json). |
+| Results file | [f_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/f_irl.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Action-dependent DDC | Diagnostic negative control; fails reward-range check. |
 

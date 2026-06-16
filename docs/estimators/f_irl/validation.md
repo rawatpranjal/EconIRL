@@ -9,7 +9,7 @@ structural recovery evidence.
 
 The full result generator is
 [`run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/f_irl/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`f_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/f_irl.json).
 
 ```bash

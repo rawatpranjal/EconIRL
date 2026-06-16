@@ -16,9 +16,9 @@ starts. Run these checks before treating a result as structural evidence.
 
 ## Canonical Simulation Checks
 
-The machine-readable results file records these pre-estimation checks.
+The results file records these pre-estimation checks.
 See the [simulation study page](validation.md) for the generator script and
-results file.
+detailed results.
 
 | Check | Value | Status |
 | --- | ---: | --- |

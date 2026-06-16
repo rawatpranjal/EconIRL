@@ -14,7 +14,7 @@ reward feature basis. The true objects are held back for evaluation.
 
 The full result generator is
 [`run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/airl/run.py).
-It writes the machine-readable results file
+It writes the results file
 [`airl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/airl.json).
 
 ```bash

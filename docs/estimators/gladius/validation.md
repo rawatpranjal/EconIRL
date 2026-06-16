@@ -8,7 +8,7 @@ truth from the data-generating process.
 
 The full result generator is
 [`run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/gladius/run.py).
-It writes two machine-readable results files:
+It writes two results files:
 [`gladius.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json)
 (primary cell) and
 [`gladius_scaled.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_scaled.json)

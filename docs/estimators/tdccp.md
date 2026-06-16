@@ -60,16 +60,16 @@ cell: 81 states, 3 actions, two encoded state coordinates, and 6 reward
 parameters. The data-generating process is fully specified, so recovered
 parameters, policy, value function, Q function, and Type A, Type B, and Type C
 counterfactual outcomes are all compared against oracle objects. The
-machine-readable results file records the reported results. TD-CCP also
+results file records the reported results. TD-CCP also
 appears on the [bus engine](../simulation_studies/rust_bus.md) and
 [abstract MDP sanity](../simulation_studies/abstract_mdp_1_sanity.md) pages of
 the simulation studies.
 
 | Evidence | Current state |
 | --- | --- |
-| Evidence scope | Synthetic tabular simulation with encoded state features. |
+| Scope | Synthetic tabular simulation with encoded state features. |
 | Primary cell | `shapeshifter_encoded_state_locally_robust`. |
-| Machine-readable results file | [tdccp.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json). |
+| Results file | [tdccp.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json). |
 | Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
 | Public example | Uses `TDCCP` with `utility="linear_cost"` on the bundled bus dataset. |
 

@@ -6,7 +6,7 @@ which re-solves oracle counterfactuals and compares them with policies implied
 by the recovered SEES structural object.
 
 See [Simulation Study](validation.md) for the generator, links to results files, and
-hard gate definitions.
+hard check definitions.
 
 ## Counterfactual Families
 

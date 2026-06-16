@@ -43,9 +43,9 @@ constraint carries it.
 Standard errors use the implicit-score identity stated on the overview page: at
 the constrained optimum, per-observation score contributions are computed from
 $\partial V / \partial \theta$ after convergence, and the robust covariance is
-their outer product. The fitted summary exposes
-`metadata["final_constraint_violation"]`; gate on it alongside the convergence
-flag, since a high likelihood with a violated constraint is not a solution.
+their outer product. After fitting, the summary provides
+`metadata["final_constraint_violation"]`; check it alongside the convergence
+indicator, since a high likelihood with a violated constraint is not a solution.
 
 The estimator lives in `econirl.estimation.mpec`. Use `MPECConfig(solver="sqp")`
 for the recommended SLSQP path. The `augmented_lagrangian` solver is retained for

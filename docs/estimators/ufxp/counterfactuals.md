@@ -29,7 +29,7 @@ oracle objects for three intervention families:
 On the canonical synthetic cell the welfare regret of UFXP's counterfactual
 policies is below 0.0003 in every family (Type A 0.00016, Type B 0.00030,
 Type C 0.00008; see the
-[machine-readable results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ufxp.json)
+[results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ufxp.json)
 and the [Simulation Study](validation.md) page). Because the recovered reward
 uses the same linear feature parameterization as the truth, it re-solves
 cleanly under all three intervention types.
