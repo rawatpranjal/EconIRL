@@ -1,0 +1,161 @@
+{
+  "meta": {
+    "title": "Serialized content with hidden reader segments",
+    "date": "2026-06-16",
+    "package_version": "0.0.6",
+    "n_states": 61,
+    "n_actions": 3,
+    "exit_action": 2,
+    "absorbing_state": 60,
+    "num_segments": 2,
+    "num_chapters": 5,
+    "n_individuals": 800,
+    "n_periods": 16,
+    "n_trajectories": 3200,
+    "n_observations": 12368,
+    "true_priors": [
+      0.47999998927116394,
+      0.5199999809265137
+    ],
+    "segment_names": [
+      "binge reader",
+      "patient reader"
+    ],
+    "action_names": [
+      "pay",
+      "wait",
+      "exit"
+    ],
+    "true_segment_gap_tv": 0.3177203726509636,
+    "diagnostics": {
+      "feature_rank": 20,
+      "num_features": 20
+    },
+    "discount_factor": 0.92,
+    "scale_parameter": 0.85,
+    "dgp_kw": {
+      "num_chapters": 5,
+      "wait_bins": 3,
+      "price_levels": 2,
+      "quality_levels": 2,
+      "books_per_user": 4,
+      "discount_factor": 0.92,
+      "scale_parameter": 0.85,
+      "seed": 4506
+    },
+    "sim": {
+      "n_individuals": 800,
+      "n_periods": 16,
+      "seed": 4507
+    }
+  },
+  "headline": {
+    "name": "AIRL-Het",
+    "error": null,
+    "assignment_accuracy": 0.895,
+    "prior_l1": 0.043477813304278856,
+    "aligned_priors": [
+      0.5017389108244645,
+      0.4982610891755354
+    ],
+    "segment_reward_nrmse": [
+      0.24404583135758476,
+      0.2650011487814588
+    ],
+    "max_segment_reward_nrmse": 0.2650011487814588,
+    "segment_policy_tv": [
+      0.038262095879778274,
+      0.04894484076071394
+    ],
+    "max_segment_policy_tv": 0.04894484076071394,
+    "segment_value_nrmse": [
+      0.09269394540489886,
+      0.14197337719868644
+    ],
+    "pooled_policy_tv": 0.027690395469897766,
+    "confusion": [
+      [
+        4146,
+        1200,
+        301
+      ],
+      [
+        1572,
+        2100,
+        522
+      ],
+      [
+        791,
+        801,
+        935
+      ]
+    ],
+    "confusion_accuracy": 0.580611254851229,
+    "confusion_ceiling_accuracy": 0.5692917205692108,
+    "permutation": [
+      1,
+      0
+    ],
+    "runtime": 23.01832604408264,
+    "converged": true,
+    "em_iterations": 2
+  },
+  "baselines": [
+    {
+      "name": "BC",
+      "family": "behavioral",
+      "recovers_segments": false,
+      "error": null,
+      "pooled_policy_tv": 0.05407686963015726,
+      "segment_policy_tv": [
+        0.1794351444854537,
+        0.14656327709668523
+      ],
+      "max_segment_policy_tv": 0.1794351444854537,
+      "runtime": 0.007771968841552734,
+      "converged": true
+    },
+    {
+      "name": "Pooled-AIRL",
+      "family": "behavioral",
+      "recovers_segments": false,
+      "error": null,
+      "pooled_policy_tv": 0.1812128518822751,
+      "segment_policy_tv": [
+        0.32362926055055685,
+        0.18867579040861868
+      ],
+      "max_segment_policy_tv": 0.32362926055055685,
+      "runtime": 2.079261064529419,
+      "converged": true
+    },
+    {
+      "name": "NFXP",
+      "family": "structural",
+      "recovers_segments": false,
+      "error": null,
+      "pooled_policy_tv": 0.03995973622959746,
+      "segment_policy_tv": [
+        0.17672151902479993,
+        0.1447101190061272
+      ],
+      "max_segment_policy_tv": 0.17672151902479993,
+      "runtime": 3.207839012145996,
+      "converged": true
+    },
+    {
+      "name": "CCP",
+      "family": "structural",
+      "recovers_segments": false,
+      "error": null,
+      "pooled_policy_tv": 0.040578553701047244,
+      "segment_policy_tv": [
+        0.17720153286516888,
+        0.14486326508970274
+      ],
+      "max_segment_policy_tv": 0.17720153286516888,
+      "runtime": 2.0249757766723633,
+      "converged": true
+    }
+  ]
+}
