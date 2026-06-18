@@ -62,7 +62,7 @@ parameters, policy, value function, Q function, and Type A, Type B, and Type C
 counterfactual outcomes are all compared against oracle objects. The
 results file records the reported results. TD-CCP also
 appears on the [bus engine](../simulation_studies/rust_bus.md) and
-[abstract MDP sanity](../simulation_studies/abstract_mdp_1_sanity.md) pages of
+[taxi gridworld](../simulation_studies/taxi_gridworld.md) pages of
 the simulation studies.
 
 | Evidence | Current state |

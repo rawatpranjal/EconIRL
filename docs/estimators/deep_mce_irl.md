@@ -74,7 +74,6 @@ the rest of the IRL roster.
 - [Pre-Estimation Checks](deep_mce_irl/pre_estimation.md)
 - [Simulation Study](deep_mce_irl/validation.md)
 - [Counterfactuals](deep_mce_irl/counterfactuals.md)
-- [Abstract MDP Example](deep_mce_irl/abstract_mdp.md)
 
 ```{toctree}
 :hidden:
@@ -85,5 +84,4 @@ deep_mce_irl/under_the_hood
 deep_mce_irl/pre_estimation
 deep_mce_irl/validation
 deep_mce_irl/counterfactuals
-deep_mce_irl/abstract_mdp
 ```

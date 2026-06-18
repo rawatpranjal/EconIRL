@@ -2,8 +2,7 @@
 
 Generates ``validation/results/sim_rust_bus.json`` and renders
 ``docs/simulation_studies/rust_bus.md`` from it via the shared harness
-(``validation/benchmark/harness.py``), inheriting the honesty contract of
-``scripts/quick_all_estimators.py``: raw per-replication facts, page as a pure
+(``validation/benchmark/harness.py``): raw per-replication facts, page as a pure
 function of the JSON, crashes first class, no fabricated metrics.
 
 Usage:

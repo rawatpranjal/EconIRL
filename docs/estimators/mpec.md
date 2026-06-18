@@ -177,8 +177,11 @@ data-generating process. The simulation cell has known rewards, transitions,
 policies, values, Q functions, and Type A, Type B, and Type C counterfactual
 oracles. The result file records these numbers. MPEC also runs on the
 [bus engine](../simulation_studies/rust_bus.md),
-[taxi gridworld](../simulation_studies/taxi_gridworld.md), and
-[abstract MDP](../simulation_studies/abstract_mdp_1_sanity.md) simulation
+[taxi gridworld](../simulation_studies/taxi_gridworld.md),
+[route choice](../simulation_studies/route_choice.md),
+[stockpiling](../simulation_studies/stockpiling.md),
+[fleet maintenance](../simulation_studies/fleet_maintenance.md), and
+[vehicle scrappage](../simulation_studies/vehicle_scrappage.md)
 study pages alongside the rest of the structural roster. The
 [direct optimization study](../simulation_studies/direct_optimization.md)
 compares the linear MPEC against its neural sibling and a model-free baseline. It
