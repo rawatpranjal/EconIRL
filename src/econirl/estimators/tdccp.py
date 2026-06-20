@@ -393,7 +393,32 @@ class TDCCP:
         return self
 
     def _build_transition_tensor(self, keep_transitions: np.ndarray) -> jnp.ndarray:
-        """Build full transition tensor for both actions."""
+        """Build full transition tensor for both actions.
+
+        Parameters
+        ----------
+        keep_transitions : numpy.ndarray
+            Either a transition matrix for action=0 (keep) of shape
+            (n_states, n_states), or a pre-built full tensor of shape
+            (n_actions, n_states, n_states).  When the 3-D form is supplied
+            it is validated and returned unchanged, allowing callers to pass
+            an arbitrary multi-action transition tensor directly.
+
+        Returns
+        -------
+        jnp.ndarray
+            Transition tensor of shape (n_actions, n_states, n_states).
+        """
+        keep_transitions = np.asarray(keep_transitions, dtype=np.float32)
+        if keep_transitions.ndim == 3:
+            expected_shape = (self.n_actions, self.n_states, self.n_states)
+            if keep_transitions.shape != expected_shape:
+                raise ValueError(
+                    "3D transitions must have shape "
+                    f"{expected_shape}, got {keep_transitions.shape}"
+                )
+            return jnp.array(keep_transitions)
+
         n = self.n_states
         transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
         transitions[0] = np.asarray(keep_transitions, dtype=np.float32)
