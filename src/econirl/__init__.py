@@ -47,7 +47,7 @@ Legacy API (deprecated, for backward compatibility):
     >>> print(result.summary())
 """
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 
 # Core types
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
@@ -67,6 +67,7 @@ from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES,
 from econirl.estimators import GLADIUS, NeuralGLADIUS
 from econirl.estimators import AIRL, NeuralAIRL
 from econirl.estimation import IQLearnEstimator as IQLearn
+from econirl.estimation import MPEC
 from econirl.estimators import MCEIRLNeural
 from econirl.estimators import NeuralUFXP
 
@@ -110,6 +111,7 @@ __all__ = [
     "SEES",
     "TDCCP",
     "UFXP",
+    "MPEC",
     "GLADIUS",
     "AIRL",
     "IQLearn",

@@ -397,6 +397,7 @@ class TestGCLSklearnAPI:
 class TestGCLComparison:
     """Compare GCL with other estimators."""
 
+    @pytest.mark.slow
     def test_gcl_vs_mce_irl_same_data(self):
         """Test that GCL and MCE IRL both run on the same data.
 
