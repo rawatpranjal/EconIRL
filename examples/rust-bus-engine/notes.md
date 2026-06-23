@@ -1,4 +1,4 @@
-# Rust (1987) Bus Engine Replacement — Replication Notes
+# Rust (1987) Bus Engine Replacement - Replication Notes
 
 ## Paper
 
@@ -12,10 +12,10 @@ Harold Zurcher, superintendent of the Madison Metropolitan Bus Company, observes
 
 - **Source**: Original NFXP data files (g870.asc, rt50.asc, t8h203.asc, a530875.asc)
 - **162 buses** across 8 groups (we have Groups 1-4 = 104 buses, 8,260 obs)
-- **Group 1**: Grumman 870 (15 buses, acquired 1983) — newer, low mileage
+- **Group 1**: Grumman 870 (15 buses, acquired 1983), newer, low mileage
 - **Group 2**: Chance RT-50 (4 buses, acquired 1981)
-- **Group 3**: GMC T8H203 (48 buses, acquired 1979) — 27 replacements
-- **Group 4**: GMC A5308 (37 buses, acquired 1975) — 33 replacements, highest mileage
+- **Group 3**: GMC T8H203 (48 buses, acquired 1979), 27 replacements
+- **Group 4**: GMC A5308 (37 buses, acquired 1975), 33 replacements, highest mileage
 - Groups 1 & 2 have **zero replacements** (newer buses, shorter observation window)
 - Rust pooled Groups 1,2,3 together and estimated Group 4 separately (p.1018)
 
@@ -49,7 +49,7 @@ The analytical gradient uses the implicit function theorem:
 ```
 (I - beta * P_pi) * dV/dtheta = sum_a pi(a|s) * dphi(s,a)/dtheta
 ```
-One n-by-n linear solve per parameter — no numerical finite differences needed.
+One n-by-n linear solve per parameter, no numerical finite differences needed.
 
 ## Results vs Paper (Table IX)
 
@@ -101,4 +101,4 @@ Output includes: data summary, transition estimates, NFXP results with standard 
 - Rust, J. (2000). "NFXP Manual, Version 6." editorialexpress.com/jrust/nfxp.pdf
 - Iskhakov et al. (2016). "Comment on Constrained Optimization Approaches." *Econometrica* 84(1).
 - Aguirregabiria, V. & Mira, P. (2002). "Swapping the Nested Fixed Point Algorithm." *Econometrica* 70(4).
-- OpenSourceEconomics/ruspy — Python reference implementation of NFXP
+- OpenSourceEconomics/ruspy, Python reference implementation of NFXP

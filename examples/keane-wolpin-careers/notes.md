@@ -1,4 +1,4 @@
-# Keane & Wolpin (1997) Career Decisions — Replication Notes
+# Keane & Wolpin (1997) Career Decisions - Replication Notes
 
 ## Paper
 
@@ -72,4 +72,4 @@ python examples/keane-wolpin-careers/replicate.py
 - Keane & Wolpin (1997). "The Career Decisions of Young Men." JPE 105(3).
 - Keane & Wolpin (1994). "Solution and Estimation of DCDP Models." REStat 76(4).
 - Aguirregabiria & Mira (2002). "Swapping the Nested Fixed Point Algorithm." Econometrica 70(4).
-- respy package (OpenSourceEconomics) — Python reference for KW estimation
+- respy package (OpenSourceEconomics), Python reference for KW estimation

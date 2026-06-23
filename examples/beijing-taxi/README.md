@@ -4,7 +4,7 @@ Estimates taxi driver preferences from real Beijing GPS data using inverse reinf
 
 ## Data
 
-Uses the [T-Drive dataset](https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/) — 10,357 taxi GPS trajectories from Beijing (Feb 2008). Raw data should be in `data/raw/tdrive/`.
+Uses the [T-Drive dataset](https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/), 10,357 taxi GPS trajectories from Beijing (Feb 2008). Raw data should be in `data/raw/tdrive/`.
 
 ## Pipeline
 

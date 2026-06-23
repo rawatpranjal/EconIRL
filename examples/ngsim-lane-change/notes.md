@@ -1,4 +1,4 @@
-# NGSIM US-101 Lane-Change IRL — Replication Notes
+# NGSIM US-101 Lane-Change IRL - Replication Notes
 
 ## Dataset
 
@@ -9,7 +9,7 @@
 
 ## Problem Setup
 
-- **State**: (lane, speed_bin) — 5 lanes x 10 speed bins = **50 states**
+- **State**: (lane, speed_bin), 5 lanes x 10 speed bins = **50 states**
 - **Actions**: lane_left / stay / lane_right = **3 actions**
 - **Discount**: beta = 0.99
 - **Data used**: 500 vehicles, subsampled to 1Hz, ~79K observations

@@ -1,4 +1,4 @@
-# experiments/ — local research one-offs
+# experiments/ - local research one-offs
 
 One-off experiment and sweep drivers: the scripts you run to investigate a
 question, not the maintained tooling that builds the public docs. The home and
@@ -17,9 +17,9 @@ in `scripts/`.
 
 ## What does NOT belong here
 
-- `scripts/sim_*.py`, `quick_all_estimators.py` — those **generate public docs
+- `scripts/sim_*.py`, `quick_all_estimators.py` - those **generate public docs
   pages**, are maintained, and stay in `scripts/`.
-- `scripts/download_*` — data fetchers, also maintained tooling.
+- `scripts/download_*` - data fetchers, also maintained tooling.
 
 A one-off's result dump sits next to its driver here (both local). Published
 figures and tables are different: those flow through the RTD docs pipeline

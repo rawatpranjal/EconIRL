@@ -30,7 +30,7 @@ Values from the canonical synthetic run (see [Simulation Study](validation.md)):
 Concentrated panels are the pattern to watch. When most trajectories visit a
 narrow corridor of states (a gridworld walked corner to corner, a mileage
 process that rarely runs high), the choice-probability estimates at the edges
-are noisy or absent. The optimal weighting handles this gracefully — thin
-states are downweighted by their sample share rather than trusted — but no
+are noisy or absent. The optimal weighting handles this gracefully. Thin
+states are downweighted by their sample share rather than trusted. But no
 weighting can recover information the data never carried. If coverage is thin
 everywhere, prefer NFXP, which pools all observations through the likelihood.

@@ -15,7 +15,7 @@ difference of their choice-specific values. Those conditions involve the value
 function, which normally forces a solve per candidate. Bray's observation is
 that the conditions only ever use the value function through fixed linear
 functionals, and each such functional has a dual representation as a fixed
-point in the empirical choice probabilities alone — independent of the
+point in the empirical choice probabilities alone, independent of the
 parameters. Computing the duals once, before the search, removes the value
 function from the problem.
 

@@ -1,4 +1,4 @@
-# Taxi-Gridworld MCE IRL — Notes
+# Taxi-Gridworld MCE IRL - Notes
 
 ## Problem Setup
 - 10x10 grid, 100 states, 5 actions (Left/Right/Up/Down/Stay)
@@ -9,21 +9,21 @@
 ## Experiments
 
 ### R(s,a) In-Sample
-Both MCE IRL and NFXP converge but with different parameter magnitudes due to scale non-identification. MCE IRL finds small params (-0.06, 0.06, 0.03), NFXP finds huge params (81, 77, 48). The RATIOS differ too — this is because the gridworld with deterministic transitions has very weak identification for absolute parameter values.
+Both MCE IRL and NFXP converge but with different parameter magnitudes due to scale non-identification. MCE IRL finds small params (-0.06, 0.06, 0.03), NFXP finds huge params (81, 77, 48). The RATIOS differ too. This is because the gridworld with deterministic transitions has very weak identification for absolute parameter values.
 
 ### R(s,a) Transfer (deterministic → 10% stochastic)
-- NFXP: 82.5% optimal — transfers well despite crazy param magnitudes
-- MCE IRL: 7.1% optimal — poor transfer
+- NFXP: 82.5% optimal, transfers well despite crazy param magnitudes
+- MCE IRL: 7.1% optimal, poor transfer
 
 NFXP transfers better because its huge parameters make the policy very peaked (essentially deterministic), which happens to be near-optimal. MCE IRL's small parameters give a softer policy that degrades under perturbation.
 
 ### R(s) State-Only Features
 - MCE IRL recovers step_penalty=-0.67, distance_weight=2.40 (correct signs, LL=-28,815)
 - MaxEnt IRL recovers step_penalty=-94.6, distance_weight=49.9 (correct signs, LL=-28,553)
-- NFXP cannot directly estimate R(s) — the flow utility cancels in P(a|s)
+- NFXP cannot directly estimate R(s), the flow utility cancels in P(a|s)
 
 ### R(s) Transfer
-MCE IRL R(s) → stochastic grid: **54.5% optimal** — much better than R(s,a) transfer (7.1%)!
+MCE IRL R(s) → stochastic grid: **54.5% optimal**, much better than R(s,a) transfer (7.1%)!
 R(s) is more portable because it doesn't bake in dynamics-specific continuation values.
 
 ## Key Insight: Why MCE IRL Can Estimate R(s) But NFXP Can't (Easily)
@@ -32,13 +32,13 @@ R(s) is more portable because it doesn't bake in dynamics-specific continuation 
 ```
 dLL/dθ = Σ_t [P(s'|s_t,a_t) - P_π(s'|s_t)]ᵀ · (I - βP_π)⁻¹ · ∂R/∂θ
 ```
-The R(s) flow term cancels in P(a|s), but enters indirectly through V(s') via the Bellman recursion. Identification is **weak** — the signal goes through (I-βP_π)⁻¹ which is ill-conditioned when β→1.
+The R(s) flow term cancels in P(a|s), but enters indirectly through V(s') via the Bellman recursion. Identification is **weak**, the signal goes through (I-βP_π)⁻¹ which is ill-conditioned when β→1.
 
 ### MCE IRL gradient for R(s):
 ```
 ∇L = μ_D - μ_π = empirical state features - model-predicted state features
 ```
-State visitation d_π(s) depends DIRECTLY on R(s) — states with higher R are visited more. This gives a **direct identification channel** that NFXP lacks.
+State visitation d_π(s) depends DIRECTLY on R(s), states with higher R are visited more. This gives a **direct identification channel** that NFXP lacks.
 
 ### Summary: Two Identification Channels
 

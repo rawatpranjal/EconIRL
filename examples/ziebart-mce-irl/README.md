@@ -9,7 +9,7 @@ Replication of experiments from Ziebart et al. (2008, 2010) using the `econirl` 
 
 ## Scripts
 
-- `run_gridworld.py` — Main replication script. Runs MCE IRL and MaxEnt IRL on a gridworld, compares recovered rewards and policies.
+- `run_gridworld.py` - Main replication script. Runs MCE IRL and MaxEnt IRL on a gridworld, compares recovered rewards and policies.
 
 ## Usage
 

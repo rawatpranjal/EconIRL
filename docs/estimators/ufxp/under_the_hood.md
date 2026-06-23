@@ -45,7 +45,7 @@ w^\top V_P = \lambda^\top u_P,
 $$
 
 and the dual $\lambda$ depends only on $\hat{P}$, $\beta$, and the
-transitions — not on $\theta$. One matrix factorization of
+transitions, not on $\theta$. One matrix factorization of
 $(I - \beta F_P^\top)$, computed before the parameter search, removes the
 value function from the problem entirely. For linear utility every estimating
 equation is then affine in $\theta$, so the estimator is closed form.

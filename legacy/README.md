@@ -1,4 +1,4 @@
-# legacy/ — retired code and docs
+# legacy/ - retired code and docs
 
 Superseded or abandoned work, kept for reference but out of the active package.
 The home and this README are tracked so the convention is visible; the
@@ -12,7 +12,7 @@ The home and this README are tracked so the convention is visible; the
 
 ## What does NOT belong here
 
-- build output (`dist/`) — that is regenerated, leave it gitignored at the root.
+- build output (`dist/`) - that is regenerated, leave it gitignored at the root.
 - anything still imported or referenced. If it is live, it has a real home.
 
 Prefer deleting over hoarding. `legacy/` is for the few things genuinely worth
