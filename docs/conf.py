@@ -21,7 +21,6 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
-    "nbsphinx",
     "sphinx_copybutton",
     "myst_parser",
 ]
@@ -91,10 +90,6 @@ intersphinx_mapping = {
     "torch": ("https://pytorch.org/docs/stable/", None),
     "gymnasium": ("https://gymnasium.farama.org/", None),
 }
-
-# nbsphinx settings
-nbsphinx_execute = "never"  # Don't execute notebooks during build
-nbsphinx_allow_errors = True
 
 # MyST settings
 myst_enable_extensions = [
