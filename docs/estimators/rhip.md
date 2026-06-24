@@ -257,14 +257,15 @@ than the finite-horizon path here, which would invert the planning cost the
 horizon is meant to trade. For the full cross-estimator comparison, see the
 [high-dimensional route-choice simulation study](../simulation_studies/highdim_route_choice.md).
 
-How much the horizon is worth depends on the demonstrators. A companion study
-runs the same route-choice problem under noisy drivers and under near-rational
-drivers. The full stochastic planner ($H = \infty$) gives the lowest policy
-error in both, since it is the correctly-specified estimator. But under noise a
-short horizon carries 2.75 times its error, while under near-rational drivers it
-carries only 1.5 times. A long horizon is essential under noise and nearly
-pointless under near-rational drivers. See the
-[horizon-versus-noise simulation study](../simulation_studies/rhip_two_regime.md).
+The horizon is an identifiable behavioral parameter, not only a compute knob. A
+companion study draws demonstrations from a finite-lookahead planner with a true
+lookahead $h$, then fits RHIP across a sweep of horizons. The best-fitting
+horizon recovers the demonstrator's lookahead: the lowest-error horizon lands at
+$H = h$ and tracks $h$ as it changes, and both the myopic $H = 0$ and the fully
+stochastic $H = \infty$ ends are worse. An interior horizon is the better-
+specified model when the demonstrator plans neither one step nor infinitely far
+ahead. See the
+[horizon-recovery simulation study](../simulation_studies/rhip_lookahead.md).
 
 ## References
 
