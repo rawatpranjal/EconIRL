@@ -290,3 +290,22 @@ Implementation and reproduction:
 Studies:
 
 - [High-dimensional route choice](../simulation_studies/highdim_route_choice.md)
+- [Horizon recovery](../simulation_studies/rhip_lookahead.md)
+
+Pages:
+
+- [Quick Start](rhip/quick_start.md)
+- [Pre-Estimation Checks](rhip/pre_estimation.md)
+- [Simulation Study](rhip/validation.md)
+- [Counterfactuals](rhip/counterfactuals.md)
+- [Route Choice Example](rhip/route_choice.md)
+
+```{toctree}
+:hidden:
+
+rhip/quick_start
+rhip/pre_estimation
+rhip/validation
+rhip/counterfactuals
+rhip/route_choice
+```
