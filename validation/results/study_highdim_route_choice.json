@@ -1,0 +1,915 @@
+{
+  "meta": {
+    "title": "Simulation study: high-dimensional route choice on a road network",
+    "date": "2026-06-23",
+    "package_version": "0.0.7",
+    "cells": [
+      {
+        "cell_id": "route_highdim",
+        "label": "High-dimensional route choice (150 nodes, 4 actions)",
+        "description": "Synthetic route choice on a random geometric road network. ``road_network(num_nodes=150, num_actions=4, discount_factor=0.95, seed=0)``.",
+        "num_states": 150,
+        "num_actions": 4,
+        "discount_factor": 0.95,
+        "n_individuals": 400,
+        "n_periods": 40,
+        "seed": 42,
+        "n_replications": 2,
+        "param_block": true,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": false,
+        "figure": "highdim_route_choice_dgp.png",
+        "results_figure": "highdim_route_choice_results.png",
+        "parameter_names": [
+          "edge_cost",
+          "amenity",
+          "goal"
+        ],
+        "true_theta": [
+          1.0,
+          0.5,
+          1.0
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 24.567918213948225,
+          "contrast_rank": 3,
+          "contrast_condition_number": 28.959796479123803
+        },
+        "roster": [
+          {
+            "name": "RHIP-H0",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-H1",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-H3",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-Hinf",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "AIRL",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": false
+          },
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          }
+        ]
+      },
+      {
+        "cell_id": "route_highdim_75",
+        "label": "High-dimensional route choice (75 nodes, 4 actions)",
+        "description": "Synthetic route choice on a random geometric road network. ``road_network(num_nodes=75, num_actions=4, discount_factor=0.95, seed=0)``.",
+        "num_states": 75,
+        "num_actions": 4,
+        "discount_factor": 0.95,
+        "n_individuals": 400,
+        "n_periods": 40,
+        "seed": 42,
+        "n_replications": 2,
+        "param_block": false,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": true,
+        "figure": null,
+        "results_figure": null,
+        "parameter_names": [
+          "edge_cost",
+          "amenity",
+          "goal"
+        ],
+        "true_theta": [
+          1.0,
+          0.5,
+          1.0
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 18.458004697341778,
+          "contrast_rank": 3,
+          "contrast_condition_number": 23.170342179596165
+        },
+        "roster": [
+          {
+            "name": "RHIP-Hinf",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-H0",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          }
+        ]
+      }
+    ],
+    "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
+    "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
+    "excluded": [
+      {
+        "name": "IQ-Learn, f-IRL",
+        "reason": "not separately identified from choices on this problem; reward is only partially identified from behavior"
+      },
+      {
+        "name": "NeuralGLADIUS",
+        "reason": "model-free policy learner, coverage-fragile at this size; peripheral nodes go unvisited and its policy estimate degrades where the panel does not reach"
+      },
+      {
+        "name": "NNES, SEES, TD-CCP, UFXP",
+        "reason": "correct structural estimators but slower at 150 states; NFXP and CCP already cover the structural family"
+      }
+    ],
+    "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).",
+    "snippets": {
+      "RHIP-H0": "def _run_rhip_h0(env, panel):\n    return _run_rhip(env, panel, 0)\n",
+      "RHIP-H1": "def _run_rhip_h1(env, panel):\n    return _run_rhip(env, panel, 1)\n",
+      "RHIP-H3": "def _run_rhip_h3(env, panel):\n    return _run_rhip(env, panel, 3)\n",
+      "RHIP-Hinf": "def _run_rhip_hinf(env, panel):\n    return _run_rhip(env, panel, float(\"inf\"))\n",
+      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=_mce_config())\n    return est.estimate(panel, _action_reward(env), env.problem_spec,\n                        env.transition_matrices)\n",
+      "AIRL": "def _run_airl(env, panel):\n    from types import SimpleNamespace\n\n    from econirl.estimators.neural_airl import NeuralAIRL\n\n    ps = env.problem_spec\n    m = NeuralAIRL(\n        n_actions=int(env.num_actions),\n        discount=float(ps.discount_factor),\n        max_epochs=200,\n        verbose=False,\n    )\n    m.fit(\n        panel,\n        features=np.asarray(env.feature_matrix),\n        transitions=np.asarray(env.transition_matrices),\n    )\n    return SimpleNamespace(\n        parameters=None,\n        standard_errors=None,\n        policy=m.policy_,\n        value_function=getattr(m, \"value_\", None),\n        converged=bool(getattr(m, \"converged_\", True)),\n    )\n",
+      "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(\n        inner_solver=\"hybrid\", inner_tol=1e-10,\n        inner_max_iter=100_000, compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec,\n                        env.transition_matrices)\n",
+      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec,\n                        env.transition_matrices)\n",
+      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    # solver=\"sqp\" is the real constrained MLE; \"slsqp\" is a legacy alias for\n    # the augmented-Lagrangian penalty solver and does not check optimality.\n    est = MPECEstimator(\n        config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8,\n                          constraint_tol=1e-6),\n        compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec,\n                        env.transition_matrices)\n"
+    },
+    "diagnoses": {
+      "RHIP-H0": "Receding Horizon Inverse Planning at horizon zero. No soft backups run, so the policy is a softmax over the deterministic continuation value. This is the Max-Margin-Planning end of the spectrum: cheap, and the least robust to demonstrator noise.",
+      "RHIP-H1": "One soft Bellman backup over the deterministic tail. A middle ground between the deterministic and the fully stochastic planner.",
+      "RHIP-H3": "Three soft Bellman backups. Most of the accuracy of the full stochastic planner at a fraction of its planning cost, which is the receding-horizon tradeoff this study is built to show.",
+      "RHIP-Hinf": "The infinite-horizon endpoint delegates to MCE-IRL with the same config, so RHIP-Hinf and MCE-IRL are the same computation here. Their rows match by construction. This anchors the spectrum at the Max Causal Entropy end.",
+      "MCE-IRL": "Max Causal Entropy IRL with linear features. Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate. It is the H=inf endpoint of the RHIP spectrum.",
+      "AIRL": "Adversarial IRL. A model-free neural reward learner trained against a policy network. It reads the feature matrix and the panel, not the transition kernel. Capped at 200 epochs here for short compute.",
+      "NFXP": "Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum. All three parameters are identified from the edge-feature contrast.",
+      "CCP": "CCP uses a first-step nonparametric policy estimate to avoid the inner Bellman loop. One policy-iteration step corrects the first-stage bias.",
+      "MPEC": "Mathematical programming with equilibrium constraints. Uses solver='sqp' for real constrained MLE; the legacy 'slsqp' alias checks only Bellman feasibility. The constrained solve is the slowest of the structural family at this size."
+    },
+    "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
+  },
+  "records": [
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        1.9841876029968262,
+        0.4523526132106781,
+        1.226908802986145
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0955151111275935,
+      "value_rmse": 19.776434756724196,
+      "regret": {
+        "baseline": 0.05537662695715569,
+        "type_a": 0.057947730926285,
+        "type_b": 0.052729390026933366,
+        "type_c": 0.05933296812881243,
+        "transferred": true
+      },
+      "runtime": 7.6819748878479,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H1",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        1.8983129262924194,
+        0.4930177330970764,
+        1.28139066696167
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.07691045967624856,
+      "value_rmse": 18.50089893001467,
+      "regret": {
+        "baseline": 0.03893583093527094,
+        "type_a": 0.04160184608857685,
+        "type_b": 0.06153640093998784,
+        "type_c": 0.09433430310502834,
+        "transferred": true
+      },
+      "runtime": 7.052156209945679,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H3",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        1.0477837324142456,
+        0.4754222333431244,
+        1.1483728885650635
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.06424586068726086,
+      "value_rmse": 15.28252397349417,
+      "regret": {
+        "baseline": 0.02025083337297768,
+        "type_a": 0.01996769208669422,
+        "type_b": 0.01425992113966919,
+        "type_c": 0.019967981703537595,
+        "transferred": true
+      },
+      "runtime": 6.463706970214844,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        0.04505587901537927,
+        0.4615926784696814,
+        0.7615309687271278
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.034583407756581495,
+      "value_rmse": 3.407760855203238,
+      "regret": {
+        "baseline": 0.05023031778585337,
+        "type_a": 0.05427934875821538,
+        "type_b": 0.07893582828524748,
+        "type_c": 0.03056012693733033,
+        "transferred": true
+      },
+      "runtime": 6.43665623664856,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        0.04505587901537927,
+        0.4615926784696814,
+        0.7615309687271278
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.034583407756581495,
+      "value_rmse": 3.407760855203238,
+      "regret": {
+        "baseline": 0.05023031778585337,
+        "type_a": 0.05427934875821538,
+        "type_b": 0.07893582828524748,
+        "type_c": 0.03056012693733033,
+        "transferred": true
+      },
+      "runtime": 5.993846893310547,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.2830897175266634,
+      "value_rmse": 17.92073069518526,
+      "regret": {
+        "baseline": 5.868966052739385,
+        "type_a": 5.620677533191165,
+        "type_b": 3.5941411759802073,
+        "type_c": 49.27763298230254,
+        "transferred": false
+      },
+      "runtime": 59.51194500923157,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        1.2196206877932836,
+        0.5147151415610995,
+        0.9748328553702353
+      ],
+      "standard_errors": [
+        0.3023158609867096,
+        0.008469412103295326,
+        0.038555823266506195
+      ],
+      "policy_tv": 0.005953536012740203,
+      "value_rmse": 0.18399744358149497,
+      "regret": {
+        "baseline": 0.0030324253001303486,
+        "type_a": 0.0029100899724274066,
+        "type_b": 0.002224013583950751,
+        "type_c": 0.001766140723953838,
+        "transferred": true
+      },
+      "runtime": 3.0940909385681152,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        0.9156510829925537,
+        0.5050490498542786,
+        0.9075092077255249
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.03569183874764602,
+      "value_rmse": 1.1470372793200605,
+      "regret": {
+        "baseline": 0.005699492419860828,
+        "type_a": 0.005788209893693651,
+        "type_b": 0.005295785733587037,
+        "type_c": 0.004141648016620817,
+        "transferred": true
+      },
+      "runtime": 3.053413152694702,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_highdim",
+      "rep": 0,
+      "params": [
+        1.2196210622787476,
+        0.5147151350975037,
+        0.9748328924179077
+      ],
+      "standard_errors": [
+        0.3023158609867096,
+        0.008469412103295326,
+        0.038555823266506195
+      ],
+      "policy_tv": 0.005953537888323984,
+      "value_rmse": 0.18399687779170312,
+      "regret": {
+        "baseline": 0.0030324235905806506,
+        "type_a": 0.0029100883065194686,
+        "type_b": 0.002224014042604262,
+        "type_c": 0.0017661399036594631,
+        "transferred": true
+      },
+      "runtime": 0.3515939712524414,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        1.6992696523666382,
+        0.4587629437446594,
+        1.2294903993606567
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.09497957776651576,
+      "value_rmse": 19.290069690745376,
+      "regret": {
+        "baseline": 0.04840689941349532,
+        "type_a": 0.049970835905234594,
+        "type_b": 0.043799359010368355,
+        "type_c": 0.05627217635182631,
+        "transferred": true
+      },
+      "runtime": 7.347101926803589,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H1",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        1.6492143869400024,
+        0.4957176446914673,
+        1.285230040550232
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.07634166402543223,
+      "value_rmse": 18.171841645513386,
+      "regret": {
+        "baseline": 0.040425797767679655,
+        "type_a": 0.04238733367796521,
+        "type_b": 0.057225114950870425,
+        "type_c": 0.09913813019171201,
+        "transferred": true
+      },
+      "runtime": 7.118227243423462,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H3",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        0.8463990092277527,
+        0.4813300371170044,
+        1.1497173309326172
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.06372360464958497,
+      "value_rmse": 14.909074878066422,
+      "regret": {
+        "baseline": 0.02002204975019779,
+        "type_a": 0.01946416950417826,
+        "type_b": 0.01289572270698077,
+        "type_c": 0.021005722610582322,
+        "transferred": true
+      },
+      "runtime": 6.904489994049072,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        -0.15523235820660913,
+        0.46834990139147165,
+        0.7310740074639251
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.03746935781761409,
+      "value_rmse": 4.0613863814958675,
+      "regret": {
+        "baseline": 0.05708613941870924,
+        "type_a": 0.062015101939462004,
+        "type_b": 0.0921152962077079,
+        "type_c": 0.03438913739124141,
+        "transferred": true
+      },
+      "runtime": 6.168468952178955,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        -0.15523235820660913,
+        0.46834990139147165,
+        0.7310740074639251
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.03746935781761409,
+      "value_rmse": 4.0613863814958675,
+      "regret": {
+        "baseline": 0.05708613941870924,
+        "type_a": 0.062015101939462004,
+        "type_b": 0.0921152962077079,
+        "type_c": 0.03438913739124141,
+        "transferred": true
+      },
+      "runtime": 6.212192058563232,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "AIRL",
+      "family": "behavioral",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.29131415362486496,
+      "value_rmse": 18.86795396610287,
+      "regret": {
+        "baseline": 6.366466840940168,
+        "type_a": 6.148530627321641,
+        "type_b": 3.952755482457323,
+        "type_c": 50.384346305060056,
+        "transferred": false
+      },
+      "runtime": 106.62132978439331,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        0.9236684312623343,
+        0.511328498789632,
+        0.9514192717930938
+      ],
+      "standard_errors": [
+        0.2966919541358948,
+        0.00838803593069315,
+        0.03812309727072716
+      ],
+      "policy_tv": 0.006975694171447531,
+      "value_rmse": 0.753194432428324,
+      "regret": {
+        "baseline": 0.002502770557188338,
+        "type_a": 0.002497493169353091,
+        "type_b": 0.001978887071463336,
+        "type_c": 0.001751997257404799,
+        "transferred": true
+      },
+      "runtime": 1.8923649787902832,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        0.6772595643997192,
+        0.5023706555366516,
+        0.8949823975563049
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.03758710277924458,
+      "value_rmse": 1.5441701071161087,
+      "regret": {
+        "baseline": 0.006288612969429893,
+        "type_a": 0.006635733904986891,
+        "type_b": 0.00889329388605258,
+        "type_c": 0.0053502299125770605,
+        "transferred": true
+      },
+      "runtime": 1.655224084854126,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_highdim",
+      "rep": 1,
+      "params": [
+        0.923668622970581,
+        0.5113285183906555,
+        0.9514194130897522
+      ],
+      "standard_errors": [
+        0.29669198393821716,
+        0.008388033136725426,
+        0.03812309727072716
+      ],
+      "policy_tv": 0.006975675911229321,
+      "value_rmse": 0.7531923528209121,
+      "regret": {
+        "baseline": 0.002502766570187705,
+        "type_a": 0.002497488927412133,
+        "type_b": 0.001978881694453565,
+        "type_c": 0.0017519932103386726,
+        "transferred": true
+      },
+      "runtime": 0.3013949394226074,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "route_highdim_75",
+      "rep": 0,
+      "params": [
+        0.3402055463325399,
+        0.49423648555912136,
+        0.9508197630040435
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.013880510495571713,
+      "value_rmse": 1.501847608783737,
+      "regret": {
+        "baseline": 0.012660275744094477,
+        "type_a": 0.013411168822510165,
+        "type_b": 0.008703200156423976,
+        "type_c": 0.01900661299742479,
+        "transferred": true
+      },
+      "runtime": 4.368299961090088,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "route_highdim_75",
+      "rep": 0,
+      "params": [
+        0.23241427540779114,
+        0.48704880475997925,
+        1.235518217086792
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.09228804481880458,
+      "value_rmse": 16.30848102091515,
+      "regret": {
+        "baseline": 0.31300303133077634,
+        "type_a": 0.314504255089826,
+        "type_b": 0.04359864708794886,
+        "type_c": 0.04261286373412003,
+        "transferred": true
+      },
+      "runtime": 4.315417051315308,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_highdim_75",
+      "rep": 0,
+      "params": [
+        1.2734564167656885,
+        0.4890190244456765,
+        1.0104653992078287
+      ],
+      "standard_errors": [
+        0.20193712413311005,
+        0.009285405278205872,
+        0.024044115096330643
+      ],
+      "policy_tv": 0.005306617429311789,
+      "value_rmse": 0.6610510326213251,
+      "regret": {
+        "baseline": 0.0016077824912585478,
+        "type_a": 0.0017448282641819278,
+        "type_b": 0.0027046349892204066,
+        "type_c": 0.0023909177945197254,
+        "transferred": true
+      },
+      "runtime": 2.8303768634796143,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_highdim_75",
+      "rep": 0,
+      "params": [
+        0.3402055463325399,
+        0.49423648555912136,
+        0.9508197630040435
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.013880510495571713,
+      "value_rmse": 1.501847608783737,
+      "regret": {
+        "baseline": 0.012660275744094477,
+        "type_a": 0.013411168822510165,
+        "type_b": 0.008703200156423976,
+        "type_c": 0.01900661299742479,
+        "transferred": true
+      },
+      "runtime": 3.6796069145202637,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "route_highdim_75",
+      "rep": 1,
+      "params": [
+        0.31064567890450206,
+        0.5022470981734685,
+        0.9443484680670157
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01351217361483208,
+      "value_rmse": 1.7025128370829865,
+      "regret": {
+        "baseline": 0.010820121806608487,
+        "type_a": 0.011400479123362424,
+        "type_b": 0.007918674381688846,
+        "type_c": 0.01866109840520842,
+        "transferred": true
+      },
+      "runtime": 3.5966410636901855,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "route_highdim_75",
+      "rep": 1,
+      "params": [
+        0.6980104446411133,
+        0.47136199474334717,
+        1.234235405921936
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.09066542994014612,
+      "value_rmse": 17.247461851417,
+      "regret": {
+        "baseline": 0.27766684829746663,
+        "type_a": 0.28132861054941954,
+        "type_b": 0.050475150252378545,
+        "type_c": 0.04148689304350789,
+        "transferred": true
+      },
+      "runtime": 6.221400737762451,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_highdim_75",
+      "rep": 1,
+      "params": [
+        0.8305339521636357,
+        0.4968694711495564,
+        0.9589816273458213
+      ],
+      "standard_errors": [
+        0.19957973062992096,
+        0.009362451732158661,
+        0.023113030940294266
+      ],
+      "policy_tv": 0.006937577385559071,
+      "value_rmse": 0.6667439879429431,
+      "regret": {
+        "baseline": 0.0022766952102913195,
+        "type_a": 0.0026836552289579403,
+        "type_b": 0.0013224746543712075,
+        "type_c": 0.003061958897324574,
+        "transferred": true
+      },
+      "runtime": 2.081965923309326,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_highdim_75",
+      "rep": 1,
+      "params": [
+        0.31064567890450206,
+        0.5022470981734685,
+        0.9443484680670157
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01351217361483208,
+      "value_rmse": 1.7025128370829865,
+      "regret": {
+        "baseline": 0.010820121806608487,
+        "type_a": 0.011400479123362424,
+        "type_b": 0.007918674381688846,
+        "type_c": 0.01866109840520842,
+        "transferred": true
+      },
+      "runtime": 3.6169662475585938,
+      "converged": false,
+      "error": null
+    }
+  ]
+}
