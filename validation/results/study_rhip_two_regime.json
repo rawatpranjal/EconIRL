@@ -1,0 +1,729 @@
+{
+  "meta": {
+    "title": "Simulation study: RHIP planning horizon vs demonstrator noise",
+    "date": "2026-06-24",
+    "package_version": "0.0.7",
+    "cells": [
+      {
+        "cell_id": "rhip_noisy",
+        "label": "Route choice, noisy drivers (sigma=1.0, 25 nodes, 4 actions)",
+        "description": "Synthetic route choice on a 25-node random geometric road network. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, scale_parameter=1.0, seed=0)``. The demonstrator logit scale is sigma=1.0.",
+        "num_states": 25,
+        "num_actions": 4,
+        "discount_factor": 0.95,
+        "n_individuals": 200,
+        "n_periods": 35,
+        "seed": 42,
+        "n_replications": 2,
+        "param_block": true,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": false,
+        "figure": null,
+        "results_figure": null,
+        "parameter_names": [
+          "edge_cost",
+          "amenity",
+          "goal"
+        ],
+        "true_theta": [
+          1.0,
+          0.5,
+          1.0
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 13.407260420676721,
+          "contrast_rank": 3,
+          "contrast_condition_number": 7.653762356022703
+        },
+        "roster": [
+          {
+            "name": "RHIP-H0",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-H1",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-H3",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-Hinf",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          }
+        ]
+      },
+      {
+        "cell_id": "rhip_rational",
+        "label": "Route choice, near-rational drivers (sigma=0.1, 25 nodes, 4 actions)",
+        "description": "Synthetic route choice on a 25-node random geometric road network. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, scale_parameter=0.1, seed=0)``. The demonstrator logit scale is sigma=0.1.",
+        "num_states": 25,
+        "num_actions": 4,
+        "discount_factor": 0.95,
+        "n_individuals": 200,
+        "n_periods": 35,
+        "seed": 42,
+        "n_replications": 2,
+        "param_block": true,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": false,
+        "figure": null,
+        "results_figure": null,
+        "parameter_names": [
+          "edge_cost",
+          "amenity",
+          "goal"
+        ],
+        "true_theta": [
+          1.0,
+          0.5,
+          1.0
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 13.407260420676721,
+          "contrast_rank": 3,
+          "contrast_condition_number": 7.653762356022703
+        },
+        "roster": [
+          {
+            "name": "RHIP-H0",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-H1",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-H3",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "RHIP-Hinf",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          }
+        ]
+      }
+    ],
+    "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
+    "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
+    "excluded": [
+      {
+        "name": "IQ-Learn, f-IRL",
+        "reason": "not separately identified from choices on this problem; reward is only partially identified from behavior"
+      }
+    ],
+    "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).",
+    "snippets": {
+      "RHIP-H0": "def _run_rhip_h0(env, panel):\n    return _run_rhip(env, panel, 0)\n",
+      "RHIP-H1": "def _run_rhip_h1(env, panel):\n    return _run_rhip(env, panel, 1)\n",
+      "RHIP-H3": "def _run_rhip_h3(env, panel):\n    return _run_rhip(env, panel, 3)\n",
+      "RHIP-Hinf": "def _run_rhip_hinf(env, panel):\n    return _run_rhip(env, panel, float(\"inf\"))\n",
+      "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(\n        inner_solver=\"hybrid\", inner_tol=1e-10,\n        inner_max_iter=100_000, compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec,\n                        env.transition_matrices)\n"
+    },
+    "diagnoses": {
+      "RHIP-H0": "Receding Horizon Inverse Planning at horizon zero, the Max-Margin-Planning end. No soft backups run, so the policy is a softmax over the deterministic continuation value. Cheap, and the least robust to demonstrator noise.",
+      "RHIP-H1": "One soft Bellman backup over the deterministic tail. A middle ground between the deterministic and the fully stochastic planner.",
+      "RHIP-H3": "Three soft Bellman backups. Recovers most of the accuracy of the full stochastic planner at a fraction of its backups.",
+      "RHIP-Hinf": "The infinite-horizon endpoint delegates to MCE-IRL with the same config, so it is the same computation as Max Causal Entropy IRL. This anchors the stochastic end of the spectrum.",
+      "NFXP": "Full-solution maximum likelihood with a nested Bellman fixed point. It is told the logit scale, so it recovers the reward and sets the lowest policy total variation reachable in each regime, the recoverable floor."
+    },
+    "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
+  },
+  "records": [
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 0,
+      "params": [
+        1.8371341228485107,
+        0.5252471566200256,
+        1.3120924234390259
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.06974418535254347,
+      "value_rmse": 27.46583144487247,
+      "regret": {
+        "baseline": 0.1520786253236953,
+        "type_a": 0.11696817098554627,
+        "type_b": 0.28028796589254024,
+        "type_c": 0.17094436450726327,
+        "transferred": true
+      },
+      "runtime": 8.037179946899414,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H1",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 0,
+      "params": [
+        1.4375531673431396,
+        0.49510276317596436,
+        1.2335238456726074
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0581697451481801,
+      "value_rmse": 25.19802077212558,
+      "regret": {
+        "baseline": 0.112216137439899,
+        "type_a": 0.07753131950190413,
+        "type_b": 0.15976061023818225,
+        "type_c": 0.11649732868533982,
+        "transferred": true
+      },
+      "runtime": 7.475129127502441,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H3",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 0,
+      "params": [
+        1.1840680837631226,
+        0.42182859778404236,
+        1.0390998125076294
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.04020813091523394,
+      "value_rmse": 20.524227020067617,
+      "regret": {
+        "baseline": 0.07513972033582994,
+        "type_a": 0.047206673972555346,
+        "type_b": 0.0602900586081726,
+        "type_c": 0.03915705485792523,
+        "transferred": true
+      },
+      "runtime": 5.800835132598877,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 0,
+      "params": [
+        1.011982345878602,
+        0.4288861623867755,
+        0.820894060975499
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.029217046012204602,
+      "value_rmse": 3.0504092805942986,
+      "regret": {
+        "baseline": 0.024307979518500385,
+        "type_a": 0.022597312412735913,
+        "type_b": 0.08395850892461851,
+        "type_c": 0.09493955100646113,
+        "transferred": true
+      },
+      "runtime": 5.039731979370117,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "rhip_noisy",
+      "rep": 0,
+      "params": [
+        1.12262348702863,
+        0.49670513006979655,
+        0.9932613402875569
+      ],
+      "standard_errors": [
+        0.16129013895988464,
+        0.025753702968358994,
+        0.051198456436395645
+      ],
+      "policy_tv": 0.0035779616535840364,
+      "value_rmse": 0.10000356118773925,
+      "regret": {
+        "baseline": 0.0008198545459641464,
+        "type_a": 0.0007828848656283309,
+        "type_b": 0.0010239300516892735,
+        "type_c": 0.0011456925681538638,
+        "transferred": true
+      },
+      "runtime": 3.9293649196624756,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 1,
+      "params": [
+        1.977550983428955,
+        0.5103102326393127,
+        1.224581241607666
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.08344449587379689,
+      "value_rmse": 26.06329682546288,
+      "regret": {
+        "baseline": 0.12303017826142308,
+        "type_a": 0.09952506878973066,
+        "type_b": 0.19284956173458595,
+        "type_c": 0.08886550562443615,
+        "transferred": true
+      },
+      "runtime": 7.223138809204102,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H1",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 1,
+      "params": [
+        1.5252236127853394,
+        0.5301457643508911,
+        1.2585629224777222
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0631280319381608,
+      "value_rmse": 25.14587970474894,
+      "regret": {
+        "baseline": 0.09472726320943894,
+        "type_a": 0.07048535093384936,
+        "type_b": 0.1775698402702199,
+        "type_c": 0.10658667755695085,
+        "transferred": true
+      },
+      "runtime": 6.917967796325684,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H3",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 1,
+      "params": [
+        1.1775200366973877,
+        0.4801003932952881,
+        1.129698395729065
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.030207025204484105,
+      "value_rmse": 21.343060072874597,
+      "regret": {
+        "baseline": 0.05852366634078748,
+        "type_a": 0.036981031254534516,
+        "type_b": 0.059755511430811564,
+        "type_c": 0.04051145331524984,
+        "transferred": true
+      },
+      "runtime": 5.764037847518921,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "rhip_noisy",
+      "rep": 1,
+      "params": [
+        0.9539490961091196,
+        0.475250708001445,
+        0.851690376869677
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.02641597223044786,
+      "value_rmse": 3.0479749891633476,
+      "regret": {
+        "baseline": 0.04354342312378533,
+        "type_a": 0.03109407569595643,
+        "type_b": 0.05711272696032745,
+        "type_c": 0.09638293415439972,
+        "transferred": true
+      },
+      "runtime": 4.0053229331970215,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "rhip_noisy",
+      "rep": 1,
+      "params": [
+        1.240633463058755,
+        0.5190725010417877,
+        1.0046820036270532
+      ],
+      "standard_errors": [
+        0.17322002351284027,
+        0.024746624752879143,
+        0.04949481412768364
+      ],
+      "policy_tv": 0.00988869627208555,
+      "value_rmse": 0.2830818748360424,
+      "regret": {
+        "baseline": 0.00805000863494402,
+        "type_a": 0.005467419252939839,
+        "type_b": 0.0076977838557182226,
+        "type_c": 0.003933997615906076,
+        "transferred": true
+      },
+      "runtime": 2.7419819831848145,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 0,
+      "params": [
+        0.9691962003707886,
+        0.42369142174720764,
+        0.8806540369987488
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.031796696590173014,
+      "value_rmse": 1.1916430021152689,
+      "regret": {
+        "baseline": 0.022039807859673535,
+        "type_a": 0.013185751502948932,
+        "type_b": 0.0010790124838295167,
+        "type_c": 0.023630921110021835,
+        "transferred": true
+      },
+      "runtime": 5.081605911254883,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H1",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 0,
+      "params": [
+        0.7983951568603516,
+        0.4352935254573822,
+        0.9109969139099121
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.023916865651227203,
+      "value_rmse": 1.0493623531455027,
+      "regret": {
+        "baseline": 0.025544391815094124,
+        "type_a": 0.018774776829843152,
+        "type_b": 0.00127771734571886,
+        "type_c": 0.027854383723089057,
+        "transferred": true
+      },
+      "runtime": 6.937838077545166,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H3",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 0,
+      "params": [
+        0.8467339277267456,
+        0.4109848439693451,
+        0.8490373492240906
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.026535035953799548,
+      "value_rmse": 1.5961565213790345,
+      "regret": {
+        "baseline": 0.029072215513438967,
+        "type_a": 0.024977644804707932,
+        "type_b": 0.0018920955310989882,
+        "type_c": 0.0294252859638324,
+        "transferred": true
+      },
+      "runtime": 4.324412822723389,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 0,
+      "params": [
+        0.8986321906042289,
+        0.42934043239363623,
+        0.8665873472679783
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0213441328652889,
+      "value_rmse": 1.6780454427896763,
+      "regret": {
+        "baseline": 0.01218403870323363,
+        "type_a": 0.013341167754943947,
+        "type_b": 0.0010528652139575622,
+        "type_c": 0.022664883265547883,
+        "transferred": true
+      },
+      "runtime": 4.410284996032715,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "rhip_rational",
+      "rep": 0,
+      "params": [
+        1.0451896301107861,
+        0.4992458557016374,
+        1.002070450048044
+      ],
+      "standard_errors": [
+        0.053291238844394684,
+        0.012589242309331894,
+        0.0289202518761158
+      ],
+      "policy_tv": 0.002514726402522982,
+      "value_rmse": 0.11343921360618217,
+      "regret": {
+        "baseline": 0.00022454627951616477,
+        "type_a": 0.00017115265951245657,
+        "type_b": 3.896855427246866e-05,
+        "type_c": 0.00034709271144464166,
+        "transferred": true
+      },
+      "runtime": 3.7995638847351074,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H0",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 1,
+      "params": [
+        0.7970197200775146,
+        0.409304678440094,
+        0.8550294637680054
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.03626644787540078,
+      "value_rmse": 1.528625010990565,
+      "regret": {
+        "baseline": 0.03590171225603091,
+        "type_a": 0.03055636119314192,
+        "type_b": 0.002308971390245517,
+        "type_c": 0.033385090758129475,
+        "transferred": true
+      },
+      "runtime": 7.142053842544556,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H1",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 1,
+      "params": [
+        0.7326624989509583,
+        0.430098295211792,
+        0.8980857729911804
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.025596800567696275,
+      "value_rmse": 1.1849591534028712,
+      "regret": {
+        "baseline": 0.03063732459753173,
+        "type_a": 0.02757560583876581,
+        "type_b": 0.002087897707279371,
+        "type_c": 0.03315306467668458,
+        "transferred": true
+      },
+      "runtime": 6.993561744689941,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-H3",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 1,
+      "params": [
+        0.8588470220565796,
+        0.41631194949150085,
+        0.8591667413711548
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.024902229615213295,
+      "value_rmse": 1.4850970699960233,
+      "regret": {
+        "baseline": 0.025701083067816998,
+        "type_a": 0.02146357331714684,
+        "type_b": 0.0015622425537464208,
+        "type_c": 0.02757679547937472,
+        "transferred": true
+      },
+      "runtime": 4.338407278060913,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "RHIP-Hinf",
+      "family": "behavioral",
+      "cell": "rhip_rational",
+      "rep": 1,
+      "params": [
+        0.8808657101828126,
+        0.4200795294083587,
+        0.8431220726336732
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.02386166326443524,
+      "value_rmse": 2.03503147654121,
+      "regret": {
+        "baseline": 0.01523529690137608,
+        "type_a": 0.017852549247874272,
+        "type_b": 0.0016249589564741455,
+        "type_c": 0.024731645294622868,
+        "transferred": true
+      },
+      "runtime": 4.522225856781006,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "rhip_rational",
+      "rep": 1,
+      "params": [
+        1.0287117640060495,
+        0.488516536612343,
+        0.9778313743806384
+      ],
+      "standard_errors": [
+        0.05311225727200508,
+        0.011501074768602848,
+        0.02658971957862377
+      ],
+      "policy_tv": 0.003790808965136471,
+      "value_rmse": 0.22916341443754398,
+      "regret": {
+        "baseline": 0.00018817182328998504,
+        "type_a": 0.00018341269835148229,
+        "type_b": 4.565522136826479e-05,
+        "type_c": 0.006695480576427319,
+        "transferred": true
+      },
+      "runtime": 4.495702028274536,
+      "converged": true,
+      "error": null
+    }
+  ]
+}

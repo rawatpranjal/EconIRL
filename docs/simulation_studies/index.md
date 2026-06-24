@@ -11,6 +11,7 @@ known, both recovery and failure are measurable.
 | [Direct optimization](direct_optimization.md) | Estimation under correct and misspecified rewards. | varies | MPEC, neural MPEC, GLADIUS. | How this family degrades under reward misspecification. |
 | [Route choice](route_choice.md) | Synthetic road network (25 nodes, random geometric graph). | 25 states x 4 actions | Structural (NFXP, CCP, MPEC), MCE-IRL, NeuralGLADIUS. | Structural parameter recovery and behavioral fidelity on a graph topology. |
 | [High-dimensional route choice](highdim_route_choice.md) | Synthetic road network at scale (150 nodes). | 150 states x 4 actions | RHIP horizon sweep (H=0/1/3/inf), MCE-IRL, AIRL, structural. | The RHIP planning-horizon spectrum at scale. H=inf matches MCE-IRL; accuracy improves along the horizon. |
+| [RHIP horizon vs noise](rhip_two_regime.md) | Route choice under noisy vs near-rational drivers (25 nodes). | 25 states x 4 actions | RHIP horizon sweep (H=0/1/3/inf), NFXP. | How much the planning horizon is worth depends on demonstrator noise. A long horizon is essential under noise and barely helps under near-rational drivers. |
 | [Stockpiling](stockpiling.md) | Consumer stockpiling of a storable good (Hendel-Nevo). | 20 states x 2 actions | Structural (NFXP, CCP, MPEC), MCE-IRL, NeuralGLADIUS. | Structural recovery on a price-driven inventory model where the optimal policy stockpiles on sale. |
 | [Fleet maintenance](fleet_maintenance.md) | Multi-component bus engine replacement (Rust 1987, K=3 components). | 216 states x 2 actions | Structural (NFXP, CCP, MPEC), MCE-IRL, NeuralGLADIUS. | High-dimensional factored environment. Structural recovery at scale; NeuralGLADIUS scalability on a factored state space. |
 | [Vehicle scrappage](vehicle_scrappage.md) | Optimal vehicle replacement using Dutch RDW inspection data (Rust 1987 framework). | 75 states x 2 actions | Structural (NFXP, CCP, MPEC, UFXP, NNES), MCE-IRL. | Classical vs modern structural estimators on a realistic optimal stopping problem. |
@@ -50,6 +51,7 @@ taxi_gridworld
 direct_optimization
 route_choice
 highdim_route_choice
+rhip_two_regime
 stockpiling
 fleet_maintenance
 vehicle_scrappage
