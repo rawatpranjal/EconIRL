@@ -644,7 +644,7 @@ wheels = [
 
 [[package]]
 name = "econirl"
-version = "0.0.6"
+version = "0.0.7"
 source = { editable = "." }
 dependencies = [
     { name = "equinox" },
@@ -654,7 +654,6 @@ dependencies = [
     { name = "jaxlib", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "jaxlib", version = "0.9.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "jaxopt" },
-    { name = "lineax" },
     { name = "matplotlib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -694,7 +693,6 @@ requires-dist = [
     { name = "jax", specifier = ">=0.4.30" },
     { name = "jaxlib", specifier = ">=0.4.30" },
     { name = "jaxopt", specifier = ">=0.8" },
-    { name = "lineax", specifier = ">=0.0.5" },
     { name = "matplotlib", specifier = ">=3.7" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0" },
