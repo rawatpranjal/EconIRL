@@ -362,12 +362,17 @@ def reward_curve(env, out_path: str, params=None, action_labels=None,
 
 
 def horizon_frontier(data: dict, cell_id: str, out_path: str) -> None:
-    """RHIP's signature figure: policy TV and fit time against the horizon $H$.
+    """RHIP's signature figure: policy TV against the planning horizon $H$.
 
     Reads the RHIP-H0 / -H1 / -H3 / -Hinf records on a cell. The horizon is the
     single knob that spans a family of methods: $H=0$ is the Max-Margin-Planning
-    end, $H=\\infty$ matches Max Causal Entropy IRL. Policy total variation is on
-    the left axis, mean fit time on a twin axis. A pure function of the records.
+    end, $H=\\infty$ matches Max Causal Entropy IRL. Accuracy improves smoothly
+    along the horizon. A pure function of the records.
+
+    Wall-clock fit time is deliberately not plotted here: the $H=\\infty$ path
+    reuses the optimized MCE-IRL soft value iteration, so it runs faster than the
+    finite-horizon path, which does not reflect the planning cost that grows with
+    $H$. Showing it would invert the real tradeoff.
     """
     import matplotlib
 
@@ -376,53 +381,38 @@ def horizon_frontier(data: dict, cell_id: str, out_path: str) -> None:
 
     order = [("RHIP-H0", 0.0, "H=0"), ("RHIP-H1", 1.0, "H=1"),
              ("RHIP-H3", 3.0, "H=3"), ("RHIP-Hinf", 4.0, "H=inf")]
-    xs, tvs, times, ticks, names = [], [], [], [], []
+    xs, tvs, ticks, names = [], [], [], []
     for name, x, lab in order:
         tv = _mean_metric(data, cell_id, name, "policy_tv")
-        rt = _mean_metric(data, cell_id, name, "runtime")
-        if tv is None and rt is None:
+        if tv is None:
             continue
         xs.append(x)
-        tvs.append(np.nan if tv is None else tv)
-        times.append(np.nan if rt is None else rt)
+        tvs.append(tv)
         ticks.append(lab)
         names.append(name)
 
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
     tv_color = "#3b6ea5"
-    ax.plot(xs, tvs, marker="o", lw=1.6, ms=6, color=tv_color, label="policy TV")
+    ax.plot(xs, tvs, marker="o", lw=1.6, ms=6, color=tv_color)
     ax.set_xlabel("planning horizon $H$")
-    ax.set_ylabel("policy total variation vs the truth", color=tv_color)
-    ax.tick_params(axis="y", labelcolor=tv_color)
+    ax.set_ylabel("policy total variation vs the truth")
     ax.set_xticks(xs)
     ax.set_xticklabels(ticks)
-    ax.set_title("RHIP: accuracy and compute across the planning horizon", pad=12)
+    ax.set_title("RHIP: accuracy across the planning horizon", pad=12)
     ax.spines["top"].set_visible(False)
-
-    ax2 = ax.twinx()
-    t_color = "#c1654a"
-    ax2.plot(xs, times, marker="s", lw=1.4, ms=5, ls="--", color=t_color,
-             label="fit time")
-    ax2.set_ylabel("mean fit time (s)", color=t_color)
-    ax2.tick_params(axis="y", labelcolor=t_color)
-    ax2.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     # Anchor the two endpoints to their classic-method names.
     if xs:
         y0 = tvs[0]
-        if np.isfinite(y0):
-            ax.annotate("H=0 = Max-Margin-Planning end", xy=(xs[0], y0),
-                        xytext=(6, -14), textcoords="offset points", fontsize=8,
-                        color=tv_color)
-        yinf = tvs[-1]
-        if names and names[-1] == "RHIP-Hinf" and np.isfinite(yinf):
-            ax.annotate("H=inf = MCE-IRL", xy=(xs[-1], yinf),
+        ax.annotate("H=0 = Max-Margin-Planning end", xy=(xs[0], y0),
+                    xytext=(6, -14), textcoords="offset points", fontsize=8,
+                    color=tv_color)
+        if names[-1] == "RHIP-Hinf":
+            ax.annotate("H=inf = MCE-IRL", xy=(xs[-1], tvs[-1]),
                         xytext=(-92, 10), textcoords="offset points", fontsize=8,
                         color=tv_color)
 
-    h1, l1 = ax.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    ax.legend(h1 + h2, l1 + l2, loc="center right", fontsize=8, frameon=False)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)

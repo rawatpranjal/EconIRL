@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "n_individuals": 250,
+    "n_periods": 40,
+    "panel_seed": 42,
+    "num_segments": 2,
+    "segment_names": [
+      "binge",
+      "sampler"
+    ],
+    "segment_thetas": [
+      [
+        4.0,
+        0.05,
+        0.1,
+        0.2
+      ],
+      [
+        0.5,
+        3.0,
+        3.0,
+        0.3
+      ]
+    ],
+    "segment_probs": [
+      0.5,
+      0.5
+    ],
+    "true_label_shares": [
+      0.552,
+      0.448
+    ],
+    "num_states": 65,
+    "num_actions": 4,
+    "feature_names": [
+      "enjoyment",
+      "satiation_cost",
+      "time_cost",
+      "variety_bonus"
+    ],
+    "max_em_iterations": 20,
+    "max_airl_rounds": 20,
+    "airl_het_seed": 7,
+    "discount_factor": 0.95,
+    "scale_parameter": 1.0
+  },
+  "methods": {
+    "AIRL-Het": {
+      "name": "AIRL-Het",
+      "family": "heterogeneity-aware",
+      "assignment_accuracy": 0.996,
+      "assignment_permutation": [
+        1,
+        0
+      ],
+      "per_segment_tv": [
+        0.3310389456328861,
+        0.6402047332924637
+      ],
+      "priors": [
+        0.44812865088489995,
+        0.5518713491151
+      ],
+      "converged": true,
+      "num_em_iterations": 4
+    },
+    "MCE-IRL": {
+      "name": "MCE-IRL",
+      "family": "homogeneous",
+      "assignment_accuracy": null,
+      "per_segment_tv": [
+        0.09391125265545709,
+        0.8922486239317813
+      ],
+      "converged": false
+    },
+    "AIRL": {
+      "name": "AIRL",
+      "family": "homogeneous",
+      "assignment_accuracy": null,
+      "per_segment_tv": [
+        0.36414330616364465,
+        0.9595542511811544
+      ],
+      "converged": false
+    }
+  }
+}

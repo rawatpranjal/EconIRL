@@ -225,9 +225,9 @@ DIAGNOSES = {
         "between the deterministic and the fully stochastic planner."
     ),
     "RHIP-H3": (
-        "Three soft Bellman backups. Most of the accuracy of the full stochastic "
-        "planner at a fraction of its planning cost, which is the receding-horizon "
-        "tradeoff this study is built to show."
+        "Three soft Bellman backups. It recovers most of the accuracy of the full "
+        "stochastic planner (H=inf), a middle point on the horizon spectrum "
+        "between the deterministic and the fully stochastic ends."
     ),
     "RHIP-Hinf": (
         "The infinite-horizon endpoint delegates to MCE-IRL with the same config, "
@@ -402,11 +402,12 @@ NARRATIVE = {
         "The same study at two problem sizes (75 and 150 states). Each line is "
         "one estimator: fit time on the left, policy total variation on the "
         "right. The structural method (NFXP) stays cheap and accurate as the "
-        "graph grows. The RHIP endpoints bracket the horizon spectrum: H=0 is the "
-        "cheap deterministic end, H=inf the expensive stochastic end that matches "
-        "MCE-IRL. The compute gap between them is the receding-horizon tradeoff, "
-        "and it is the gap this study is built to expose. With only two sizes the "
-        "lines trace a direction, not an asymptotic rate."
+        "graph grows. On accuracy the RHIP endpoints bracket the horizon "
+        "spectrum: H=0 (deterministic) is the least accurate, H=inf (stochastic) "
+        "matches MCE-IRL and is the most accurate. Wall-clock does not track the "
+        "horizon here, because the H=inf path reuses the optimized MCE-IRL solver "
+        "and so is not the slowest. With only two sizes the lines trace a "
+        "direction, not an asymptotic rate."
     ),
     "script": "scripts/study_highdim_route_choice.py",
     "results_rel": "validation/results/study_highdim_route_choice.json",
@@ -422,12 +423,14 @@ NARRATIVE = {
         "(../_static/simulation_studies/highdim_route_choice_network.png)\n"
         "\n"
         "The horizon $H$ is the single knob that spans a family of methods. The "
-        "figure traces policy total variation and fit time across the four "
-        "horizons. $H=0$ is the Max-Margin-Planning end. $H=\\infty$ matches Max "
-        "Causal Entropy IRL. Accuracy improves as the horizon grows, and the "
-        "compute climbs with it. That tradeoff is what the horizon buys.\n"
+        "figure traces policy total variation across the four horizons. $H=0$ is "
+        "the Max-Margin-Planning end. $H=\\infty$ matches Max Causal Entropy IRL. "
+        "Accuracy improves smoothly as the horizon grows. Wall-clock fit time is "
+        "not shown: the $H=\\infty$ path reuses the optimized MCE-IRL solver and "
+        "runs faster than the finite-horizon path, which would invert the "
+        "planning cost the horizon is meant to trade.\n"
         "\n"
-        "![Policy total variation and fit time across the planning horizon]"
+        "![Policy total variation across the planning horizon]"
         "(../_static/simulation_studies/highdim_route_choice_horizon.png)\n"
     ),
 }
