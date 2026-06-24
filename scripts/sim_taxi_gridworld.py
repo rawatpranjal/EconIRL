@@ -28,17 +28,25 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "sim_taxi_gridworld.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "taxi_gridworld.md")
-FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                          "taxi_gridworld_dgp.png")
+_STATIC = os.path.join(_ROOT, "docs", "_static", "simulation_studies")
+FIGURE_PNG = os.path.join(_STATIC, "taxi_gridworld_dgp.png")
+RESULTS_FIG = os.path.join(_STATIC, "taxi_gridworld_results.png")
+SCALING_FIG = os.path.join(_STATIC, "taxi_gridworld_scaling.png")
 
 # 8x8 grid, 64 states, 5 actions. discount 0.95 (not the 0.99 default) keeps
 # the inner solves cheap on a page meant to be light; the economics is the same.
+# The scaling sweep reruns a trimmed roster at 6x6 (36 states) and 10x10 (100
+# states) to trace compute and accuracy against problem size.
 ENV = dict(grid_size=8, step_penalty=-0.1, terminal_reward=10.0,
            distance_weight=0.1, discount_factor=0.95)
+HEADLINE_SIZE = 8
+SCALING_SIZES = (6, 10)
 
 
-def _env():
-    return GridworldEnvironment(**ENV)
+def _env(grid_size=HEADLINE_SIZE):
+    cfg = dict(ENV)
+    cfg["grid_size"] = grid_size
+    return GridworldEnvironment(**cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -160,18 +168,29 @@ def _run_ufxp(env, panel):
 
 
 ROSTER = (
-    RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl),
-    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl),
-    RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl),
-    RosterEntry("AIRL", "behavioral", _run_airl),
-    RosterEntry("IQ-Learn", "behavioral", _run_iq_learn),
-    RosterEntry("f-IRL", "behavioral", _run_firl),
-    RosterEntry("GLADIUS", "behavioral", _run_gladius),
-    RosterEntry("BC", "behavioral", _run_bc),
-    RosterEntry("NFXP", "structural", _run_nfxp),
-    RosterEntry("CCP", "structural", _run_ccp),
-    RosterEntry("MPEC", "structural", _run_mpec),
-    RosterEntry("UFXP", "structural", _run_ufxp),
+    RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl, uses_transitions=True),
+    RosterEntry("AIRL", "behavioral", _run_airl, uses_transitions=True),
+    RosterEntry("IQ-Learn", "behavioral", _run_iq_learn, uses_transitions=True),
+    RosterEntry("f-IRL", "behavioral", _run_firl, uses_transitions=True),
+    RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
+    RosterEntry("BC", "behavioral", _run_bc, uses_transitions=True),
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
+    RosterEntry("UFXP", "structural", _run_ufxp, uses_transitions=True),
+)
+
+# A trimmed, representative subset of ROSTER for the scaling sweep: five lines
+# (two structural, the structural-plus-MPEC trio, one IRL) keep the scaling
+# figure readable and the sweep fast. Same _run_* and uses_transitions as above.
+SCALING_ROSTER = (
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
 )
 
 
@@ -197,19 +216,51 @@ EXCLUDED = [
      "code or too slow; not benchmarked in this study"},
 ]
 
+def _scaling_cell(grid_size):
+    """One scaling-only gridworld cell at a given size.
+
+    Runs the trimmed SCALING_ROSTER to feed the scaling figure (fit time and
+    policy TV vs problem size). Renders no per-cell tables of its own. The
+    smallest size is a scaling cell, so the scaling figure's line set comes
+    from SCALING_ROSTER, not the full headline roster.
+    """
+    n_states = grid_size * grid_size
+    return Cell(
+        cell_id=f"taxi_gridworld_{grid_size}",
+        label=f"Gridworld {grid_size}x{grid_size}",
+        description=(
+            f"`GridworldEnvironment(grid_size={grid_size}, "
+            f"step_penalty={ENV['step_penalty']}, "
+            f"terminal_reward={ENV['terminal_reward']}, "
+            f"distance_weight={ENV['distance_weight']}, "
+            f"discount_factor={ENV['discount_factor']})`. Transitions are "
+            f"deterministic; {n_states} states, 5 actions."
+        ),
+        env_factory=(lambda n=grid_size: _env(n)),
+        roster=SCALING_ROSTER,
+        n_individuals=500,
+        n_periods=20,
+        seed=7,
+        n_replications=2,
+        fit_timeout=900,
+        scaling_only=True,
+    )
+
+
+# Headline first so single-cell runs (--only-cell gridworld) still work.
 CELLS = (
     Cell(
         cell_id="gridworld",
         label="Gridworld 8x8",
         description=(
-            f"`GridworldEnvironment(grid_size={ENV['grid_size']}, "
+            f"`GridworldEnvironment(grid_size={HEADLINE_SIZE}, "
             f"step_penalty={ENV['step_penalty']}, "
             f"terminal_reward={ENV['terminal_reward']}, "
             f"distance_weight={ENV['distance_weight']}, "
             f"discount_factor={ENV['discount_factor']})`. Transitions are "
             "deterministic; 64 states, 5 actions (left, right, up, down, stay)."
         ),
-        env_factory=_env,
+        env_factory=(lambda n=HEADLINE_SIZE: _env(n)),
         roster=ROSTER,
         n_individuals=500,
         n_periods=20,
@@ -217,12 +268,14 @@ CELLS = (
         n_replications=3,
         fit_timeout=900,
         figure=FIGURE_PNG,
+        results_figure=RESULTS_FIG,
         # Parameters are not separately identified here (action-contrast rank
         # 1), so the parameter and regret-transfer columns would print
         # arbitrary ridge points and meaningless transfers.
         show_params=False,
         show_regret=False,
     ),
+    *(_scaling_cell(n) for n in SCALING_SIZES),
 )
 
 NARRATIVE = {
@@ -290,6 +343,15 @@ NARRATIVE = {
             ),
         },
     },
+    "scaling_intro": (
+        "The same study at three grid sizes (36, 64, 100 states). Each line is "
+        "one estimator: fit time on the left, policy total variation on the "
+        "right. The structural rows track behavior closely across sizes. The "
+        "compute lines reflect fixed overhead as much as problem size at this "
+        "scale, so the time curves need not rise cleanly with the state count. "
+        "Policy total variation is the right scorecard here because the reward "
+        "parameters are not separately identified on this grid."
+    ),
     "script": "scripts/sim_taxi_gridworld.py",
     "results_rel": "validation/results/sim_taxi_gridworld.json",
 }
@@ -298,4 +360,5 @@ NARRATIVE = {
 if __name__ == "__main__":
     main_cli(cells=CELLS, title="Simulation study: gridworld navigation",
              narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
-             results_json=RESULTS_JSON, page_path=PAGE_PATH)
+             results_json=RESULTS_JSON, page_path=PAGE_PATH,
+             scaling_figure=SCALING_FIG)

@@ -65,6 +65,10 @@ class RosterEntry:
     run: Callable[[object, object], object]
     max_reps: int | None = None
     timeout: int | None = None  # per-fit budget in seconds (overrides the cell's)
+    # Static estimator fact for the capability table: does the estimator consume
+    # the transition kernel P(s'|s,a)? Model-free learners (e.g. NeuralGLADIUS)
+    # do not. Left None to omit the estimator from the capability table.
+    uses_transitions: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -82,7 +86,12 @@ class Cell:
     n_replications: int = 3
     param_block: bool = False  # render the bias/SE/RMSE/coverage table
     figure: str | None = None  # absolute PNG path for the 1x2 DGP figure
+    results_figure: str | None = None  # absolute PNG path for the scorecard
     fit_timeout: int | None = None  # default per-fit budget in seconds
+    # A scaling-only cell feeds the scaling figure (fit time and policy TV vs
+    # problem size) but renders no per-cell tables, so a multi-size sweep can
+    # share one study page without bloating it with a table per size.
+    scaling_only: bool = False
     # Page-level display choices. Drop the parameter columns on cells where
     # parameters are not separately identified (printing arbitrary ridge
     # points would only confuse), and drop the regret columns where transfer
@@ -191,13 +200,20 @@ def _cell_meta(cell: Cell, env) -> dict:
         "param_block": cell.param_block,
         "show_params": cell.show_params,
         "show_regret": cell.show_regret,
+        "scaling_only": cell.scaling_only,
         "figure": os.path.basename(cell.figure) if cell.figure else None,
+        "results_figure": (os.path.basename(cell.results_figure)
+                           if cell.results_figure else None),
         "parameter_names": names,
         "true_theta": true_theta,
         "diagnostics": M.feature_diagnostics(np.asarray(env.feature_matrix)),
-        "roster": [{"name": e.name, "family": e.family, "max_reps": e.max_reps}
-                   for e in cell.roster],
+        "roster": [_roster_meta(e) for e in cell.roster],
     }
+
+
+def _roster_meta(e: RosterEntry) -> dict:
+    return {"name": e.name, "family": e.family, "max_reps": e.max_reps,
+            "uses_transitions": e.uses_transitions}
 
 
 def run_experiment(cells: tuple[Cell, ...], *, title: str, diagnoses: dict,
@@ -450,6 +466,45 @@ def _param_block(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
     return L
 
 
+def _yn(b) -> str:
+    return "yes" if b else "no"
+
+
+def _capability_table(cell_meta: dict, by_est: dict[str, list]) -> list[str]:
+    """What each estimator consumes and produces.
+
+    Renders only for roster entries that declare ``uses_transitions`` (a static
+    estimator fact). Whether a usable reward transfers to counterfactuals and
+    whether standard errors come back are read from the raw records, so the
+    table reports what the run actually delivered, not a hand-typed claim.
+    """
+    rows = [s for s in cell_meta["roster"] if s.get("uses_transitions") is not None]
+    if not rows:
+        return []
+    L = ["| Estimator | Family | Uses transitions $P(s'\\mid s,a)$ | "
+         "Transferable reward | Standard errors |",
+         "|---|---|---|---|---|"]
+    for spec in rows:
+        ok = [r for r in by_est.get(spec["name"], []) if r["error"] is None]
+        transfer = any(r.get("regret") is not None and r["regret"].get("transferred")
+                       for r in ok)
+        # A usable standard error is finite. An all-NaN vector is "returns an
+        # array, no inference" and reads as no, consistent with the SE-avail
+        # column in the parameter-recovery table.
+        se = any(r.get("standard_errors") is not None
+                 and np.all(np.isfinite(r["standard_errors"])) for r in ok)
+        L.append(f"| {spec['name']} | {spec['family']} | "
+                 f"{_yn(spec['uses_transitions'])} | {_yn(transfer)} | {_yn(se)} |")
+    L.append("")
+    L.append("Uses transitions is whether the estimator reads the transition "
+             "kernel; model-free learners do not. Transferable reward is whether "
+             "it recovers a reward that re-solves under a counterfactual. Standard "
+             "errors is whether it returns inference. The last two are read from "
+             "the run.")
+    L.append("")
+    return L
+
+
 def _table_note(cell_meta: dict) -> str:
     parts = []
     if cell_meta.get("show_params", True):
@@ -473,11 +528,14 @@ def _table_note(cell_meta: dict) -> str:
 def render_page(data: dict, narrative: dict) -> str:
     """Render a docs sub-page from the raw records. Pure function of its inputs."""
     meta = data["meta"]
-    single = len(meta["cells"]) == 1
+    # Scaling-only cells feed the scaling figure but render no sections, so the
+    # page reads as a single-study page laid out around its headline cell.
+    display_cells = [cm for cm in meta["cells"] if not cm.get("scaling_only")]
+    single = len(display_cells) == 1
     L = [f"# {narrative['title']}\n"]
     L.append(narrative["intro"].strip() + "\n")
 
-    for cm in meta["cells"]:
+    for cm in display_cells:
         by_est = _cell_records(data, cm["cell_id"])
         if not single:
             L.append(f"## {cm['label']}\n")
@@ -502,9 +560,17 @@ def render_page(data: dict, narrative: dict) -> str:
         if cm.get("figure"):
             L.append(f"![Simulated trajectories and the optimal value function "
                      f"for {cm['label']}](../_static/simulation_studies/{cm['figure']})\n")
+        cap = _capability_table(cm, by_est)
+        if cap:
+            L.append("### Estimators and data\n" if not single
+                     else "## Estimators and data\n")
+            L.extend(cap)
         L.append("### Results\n" if not single else "## Results\n")
         L.extend(_results_table(cm, by_est))
         L.append(_table_note(cm) + "\n")
+        if cm.get("results_figure"):
+            L.append(f"![Policy total variation per estimator for {cm['label']}]"
+                     f"(../_static/simulation_studies/{cm['results_figure']})\n")
         if cm["param_block"] and cm["true_theta"] is not None:
             L.append("### Parameter recovery\n" if not single
                      else "## Parameter recovery\n")
@@ -523,6 +589,18 @@ def render_page(data: dict, narrative: dict) -> str:
         after = narrative.get("cells", {}).get(cm["cell_id"], {}).get("after")
         if after:
             L.append(after.strip() + "\n")
+
+    if meta.get("scaling_figure"):
+        sizes = sorted(cm["num_states"] for cm in meta["cells"])
+        L.append("## Scaling\n")
+        L.append(narrative.get("scaling_intro",
+                 f"The same study at {len(sizes)} problem sizes "
+                 f"({', '.join(str(s) for s in sizes)} states). Each line is one "
+                 "estimator. The left panel is fit time, the right is policy total "
+                 "variation. Compute and accuracy as the state space grows.").strip()
+                 + "\n")
+        L.append(f"![Fit time and policy total variation against the number of "
+                 f"states](../_static/simulation_studies/{meta['scaling_figure']})\n")
 
     probes = meta.get("feasibility_probes")
     if probes:
@@ -622,7 +700,8 @@ def render_console(data: dict) -> str:
 
 def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
              diagnoses: dict, excluded: list[dict], results_json: str,
-             page_path: str, extra_meta: dict | None = None) -> None:
+             page_path: str, extra_meta: dict | None = None,
+             scaling_figure: str | None = None) -> None:
     parser = argparse.ArgumentParser(description=title)
     parser.add_argument("--replications", type=int, default=None,
                         help="Override every cell's replication count.")
@@ -654,9 +733,8 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
             # dropped from a page's scope after a run keep their raw records
             # in the JSON but are no longer rendered, with the reason stated
             # in the excluded list.
-            roster_by_cell = {c.cell_id: [{"name": e.name, "family": e.family,
-                                           "max_reps": e.max_reps}
-                                          for e in c.roster] for c in cells}
+            roster_by_cell = {c.cell_id: [_roster_meta(e) for e in c.roster]
+                              for c in cells}
             for cm in data["meta"]["cells"]:
                 if cm["cell_id"] in roster_by_cell:
                     cm["roster"] = roster_by_cell[cm["cell_id"]]
@@ -672,6 +750,9 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
                     cm["param_block"] = c.param_block
                     cm["show_params"] = c.show_params
                     cm["show_regret"] = c.show_regret
+                    cm["scaling_only"] = c.scaling_only
+                    cm["results_figure"] = (os.path.basename(c.results_figure)
+                                            if c.results_figure else None)
             # Diagnostics are deterministic functions of the environment, so
             # newly added checks (e.g. the action-contrast rank) reach old
             # pages without a re-run.
@@ -700,6 +781,21 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
                     os.makedirs(os.path.dirname(c.figure), exist_ok=True)
                     dgp_figure(env, fig_panel, oracle_value, c.figure)
                     print(f"Wrote {c.figure}")
+            # Comparison figures are pure functions of the stored records, so
+            # they regenerate on --page with no re-run, like the DGP figures.
+            from validation.benchmark.figures import (results_figure as _rfig,
+                                                       scaling_figure as _sfig)
+
+            for c in cells:
+                if c.results_figure is not None:
+                    os.makedirs(os.path.dirname(c.results_figure), exist_ok=True)
+                    _rfig(data, c.cell_id, c.results_figure)
+                    print(f"Wrote {c.results_figure}")
+            if scaling_figure is not None:
+                os.makedirs(os.path.dirname(scaling_figure), exist_ok=True)
+                _sfig(data, scaling_figure)
+                data["meta"]["scaling_figure"] = os.path.basename(scaling_figure)
+                print(f"Wrote {scaling_figure}")
             with open(page_path, "w") as f:
                 f.write(render_page(data, narrative))
             print(f"Wrote {page_path}")

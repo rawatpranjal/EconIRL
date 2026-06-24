@@ -1,13 +1,13 @@
 {
   "meta": {
     "title": "Simulation study: route choice on a road network",
-    "date": "2026-06-16",
-    "package_version": "0.0.6",
+    "date": "2026-06-23",
+    "package_version": "0.0.7",
     "cells": [
       {
         "cell_id": "route_choice",
         "label": "Route choice (25 nodes, 4 actions)",
-        "description": "Synthetic route-choice problem on a random geometric graph. 25 nodes placed uniformly in the unit square; edges within Euclidean radius 0.25, plus a spanning tree for connectivity. An agent at node $s$ picks among 4 nearest neighbours; actions beyond node degree self-loop. Reward is linear in three edge features: negative edge length, destination amenity, and negative shortest-path distance to a fixed goal. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, seed=0)``.",
+        "description": "Synthetic route choice on a random geometric graph. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, seed=0)``.",
         "num_states": 25,
         "num_actions": 4,
         "discount_factor": 0.95,
@@ -18,7 +18,9 @@
         "param_block": true,
         "show_params": true,
         "show_regret": true,
+        "scaling_only": false,
         "figure": "route_choice_dgp.png",
+        "results_figure": "route_choice_results.png",
         "parameter_names": [
           "edge_cost",
           "amenity",
@@ -40,27 +42,166 @@
           {
             "name": "NFXP",
             "family": "structural",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": true
           },
           {
             "name": "CCP",
             "family": "structural",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": true
           },
           {
             "name": "MPEC",
             "family": "structural",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": true
           },
           {
             "name": "MCE-IRL",
             "family": "behavioral",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": true
           },
           {
             "name": "NeuralGLADIUS",
             "family": "behavioral",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": false
+          }
+        ]
+      },
+      {
+        "cell_id": "route_choice_15",
+        "label": "Route choice (15 nodes, 4 actions)",
+        "description": "Synthetic route choice on a random geometric graph. ``road_network(num_nodes=15, num_actions=4, discount_factor=0.95, seed=0)``.",
+        "num_states": 15,
+        "num_actions": 4,
+        "discount_factor": 0.95,
+        "n_individuals": 200,
+        "n_periods": 35,
+        "seed": 42,
+        "n_replications": 2,
+        "param_block": false,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": true,
+        "figure": null,
+        "results_figure": null,
+        "parameter_names": [
+          "edge_cost",
+          "amenity",
+          "goal"
+        ],
+        "true_theta": [
+          1.0,
+          0.5,
+          1.0
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 9.902058160590908,
+          "contrast_rank": 3,
+          "contrast_condition_number": 6.938107882388381
+        },
+        "roster": [
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "NeuralGLADIUS",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": false
+          }
+        ]
+      },
+      {
+        "cell_id": "route_choice_40",
+        "label": "Route choice (40 nodes, 4 actions)",
+        "description": "Synthetic route choice on a random geometric graph. ``road_network(num_nodes=40, num_actions=4, discount_factor=0.95, seed=0)``.",
+        "num_states": 40,
+        "num_actions": 4,
+        "discount_factor": 0.95,
+        "n_individuals": 200,
+        "n_periods": 35,
+        "seed": 42,
+        "n_replications": 2,
+        "param_block": false,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": true,
+        "figure": null,
+        "results_figure": null,
+        "parameter_names": [
+          "edge_cost",
+          "amenity",
+          "goal"
+        ],
+        "true_theta": [
+          1.0,
+          0.5,
+          1.0
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 13.40103667452833,
+          "contrast_rank": 3,
+          "contrast_condition_number": 13.356718379505892
+        },
+        "roster": [
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "NeuralGLADIUS",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": false
           }
         ]
       }
@@ -123,7 +264,7 @@
         "type_c": 0.0011456925681538638,
         "transferred": true
       },
-      "runtime": 4.111637115478516,
+      "runtime": 3.7290470600128174,
       "converged": true,
       "error": null
     },
@@ -151,7 +292,7 @@
         "type_c": 0.009247853382786499,
         "transferred": true
       },
-      "runtime": 3.111881971359253,
+      "runtime": 2.9767961502075195,
       "converged": true,
       "error": null
     },
@@ -179,7 +320,7 @@
         "type_c": 0.0011456935813520886,
         "transferred": true
       },
-      "runtime": 0.3227803707122803,
+      "runtime": 0.2942221164703369,
       "converged": true,
       "error": null
     },
@@ -207,7 +348,7 @@
         "type_c": 0.0011456957815586945,
         "transferred": true
       },
-      "runtime": 6.753982782363892,
+      "runtime": 6.23435115814209,
       "converged": false,
       "error": null
     },
@@ -218,16 +359,16 @@
       "rep": 0,
       "params": null,
       "standard_errors": null,
-      "policy_tv": 0.2660435565336338,
-      "value_rmse": 11.103083308330195,
+      "policy_tv": 0.26944430757623883,
+      "value_rmse": 11.05851961769085,
       "regret": {
-        "baseline": 4.227880727225471,
-        "type_a": 4.231194518181734,
-        "type_b": 3.3519470169021517,
-        "type_c": 46.63541557812453,
+        "baseline": 4.313843703307576,
+        "type_a": 4.299478934067137,
+        "type_b": 3.3922251978193487,
+        "type_c": 43.35478984792226,
         "transferred": false
       },
-      "runtime": 6.563239097595215,
+      "runtime": 6.046600818634033,
       "converged": true,
       "error": null
     },
@@ -255,7 +396,7 @@
         "type_c": 0.003933997615906076,
         "transferred": true
       },
-      "runtime": 2.4243087768554688,
+      "runtime": 2.3096299171447754,
       "converged": true,
       "error": null
     },
@@ -283,7 +424,7 @@
         "type_c": 0.008322461771850673,
         "transferred": true
       },
-      "runtime": 1.431121826171875,
+      "runtime": 1.3616390228271484,
       "converged": true,
       "error": null
     },
@@ -311,7 +452,7 @@
         "type_c": 0.003934019266628433,
         "transferred": true
       },
-      "runtime": 0.2402970790863037,
+      "runtime": 0.22617292404174805,
       "converged": true,
       "error": null
     },
@@ -339,7 +480,7 @@
         "type_c": 0.0039351773874913495,
         "transferred": true
       },
-      "runtime": 4.139533042907715,
+      "runtime": 3.8183212280273438,
       "converged": false,
       "error": null
     },
@@ -350,16 +491,544 @@
       "rep": 1,
       "params": null,
       "standard_errors": null,
-      "policy_tv": 0.2623365895259315,
-      "value_rmse": 11.052783619545314,
+      "policy_tv": 0.26219238395928496,
+      "value_rmse": 11.087597523206831,
       "regret": {
-        "baseline": 4.132294360208883,
-        "type_a": 4.12061172699179,
-        "type_b": 3.421386144635284,
-        "type_c": 45.22573711053652,
+        "baseline": 4.214164767876853,
+        "type_a": 4.210952704375231,
+        "type_b": 3.3516764561221155,
+        "type_c": 45.48466162400763,
         "transferred": false
       },
-      "runtime": 7.018312931060791,
+      "runtime": 6.235297918319702,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 0,
+      "params": [
+        1.0338225047845997,
+        0.455508949107448,
+        1.0236986013384948
+      ],
+      "standard_errors": [
+        0.19249975681304932,
+        0.0394100584089756,
+        0.05277293547987938
+      ],
+      "policy_tv": 0.007277260642652417,
+      "value_rmse": 0.7195961953326987,
+      "regret": {
+        "baseline": 0.002787927580406635,
+        "type_a": 0.003842260460519118,
+        "type_b": 0.01155110365641173,
+        "type_c": 0.013929719605654044,
+        "transferred": true
+      },
+      "runtime": 1.929069995880127,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 0,
+      "params": [
+        1.0699982643127441,
+        0.4509489834308624,
+        1.0012404918670654
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008612464350365452,
+      "value_rmse": 0.739131037111286,
+      "regret": {
+        "baseline": 0.00290424035140605,
+        "type_a": 0.004217403797241634,
+        "type_b": 0.013705734772349916,
+        "type_c": 0.014861917339582231,
+        "transferred": true
+      },
+      "runtime": 2.0084829330444336,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 0,
+      "params": [
+        1.0338222980499268,
+        0.45550909638404846,
+        1.0236985683441162
+      ],
+      "standard_errors": [
+        0.19249975681304932,
+        0.0394100584089756,
+        0.05277293175458908
+      ],
+      "policy_tv": 0.007277235280507336,
+      "value_rmse": 0.7195936795559655,
+      "regret": {
+        "baseline": 0.002787911260026425,
+        "type_a": 0.0038422370746895133,
+        "type_b": 0.011551033100493636,
+        "type_c": 0.013929639876846738,
+        "transferred": true
+      },
+      "runtime": 0.2901608943939209,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_15",
+      "rep": 0,
+      "params": [
+        1.0338172912597656,
+        0.45550966262817383,
+        1.0237042903900146
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00727734198485031,
+      "value_rmse": 0.7196023884230638,
+      "regret": {
+        "baseline": 0.002788032300401814,
+        "type_a": 0.003842332332639421,
+        "type_b": 0.011551141484703658,
+        "type_c": 0.01393020359644648,
+        "transferred": true
+      },
+      "runtime": 5.855152130126953,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NeuralGLADIUS",
+      "family": "behavioral",
+      "cell": "route_choice_15",
+      "rep": 0,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.3361570865664401,
+      "value_rmse": 22.964953152229956,
+      "regret": {
+        "baseline": 13.774088648576303,
+        "type_a": 13.2282831363399,
+        "type_b": 7.928251418564213,
+        "type_c": 60.398686111741206,
+        "transferred": false
+      },
+      "runtime": 5.868987083435059,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 1,
+      "params": [
+        0.811215535414173,
+        0.5425460304745975,
+        1.0518322454047901
+      ],
+      "standard_errors": [
+        0.1992323100566864,
+        0.04336760565638542,
+        0.05092990770936012
+      ],
+      "policy_tv": 0.013871406225554413,
+      "value_rmse": 0.6095087817960211,
+      "regret": {
+        "baseline": 0.003915903269275516,
+        "type_a": 0.005278100378135333,
+        "type_b": 0.017977206105459668,
+        "type_c": 0.01990904138422299,
+        "transferred": true
+      },
+      "runtime": 1.5234858989715576,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 1,
+      "params": [
+        0.8400238156318665,
+        0.5365028381347656,
+        1.0273090600967407
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01793963398254891,
+      "value_rmse": 0.5815392206916511,
+      "regret": {
+        "baseline": 0.002055744125891533,
+        "type_a": 0.0028127083115908483,
+        "type_b": 0.01228381482653072,
+        "type_c": 0.014172719048799803,
+        "transferred": true
+      },
+      "runtime": 1.3492481708526611,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 1,
+      "params": [
+        0.8112154603004456,
+        0.5425460934638977,
+        1.0518323183059692
+      ],
+      "standard_errors": [
+        0.1992323100566864,
+        0.04336760565638542,
+        0.05092990770936012
+      ],
+      "policy_tv": 0.01387141380860885,
+      "value_rmse": 0.6095096943596914,
+      "regret": {
+        "baseline": 0.003915914926791966,
+        "type_a": 0.0052781164902146,
+        "type_b": 0.01797724872975259,
+        "type_c": 0.019909072951574142,
+        "transferred": true
+      },
+      "runtime": 0.23143887519836426,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_15",
+      "rep": 1,
+      "params": [
+        0.811216413974762,
+        0.5425459742546082,
+        1.0518323183059692
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.013871413934049844,
+      "value_rmse": 0.6095068211539886,
+      "regret": {
+        "baseline": 0.003915904980679839,
+        "type_a": 0.005278102868521788,
+        "type_b": 0.01797712541027834,
+        "type_c": 0.019908940331182685,
+        "transferred": true
+      },
+      "runtime": 4.37360405921936,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NeuralGLADIUS",
+      "family": "behavioral",
+      "cell": "route_choice_15",
+      "rep": 1,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.26704025520789837,
+      "value_rmse": 22.353840006947614,
+      "regret": {
+        "baseline": 4.892427916470922,
+        "type_a": 4.5595638041593,
+        "type_b": 11.248307083808973,
+        "type_c": 42.70699332547697,
+        "transferred": false
+      },
+      "runtime": 12.295525789260864,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 0,
+      "params": [
+        1.1529490454495774,
+        0.48483056228579413,
+        0.8922340220263111
+      ],
+      "standard_errors": [
+        0.21078374981880188,
+        0.023926664143800735,
+        0.08807075023651123
+      ],
+      "policy_tv": 0.014422778306183206,
+      "value_rmse": 1.590584243351825,
+      "regret": {
+        "baseline": 0.004153413129077895,
+        "type_a": 0.004043776603119221,
+        "type_b": 0.016893317057624403,
+        "type_c": 0.010889536163720303,
+        "transferred": true
+      },
+      "runtime": 1.6958389282226562,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 0,
+      "params": [
+        1.1747846603393555,
+        0.4758692979812622,
+        0.7830116748809814
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01677100655921007,
+      "value_rmse": 3.3342884539363706,
+      "regret": {
+        "baseline": 0.017335335210675505,
+        "type_a": 0.016815363416255218,
+        "type_b": 0.06525676068652407,
+        "type_c": 0.05452490190524566,
+        "transferred": true
+      },
+      "runtime": 2.2439019680023193,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 0,
+      "params": [
+        1.1529488563537598,
+        0.4848305583000183,
+        0.8922340869903564
+      ],
+      "standard_errors": [
+        0.21078376471996307,
+        0.023926664143800735,
+        0.08807075023651123
+      ],
+      "policy_tv": 0.014422771496365786,
+      "value_rmse": 1.5905833622590837,
+      "regret": {
+        "baseline": 0.004153409301160312,
+        "type_a": 0.0040437738255981424,
+        "type_b": 0.016893304162594457,
+        "type_c": 0.010889529282849352,
+        "transferred": true
+      },
+      "runtime": 0.3000209331512451,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_40",
+      "rep": 0,
+      "params": [
+        1.152826189994812,
+        0.48483842611312866,
+        0.892224133014679
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.014422938449229723,
+      "value_rmse": 1.5908645620343667,
+      "regret": {
+        "baseline": 0.004153044546541888,
+        "type_a": 0.00404333697691591,
+        "type_b": 0.016892321726932627,
+        "type_c": 0.010890097053306019,
+        "transferred": true
+      },
+      "runtime": 7.071191072463989,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NeuralGLADIUS",
+      "family": "behavioral",
+      "cell": "route_choice_40",
+      "rep": 0,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.42717480816850983,
+      "value_rmse": 23.119085545584948,
+      "regret": {
+        "baseline": 14.11145415597687,
+        "type_a": 14.21181795088239,
+        "type_b": 5.1838332516470675,
+        "type_c": 46.083610714883086,
+        "transferred": false
+      },
+      "runtime": 4.659267902374268,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 1,
+      "params": [
+        0.8903824279573,
+        0.5419009757041792,
+        0.9909625447455886
+      ],
+      "standard_errors": [
+        0.21819618344306946,
+        0.02533685602247715,
+        0.09024795889854431
+      ],
+      "policy_tv": 0.009577646142563793,
+      "value_rmse": 1.1576259619240963,
+      "regret": {
+        "baseline": 0.004946250001605442,
+        "type_a": 0.004504736161463019,
+        "type_b": 0.012718142069023589,
+        "type_c": 0.008583499770965525,
+        "transferred": true
+      },
+      "runtime": 1.6426341533660889,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 1,
+      "params": [
+        0.9013574719429016,
+        0.5344962477684021,
+        0.8996222019195557
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.020945233053603185,
+      "value_rmse": 2.2600019948863177,
+      "regret": {
+        "baseline": 0.005201218057274744,
+        "type_a": 0.004550791176340133,
+        "type_b": 0.014255473688556956,
+        "type_c": 0.0069545887478312,
+        "transferred": true
+      },
+      "runtime": 1.5337669849395752,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 1,
+      "params": [
+        0.8903818726539612,
+        0.5419007539749146,
+        0.9909628629684448
+      ],
+      "standard_errors": [
+        0.21819613873958588,
+        0.025336846709251404,
+        0.09024795889854431
+      ],
+      "policy_tv": 0.009577612461312302,
+      "value_rmse": 1.1576191454460443,
+      "regret": {
+        "baseline": 0.004946190617219529,
+        "type_a": 0.0045046817970146235,
+        "type_b": 0.012717998719496668,
+        "type_c": 0.008583408924669732,
+        "transferred": true
+      },
+      "runtime": 0.24379920959472656,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_40",
+      "rep": 1,
+      "params": [
+        0.8903864026069641,
+        0.5419008731842041,
+        0.990955650806427
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.009577372038574696,
+      "value_rmse": 1.1576866027108539,
+      "regret": {
+        "baseline": 0.00494622791583497,
+        "type_a": 0.00450469003452154,
+        "type_b": 0.012717847888135951,
+        "type_c": 0.008583124065407835,
+        "transferred": true
+      },
+      "runtime": 6.462944984436035,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NeuralGLADIUS",
+      "family": "behavioral",
+      "cell": "route_choice_40",
+      "rep": 1,
+      "params": null,
+      "standard_errors": null,
+      "policy_tv": 0.42141761284454893,
+      "value_rmse": 22.967364914803444,
+      "regret": {
+        "baseline": 14.114997070066789,
+        "type_a": 14.158126035884719,
+        "type_b": 5.5166263835948985,
+        "type_c": 39.18778042782458,
+        "transferred": false
+      },
+      "runtime": 6.602828025817871,
       "converged": true,
       "error": null
     }

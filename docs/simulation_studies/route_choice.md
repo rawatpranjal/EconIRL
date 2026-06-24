@@ -16,21 +16,35 @@ where $d_{ss'}$ is the Euclidean edge length, $\mathrm{am}(s')$ is a node-level 
 
 Agents discount future payoffs at $\beta$ and face i.i.d. logit taste shocks (scale $\sigma = 1$). Their behaviour solves the soft Bellman equation. All three parameters are identified from observed route choices because the features vary across edges, not just states. The panel simulates $N$ agents for $T$ periods from the true optimal policy. The figure shows simulated paths and the optimal value function (lower at nodes far from the goal).
 
-Synthetic route-choice problem on a random geometric graph. 25 nodes placed uniformly in the unit square; edges within Euclidean radius 0.25, plus a spanning tree for connectivity. An agent at node $s$ picks among 4 nearest neighbours; actions beyond node degree self-loop. Reward is linear in three edge features: negative edge length, destination amenity, and negative shortest-path distance to a fixed goal. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, seed=0)``. 200 x 35 observations, 2 replications, seed 42. True theta `[1.0, 0.5, 1.0]`. Design rank 3/3, condition number 1.34e+01, action-contrast rank 3/3 (the rank that identification from choices actually uses). Generated 2026-06-16 with econirl 0.0.6.
+Synthetic route choice on a random geometric graph. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, seed=0)``. 200 x 35 observations, 2 replications, seed 42. True theta `[1.0, 0.5, 1.0]`. Design rank 3/3, condition number 1.34e+01, action-contrast rank 3/3 (the rank that identification from choices actually uses). Generated 2026-06-23 with econirl 0.0.7.
 
 ![Simulated trajectories and the optimal value function for Route choice (25 nodes, 4 actions)](../_static/simulation_studies/route_choice_dgp.png)
+
+## Estimators and data
+
+| Estimator | Family | Uses transitions $P(s'\mid s,a)$ | Transferable reward | Standard errors |
+|---|---|---|---|---|
+| NFXP | structural | yes | yes | yes |
+| CCP | structural | yes | yes | no |
+| MPEC | structural | yes | yes | yes |
+| MCE-IRL | behavioral | yes | yes | no |
+| NeuralGLADIUS | behavioral | no | no | no |
+
+Uses transitions is whether the estimator reads the transition kernel; model-free learners do not. Transferable reward is whether it recovers a reward that re-solves under a counterfactual. Standard errors is whether it returns inference. The last two are read from the run.
 
 ## Results
 
 | Estimator | Family | Ran | Conv | Recovered params | Param RMSE | Policy TV | Regret base | Regret A | Regret B | Regret C | Time (s) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| NFXP | structural | 2/2 | 2/2 | [1.182, 0.508, 0.999] | 0.1052 | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 3.3 |
-| CCP | structural | 2/2 | 2/2 | [1.167, 0.488, 0.953] | 0.1025 | 0.0126 | 0.0058 | 0.0042 | 0.0086 | 0.0088 | 2.3 |
+| NFXP | structural | 2/2 | 2/2 | [1.182, 0.508, 0.999] | 0.1052 | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 3.0 |
+| CCP | structural | 2/2 | 2/2 | [1.167, 0.488, 0.953] | 0.1025 | 0.0126 | 0.0058 | 0.0042 | 0.0086 | 0.0088 | 2.2 |
 | MPEC | structural | 2/2 | 2/2 | [1.182, 0.508, 0.999] | 0.1052 | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 0.3 |
-| MCE-IRL | behavioral | 2/2 | 0/2 | [1.182, 0.508, 0.999] | - | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 5.4 |
-| NeuralGLADIUS | behavioral | 2/2 | 2/2 | - | - | 0.2642 | 4.1801 | 4.1759 | 3.3867 | 45.9306 | 6.8 |
+| MCE-IRL | behavioral | 2/2 | 0/2 | [1.182, 0.508, 0.999] | - | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 5.0 |
+| NeuralGLADIUS | behavioral | 2/2 | 2/2 | - | - | 0.2658 | 4.2640 | 4.2552 | 3.3720 | 44.4197 | 6.1 |
 
 Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
+
+![Policy total variation per estimator for Route choice (25 nodes, 4 actions)](../_static/simulation_studies/route_choice_results.png)
 
 ## Parameter recovery
 
@@ -48,7 +62,13 @@ Param RMSE covers the structural family only, which shares the parameterization 
 
 Coverage is the share of replications whose 95% interval contains the truth, shown with its Monte Carlo standard error. It is computed only where every replication produced a finite standard error. SE avail is the share of replications with finite standard errors.
 
-The structural family (NFXP, CCP, MPEC) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL and NeuralGLADIUS recover a reward in their own parameterization: reward is only partially identified from behaviour, so comparing their internal weights to the truth is not meaningful. Policy TV and regret are the right scorecards for the behavioral family.
+The structural family (NFXP, CCP, MPEC) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL here uses the same linear features and recovers the same values, but its weights stay out of the recovery table because an IRL reward is only partially identified in general. NeuralGLADIUS learns a model-free policy with no reward weights to compare. Policy TV and regret are the right scorecards for the behavioral family.
+
+## Scaling
+
+The same study at three problem sizes (15, 25, 40 states). Each line is one estimator: fit time on the left, policy total variation on the right. The structural methods stay accurate across sizes, with MPEC the fastest. NeuralGLADIUS is the least accurate at every size. The fits run from sub-second to a few seconds, so the compute lines reflect fixed overhead more than asymptotics at this scale.
+
+![Fit time and policy total variation against the number of states](../_static/simulation_studies/route_choice_scaling.png)
 
 ## Notes per estimator
 

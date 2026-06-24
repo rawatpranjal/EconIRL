@@ -33,6 +33,8 @@ RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "study_stockpiling.j
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "stockpiling.md")
 FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                           "stockpiling_dgp.png")
+RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                           "stockpiling_results.png")
 
 # ---- DGP configuration ----
 # 10 inventory levels x 2 price regimes = 20 states, 2 actions. Small enough for
@@ -117,11 +119,13 @@ def _run_neural_gladius(env, panel):
 
 
 ROSTER = (
-    RosterEntry("NFXP",         "structural", _run_nfxp),
-    RosterEntry("CCP",          "structural", _run_ccp),
-    RosterEntry("MPEC",         "structural", _run_mpec, timeout=120),
-    RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl),
-    RosterEntry("NeuralGLADIUS","behavioral", _run_neural_gladius),
+    RosterEntry("NFXP",         "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP",          "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC",         "structural", _run_mpec, timeout=120,
+                uses_transitions=True),
+    RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("NeuralGLADIUS","behavioral", _run_neural_gladius,
+                uses_transitions=False),
 )
 
 # ---------------------------------------------------------------------------
@@ -211,6 +215,7 @@ CELLS = (
         fit_timeout=240,
         param_block=True,
         figure=FIGURE_PNG,
+        results_figure=RESULTS_FIG,
     ),
 )
 
@@ -264,11 +269,12 @@ NARRATIVE = {
             "after": (
                 "The structural family (NFXP, CCP, MPEC) recovers all three "
                 "parameters on the same scale as the truth, so Param RMSE applies "
-                "to them alone. MCE-IRL and NeuralGLADIUS recover a reward in "
-                "their own parameterization: reward is only partially identified "
-                "from behaviour, so comparing their internal weights to the truth "
-                "is not meaningful. Policy TV and regret are the right scorecards "
-                "for the behavioral family."
+                "to them alone. MCE-IRL here uses the same linear features and "
+                "recovers the same values, but its weights stay out of the "
+                "recovery table because an IRL reward is only partially identified "
+                "in general. NeuralGLADIUS learns a model-free policy with no "
+                "reward weights to compare. Policy TV and regret are the right "
+                "scorecards for the behavioral family."
             ),
         },
     },

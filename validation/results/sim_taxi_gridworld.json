@@ -94,6 +94,140 @@
             "max_reps": null
           }
         ]
+      },
+      {
+        "cell_id": "taxi_gridworld_6",
+        "label": "Gridworld 6x6",
+        "description": "`GridworldEnvironment(grid_size=6, step_penalty=-0.1, terminal_reward=10.0, distance_weight=0.1, discount_factor=0.95)`. Transitions are deterministic; 36 states, 5 actions.",
+        "num_states": 36,
+        "num_actions": 5,
+        "discount_factor": 0.95,
+        "n_individuals": 500,
+        "n_periods": 20,
+        "seed": 7,
+        "n_replications": 2,
+        "param_block": false,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": true,
+        "figure": null,
+        "results_figure": null,
+        "parameter_names": [
+          "step_penalty",
+          "terminal_reward",
+          "distance_weight"
+        ],
+        "true_theta": [
+          -0.10000000149011612,
+          10.0,
+          0.10000000149011612
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 6.361057905466603,
+          "contrast_rank": 1,
+          "contrast_condition_number": 1.0
+        },
+        "roster": [
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "GLADIUS",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          }
+        ]
+      },
+      {
+        "cell_id": "taxi_gridworld_10",
+        "label": "Gridworld 10x10",
+        "description": "`GridworldEnvironment(grid_size=10, step_penalty=-0.1, terminal_reward=10.0, distance_weight=0.1, discount_factor=0.95)`. Transitions are deterministic; 100 states, 5 actions.",
+        "num_states": 100,
+        "num_actions": 5,
+        "discount_factor": 0.95,
+        "n_individuals": 500,
+        "n_periods": 20,
+        "seed": 7,
+        "n_replications": 2,
+        "param_block": false,
+        "show_params": true,
+        "show_regret": true,
+        "scaling_only": true,
+        "figure": null,
+        "results_figure": null,
+        "parameter_names": [
+          "step_penalty",
+          "terminal_reward",
+          "distance_weight"
+        ],
+        "true_theta": [
+          -0.10000000149011612,
+          10.0,
+          0.10000000149011612
+        ],
+        "diagnostics": {
+          "num_features": 3,
+          "feature_rank": 3,
+          "condition_number": 9.309431496355893,
+          "contrast_rank": 1,
+          "contrast_condition_number": 1.0
+        },
+        "roster": [
+          {
+            "name": "NFXP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "CCP",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MPEC",
+            "family": "structural",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "MCE-IRL",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          },
+          {
+            "name": "GLADIUS",
+            "family": "behavioral",
+            "max_reps": null,
+            "uses_transitions": true
+          }
+        ]
       }
     ],
     "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
@@ -4941,6 +5075,566 @@
         "transferred": true
       },
       "runtime": 0.3784639835357666,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "taxi_gridworld_6",
+      "rep": 0,
+      "params": [
+        -5228.863626263617,
+        4927.625794854339,
+        3244.6907879205614
+      ],
+      "standard_errors": [
+        28251749613568.0,
+        11772122628096.0,
+        90436542660608.0
+      ],
+      "policy_tv": 0.00019579073129129195,
+      "value_rmse": 57878.70965634547,
+      "regret": {
+        "baseline": 0.0028210607436562896,
+        "type_a": 0.003260409791977281,
+        "type_b": 15.436070902045415,
+        "type_c": 0.02413389245909059,
+        "transferred": true
+      },
+      "runtime": 2.1690750122070312,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "taxi_gridworld_6",
+      "rep": 0,
+      "params": [
+        -25059.517578125,
+        109023.2578125,
+        174515.8125
+      ],
+      "standard_errors": [
+        10000.0,
+        10000.0,
+        10000.0
+      ],
+      "policy_tv": 0.012017332699292936,
+      "value_rmse": 1502845.1066306003,
+      "regret": {
+        "baseline": 0.002821060743627868,
+        "type_a": 0.0032776375772414212,
+        "type_b": 29.02260272144879,
+        "type_c": 0.024133892459076378,
+        "transferred": true
+      },
+      "runtime": 2.932823896408081,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "taxi_gridworld_6",
+      "rep": 0,
+      "params": [
+        -20.408716201782227,
+        6.705284595489502,
+        14.803482055664062
+      ],
+      "standard_errors": [
+        2211740909568.0,
+        2102843932672.0,
+        40928571392.0
+      ],
+      "policy_tv": 0.00019579176539216128,
+      "value_rmse": 170.04231274897222,
+      "regret": {
+        "baseline": 0.0028210604604055334,
+        "type_a": 0.0032603867006457676,
+        "type_b": 12.844049735300878,
+        "type_c": 0.024133890003298575,
+        "transferred": true
+      },
+      "runtime": 0.31397080421447754,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_6",
+      "rep": 0,
+      "params": [
+        -8589.4970703125,
+        9041.5751953125,
+        5499.43603515625
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0001957907312912989,
+      "value_rmse": 110100.82240574427,
+      "regret": {
+        "baseline": 0.002821060743627868,
+        "type_a": 0.0032605996452730324,
+        "type_b": 15.436070902045415,
+        "type_c": 0.024133892459062167,
+        "transferred": true
+      },
+      "runtime": 2.6232998371124268,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_6",
+      "rep": 0,
+      "params": [
+        0.0,
+        3.0856601594445623,
+        0.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.22254163908208677,
+      "value_rmse": 182.57628042519244,
+      "regret": {
+        "baseline": 1.7249203048563402,
+        "type_a": 1.9919659202282958,
+        "type_b": 14.564204133661256,
+        "type_c": 57.79221279773934,
+        "transferred": true
+      },
+      "runtime": 33.06593894958496,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "taxi_gridworld_6",
+      "rep": 1,
+      "params": [
+        -4443.863782864947,
+        -4123.061683278626,
+        -89.2728618610588
+      ],
+      "standard_errors": [
+        84.81792449951172,
+        79.60919952392578,
+        81.09928894042969
+      ],
+      "policy_tv": 0.00022458338577917143,
+      "value_rmse": 87183.41526996753,
+      "regret": {
+        "baseline": 0.0028027505532008945,
+        "type_a": 0.003240515741879335,
+        "type_b": 15.671517002068128,
+        "type_c": 0.024369089007109324,
+        "transferred": true
+      },
+      "runtime": 3.9417500495910645,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "taxi_gridworld_6",
+      "rep": 1,
+      "params": [
+        -1125.81298828125,
+        1201.3612060546875,
+        -2244.17041015625
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.001651315357666132,
+      "value_rmse": 17781.427153473676,
+      "regret": {
+        "baseline": 0.0028233344106922686,
+        "type_a": 0.003264486157547708,
+        "type_b": 80.42624257697037,
+        "type_c": 0.02453526644646331,
+        "transferred": true
+      },
+      "runtime": 1.5131289958953857,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "taxi_gridworld_6",
+      "rep": 1,
+      "params": [
+        -202.9075927734375,
+        36.463966369628906,
+        -218.8466796875
+      ],
+      "standard_errors": [
+        84.49297332763672,
+        79.5625,
+        79.41053771972656
+      ],
+      "policy_tv": 0.00022476931677418288,
+      "value_rmse": 292.7405174001181,
+      "regret": {
+        "baseline": 0.0028154003502152136,
+        "type_a": 0.0032551904063211623,
+        "type_b": 80.42624257695873,
+        "type_c": 0.024471176431319464,
+        "transferred": true
+      },
+      "runtime": 0.25881409645080566,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_6",
+      "rep": 1,
+      "params": [
+        -1.7633154727276236e+20,
+        1.894921868857993e+19,
+        1.054417788394581e+21
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.09012933390845727,
+      "value_rmse": 2.3689994961588176e+21,
+      "regret": {
+        "baseline": 0.19804037462091628,
+        "type_a": 0.27189082662707165,
+        "type_b": 40.49352155596682,
+        "type_c": 23.48772334236743,
+        "transferred": true
+      },
+      "runtime": 111.86862015724182,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_6",
+      "rep": 1,
+      "params": [
+        0.0,
+        2.940787119750024,
+        0.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.2297550916595348,
+      "value_rmse": 184.30845710689306,
+      "regret": {
+        "baseline": 1.9984165817499786,
+        "type_a": 2.312579072615847,
+        "type_b": 15.612168092470533,
+        "type_c": 74.43522420894257,
+        "transferred": true
+      },
+      "runtime": 19.911043167114258,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "taxi_gridworld_10",
+      "rep": 0,
+      "params": [
+        31.876372759548453,
+        41.8563464790434,
+        -0.8634882024615537
+      ],
+      "standard_errors": [
+        73.94696044921875,
+        70.23302459716797,
+        1.899789571762085
+      ],
+      "policy_tv": 0.00029802961672780446,
+      "value_rmse": 661.4070421068029,
+      "regret": {
+        "baseline": 0.0005548504527439491,
+        "type_a": 0.0006146353410514394,
+        "type_b": 0.017687604407115032,
+        "type_c": 0.02257172544175745,
+        "transferred": true
+      },
+      "runtime": 2.349618911743164,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "taxi_gridworld_10",
+      "rep": 0,
+      "params": [
+        -5.797645568847656,
+        6.087518692016602,
+        -0.8788144588470459
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0316895114168218,
+      "value_rmse": 91.78765765636699,
+      "regret": {
+        "baseline": 0.0005660929876540877,
+        "type_a": 0.0006270576528493166,
+        "type_b": 22.153374054974194,
+        "type_c": 0.02304208759677806,
+        "transferred": true
+      },
+      "runtime": 2.361555814743042,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "taxi_gridworld_10",
+      "rep": 0,
+      "params": [
+        -7.8431596755981445,
+        4.122810363769531,
+        -0.8635150194168091
+      ],
+      "standard_errors": [
+        73.9515380859375,
+        70.23721313476562,
+        1.8997926712036133
+      ],
+      "policy_tv": 0.0002980266483422627,
+      "value_rmse": 132.6313433988641,
+      "regret": {
+        "baseline": 0.0005548324737816301,
+        "type_a": 0.0006146140088958418,
+        "type_b": 23.831555468236544,
+        "type_c": 0.022571286665204582,
+        "transferred": true
+      },
+      "runtime": 0.33054590225219727,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_10",
+      "rep": 0,
+      "params": [
+        -1.7761925299437568e+16,
+        -1.6864137548136448e+16,
+        -12662926336.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.11322098640240037,
+      "value_rmse": 3.549339871268503e+17,
+      "regret": {
+        "baseline": 0.30607481007038473,
+        "type_a": 0.3719176293331685,
+        "type_b": 35.19503340824694,
+        "type_c": 22.725411288959847,
+        "transferred": true
+      },
+      "runtime": 138.99790787696838,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_10",
+      "rep": 0,
+      "params": [
+        0.0,
+        2.5953967214271163,
+        0.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.21063794818159146,
+      "value_rmse": 156.73136787286725,
+      "regret": {
+        "baseline": 6.197605706517692,
+        "type_a": 7.489325523643714,
+        "type_b": 37.37946660076593,
+        "type_c": 24.30989283392409,
+        "transferred": true
+      },
+      "runtime": 37.36896896362305,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "taxi_gridworld_10",
+      "rep": 1,
+      "params": [
+        -10.693508400809026,
+        -0.8614583625603186,
+        0.8849383897314378
+      ],
+      "standard_errors": [
+        81.94398498535156,
+        77.80712127685547,
+        1.964673399925232
+      ],
+      "policy_tv": 0.0001351006867341401,
+      "value_rmse": 224.32995954410575,
+      "regret": {
+        "baseline": 0.00020418689436496607,
+        "type_a": 0.000227166837262871,
+        "type_b": 24.364170286161738,
+        "type_c": 0.005952859065345706,
+        "transferred": true
+      },
+      "runtime": 2.6265687942504883,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "taxi_gridworld_10",
+      "rep": 1,
+      "params": [
+        -4.450567722320557,
+        4.796272277832031,
+        1.0428924560546875
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.040004747843535256,
+      "value_rmse": 103.90781254858555,
+      "regret": {
+        "baseline": 0.0002745046487575564,
+        "type_a": 0.00029733232200612747,
+        "type_b": 22.54919134856985,
+        "type_c": 0.010052732455363866,
+        "transferred": true
+      },
+      "runtime": 1.7453110218048096,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MPEC",
+      "family": "structural",
+      "cell": "taxi_gridworld_10",
+      "rep": 1,
+      "params": [
+        -6.103696346282959,
+        3.4989700317382812,
+        0.8848456144332886
+      ],
+      "standard_errors": [
+        81.69001007080078,
+        77.56596374511719,
+        1.964672565460205
+      ],
+      "policy_tv": 0.0001350829489377599,
+      "value_rmse": 132.5789053064966,
+      "regret": {
+        "baseline": 0.00020414416589176199,
+        "type_a": 0.00022712023586279884,
+        "type_b": 23.71313453905293,
+        "type_c": 0.005951448312281116,
+        "transferred": true
+      },
+      "runtime": 0.27373790740966797,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_10",
+      "rep": 1,
+      "params": [
+        1.1402101881170821e+18,
+        1.0849081204943094e+18,
+        78732689670144.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.11322098640240037,
+      "value_rmse": 2.2816049062460555e+19,
+      "regret": {
+        "baseline": 0.30607481007038473,
+        "type_a": 0.3719176293331685,
+        "type_b": 0.017687656720923428,
+        "type_c": 22.725411288959847,
+        "transferred": true
+      },
+      "runtime": 243.41426730155945,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "GLADIUS",
+      "family": "behavioral",
+      "cell": "taxi_gridworld_10",
+      "rep": 1,
+      "params": [
+        0.0,
+        2.5123071247206794,
+        0.0
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.20496794764312593,
+      "value_rmse": 156.59180041032272,
+      "regret": {
+        "baseline": 6.710445736206935,
+        "type_a": 8.136882430417288,
+        "type_b": 38.27420525657507,
+        "type_c": 24.30989283392409,
+        "transferred": true
+      },
+      "runtime": 37.38694214820862,
       "converged": true,
       "error": null
     }

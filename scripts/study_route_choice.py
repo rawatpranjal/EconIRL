@@ -31,17 +31,23 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "study_route_choice.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "route_choice.md")
-FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                          "route_choice_dgp.png")
+_STATIC = os.path.join(_ROOT, "docs", "_static", "simulation_studies")
+FIGURE_PNG = os.path.join(_STATIC, "route_choice_dgp.png")
+RESULTS_FIG = os.path.join(_STATIC, "route_choice_results.png")
+SCALING_FIG = os.path.join(_STATIC, "route_choice_scaling.png")
 
 # ---- DGP configuration ----
-# 25 nodes, 4 actions. Small enough for sub-minute per-estimator fits while
-# giving the structural family enough variation to identify all three parameters.
-ENV = dict(num_nodes=25, num_actions=4, seed=0, discount_factor=0.95)
+# 4 actions, beta 0.95. The headline cell is 25 nodes: small enough for
+# sub-minute per-estimator fits while giving the structural family enough
+# variation to identify all three parameters. The scaling sweep reruns the
+# same roster at 15 and 40 nodes to trace compute and accuracy against size.
+HEADLINE_NODES = 25
+SCALING_NODES = (15, 40)
 
 
-def _env():
-    return road_network(**ENV)
+def _env(num_nodes=HEADLINE_NODES):
+    return road_network(num_nodes=num_nodes, num_actions=4, seed=0,
+                        discount_factor=0.95)
 
 
 # ---------------------------------------------------------------------------
@@ -116,11 +122,13 @@ def _run_neural_gladius(env, panel):
 
 
 ROSTER = (
-    RosterEntry("NFXP",         "structural", _run_nfxp),
-    RosterEntry("CCP",          "structural", _run_ccp),
-    RosterEntry("MPEC",         "structural", _run_mpec, timeout=120),
-    RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl),
-    RosterEntry("NeuralGLADIUS","behavioral", _run_neural_gladius),
+    RosterEntry("NFXP",         "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP",          "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC",         "structural", _run_mpec, timeout=120,
+                uses_transitions=True),
+    RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("NeuralGLADIUS","behavioral", _run_neural_gladius,
+                uses_transitions=False),
 )
 
 # ---------------------------------------------------------------------------
@@ -182,33 +190,39 @@ EXCLUDED = [
     },
 ]
 
-CELLS = (
-    Cell(
-        cell_id="route_choice",
-        label="Route choice (25 nodes, 4 actions)",
+def _cell(num_nodes, *, headline):
+    """One route-choice cell at a given graph size.
+
+    The headline cell carries the DGP figure, the parameter-recovery table, and
+    the scorecard. The other sizes are scaling-only: they run the same roster to
+    feed the scaling figure but render no tables of their own.
+    """
+    return Cell(
+        cell_id="route_choice" if headline else f"route_choice_{num_nodes}",
+        label=f"Route choice ({num_nodes} nodes, 4 actions)",
         description=(
-            "Synthetic route-choice problem on a random geometric graph. "
-            "25 nodes placed uniformly in the unit square; edges within "
-            "Euclidean radius 0.25, plus a spanning tree for connectivity. "
-            "An agent at node $s$ picks among 4 nearest neighbours; actions "
-            "beyond node degree self-loop. Reward is linear in three edge "
-            "features: negative edge length, destination amenity, and negative "
-            "shortest-path distance to a fixed goal. "
-            f"``road_network(num_nodes={ENV['num_nodes']}, "
-            f"num_actions={ENV['num_actions']}, "
-            f"discount_factor={ENV['discount_factor']}, "
-            f"seed={ENV['seed']})``."
+            "Synthetic route choice on a random geometric graph. "
+            f"``road_network(num_nodes={num_nodes}, num_actions=4, "
+            "discount_factor=0.95, seed=0)``."
         ),
-        env_factory=_env,
+        env_factory=(lambda n=num_nodes: _env(n)),
         roster=ROSTER,
         n_individuals=200,
         n_periods=35,
         seed=42,
         n_replications=2,
         fit_timeout=240,
-        param_block=True,
-        figure=FIGURE_PNG,
-    ),
+        param_block=headline,
+        figure=FIGURE_PNG if headline else None,
+        results_figure=RESULTS_FIG if headline else None,
+        scaling_only=not headline,
+    )
+
+
+# Headline first so single-size runs (--only-cell route_choice) still work.
+CELLS = (
+    _cell(HEADLINE_NODES, headline=True),
+    *(_cell(n, headline=False) for n in SCALING_NODES),
 )
 
 NARRATIVE = {
@@ -254,14 +268,23 @@ NARRATIVE = {
             "after": (
                 "The structural family (NFXP, CCP, MPEC) recovers all three "
                 "parameters on the same scale as the truth, so Param RMSE applies "
-                "to them alone. MCE-IRL and NeuralGLADIUS recover a reward in "
-                "their own parameterization: reward is only partially identified "
-                "from behaviour, so comparing their internal weights to the truth "
-                "is not meaningful. Policy TV and regret are the right scorecards "
-                "for the behavioral family."
+                "to them alone. MCE-IRL here uses the same linear features and "
+                "recovers the same values, but its weights stay out of the "
+                "recovery table because an IRL reward is only partially identified "
+                "in general. NeuralGLADIUS learns a model-free policy with no "
+                "reward weights to compare. Policy TV and regret are the right "
+                "scorecards for the behavioral family."
             ),
         },
     },
+    "scaling_intro": (
+        "The same study at three problem sizes (15, 25, 40 states). Each line is "
+        "one estimator: fit time on the left, policy total variation on the right. "
+        "The structural methods stay accurate across sizes, with MPEC the fastest. "
+        "NeuralGLADIUS is the least accurate at every size. The fits run from "
+        "sub-second to a few seconds, so the compute lines reflect fixed overhead "
+        "more than asymptotics at this scale."
+    ),
     "script": "scripts/study_route_choice.py",
     "results_rel": "validation/results/study_route_choice.json",
 }
@@ -276,4 +299,5 @@ if __name__ == "__main__":
         excluded=EXCLUDED,
         results_json=RESULTS_JSON,
         page_path=PAGE_PATH,
+        scaling_figure=SCALING_FIG,
     )

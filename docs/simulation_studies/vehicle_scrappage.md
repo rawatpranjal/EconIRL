@@ -29,6 +29,19 @@ True parameters: $\theta = [0.15,\;0.5,\;1.5,\;3.0]$. If keep: age increments by
 
 ![Simulated trajectories and the optimal value function for Vehicle scrappage (75 states, 2 actions)](../_static/simulation_studies/vehicle_scrappage_dgp.png)
 
+## Estimators and data
+
+| Estimator | Family | Uses transitions $P(s'\mid s,a)$ | Transferable reward | Standard errors |
+|---|---|---|---|---|
+| NFXP | structural | yes | yes | yes |
+| CCP | structural | yes | yes | yes |
+| MPEC | structural | yes | yes | yes |
+| UFXP | structural | yes | yes | yes |
+| NNES | structural | yes | yes | no |
+| MCE-IRL | behavioral | yes | yes | no |
+
+Uses transitions is whether the estimator reads the transition kernel; model-free learners do not. Transferable reward is whether it recovers a reward that re-solves under a counterfactual. Standard errors is whether it returns inference. The last two are read from the run.
+
 ## Results
 
 | Estimator | Family | Ran | Conv | Recovered params | Param RMSE | Policy TV | Regret base | Regret A | Regret B | Regret C | Time (s) |
@@ -41,6 +54,8 @@ True parameters: $\theta = [0.15,\;0.5,\;1.5,\;3.0]$. If keep: age increments by
 | MCE-IRL | behavioral | 2/2 | 0/2 | [0.152, 0.511, 1.415, 2.963] | - | 0.0113 | 0.0051 | 0.0051 | 0.0208 | 0.0120 | 13.6 |
 
 Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
+
+![Policy total variation per estimator for Vehicle scrappage (75 states, 2 actions)](../_static/simulation_studies/vehicle_scrappage_results.png)
 
 ## Parameter recovery
 
@@ -69,7 +84,7 @@ Param RMSE covers the structural family only, which shares the parameterization 
 
 Coverage is the share of replications whose 95% interval contains the truth, shown with its Monte Carlo standard error. It is computed only where every replication produced a finite standard error. SE avail is the share of replications with finite standard errors.
 
-The structural family (NFXP, CCP, MPEC, UFXP, NNES) recovers all four parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL recovers a reward in its own parameterization: reward is only partially identified from behaviour, so comparing its internal weights to the truth is not meaningful. Policy TV and regret are the right scorecards for the behavioral family.
+The structural family (NFXP, CCP, MPEC, UFXP, NNES) recovers all four parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL here uses the same linear features and recovers the same values, but its weights stay out of the recovery table because an IRL reward is only partially identified in general. Policy TV and regret are the right scorecards for the behavioral family.
 
 ## Notes per estimator
 

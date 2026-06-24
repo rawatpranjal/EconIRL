@@ -33,6 +33,8 @@ RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "study_vehicle_scrap
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "vehicle_scrappage.md")
 FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                           "vehicle_scrappage_dgp.png")
+RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                           "vehicle_scrappage_results.png")
 
 # ---- DGP configuration ----
 # 25 age bins x 3 defect levels = 75 states, 2 actions (keep/scrap).
@@ -112,12 +114,15 @@ def _run_mce_irl(env, panel):
 
 
 ROSTER = (
-    RosterEntry("NFXP",   "structural", _run_nfxp),
-    RosterEntry("CCP",    "structural", _run_ccp),
-    RosterEntry("MPEC",   "structural", _run_mpec,  timeout=180),
-    RosterEntry("UFXP",   "structural", _run_ufxp,  timeout=180),
-    RosterEntry("NNES",   "structural", _run_nnes,  timeout=300),
-    RosterEntry("MCE-IRL","behavioral", _run_mce_irl),
+    RosterEntry("NFXP",   "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP",    "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC",   "structural", _run_mpec,  timeout=180,
+                uses_transitions=True),
+    RosterEntry("UFXP",   "structural", _run_ufxp,  timeout=180,
+                uses_transitions=True),
+    RosterEntry("NNES",   "structural", _run_nnes,  timeout=300,
+                uses_transitions=True),
+    RosterEntry("MCE-IRL","behavioral", _run_mce_irl, uses_transitions=True),
 )
 
 # ---------------------------------------------------------------------------
@@ -226,6 +231,7 @@ CELLS = (
         fit_timeout=240,
         param_block=True,
         figure=FIGURE_PNG,
+        results_figure=RESULTS_FIG,
     ),
 )
 
@@ -290,10 +296,10 @@ NARRATIVE = {
             "after": (
                 "The structural family (NFXP, CCP, MPEC, UFXP, NNES) recovers "
                 "all four parameters on the same scale as the truth, so Param RMSE "
-                "applies to them alone. MCE-IRL recovers a reward in its own "
-                "parameterization: reward is only partially identified from "
-                "behaviour, so comparing its internal weights to the truth is not "
-                "meaningful. Policy TV and regret are the right scorecards for the "
+                "applies to them alone. MCE-IRL here uses the same linear features "
+                "and recovers the same values, but its weights stay out of the "
+                "recovery table because an IRL reward is only partially identified "
+                "in general. Policy TV and regret are the right scorecards for the "
                 "behavioral family."
             ),
         },

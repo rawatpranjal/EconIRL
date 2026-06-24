@@ -31,6 +31,26 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 
 ![Simulated trajectories and the optimal value function for Bus engine (20 mileage bins)](../_static/simulation_studies/rust_bus_dgp.png)
 
+## Estimators and data
+
+| Estimator | Family | Uses transitions $P(s'\mid s,a)$ | Transferable reward | Standard errors |
+|---|---|---|---|---|
+| NFXP | structural | yes | yes | yes |
+| CCP | structural | yes | yes | yes |
+| MPEC | structural | yes | yes | yes |
+| NNES | structural | yes | yes | no |
+| SEES | structural | yes | yes | no |
+| TD-CCP | structural | yes | yes | no |
+| UFXP | structural | yes | yes | yes |
+| MCE-IRL | behavioral | yes | yes | no |
+| MaxEnt-IRL | behavioral | yes | yes | no |
+| IQ-Learn | behavioral | yes | yes | no |
+| GLADIUS | behavioral | yes | yes | no |
+| AIRL | behavioral | yes | yes | no |
+| Deep-MCE-IRL | behavioral | yes | yes | no |
+
+Uses transitions is whether the estimator reads the transition kernel; model-free learners do not. Transferable reward is whether it recovers a reward that re-solves under a counterfactual. Standard errors is whether it returns inference. The last two are read from the run.
+
 ## Results
 
 | Estimator | Family | Ran | Conv | Recovered params | Param RMSE | Policy TV | Regret base | Regret A | Regret B | Regret C | Time (s) |
@@ -51,7 +71,15 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 
 Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
-The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the cost parameters on the same scale as the truth, so Param RMSE applies to it alone. The IRL family is scored on behavior and regret. Its reward parameters are in a different parameterization, because reward is only partially identified from behavior. Estimators that recover a transferable reward adapt under the interventions. Policy-only methods keep their old policy, which is why their Type C regret is large.
+![Policy total variation per estimator for Bus engine (20 mileage bins)](../_static/simulation_studies/rust_bus_results.png)
+
+The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, UFXP) recovers the cost parameters on the same scale as the truth, so Param RMSE applies to it alone. MCE-IRL uses the same linear cost features and recovers the same scale, but the IRL family is scored on behavior and regret because reward is only partially identified from behavior in general. Estimators that recover a transferable reward adapt under the interventions. Policy-only methods keep their old policy, which is why their Type C regret is large.
+
+## Scaling
+
+The same study at three mileage-grid sizes (15, 20, 30 bins). Each line is one estimator: fit time on the left, policy total variation on the right. The structural methods stay cheap and accurate across sizes. The neural and IRL methods cost more and are less accurate. These are small fits, so the compute lines reflect fixed overhead as much as problem size, and the trend is not a clean monotone curve.
+
+![Fit time and policy total variation against the number of states](../_static/simulation_studies/rust_bus_scaling.png)
 
 ## Notes per estimator
 

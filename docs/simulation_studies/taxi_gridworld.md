@@ -25,6 +25,25 @@ and every trajectory starts at the top-left corner (state 0). The figure shows t
 
 ![Simulated trajectories and the optimal value function for Gridworld 8x8](../_static/simulation_studies/taxi_gridworld_dgp.png)
 
+## Estimators and data
+
+| Estimator | Family | Uses transitions $P(s'\mid s,a)$ | Transferable reward | Standard errors |
+|---|---|---|---|---|
+| MaxEnt-IRL | behavioral | yes | yes | no |
+| MCE-IRL | behavioral | yes | yes | no |
+| Deep-MCE-IRL | behavioral | yes | yes | no |
+| AIRL | behavioral | yes | yes | no |
+| IQ-Learn | behavioral | yes | yes | no |
+| f-IRL | behavioral | yes | no | no |
+| GLADIUS | behavioral | yes | yes | no |
+| BC | behavioral | yes | no | no |
+| NFXP | structural | yes | yes | yes |
+| CCP | structural | yes | yes | yes |
+| MPEC | structural | yes | yes | yes |
+| UFXP | structural | yes | yes | yes |
+
+Uses transitions is whether the estimator reads the transition kernel; model-free learners do not. Transferable reward is whether it recovers a reward that re-solves under a counterfactual. Standard errors is whether it returns inference. The last two are read from the run.
+
 ## Results
 
 | Estimator | Family | Ran | Conv | Policy TV | Time (s) |
@@ -44,7 +63,15 @@ and every trajectory starts at the top-left corner (state 0). The figure shows t
 
 Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate.
 
+![Policy total variation per estimator for Gridworld 8x8](../_static/simulation_studies/taxi_gridworld_results.png)
+
 The structural rows match behavior almost perfectly, but their parameters are not separately identified here, so the parameter columns are omitted. The raw feature design has full rank, while the action-contrast design has rank 1. The step-penalty and distance features take the same value for every action at a state, so they cancel out of every choice probability. The regret columns are omitted for the same reason, because transferring an unidentified reward is not a meaningful exercise. The lesson is to check the rank of the action-differenced features before estimating.
+
+## Scaling
+
+The same study at three grid sizes (36, 64, 100 states). Each line is one estimator: fit time on the left, policy total variation on the right. The structural rows track behavior closely across sizes. The compute lines reflect fixed overhead as much as problem size at this scale, so the time curves need not rise cleanly with the state count. Policy total variation is the right scorecard here because the reward parameters are not separately identified on this grid.
+
+![Fit time and policy total variation against the number of states](../_static/simulation_studies/taxi_gridworld_scaling.png)
 
 ## Notes per estimator
 
@@ -62,4 +89,4 @@ python scripts/sim_taxi_gridworld.py --verify        # re-derive the table from 
 
 Raw facts: `validation/results/sim_taxi_gridworld.json`.
 
-Not shown on this page: SEES (its spline value basis is built for an ordered 1-D state index. A 2-D grid breaks that geometry, so running it here would be misspecification by construction); NNES, TD-CCP (the structural contrast is carried by NFXP/CCP/MPEC/UFXP here. The full structural roster runs on the bus engine and other study pages); MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code or too slow; not benchmarked in this study).
+Not shown on this page: SEES (its spline value basis is built for an ordered 1-D state index. A 2-D grid breaks that geometry, so running it here would be misspecification by construction); NNES, TD-CCP (the structural contrast is carried by NFXP/CCP/MPEC/UFXP here. The full structural roster runs on the bus engine and abstract MDP pages); MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code or too slow; not benchmarked in this study).

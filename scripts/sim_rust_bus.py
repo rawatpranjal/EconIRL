@@ -31,15 +31,23 @@ RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "sim_rust_bus.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "rust_bus.md")
 FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                           "rust_bus_dgp.png")
+RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                           "rust_bus_results.png")
+SCALING_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                           "rust_bus_scaling.png")
 
 # The canonical recoverable cell: identical to the prior benchmark ladder's
 # simple_binary configuration, so this page genuinely re-homes that cell.
-ENV = dict(num_mileage_bins=20, operating_cost=0.01, replacement_cost=2.0,
-           discount_factor=0.95)
+# The headline cell is 20 mileage bins. The scaling sweep reruns a trimmed
+# roster at 15 and 30 bins to trace compute and accuracy against problem size.
+HEADLINE_BINS = 20
+SCALING_BINS = (15, 30)
+ENV = dict(num_mileage_bins=HEADLINE_BINS, operating_cost=0.01,
+           replacement_cost=2.0, discount_factor=0.95)
 
 
-def _env():
-    return RustBusEnvironment(**ENV)
+def _env(num_mileage_bins=HEADLINE_BINS):
+    return RustBusEnvironment(**{**ENV, "num_mileage_bins": num_mileage_bins})
 
 
 # ---------------------------------------------------------------------------
@@ -208,19 +216,30 @@ def _run_max_margin(env, panel):
 
 
 ROSTER = (
-    RosterEntry("NFXP", "structural", _run_nfxp),
-    RosterEntry("CCP", "structural", _run_ccp),
-    RosterEntry("MPEC", "structural", _run_mpec),
-    RosterEntry("NNES", "structural", _run_nnes),
-    RosterEntry("SEES", "structural", _run_sees),
-    RosterEntry("TD-CCP", "structural", _run_tdccp),
-    RosterEntry("UFXP", "structural", _run_ufxp),
-    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl),
-    RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl),
-    RosterEntry("IQ-Learn", "behavioral", _run_iq_learn),
-    RosterEntry("GLADIUS", "behavioral", _run_gladius),
-    RosterEntry("AIRL", "behavioral", _run_airl),
-    RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl),
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
+    RosterEntry("NNES", "structural", _run_nnes, uses_transitions=True),
+    RosterEntry("SEES", "structural", _run_sees, uses_transitions=True),
+    RosterEntry("TD-CCP", "structural", _run_tdccp, uses_transitions=True),
+    RosterEntry("UFXP", "structural", _run_ufxp, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl, uses_transitions=True),
+    RosterEntry("IQ-Learn", "behavioral", _run_iq_learn, uses_transitions=True),
+    RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
+    RosterEntry("AIRL", "behavioral", _run_airl, uses_transitions=True),
+    RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl, uses_transitions=True),
+)
+
+# Trimmed roster for the scaling sweep: five representative lines, a strict
+# subset of ROSTER (same _run_* and uses_transitions). Thirteen lines on one
+# plot is unreadable and slow.
+SCALING_ROSTER = (
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
 )
 
 
@@ -253,28 +272,61 @@ EXCLUDED = [
      "their raw records remain in the results file"},
 ]
 
-CELLS = (
-    Cell(
-        cell_id="rust_bus",
-        label="Bus engine (20 mileage bins)",
+_HEADLINE_CELL = Cell(
+    cell_id="rust_bus",
+    label="Bus engine (20 mileage bins)",
+    description=(
+        "Harold Zurcher's bus-engine replacement problem (Rust 1987): a "
+        "binary keep-or-replace choice over a discretized mileage state, "
+        "with linear operating and replacement costs. "
+        f"`RustBusEnvironment(num_mileage_bins={ENV['num_mileage_bins']}, "
+        f"operating_cost={ENV['operating_cost']}, "
+        f"replacement_cost={ENV['replacement_cost']}, "
+        f"discount_factor={ENV['discount_factor']})`."
+    ),
+    env_factory=_env,
+    roster=ROSTER,
+    n_individuals=500,
+    n_periods=80,
+    seed=42,
+    n_replications=3,
+    fit_timeout=600,
+    figure=FIGURE_PNG,
+    results_figure=RESULTS_FIG,
+)
+
+
+def _scaling_cell(num_mileage_bins):
+    """One scaling-only cell at a given mileage-grid size.
+
+    Runs the trimmed SCALING_ROSTER to feed the scaling figure. Renders no
+    tables or figures of its own.
+    """
+    return Cell(
+        cell_id=f"rust_bus_{num_mileage_bins}",
+        label=f"Bus engine ({num_mileage_bins} mileage bins)",
         description=(
-            "Harold Zurcher's bus-engine replacement problem (Rust 1987): a "
-            "binary keep-or-replace choice over a discretized mileage state, "
-            "with linear operating and replacement costs. "
-            f"`RustBusEnvironment(num_mileage_bins={ENV['num_mileage_bins']}, "
+            "Bus-engine replacement at a smaller or larger mileage grid. "
+            f"`RustBusEnvironment(num_mileage_bins={num_mileage_bins}, "
             f"operating_cost={ENV['operating_cost']}, "
             f"replacement_cost={ENV['replacement_cost']}, "
             f"discount_factor={ENV['discount_factor']})`."
         ),
-        env_factory=_env,
-        roster=ROSTER,
+        env_factory=(lambda n=num_mileage_bins: _env(n)),
+        roster=SCALING_ROSTER,
         n_individuals=500,
         n_periods=80,
         seed=42,
-        n_replications=3,
+        n_replications=2,
         fit_timeout=600,
-        figure=FIGURE_PNG,
-    ),
+        scaling_only=True,
+    )
+
+
+# Headline first so single-cell runs (--only-cell rust_bus) still work.
+CELLS = (
+    _HEADLINE_CELL,
+    *(_scaling_cell(n) for n in SCALING_BINS),
 )
 
 NARRATIVE = {
@@ -331,16 +383,24 @@ NARRATIVE = {
             "after": (
                 "The structural family (NFXP, CCP, MPEC, NNES, SEES, TD-CCP, "
                 "UFXP) recovers the cost parameters on the same scale as the "
-                "truth, so Param RMSE applies to it alone. The IRL family is "
-                "scored on behavior and regret. Its reward parameters are in "
-                "a different parameterization, because reward is only partially "
-                "identified from behavior. Estimators that recover a "
-                "transferable reward adapt under the interventions. "
+                "truth, so Param RMSE applies to it alone. MCE-IRL uses the same "
+                "linear cost features and recovers the same scale, but the IRL "
+                "family is scored on behavior and regret because reward is only "
+                "partially identified from behavior in general. Estimators that "
+                "recover a transferable reward adapt under the interventions. "
                 "Policy-only methods keep their old policy, which is why "
                 "their Type C regret is large."
             ),
         },
     },
+    "scaling_intro": (
+        "The same study at three mileage-grid sizes (15, 20, 30 bins). Each "
+        "line is one estimator: fit time on the left, policy total variation "
+        "on the right. The structural methods stay cheap and accurate across "
+        "sizes. The neural and IRL methods cost more and are less accurate. "
+        "These are small fits, so the compute lines reflect fixed overhead as "
+        "much as problem size, and the trend is not a clean monotone curve."
+    ),
     "script": "scripts/sim_rust_bus.py",
     "results_rel": "validation/results/sim_rust_bus.json",
 }
@@ -349,4 +409,5 @@ NARRATIVE = {
 if __name__ == "__main__":
     main_cli(cells=CELLS, title="Simulation study: bus engine replacement",
              narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
-             results_json=RESULTS_JSON, page_path=PAGE_PATH)
+             results_json=RESULTS_JSON, page_path=PAGE_PATH,
+             scaling_figure=SCALING_FIG)
