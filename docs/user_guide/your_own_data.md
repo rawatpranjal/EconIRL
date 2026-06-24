@@ -135,6 +135,7 @@ Read three things from this.
 Only fit once `contrast_rank` equals `num_features` and both condition numbers
 are moderate.
 
+(choosing-your-estimator)=
 ## Choosing your estimator
 
 Two families fit the same kind of panel but recover different objects. Pick by
