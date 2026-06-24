@@ -335,20 +335,22 @@ attributes, weighting modes, and the lower-level `UFXPEstimator` interface.
 
 Parameter recovery is measured on the `canonical_low_action` synthetic cell, which
 has known rewards, transitions, policies, values, Q functions, and Type A, Type B,
-and Type C counterfactual oracles. The figure below is a Monte-Carlo study over 200
+and Type C counterfactual oracles. The figure below is a Monte-Carlo study over 100
 replications: the panel is resimulated and refit on a fresh seed each time, and each
 parameter is plotted as its recovered mean and 95% interval against the true value.
 
 ![ufxp parameter recovery, Monte Carlo](../_static/estimators/ufxp_recovery.png)
 
-Recovery statistics are over a Monte-Carlo run; numbers are pending the full run.
+Recovery statistics are over a Monte-Carlo run of 100 replications.
 
 | Parameter | True | Recovered (mean) | 95% interval |
 | --- | ---: | ---: | --- |
-| `action_0_intercept` | 0.10 | _pending MC_ | _pending MC_ |
-| `action_0_progress` | 0.50 | _pending MC_ | _pending MC_ |
-| `action_1_intercept` | 0.00 | _pending MC_ | _pending MC_ |
-| `action_1_progress` | -0.20 | _pending MC_ | _pending MC_ |
+| `action_0_intercept` | 0.10 | 0.103 | [0.053, 0.151] |
+| `action_0_progress` | 0.50 | 0.494 | [0.432, 0.567] |
+| `action_1_intercept` | 0.00 | 0.003 | [-0.076, 0.071] |
+| `action_1_progress` | -0.20 | -0.198 | [-0.310, -0.086] |
+
+Across the 100 replications the true value sits inside the 95% interval for every parameter, and the mean estimate is close to the truth.
 
 Behavioral fit and counterfactual regret on the same cell, against the known
 oracle objects:

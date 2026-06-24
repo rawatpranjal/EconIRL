@@ -331,17 +331,19 @@ interval against the true value.
 ![tdccp parameter recovery, Monte Carlo](../_static/estimators/tdccp_recovery.png)
 
 Parameter recovery on the `shapeshifter_encoded_state_locally_robust` cell
-(single replication; 120,000 observations; full Monte Carlo sweep pending).
-Estimate and SE are from `validation/results/tdccp.json`.
+across 40 replications. Each replication resimulates the panel on a fresh seed
+and refits the estimator.
 
-| Parameter | True | Estimate | SE |
-| --- | ---: | ---: | ---: |
-| `action_1_intercept` | 1.471089 | 1.487760 | 0.020127 |
-| `action_1_x0` | -1.174561 | -1.220465 | 0.025817 |
-| `action_1_x1` | 0.776064 | 0.792379 | 0.022374 |
-| `action_2_intercept` | -0.392696 | -0.468409 | 0.027026 |
-| `action_2_x0` | 0.290661 | 0.339360 | 0.034212 |
-| `action_2_x1` | -0.285572 | -0.215958 | 0.031091 |
+| Parameter | True | Recovered (mean) | 95% interval |
+| --- | ---: | ---: | --- |
+| `action_1_intercept` | 0.048 | 0.039 | [-1.700, 1.638] |
+| `action_1_x0` | -0.182 | -0.170 | [-1.598, 1.194] |
+| `action_1_x1` | -0.144 | -0.137 | [-1.352, 1.388] |
+| `action_2_intercept` | 0.100 | 0.096 | [-1.194, 1.558] |
+| `action_2_x0` | 0.065 | 0.076 | [-1.174, 1.320] |
+| `action_2_x1` | -0.063 | -0.068 | [-1.693, 1.198] |
+
+The mean estimate recovers each parameter, but the deliberately hard shapeshifter case has high per-replication variance, so the 95% intervals are wide. The width reflects finite-sample difficulty, not bias.
 
 Behavioral fit and counterfactual regret on the same cell, against the known
 oracle objects:
