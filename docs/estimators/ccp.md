@@ -22,7 +22,11 @@ to approach full maximum likelihood efficiency.
 Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed for
 individual $i$ in period $t$. The vector $\phi(s, a)$ collects the known reward
 features and $\theta$ the reward parameters to be estimated. The discount factor is
-$\beta$ and the logit shock scale is $\sigma$. The transition kernel $P_a(s, s')$
+$\beta$ and the logit shock scale is $\sigma$. The additive choice-specific shock is
+$\varepsilon_a$, drawn independently across choices as Type-I extreme value with scale
+$\sigma$; its conditional expectation given optimality equals the emax correction
+$\gamma - \log \hat\pi(a \mid s)$ (in utility units, before dividing by $\sigma$).
+The transition kernel $P_a(s, s')$
 gives the probability of moving to $s'$ from $s$ under action $a$, stored in
 $(A, S, S)$ orientation. The first-stage empirical conditional choice probability is
 $\hat\pi(a \mid s)$, estimated from state-action frequencies. The Euler-Mascheroni
@@ -49,8 +53,28 @@ F_{\hat\pi}(s, s') = \sum_a \hat\pi(a \mid s)\, P_a(s, s'),
 e_{\hat\pi}(s, a) = \gamma - \log \hat\pi(a \mid s).
 $$
 
-The Hotz-Miller inversion writes the integrated value under $\hat\pi$ as a matrix
-resolve:
+The emax correction $e_{\hat\pi}$ is in utility units (i.e., it enters flow payoffs
+before the softmax divides by $\sigma$). For Type-I extreme value shocks with scale
+$\sigma$, the Williams-Daly-Zachary theorem gives
+$E[\varepsilon_a \mid a = \operatorname{argmax}_b] = \sigma(\gamma - \log \hat\pi(a \mid s))$.
+This is $\sigma \cdot e_{\hat\pi}(s,a)$ in scaled units. The implementation
+stores $e_{\hat\pi}$ in utility units and applies the $\sigma$ factor only when
+computing the logit probabilities via $\exp(\tilde Q / \sigma)$. The two
+conventions coincide at $\sigma = 1$, the scale used in the validation cell.
+See Rust (1994) or Hotz and Miller (1993) Lemma 1.
+
+The integrated Bellman equation under $\hat\pi$ is:
+
+$$
+\bar{V}_{\hat\pi}(s)
+= \sum_a \hat\pi(a \mid s)
+  \bigl[u_\theta(s, a) + e_{\hat\pi}(s, a)
+        + \beta \sum_{s'} P_a(s, s')\, \bar{V}_{\hat\pi}(s')\bigr].
+$$
+
+Collecting the $\bar{V}$ terms, this becomes
+$(I - \beta F_{\hat\pi})\bar{V}_{\hat\pi} = \sum_a \hat\pi(a \mid s)\{u_\theta(s, a) + e_{\hat\pi}(s, a)\}$,
+which inverts to:
 
 $$
 \bar{V}_{\hat\pi}
@@ -88,6 +112,37 @@ where $\tilde{z}(s,a) = \phi(s,a) + \beta \sum_{s'} P_a(s,s') W_\phi(s')$ and
 $\tilde{e}(s,a) = \beta \sum_{s'} P_a(s,s') W_e(s')$ depend on $\hat\pi$ but not on
 $\theta$. One factorization of $(I - \beta F_{\hat\pi})$ per NPL step replaces the
 repeated per-evaluation Bellman solves that NFXP pays at every likelihood call.
+
+**Gradient with respect to $\theta$ (implicit-differentiation step).**
+With $\hat\pi$ fixed, $W_\phi = \partial \bar{V}_{\hat\pi}/\partial\theta$
+because $\bar{V}_{\hat\pi}$ is the only $\theta$-dependent quantity on the
+right-hand side.  To derive the linear system for $W_\phi$ explicitly,
+differentiate the fixed-$\hat\pi$ Bellman equation
+$(I - \beta F_{\hat\pi})\bar{V}_{\hat\pi} = \sum_a \hat\pi(a \mid s)\,[\phi(s,a)^\top\theta + e_{\hat\pi}(s,a)]$
+with respect to $\theta$:
+
+$$
+(I - \beta F_{\hat\pi})\frac{\partial \bar{V}_{\hat\pi}}{\partial\theta}
+= \sum_a \hat\pi(a \mid s)\,\phi(s, a).
+$$
+
+Because $\hat\pi$ and $F_{\hat\pi}$ do not depend on $\theta$, the left-hand
+side is linear in $\partial \bar{V}/\partial\theta$ and the right-hand side is
+constant.  The unique solution is:
+
+$$
+W_\phi \;=\; \frac{\partial \bar{V}_{\hat\pi}}{\partial\theta}
+\;=\; (I - \beta F_{\hat\pi})^{-1} \sum_a \hat\pi(a \mid s)\,\phi(s, a),
+$$
+
+which is exactly the formula already used to define $W_\phi$ above.  This shows
+that $W_\phi$ is not an arbitrary matrix inversion: it is the derivative of the
+CCP-implied value function with respect to $\theta$, obtained by solving the
+one-shot linear system rather than differentiating through the full Bellman
+iteration.  No implicit differentiation through the iteration is needed because
+$\hat\pi$ is treated as a constant inside each NPL step; the nonlinear dependence
+of $\hat\pi$ on $\theta$ only enters when the outer loop updates the policy.
+See Aguirregabiria and Mira (2002) eqs. (4)-(5).
 
 ## Identification
 
@@ -150,13 +205,25 @@ $$
   \left[
     \tilde{z}(s_i, a_i)
     - \sum_a \tilde\pi_\theta(a \mid s_i; \hat\pi^{k-1})\, \tilde{z}(s_i, a)
-  \right].
+  \right],
 $$
 
-Standard errors are computed from the full Bellman-constrained likelihood Hessian,
-evaluated numerically at the converged estimate, and from per-observation gradients
-for robust sandwich inference. This keeps the fitted summary compatible with the
-shared inference interface used by NFXP.
+where $(s_i, a_i)$ stands for a single observation $(s_{it}, a_{it})$ from the panel.
+
+The pseudo-MLE first-order condition is:
+
+$$
+\sum_{i,t} \psi_i(\hat\theta_k) = 0,
+$$
+
+which the inner L-BFGS-B step solves numerically.
+
+The score $\psi_i$ above is used only by the inner L-BFGS-B step to maximize the
+pseudo-LL; it is NOT the score used to form the sandwich estimator. Standard errors
+use the Hessian of the full structural log-likelihood (re-solving Bellman at each
+perturbation), which matches the NFXP Hessian convention and avoids the
+rank-deficiency of the pseudo-LL Hessian. This keeps the fitted summary compatible
+with the shared inference interface used by NFXP.
 
 ## Algorithm
 
@@ -164,31 +231,33 @@ shared inference interface used by NFXP.
 Algorithm  CCP/NPL (conditional choice probability, K-step nested pseudo-likelihood)
 Input   panel {(s_it, a_it, s_{i,t+1})}, features phi, transitions P,
         discount beta, logit scale sigma, NPL steps K
-Output  theta_hat, standard errors, policy pi-hat, value V
+Output  theta_hat, standard errors, policy pi^K, value V
 
-1   estimate pi-hat(a | s) from state-action frequencies      # first-stage CCPs
+1   estimate pi^0(a | s) from state-action frequencies        # first-stage CCPs
 2   for k = 1, ..., K do                                      # outer NPL loop
-3       F_pi(s, s') := sum_a pi-hat(a | s) * P_a(s, s')      # policy-weighted transitions
-4       e_pi(s, a) := gamma - log pi-hat(a | s)               # emax correction
+3       F_pi(s, s') := sum_a pi^{k-1}(a | s) * P_a(s, s')   # policy-weighted transitions
+4       e_pi(s, a) := gamma - log pi^{k-1}(a | s)            # emax correction (utility units)
 5       W_phi, W_e := (I - beta * F_pi)^{-1} applied to      # Hotz-Miller inversion
-              (sum_a pi-hat * phi, sum_a pi-hat * e_pi)
+              (sum_a pi^{k-1} * phi, sum_a pi^{k-1} * e_pi)
 6       z-tilde(s, a) := phi(s, a) + beta * sum_{s'} P_a(s, s') W_phi(s')
 7       e-tilde(s, a) := beta * sum_{s'} P_a(s, s') W_e(s')
 8       theta_k := argmax_theta sum_{i,t} log-softmax(        # L-BFGS-B step
               (z-tilde(s_it, *)' theta + e-tilde(s_it, *)) / sigma)[a_it]
-9       pi-hat(a | s) := softmax(                             # update policy
+9       pi^k(a | s) := softmax(                               # update policy
               (z-tilde(s, *)' theta_k + e-tilde(s, *)) / sigma)[a]
 10      if ||theta_k - theta_{k-1}|| < tol: break             # NPL convergence
-11  return theta_hat = theta_K, standard errors, pi-hat, V
+11  return theta_hat = theta_K, standard errors, pi^K, V
 ```
 
 The outer optimizer in step 8 is L-BFGS-B, applied to the augmented-feature logit;
 the gradient is the closed-form score $\psi_i$ from the Estimator section. The
 default in the public `CCP` wrapper is `num_policy_iterations=1`: the loop runs
-once, giving the one-step Hotz-Miller estimator, which is consistent but
-asymptotically less efficient than full MLE. Setting `num_policy_iterations=K` for
-$K > 1$ runs the NPL iteration for $K$ steps; setting $K = -1$ continues until
-parameter convergence. The implementation lives in `econirl.estimation.ccp`.
+once, giving the one-step Hotz-Miller estimator. Hotz and Miller (1993) show the
+one-step estimator is root-$N$ consistent; Aguirregabiria and Mira (2002,
+Proposition 1) show NPL iteration recovers full MLE efficiency as $K$ grows.
+Setting `num_policy_iterations=K` for $K > 1$ runs the NPL iteration for $K$
+steps; setting $K = -1$ continues until parameter convergence. The implementation
+lives in `econirl.estimation.ccp`.
 
 ## Applicability
 

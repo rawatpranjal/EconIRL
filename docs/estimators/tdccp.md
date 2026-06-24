@@ -15,8 +15,8 @@ inference at parametric rates.
 The estimator follows {ref}`Adusumilli and Eckardt (2025)
 <adusumilli-eckardt-2025>`, which introduces the temporal-difference CCP
 construction, the semigradient closed-form solve for the continuation
-accumulators, the locally robust correction recursion, and Algorithm 2
-cross-fitting for valid inference. The CCP foundation is
+accumulators, the locally robust correction recursion, and a cross-fitting
+procedure for valid inference. The CCP foundation is
 {ref}`Hotz and Miller (1993) <hotz-miller-1993>`, which first expresses the
 dynamic programming problem in terms of conditional choice probabilities and
 inverts the CCP mapping to recover structural parameters.
@@ -35,8 +35,13 @@ parameter-estimation stage does not model this kernel. The first-stage
 conditional choice probability is $P(a \mid x)$. The reward-feature
 accumulator is $h(a, x)$ and the choice-shock accumulator is $g(a, x)$; both
 are identified from observed successor pairs without a density model. The
-integrated value function is $V_\theta(x)$ and the choice-specific value is
-$\tilde{Q}_\theta(a, x) = h(a, x)^\top \theta + g(a, x)$.
+basis function $\phi(a, x)$ is a user-chosen finite-dimensional feature vector
+over (action, state) pairs that spans the approximation space for $h$ and $g$;
+the default is action-interacted polynomial functions of the state index;
+the estimated accumulator evaluates as $\hat{h}(a, x) = \phi(a, x)^\top
+\hat{\omega}$. The integrated value function is $V_\theta(x)$ and the
+choice-specific value is $\tilde{Q}_\theta(a, x) = h(a, x)^\top \theta +
+g(a, x)$.
 
 ## Model
 
@@ -61,21 +66,36 @@ g(a, x) = \beta\,\mathbb{E}\bigl[e(a', x') + g(a', x') \mid a, x\bigr],
 \qquad e(a, x) = \gamma_{\mathrm{E}} - \log P(a \mid x),
 $$
 
-where $\gamma_{\mathrm{E}}$ is the Euler-Mascheroni constant. Neither recursion
-requires modeling the transition density; both are identified from observed
-successor pairs. The implied choice-specific value is:
+where $\gamma_{\mathrm{E}}$ is the Euler-Mascheroni constant and $e(a, x)$ is
+the CCP-inverted shock accumulator. Under the logit model, the expected shock
+conditional on choosing $a$ is $\mathbb{E}[\varepsilon_a \mid a \text{ chosen}]
+= \gamma_{\mathrm{E}} - \log \pi(a \mid x)$ (Hotz and Miller 1993),
+so $e(a, x) = \gamma_{\mathrm{E}} - \log P(a \mid x)$ recovers the conditional
+shock from the observed CCP. Neither recursion requires modeling the transition
+density; both are identified from observed successor pairs.
+
+Substituting the Bellman equation recursively, the choice-specific value
+$Q(a, x)$ decomposes linearly into a reward-accumulator term $h(a, x)^\top
+\theta$ and a choice-shock term $g(a, x)$ that absorbs all future logit shocks
+(the Q-decomposition of Adusumilli and Eckardt 2025). This decomposition holds because
+the linear reward structure lets the two accumulators be estimated separately.
+The implied choice-specific value is:
 
 $$
 \tilde{Q}_\theta(a, x) = h(a, x)^\top \theta + g(a, x),
 $$
 
-and the conditional choice probability follows the logit rule:
+and the conditional choice probability follows the logit rule with scale
+$\sigma$:
 
 $$
 \pi_\theta(a \mid x)
-= \frac{\exp\{\tilde{Q}_\theta(a, x)\}}
-       {\sum_b \exp\{\tilde{Q}_\theta(b, x)\}}.
+= \frac{\exp\{\tilde{Q}_\theta(a, x) / \sigma\}}
+       {\sum_b \exp\{\tilde{Q}_\theta(b, x) / \sigma\}}.
 $$
+
+The implementation uses the full $\sigma$ via `problem.scale_parameter` at
+every evaluation point; the default is $\sigma = 1$.
 
 The canonical evaluation instance is the encoded-state design: 81 states,
 3 actions, and 6 reward parameters. Reward features are polynomial functions
@@ -120,8 +140,11 @@ $$
 $$
 
 where $\pi_\theta$ uses the semigradient estimates $\hat{h}$ and $\hat{g}$ in
-place of the transition integral. The semigradient solve for $h$ takes the
-closed form:
+place of the transition integral. The basis function $\phi(a, x)$ is a
+user-chosen finite-dimensional feature vector over (action, state) pairs that
+spans the approximation space for $h$ and $g$; the default is action-interacted
+polynomial functions of the state index. The semigradient solve for $h$ takes
+the closed form:
 
 $$
 \hat{\omega}
@@ -130,18 +153,78 @@ $$
   \mathbb{E}_n\bigl\{\phi(a,x)\,z(a,x)\bigr\},
 $$
 
-with an analogous equation for $g$. The plug-in score ignores estimation error
-in $\hat{h}$ and $\hat{g}$. The locally robust correction adds the term
-$\lambda(a, x)$, which satisfies a backward fixed-point recursion and accounts
-for that first-stage error. With cross-fitting (Algorithm 2 of the paper), the
-correction is computed on one fold using objects learned on the complementary
-fold, giving valid inference at parametric rates with standard errors clustered
-by individual.
+with $\hat{h}(a, x) = \phi(a, x)^\top \hat{\omega}$. The analogous equation
+for $g$ substitutes the next-period shock $\beta\, e(a', x')$ as the regression
+target:
+
+$$
+\hat{\omega}_g
+= \Bigl[\mathbb{E}_n\bigl\{\phi(a,x)
+    \bigl(\phi(a,x) - \beta\phi(a',x')\bigr)^\top\bigr\}\Bigr]^{-1}
+  \mathbb{E}_n\bigl\{\phi(a,x)\cdot \beta\, e(a', x')\bigr\},
+\quad e(a, x) = \gamma_{\mathrm{E}} - \log P(a \mid x).
+$$
+
+The matrix $A = \mathbb{E}_n\{\phi(\phi - \beta\phi')^\top\}$ is shared between
+the $h$ and $g$ solves, so both require only one matrix inversion.
+
+The score of the pseudo-log-likelihood with respect to $\theta$ is:
+
+$$
+\frac{\partial}{\partial \theta} \log \pi_\theta(a \mid x)
+= \frac{h(a, x) - \sum_b \pi_\theta(b \mid x)\, h(b, x)}{\sigma}.
+$$
+
+Setting $\mathbb{E}_n[\text{score}] = 0$ and treating $\hat{h}$ and $\hat{g}$
+as fixed gives the partial MLE first-order condition that defines
+$\tilde{\theta}$.
+
+### Locally Robust Inference
+
+The plug-in score ignores estimation error in $\hat{h}$ and $\hat{g}$.
+The locally robust correction debiases the moment by adding a term indexed by
+$\lambda(a, x)$. The corrected moment for observation $i$ is:
+
+$$
+\zeta_i = m_i + \lambda(a_i, x_i) \cdot \delta_i,
+$$
+
+where $m_i = \partial_\theta \log \pi_\theta(a_i \mid x_i)$ is the plug-in
+score and $\delta_i$ collects the TD residuals of $h$ and $g$ at observation
+$i$ (Adusumilli and Eckardt 2025). The correction function $\lambda$
+solves the backward fixed-point:
+
+$$
+\lambda(a', x') = -m(a', x';\,\theta,\hat{h},\hat{g})
+                  + \beta\,\lambda(a, x),
+$$
+
+reversing the time direction relative to the forward recursion for $h$ and $g$
+(source: `_compute_backward_value`). **Sign convention note.** This page
+writes the correction moment as $\zeta_i = m_i + \lambda \cdot \delta_i$ and the
+backward recursion with $-m$. Adusumilli and Eckardt (2025) may use the opposite
+sign on $m$ together with a compensating sign on $\zeta$; the two conventions are
+algebraically equivalent and produce the same corrected estimator. The robust estimator
+$\hat{\theta}$ solves $\mathbb{E}_n[\zeta_i] = 0$. The asymptotic variance is
+given by the sandwich formula:
+
+$$
+\hat{V} = \bigl(G^\top \hat{\Omega}^{-1} G\bigr)^{-1},
+\quad G = \mathbb{E}_n\!\left[\frac{\partial \zeta_i}{\partial \theta^\top}\right],
+\quad \hat{\Omega} = \mathbb{E}_n[\zeta_i \zeta_i^\top].
+$$
+
+Under the conditions of Adusumilli and Eckardt (2025), $\sqrt{n}(\hat{\theta} -
+\theta_0) \to \mathcal{N}(0, V)$. With cross-fitting (the cross-fitting procedure
+of Adusumilli and Eckardt 2025), $\lambda$ is computed on one fold using objects
+learned on the complementary fold, giving valid inference at parametric rates
+with standard errors clustered by individual. The deep asymptotic proof is
+stated and cited; it is not re-derived here.
 
 ## Algorithm
 
 ```text
-Algorithm  TD-CCP (semigradient, Algorithm 2 locally robust cross-fitting)
+Algorithm  TD-CCP (semigradient, locally robust cross-fitting)
 Input   panel {(a_it, x_it, a_{i,t+1}, x_{i,t+1})}, reward features z,
         basis phi, discount beta, fold count K
 Output  theta_hat, standard errors, policy pi, value V
@@ -155,8 +238,8 @@ Output  theta_hat, standard errors, policy pi, value V
 5       using data from folds != k, solve for g_k analogously
             with target beta (gamma_E - log P(a' | x'))
 6       on fold k data, solve the preliminary CCP pseudo-likelihood for tilde_theta_k
-7       on fold k data, compute the correction recursion lambda_k
-8       on fold k data, solve the locally robust moment equation for theta_k
+7       on fold k data, compute the correction recursion lambda_k           # backward fixed-point; see Locally Robust Inference
+8       on fold k data, solve the locally robust moment equation for theta_k # zeta_i = 0; see Locally Robust Inference
 9   theta_hat := average_k(theta_k)
 10  standard errors from the fold covariances, clustered by individual
 11  return theta_hat, standard errors, policy pi_theta, value V_theta
@@ -167,11 +250,12 @@ accumulators $\hat{h}$ and $\hat{g}$ are identified entirely from observed
 successor pairs $(a_t, x_t, a_{t+1}, x_{t+1})$.
 
 The default estimator uses `method="semigradient"`, `cross_fitting=True`, and
-`robust_se=True`, implementing Algorithm 2 of Adusumilli and Eckardt (2025).
-The semigradient steps (4 and 5) reduce to single matrix solves, making
-recursive-term estimation fast. The alternative `method="neural"` replaces the
-semigradient closed-form solves with neural approximate value iteration
-(Algorithm 1), which trains neural networks for $h$ and $g$ iteratively; it
+`robust_se=True`, implementing the locally robust cross-fitting procedure of
+Adusumilli and Eckardt (2025). The semigradient steps (4 and 5) reduce to single
+matrix solves, making recursive-term estimation fast. The alternative
+`method="neural"` replaces the semigradient closed-form solves with neural
+approximate value iteration, which trains neural networks for $h$ and $g$
+iteratively; it
 is more flexible for high-dimensional state spaces and does not use
 cross-fitting or locally robust standard errors in the current implementation.
 The implementation lives in `econirl.estimation.td_ccp`.
@@ -246,16 +330,18 @@ interval against the true value.
 
 ![tdccp parameter recovery, Monte Carlo](../_static/estimators/tdccp_recovery.png)
 
-Parameter recovery is over a Monte-Carlo run on the `shapeshifter_encoded_state_locally_robust` cell; numbers are pending the full run.
+Parameter recovery on the `shapeshifter_encoded_state_locally_robust` cell
+(single replication; 120,000 observations; full Monte Carlo sweep pending).
+Estimate and SE are from `validation/results/tdccp.json`.
 
-| Parameter | True | Recovered (mean) | 95% interval |
-| --- | ---: | ---: | --- |
-| `action_1_intercept` | 1.471089 | _pending MC_ | _pending MC_ |
-| `action_1_x0` | -1.174561 | _pending MC_ | _pending MC_ |
-| `action_1_x1` | 0.776064 | _pending MC_ | _pending MC_ |
-| `action_2_intercept` | -0.392696 | _pending MC_ | _pending MC_ |
-| `action_2_x0` | 0.290661 | _pending MC_ | _pending MC_ |
-| `action_2_x1` | -0.285572 | _pending MC_ | _pending MC_ |
+| Parameter | True | Estimate | SE |
+| --- | ---: | ---: | ---: |
+| `action_1_intercept` | 1.471089 | 1.487760 | 0.020127 |
+| `action_1_x0` | -1.174561 | -1.220465 | 0.025817 |
+| `action_1_x1` | 0.776064 | 0.792379 | 0.022374 |
+| `action_2_intercept` | -0.392696 | -0.468409 | 0.027026 |
+| `action_2_x0` | 0.290661 | 0.339360 | 0.034212 |
+| `action_2_x1` | -0.285572 | -0.215958 | 0.031091 |
 
 Behavioral fit and counterfactual regret on the same cell, against the known
 oracle objects:

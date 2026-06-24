@@ -24,14 +24,18 @@ dynamic discrete choice comparisons in this package.
 Throughout, $s$ indexes the discrete state and $a$ the discrete action,
 observed for individual $i$ in period $t$. The vector $\phi(s, a)$ collects
 the action-dependent reward features and $\theta$ the reward parameters to be
-estimated. The discount factor is $\beta$ and the logit shock scale is
-$\sigma$. The transition kernel $P_a(s, s')$ gives the probability of moving
-to $s'$ from $s$ under action $a$, stored in $(A, S, S)$ orientation. The
-soft value function is $V_\theta(s)$, the choice-specific value is
-$Q_\theta(s, a)$, and the causal policy is $\pi_\theta(a \mid s)$. The
-empirical discounted expert occupancy is $D_E(s, a)$ and the model occupancy
-is $D_\theta(s, a)$. The expert and model feature moments are $\mu_E$ and
-$\mu_\theta$.
+estimated. The subscript $k$ indexes the $k$-th component of $\phi$, so
+$\phi_k(s, a)$ denotes the $k$-th feature value at $(s, a)$. The discount
+factor is $\beta$ and the logit shock scale is $\sigma$. Setting $\sigma = 1$
+recovers the unit-scale convention used in the internal derivation and in
+Ziebart (2010); the public page keeps $\sigma$ explicit for the DDC
+comparison. The transition kernel $P_a(s, s')$ gives the probability of
+moving to $s'$ from $s$ under action $a$, stored in $(A, S, S)$ orientation.
+The initial state distribution is $\rho_0(s)$. The soft value function is
+$V_\theta(s)$, the choice-specific value is $Q_\theta(s, a)$, and the causal
+policy is $\pi_\theta(a \mid s)$. The empirical discounted expert occupancy is
+$D_E(s, a)$ and the model occupancy is $D_\theta(s, a)$. The expert and model
+feature moments are $\mu_E$ and $\mu_\theta$.
 
 ## Model
 
@@ -122,7 +126,49 @@ $$
 $$
 
 Equivalently, this is the stationarity condition of the causal-entropy dual
-objective:
+objective. The primal problem is
+
+$$
+\max_{\pi \text{ causal}} H_\text{causal}(\pi)
+\quad \text{s.t.} \quad
+\mathbb{E}_\pi[\phi(s,a)] = \mu_E,
+$$
+
+where $H_\text{causal}(\pi)$ is the causal entropy of the policy. Introducing
+$\theta$ as the Lagrange multiplier on the feature-matching constraint gives
+the dual objective
+
+$$
+L(\theta) = \min_{\pi \text{ causal}}
+  \Bigl[\theta \cdot (\mu_\pi - \mu_E)\Bigr] + H_\text{causal}(\pi),
+$$
+
+whose gradient is $\nabla_\theta L(\theta) = \mu_E - \mu_\theta$
+(Ziebart, 2010, ch. 3). The causal policy is the soft-optimal policy of this
+dual, which is precisely the softmax of $Q_\theta / \sigma$ derived above.
+This equivalence follows from differentiating $\log \pi_\theta(a \mid s)$
+directly. Since the policy is the softmax of $Q_\theta / \sigma$, the score has
+the logit form
+
+$$
+\frac{\partial \log \pi_\theta(a \mid s)}{\partial \theta_k}
+= \frac{1}{\sigma}\left(
+    \frac{\partial Q_\theta(s, a)}{\partial \theta_k}
+    - \sum_b \pi_\theta(b \mid s)\,\frac{\partial Q_\theta(s, b)}{\partial \theta_k}
+  \right),
+$$
+
+where the $Q$-gradient carries a continuation term through the value function,
+
+$$
+\frac{\partial Q_\theta(s, a)}{\partial \theta_k}
+= \phi_k(s, a)
+  + \beta \sum_{s'} P_a(s, s')\,\frac{\partial V_\theta(s')}{\partial \theta_k}.
+$$
+
+Aggregated over the discounted state-action occupancy of the expert and the
+model, the continuation terms telescope and the gradient reduces to the
+feature-expectation difference (Ziebart, 2010, §3.4):
 
 $$
 \nabla_\theta L(\theta) = \mu_E - \mu_\theta.
@@ -139,8 +185,39 @@ $$
 $$
 
 where $P_\pi = \sum_a \operatorname{diag}(\pi_\theta(\cdot, a)) P_a$ is the
-policy-weighted transition matrix. The resulting gradient has the same logit
-form as the structural conditional likelihood score.
+policy-weighted transition matrix.
+
+The model state occupancy $D_\theta(s)$ required for $\mu_\theta$ is computed
+by a forward pass (Ziebart, 2010, Algorithm 1):
+
+$$
+D_\theta(s) = \rho_0(s)
+  + \beta \sum_{s', a} D_\theta(s')\,\pi_\theta(a \mid s')\,P_a(s', s),
+$$
+
+or in matrix form $D_\theta = \rho_0 + \beta P_\pi^\top D_\theta$, solved by
+fixed-point iteration. The state-action occupancy is then
+$D_\theta(s, a) = D_\theta(s)\,\pi_\theta(a \mid s)$, from which
+$\mu_\theta = \sum_{s,a} D_\theta(s, a)\,\phi(s, a)$. This forward pass
+corresponds to `_compute_state_visitation` in the source
+(lines 272–283 of `mce_irl.py`).
+
+The final gradient of the log-likelihood with respect to $\theta_k$ is
+
+$$
+\frac{\partial \mathcal{L}}{\partial \theta_k}
+= \frac{1}{\sigma} \sum_t
+  \Bigl[
+    dQ_k(s_t, a_t)
+    - \sum_a \pi_\theta(a \mid s_t)\,dQ_k(s_t, a)
+  \Bigr],
+$$
+
+where $dQ_k(s, a) = \phi_k(s, a) + \beta (P_a\, dV_k)(s)$ and $dV_k$ solves
+the implicit-differentiation system above. This formula appears directly in
+the source at lines 667–676 of `mce_irl.py` and is the step that connects
+implicit differentiation to the gradient used in L-BFGS-B. The resulting
+gradient has the same logit form as the structural conditional likelihood score.
 
 ## Algorithm
 

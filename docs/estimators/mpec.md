@@ -19,15 +19,17 @@ in {ref}`Koiso and Otani (2024) <koiso-otani-2024>`.
 
 ## Notation
 
-Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed
-for individual $i$ in period $t$. The vector $\phi(s, a)$ collects the known
-reward features and $\theta$ the reward parameters to be estimated. The discount
-factor is $\beta$ and the logit shock scale is $\sigma$. The transition kernel
-$P_a(s, s')$ gives the probability of moving to $s'$ from $s$ under action $a$,
-stored in $(A, S, S)$ orientation. The value function is $V$, held as an explicit
-variable in the constrained program. The choice-specific value is
-$Q_\theta(s, a; V)$, which depends on the current value vector. The conditional
-choice probability, the policy, is $\pi_{\theta, V}(a \mid s)$.
+Throughout, $s \in \{1, \dots, S\}$ indexes the discrete state ($S$ the total
+state count) and $a$ the discrete action, observed for individual $i$ in period
+$t$. The vector $\phi(s, a)$ collects the known reward features and
+$\theta \in \mathbb{R}^K$ the reward parameters to be estimated ($K$ the
+parameter dimension). The discount factor is $\beta$ and the logit shock scale
+is $\sigma$. The transition kernel $P_a(s, s')$ gives the probability of moving
+to $s'$ from $s$ under action $a$, stored in $(A, S, S)$ orientation. The value
+function is $V$, held as an explicit variable in the constrained program. The
+choice-specific value is $Q_\theta(s, a; V)$, which depends on the current value
+vector. The conditional choice probability, the policy, is
+$\pi_{\theta, V}(a \mid s)$.
 
 ## Model
 
@@ -47,6 +49,10 @@ T_\theta V(s)
     \frac{u_\theta(s, a) + \beta \sum_{s'} P_a(s, s') V(s')}{\sigma}
 \right).
 $$
+
+The log-sum-exp form follows because integrating over Type-I extreme value shocks
+yields $E[\max_a (Q_a + \varepsilon_a)] = \sigma \log \sum_a \exp(Q_a/\sigma)$
+(standard result; see Rust 1987, Section 3).
 
 Given a value vector $V$, the choice-specific value is:
 
@@ -115,8 +121,11 @@ V - T_\theta V = 0.
 $$
 
 At any feasible point the constraint forces $V = V_\theta$, so MPEC and NFXP
-evaluate the same likelihood and target the same maximum likelihood estimate. The
-difference is numerical route, not structural object.
+evaluate the same likelihood and target the same maximum likelihood estimate.
+When $V = T_\theta V$, the choice-specific values $Q_\theta(s, a; V)$ equal the
+Bellman Q-values, so $\pi_{\theta, V}(a \mid s) = \pi_\theta(a \mid s)$; the two
+likelihoods are identical. The difference is numerical route, not structural
+object.
 
 Standard errors use the same implicit-score identity as NFXP. At the constrained
 optimum, the sensitivity of the value function to the reward parameters satisfies:
@@ -126,16 +135,71 @@ $$
 = \sum_a \pi(a \mid s)\, \phi(s, a),
 $$
 
-where $P_\pi = \sum_a \operatorname{diag}(\pi_{\theta,V}(\cdot, a)) P_a$ is the
-policy-weighted transition matrix. Per-observation scores follow from this linear
-system, and the robust covariance is their outer product.
+where $P_\pi = \sum_a \operatorname{diag}(\pi_{\theta,V}(\cdot \mid a)) P_a$ is
+the policy-weighted transition matrix, with $\operatorname{diag}(\pi_{\theta,V}(\cdot \mid a))$
+denoting the $S \times S$ diagonal matrix whose $(s,s)$ entry is
+$\pi_{\theta,V}(a \mid s)$. Here $\partial V / \partial \theta$ is an
+$S \times K$ matrix; the linear system is solved once per reward parameter
+($K$ right-hand sides).
+
+This equation follows from differentiating the Bellman fixed-point constraint
+$V = T_\theta V$ totally with respect to $\theta$:
+
+$$
+\frac{\partial V}{\partial \theta}
+= \frac{\partial (T_\theta V)}{\partial V}\,\frac{\partial V}{\partial \theta}
+  + \frac{\partial (T_\theta V)}{\partial \theta}.
+$$
+
+The two partial derivatives on the right are obtained from the log-sum-exp
+expression for $T_\theta V(s)$:
+
+- **Jacobian $\partial (T_\theta V)/\partial V$.** Differentiating
+  $\sigma \log \sum_a \exp(Q_\theta(s,a;V)/\sigma)$ with respect to $V_{s'}$
+  gives $\sum_a \pi(a \mid s)\, \beta P_a(s, s')$, so the $S \times S$ Jacobian
+  is $\beta P_\pi$.
+- **Feature gradient $\partial (T_\theta V)/\partial \theta$.** Differentiating
+  with respect to $\theta$ gives $\sum_a \pi(a \mid s)\, \phi(s, a)$, the
+  policy-weighted feature average.
+
+Substituting both and rearranging yields $(I - \beta P_\pi)\,\partial V/\partial
+\theta = \sum_a \pi(a \mid s)\, \phi(s, a)$.
+
+The per-observation score is obtained by the chain rule through $\log
+\pi_{\theta,V}(a_{it} \mid s_{it})$:
+
+$$
+\frac{\partial \log \pi(a_{it} \mid s_{it})}{\partial \theta}
+= \frac{1}{\sigma}\!\left[
+    \phi(s_{it}, a_{it}) - \sum_b \pi(b \mid s_{it})\, \phi(s_{it}, b)
+  \right]
++ \frac{\beta}{\sigma} \sum_{s'}\!\left[
+    P_{a_{it}}(s_{it}, s') - \sum_b \pi(b \mid s_{it})\, P_b(s_{it}, s')
+  \right]
+  \left(\frac{\partial V}{\partial \theta}\right)_{s'},
+$$
+
+where the second term uses the solved $\partial V/\partial \theta$ from the
+linear system above. Stacking scores over observations, the sandwich covariance
+is $\bigl(\sum_i g_i g_i^\top\bigr)^{-1}$ where $g_i = \sum_t (\text{score at
+observation } it)$ is the per-individual score vector.
 
 Shapiro and Xu (2005) establish that stationary points of the sample constrained
-problem converge to stationary points of the population problem, and that a sharp
-local optimum of the population problem is, with probability approaching one, a
-sharp local optimum of the sample problem. These results justify treating the MPEC
-estimate as consistent and asymptotically normal under a well-specified tabular DDC
-with the assumptions above.
+problem converge to stationary points of the population problem (their Prop. 4.2),
+and that a sharp local optimum of the population problem is a sharp local optimum
+of the sample problem with probability approaching one (their Thm 5.4). Thm 5.4
+is the hook into the standard delta-method / sandwich asymptotic normality result
+for smooth M-estimators: once the sample optimum tracks a unique, sharp population
+optimum, a Taylor expansion of the first-order conditions around the true
+parameter value yields $\sqrt{N}(\hat\theta - \theta_0) \xrightarrow{d} N(0, J^{-1} \Sigma J^{-\top})$,
+where $J$ is the population Hessian of the log-likelihood and $\Sigma$ is the
+outer product of the score, the standard sandwich form for a smooth
+M-estimator. Shapiro and Xu supply the stochastic-MPEC analogue of
+the regularity conditions (their smoothing assumption and Lipschitz continuity of
+the equilibrium operator) that make the expected log-likelihood continuously
+differentiable in $\theta$. Together these results justify treating the MPEC
+estimate as consistent and asymptotically normal under a well-specified tabular
+DDC with the assumptions above.
 
 ## Algorithm
 

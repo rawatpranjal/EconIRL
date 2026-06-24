@@ -30,7 +30,9 @@ sieve value approximation is $V_\alpha(s) = \Psi(s)^\top \alpha$. The
 choice-specific value under the sieve is $Q_{\theta,\alpha}(s, a)$, the
 conditional choice probability is $\pi_{\theta,\alpha}(a \mid s)$, $\omega$ is
 the Bellman-equilibrium penalty weight, and $T_\theta$ is the soft Bellman
-operator.
+operator, and $\|\cdot\|^2$ in the penalty denotes the state-average squared
+residual $\frac{1}{|S|}\sum_s (\cdot)_s^2$, consistent with
+`jnp.mean(residual**2)` in the implementation.
 
 ## Model
 
@@ -62,6 +64,18 @@ $$
 = \frac{\exp(Q_{\theta,\alpha}(s, a) / \sigma)}
        {\sum_b \exp(Q_{\theta,\alpha}(s, b) / \sigma)}.
 $$
+
+The soft Bellman operator $T_\theta$ maps a value function $V$ to the
+log-sum-exp social surplus:
+
+$$
+T_\theta(V)(s)
+= \sigma \log \sum_a \exp\!\Bigl(Q_\theta(s, a; V) / \sigma\Bigr),
+$$
+
+where $Q_\theta(s, a; V) = \phi(s,a)^\top\theta + \beta\sum_{s'} P_a(s,s') V(s')$
+takes $V$ as its direct argument (no alpha subscript). The fixed point satisfies
+$V = T_\theta(V)$ at the true value function. (Source: `bellman.py` lines 9 and 94–95.)
 
 The canonical instance is the Rust bus-engine replacement model. A bus
 operator decides each period whether to keep a deteriorating engine or pay a
@@ -103,13 +117,48 @@ $$
 (\hat{\theta}, \hat{\alpha})
 = \arg\max_{\theta,\alpha}
     \ell(\theta, \alpha)
-    - \omega \bigl\| V_\alpha - T_\theta(V_\alpha) \bigr\|^2,
+    - \omega \cdot \frac{1}{|S|}
+      \sum_{s} \bigl[V_\alpha(s) - T_\theta(V_\alpha)(s)\bigr]^2,
 $$
 
 where $\ell(\theta,\alpha) = \sum_{i,t} \log \pi_{\theta,\alpha}(a_{it} \mid
 s_{it})$ is the conditional log likelihood and the second term penalizes the
-Bellman equilibrium residual. The unpenalized log likelihood is reported at the
-final point; the Bellman violation is reported separately.
+state-average squared Bellman equilibrium residual. (Implementation:
+`penalized_criterion_mean` in `sees.py` lines 760–766 uses
+`jnp.mean(residual**2)`, so $\omega$ is on the mean-squared scale; using a
+sum norm instead would rescale $\omega$ by $|S|$.) The unpenalized log
+likelihood is reported at the final point; the Bellman violation, defined as
+the maximum absolute pointwise residual $\|V_\alpha - T_\theta(V_\alpha)\|_\infty
+= \max_s |V_\alpha(s) - T_\theta(V_\alpha)(s)|$, is reported separately.
+(Source: `sees.py` line 876, `jnp.max(jnp.abs(bellman_residual))`.)
+
+**Score of the penalized objective.** The log-likelihood score with respect
+to $\theta$ follows from differentiating $\log \pi_{\theta,\alpha}(a \mid s)$:
+
+$$
+\frac{\partial \log \pi_{\theta,\alpha}(a \mid s)}{\partial \theta}
+= \frac{1}{\sigma}\Bigl[\phi(s, a) - \sum_{a'} \pi_{\theta,\alpha}(a' \mid s)\,\phi(s, a')\Bigr],
+$$
+
+the observed minus expected feature vector, which aggregates to
+$\partial \ell / \partial \theta = \sum_{i,t} (\partial \log \pi / \partial
+\theta)_{s_{it}, a_{it}}$. The log-likelihood also has a nonzero gradient
+with respect to $\alpha$: because $Q_{\theta,\alpha}(s, a) = \phi(s,a)^\top\theta
++ \beta\sum_{s'} P_a(s,s') V_\alpha(s')$, the choice probabilities
+$\pi_{\theta,\alpha}$ depend on $\alpha$ through the continuation values,
+so $\partial \ell / \partial \alpha \neq 0$.
+The Bellman penalty gradient with respect to
+$\alpha$ is $-2\omega \Psi^\top(V_\alpha - T_\theta V_\alpha) / |S|$, and
+the penalty gradient with respect to $\theta$ passes through $\partial T_\theta(V_\alpha)(s) /
+\partial \theta = \sum_{a'} \pi_{\theta,\alpha}(a' \mid s)\,\phi(s, a')$, the
+expected feature vector under the current policy. The implementation computes
+the full gradient of the penalized objective over $(\theta, \alpha)$ jointly
+via JAX autodiff (`jax.jit` over the negated penalized criterion); both
+gradient contributions are taken together in a single autodiff pass.
+L-BFGS-B descends the negated sum. (Derivation: differentiates
+the logit CCP and the log-sum-exp operator on the page; implementation:
+`_neg_penalized_ll = jax.jit(lambda x: -penalized_criterion_mean(x))`,
+`sees.py` line 774; see also Luo and Sang (2024) Appendix.)
 
 Standard errors for $\theta$ are obtained by marginalizing out the sieve
 coefficients as a nuisance block via the Schur complement of the joint Hessian.
@@ -130,6 +179,15 @@ $$
 = H_{\theta\theta}
   - H_{\theta\alpha} H_{\alpha\alpha}^{-1} H_{\alpha\theta}.
 $$
+
+This follows from the block-matrix inverse identity: $(H^{-1})_{\theta\theta}
+= (H_{\theta\theta} - H_{\theta\alpha} H_{\alpha\alpha}^{-1}
+H_{\alpha\theta})^{-1} = \tilde{H}_\theta^{-1}$, so
+$\operatorname{Var}(\hat{\theta}) \approx \tilde{H}_\theta^{-1}$. The
+$(\theta,\theta)$ block of the full inverse equals the inverse of the Schur
+complement of the nuisance block $H_{\alpha\alpha}$, so marginalizing out
+$\alpha$ is equivalent to taking this Schur complement. (Standard linear
+algebra; see, e.g., Horn and Johnson, *Matrix Analysis*, §0.7.3.)
 
 A non-singular $\tilde{H}_\theta$ is required for finite standard errors. The
 implementation lives in `econirl.estimation.sees`.
