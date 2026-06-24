@@ -35,6 +35,10 @@ RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                            "rust_bus_results.png")
 SCALING_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                            "rust_bus_scaling.png")
+CURVE_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                         "rust_bus_reward_curve.png")
+REWARD_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                          "rust_bus_reward.png")
 
 # The canonical recoverable cell: identical to the prior benchmark ladder's
 # simple_binary configuration, so this page genuinely re-homes that cell.
@@ -403,11 +407,54 @@ NARRATIVE = {
     ),
     "script": "scripts/sim_rust_bus.py",
     "results_rel": "validation/results/sim_rust_bus.json",
+    "extra_sections": (
+        "## Reward and structure\n"
+        "\n"
+        "Mileage is the natural ordering, so reward plots cleanly against the "
+        "state index. The keep cost slopes down with mileage. The replacement "
+        "cost is flat. Where they cross is near the replacement threshold. The "
+        "recovered reward (dashed) tracks the true reward, and the optimal value "
+        "falls as mileage rises.\n"
+        "\n"
+        "![Reward against mileage, keep versus replace, with optimal value]"
+        "(../_static/simulation_studies/rust_bus_reward_curve.png)\n"
+        "\n"
+        "The same reward as a state-by-action heatmap puts the true and recovered "
+        "rewards side by side on one color scale.\n"
+        "\n"
+        "![True and recovered reward heatmaps]"
+        "(../_static/simulation_studies/rust_bus_reward.png)\n"
+    ),
 }
+
+_ACTIONS = ["keep", "replace"]
+
+
+def _make_curve_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_curve)
+
+    _, theta = _structural_mean_params(data, "rust_bus")
+    reward_curve(_env(), CURVE_FIG, params=theta, action_labels=_ACTIONS,
+                 state_label="mileage bin $s$")
+
+
+def _make_reward_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_heatmap)
+
+    name, theta = _structural_mean_params(data, "rust_bus")
+    if theta is None:
+        return
+    reward_heatmap(_env(), theta, REWARD_FIG,
+                   title=f"Recovered reward from {name}")
+
+
+EXTRA_FIGURES = [(CURVE_FIG, _make_curve_fig), (REWARD_FIG, _make_reward_fig)]
 
 
 if __name__ == "__main__":
     main_cli(cells=CELLS, title="Simulation study: bus engine replacement",
              narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
              results_json=RESULTS_JSON, page_path=PAGE_PATH,
-             scaling_figure=SCALING_FIG)
+             scaling_figure=SCALING_FIG, extra_figures=EXTRA_FIGURES)

@@ -34,6 +34,8 @@ PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "fleet_maintenance
 _STATIC = os.path.join(_ROOT, "docs", "_static", "simulation_studies")
 FIGURE_PNG = os.path.join(_STATIC, "fleet_maintenance_dgp.png")
 RESULTS_FIG = os.path.join(_STATIC, "fleet_maintenance_results.png")
+REWARD_FIG = os.path.join(_STATIC, "fleet_maintenance_reward.png")
+CURVE_FIG = os.path.join(_STATIC, "fleet_maintenance_reward_curve.png")
 
 # ---- DGP configuration ----
 # K=3 components x M=6 mileage bins = 216 states, 2 actions (keep/replace).
@@ -310,7 +312,64 @@ NARRATIVE = {
     },
     "script": "scripts/study_fleet_maintenance.py",
     "results_rel": "validation/results/study_fleet_maintenance.json",
+    "extra_sections": (
+        "## Reward and structure\n"
+        "\n"
+        "The true and recovered rewards sit side by side as state-by-action "
+        "heatmaps on one color scale. The 216 states are the factored mileage "
+        "combinations. The replace action is flat. The keep action darkens as "
+        "aggregate mileage rises.\n"
+        "\n"
+        "![True and recovered reward heatmaps]"
+        "(../_static/simulation_studies/fleet_maintenance_reward.png)\n"
+        "\n"
+        "The raw state index is not ordered, because the state is a factored "
+        "combination of three component mileages. Plotting reward against "
+        "aggregate mileage $x(s) = \\sum_k m_k / M$ recovers the structural "
+        "shape: the keep cost falls with mileage, the replace cost is flat, and "
+        "the recovered reward (dashed) tracks the truth.\n"
+        "\n"
+        "![Reward against aggregate mileage, keep versus replace]"
+        "(../_static/simulation_studies/fleet_maintenance_reward_curve.png)\n"
+    ),
 }
+
+_ACTIONS = ["keep", "replace"]
+
+
+def _aggregate_mileage(env):
+    """Per-state aggregate mileage x(s), read off the keep-action feature.
+
+    The keep action's operating-cost feature is -x(s) (feature column 1), so
+    x(s) = -feature_matrix[s, keep, 1]. Pure from the env's features.
+    """
+    fm = np.asarray(env.feature_matrix)
+    return -fm[:, 0, 1]
+
+
+def _make_reward_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_heatmap)
+
+    name, theta = _structural_mean_params(data, "fleet_maintenance")
+    if theta is None:
+        return
+    reward_heatmap(_env(), theta, REWARD_FIG,
+                   title=f"Recovered reward from {name}")
+
+
+def _make_curve_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_curve)
+
+    _, theta = _structural_mean_params(data, "fleet_maintenance")
+    env = _env()
+    reward_curve(env, CURVE_FIG, params=theta, action_labels=_ACTIONS,
+                 state_label="aggregate mileage $x(s)$",
+                 x=_aggregate_mileage(env))
+
+
+EXTRA_FIGURES = [(REWARD_FIG, _make_reward_fig), (CURVE_FIG, _make_curve_fig)]
 
 
 if __name__ == "__main__":
@@ -322,4 +381,5 @@ if __name__ == "__main__":
         excluded=EXCLUDED,
         results_json=RESULTS_JSON,
         page_path=PAGE_PATH,
+        extra_figures=EXTRA_FIGURES,
     )

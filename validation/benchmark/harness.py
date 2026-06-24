@@ -701,7 +701,17 @@ def render_console(data: dict) -> str:
 def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
              diagnoses: dict, excluded: list[dict], results_json: str,
              page_path: str, extra_meta: dict | None = None,
-             scaling_figure: str | None = None) -> None:
+             scaling_figure: str | None = None,
+             extra_figures: list[tuple[str, Callable[[dict], None]]] | None = None) -> None:
+    """Run / verify / render a study page.
+
+    ``extra_figures`` is an optional list of ``(abs_png_path, render_fn)`` pairs.
+    Each ``render_fn(data)`` is a pure function of the saved records (and any env
+    it rebuilds itself) that writes the PNG. They regenerate on ``--page`` next
+    to the scorecard and scaling figures, so a study can carry tailored figures
+    without re-running any estimator. The page embeds them through the
+    narrative's ``extra_sections`` markdown by basename.
+    """
     parser = argparse.ArgumentParser(description=title)
     parser.add_argument("--replications", type=int, default=None,
                         help="Override every cell's replication count.")
@@ -796,6 +806,13 @@ def main_cli(*, cells: tuple[Cell, ...], title: str, narrative: dict,
                 _sfig(data, scaling_figure)
                 data["meta"]["scaling_figure"] = os.path.basename(scaling_figure)
                 print(f"Wrote {scaling_figure}")
+            # Tailored study figures: pure functions of the records (and any env
+            # they rebuild), so they regenerate on --page with no estimator run.
+            if extra_figures:
+                for fig_path, render_fn in extra_figures:
+                    os.makedirs(os.path.dirname(fig_path), exist_ok=True)
+                    render_fn(data)
+                    print(f"Wrote {fig_path}")
             with open(page_path, "w") as f:
                 f.write(render_page(data, narrative))
             print(f"Wrote {page_path}")

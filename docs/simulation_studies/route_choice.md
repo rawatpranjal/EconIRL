@@ -70,6 +70,16 @@ The same study at three problem sizes (15, 25, 40 states). Each line is one esti
 
 ![Fit time and policy total variation against the number of states](../_static/simulation_studies/route_choice_scaling.png)
 
+## Reward and structure
+
+The network sits in the unit square. Each dot is a node, each line an edge. The color is the optimal value $V^*(s)$ at the true parameters: value rises toward the goal node (the star). The spatial structure is the routing problem.
+
+![Road network layout colored by optimal value](../_static/simulation_studies/route_choice_network.png)
+
+The recovered reward sits beside the true reward as state-by-action heatmaps, sharing one color scale. The recovered panel uses the best structural estimator's mean coefficients. The two panels read the same, so the linear reward is recovered across the state space.
+
+![True and recovered reward heatmaps](../_static/simulation_studies/route_choice_reward.png)
+
 ## Notes per estimator
 
 **NFXP.** Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum; all three parameters are identified from the edge-feature contrast.

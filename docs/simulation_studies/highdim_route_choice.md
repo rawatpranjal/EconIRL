@@ -88,6 +88,16 @@ The same study at two problem sizes (75 and 150 states). Each line is one estima
 
 ![Fit time and policy total variation against the number of states](../_static/simulation_studies/highdim_route_choice_scaling.png)
 
+## Reward and structure
+
+The 150-node network sits in the unit square. Each dot is a node, each line an edge. The color is the optimal value $V^*(s)$ at the true parameters: value rises toward the goal node (the star). This is the spatial scale a short planning horizon is built for.
+
+![Road network layout colored by optimal value](../_static/simulation_studies/highdim_route_choice_network.png)
+
+The horizon $H$ is the single knob that spans a family of methods. The figure traces policy total variation and fit time across the four horizons. $H=0$ is the Max-Margin-Planning end. $H=\infty$ matches Max Causal Entropy IRL. Accuracy improves as the horizon grows, and the compute climbs with it. That tradeoff is what the horizon buys.
+
+![Policy total variation and fit time across the planning horizon](../_static/simulation_studies/highdim_route_choice_horizon.png)
+
 ## Notes per estimator
 
 **RHIP-H0.** Receding Horizon Inverse Planning at horizon zero. No soft backups run, so the policy is a softmax over the deterministic continuation value. This is the Max-Margin-Planning end of the spectrum: cheap, and the least robust to demonstrator noise.

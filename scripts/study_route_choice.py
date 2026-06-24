@@ -35,6 +35,8 @@ _STATIC = os.path.join(_ROOT, "docs", "_static", "simulation_studies")
 FIGURE_PNG = os.path.join(_STATIC, "route_choice_dgp.png")
 RESULTS_FIG = os.path.join(_STATIC, "route_choice_results.png")
 SCALING_FIG = os.path.join(_STATIC, "route_choice_scaling.png")
+NETWORK_FIG = os.path.join(_STATIC, "route_choice_network.png")
+REWARD_FIG = os.path.join(_STATIC, "route_choice_reward.png")
 
 # ---- DGP configuration ----
 # 4 actions, beta 0.95. The headline cell is 25 nodes: small enough for
@@ -287,7 +289,50 @@ NARRATIVE = {
     ),
     "script": "scripts/study_route_choice.py",
     "results_rel": "validation/results/study_route_choice.json",
+    "extra_sections": (
+        "## Reward and structure\n"
+        "\n"
+        "The network sits in the unit square. Each dot is a node, each line an "
+        "edge. The color is the optimal value $V^*(s)$ at the true parameters: "
+        "value rises toward the goal node (the star). The spatial structure is "
+        "the routing problem.\n"
+        "\n"
+        "![Road network layout colored by optimal value]"
+        "(../_static/simulation_studies/route_choice_network.png)\n"
+        "\n"
+        "The recovered reward sits beside the true reward as state-by-action "
+        "heatmaps, sharing one color scale. The recovered panel uses the best "
+        "structural estimator's mean coefficients. The two panels read the same, "
+        "so the linear reward is recovered across the state space.\n"
+        "\n"
+        "![True and recovered reward heatmaps]"
+        "(../_static/simulation_studies/route_choice_reward.png)\n"
+    ),
 }
+
+
+# Construction seed for the road_network geometry (matches ``_env``).
+_NETWORK_SEED = 0
+
+
+def _make_network_fig(data):  # noqa: ARG001 - pure from the env it rebuilds
+    from validation.benchmark.figures import network_plot
+
+    network_plot(_env(HEADLINE_NODES), NETWORK_FIG, seed=_NETWORK_SEED)
+
+
+def _make_reward_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_heatmap)
+
+    name, theta = _structural_mean_params(data, "route_choice")
+    if theta is None:
+        return
+    reward_heatmap(_env(HEADLINE_NODES), theta, REWARD_FIG,
+                   title=f"Recovered reward from {name}")
+
+
+EXTRA_FIGURES = [(NETWORK_FIG, _make_network_fig), (REWARD_FIG, _make_reward_fig)]
 
 
 if __name__ == "__main__":
@@ -300,4 +345,5 @@ if __name__ == "__main__":
         results_json=RESULTS_JSON,
         page_path=PAGE_PATH,
         scaling_figure=SCALING_FIG,
+        extra_figures=EXTRA_FIGURES,
     )

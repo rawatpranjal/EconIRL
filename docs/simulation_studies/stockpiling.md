@@ -66,6 +66,16 @@ Coverage is the share of replications whose 95% interval contains the truth, sho
 
 The structural family (NFXP, CCP, MPEC) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL here uses the same linear features and recovers the same values, but its weights stay out of the recovery table because an IRL reward is only partially identified in general. NeuralGLADIUS learns a model-free policy with no reward weights to compare. Policy TV and regret are the right scorecards for the behavioral family.
 
+## Reward and structure
+
+The state index is $s = 2i + p$: inventory $i$ rises in steps of two, and the sale and regular price regimes interleave. The reward against $s$ shows the buy and no-buy lines, with the recovered reward dashed over the true reward. The zigzag is the price regime alternating. The optimal value falls as inventory and holding cost rise.
+
+![Reward against the inventory-price state index, buy versus no-buy](../_static/simulation_studies/stockpiling_reward_curve.png)
+
+The same reward as a state-by-action heatmap puts the true and recovered rewards side by side on one color scale.
+
+![True and recovered reward heatmaps](../_static/simulation_studies/stockpiling_reward.png)
+
 ## Notes per estimator
 
 **NFXP.** Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum; all three parameters are identified from the action-dependent stockout feature and the price-varying spending feature.

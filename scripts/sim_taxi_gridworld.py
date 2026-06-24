@@ -32,6 +32,7 @@ _STATIC = os.path.join(_ROOT, "docs", "_static", "simulation_studies")
 FIGURE_PNG = os.path.join(_STATIC, "taxi_gridworld_dgp.png")
 RESULTS_FIG = os.path.join(_STATIC, "taxi_gridworld_results.png")
 SCALING_FIG = os.path.join(_STATIC, "taxi_gridworld_scaling.png")
+GRID_FIG = os.path.join(_STATIC, "taxi_gridworld_grid.png")
 
 # 8x8 grid, 64 states, 5 actions. discount 0.95 (not the 0.99 default) keeps
 # the inner solves cheap on a page meant to be light; the economics is the same.
@@ -354,11 +355,31 @@ NARRATIVE = {
     ),
     "script": "scripts/sim_taxi_gridworld.py",
     "results_rel": "validation/results/sim_taxi_gridworld.json",
+    "extra_sections": (
+        "## Reward and structure\n"
+        "\n"
+        "The reward and the optimal value lie on the actual grid. The left panel "
+        "is the best move's reward at each cell. The right panel is $V^*(s)$. "
+        "Both rise toward the absorbing goal at the bottom-right corner, which is "
+        "the geometry the navigation problem is built on.\n"
+        "\n"
+        "![Per-state reward and optimal value on the grid]"
+        "(../_static/simulation_studies/taxi_gridworld_grid.png)\n"
+    ),
 }
+
+
+def _make_grid_fig(data):  # noqa: ARG001 - pure from the env it rebuilds
+    from validation.benchmark.figures import grid_maps
+
+    grid_maps(_env(HEADLINE_SIZE), GRID_FIG)
+
+
+EXTRA_FIGURES = [(GRID_FIG, _make_grid_fig)]
 
 
 if __name__ == "__main__":
     main_cli(cells=CELLS, title="Simulation study: gridworld navigation",
              narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
              results_json=RESULTS_JSON, page_path=PAGE_PATH,
-             scaling_figure=SCALING_FIG)
+             scaling_figure=SCALING_FIG, extra_figures=EXTRA_FIGURES)

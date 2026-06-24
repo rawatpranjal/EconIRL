@@ -73,6 +73,12 @@ The same study at three grid sizes (36, 64, 100 states). Each line is one estima
 
 ![Fit time and policy total variation against the number of states](../_static/simulation_studies/taxi_gridworld_scaling.png)
 
+## Reward and structure
+
+The reward and the optimal value lie on the actual grid. The left panel is the best move's reward at each cell. The right panel is $V^*(s)$. Both rise toward the absorbing goal at the bottom-right corner, which is the geometry the navigation problem is built on.
+
+![Per-state reward and optimal value on the grid](../_static/simulation_studies/taxi_gridworld_grid.png)
+
 ## Notes per estimator
 
 **MCE-IRL.** Two of its three reward directions, the state-only step and distance features, are unidentified here. Its gradient ascent can drift along them, and in one replication of three the policy collapsed. Read the per-rep records, not just the mean.

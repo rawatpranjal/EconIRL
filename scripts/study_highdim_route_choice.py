@@ -45,6 +45,8 @@ _STATIC = os.path.join(_ROOT, "docs", "_static", "simulation_studies")
 FIGURE_PNG = os.path.join(_STATIC, "highdim_route_choice_dgp.png")
 RESULTS_FIG = os.path.join(_STATIC, "highdim_route_choice_results.png")
 SCALING_FIG = os.path.join(_STATIC, "highdim_route_choice_scaling.png")
+NETWORK_FIG = os.path.join(_STATIC, "highdim_route_choice_network.png")
+HORIZON_FIG = os.path.join(_STATIC, "highdim_route_choice_horizon.png")
 
 # ---- DGP configuration ----
 # 4 actions, beta 0.95. The headline cell is 150 nodes (150 states): genuinely
@@ -408,7 +410,46 @@ NARRATIVE = {
     ),
     "script": "scripts/study_highdim_route_choice.py",
     "results_rel": "validation/results/study_highdim_route_choice.json",
+    "extra_sections": (
+        "## Reward and structure\n"
+        "\n"
+        "The 150-node network sits in the unit square. Each dot is a node, each "
+        "line an edge. The color is the optimal value $V^*(s)$ at the true "
+        "parameters: value rises toward the goal node (the star). This is the "
+        "spatial scale a short planning horizon is built for.\n"
+        "\n"
+        "![Road network layout colored by optimal value]"
+        "(../_static/simulation_studies/highdim_route_choice_network.png)\n"
+        "\n"
+        "The horizon $H$ is the single knob that spans a family of methods. The "
+        "figure traces policy total variation and fit time across the four "
+        "horizons. $H=0$ is the Max-Margin-Planning end. $H=\\infty$ matches Max "
+        "Causal Entropy IRL. Accuracy improves as the horizon grows, and the "
+        "compute climbs with it. That tradeoff is what the horizon buys.\n"
+        "\n"
+        "![Policy total variation and fit time across the planning horizon]"
+        "(../_static/simulation_studies/highdim_route_choice_horizon.png)\n"
+    ),
 }
+
+
+# Construction seed for the road_network geometry (matches ``_env``).
+_NETWORK_SEED = 0
+
+
+def _make_network_fig(data):  # noqa: ARG001 - pure from the env it rebuilds
+    from validation.benchmark.figures import network_plot
+
+    network_plot(_env(HEADLINE_NODES), NETWORK_FIG, seed=_NETWORK_SEED)
+
+
+def _make_horizon_fig(data):
+    from validation.benchmark.figures import horizon_frontier
+
+    horizon_frontier(data, "route_highdim", HORIZON_FIG)
+
+
+EXTRA_FIGURES = [(NETWORK_FIG, _make_network_fig), (HORIZON_FIG, _make_horizon_fig)]
 
 
 if __name__ == "__main__":
@@ -421,4 +462,5 @@ if __name__ == "__main__":
         results_json=RESULTS_JSON,
         page_path=PAGE_PATH,
         scaling_figure=SCALING_FIG,
+        extra_figures=EXTRA_FIGURES,
     )

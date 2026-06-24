@@ -69,6 +69,16 @@ Coverage is the share of replications whose 95% interval contains the truth, sho
 
 The structural family (NFXP, CCP, MPEC) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL here uses the same linear features and recovers the same values, but its weights stay out of the recovery table because an IRL reward is only partially identified in general. NeuralGLADIUS learns a model-free policy with no reward weights to compare. Policy TV and regret are the right scorecards for the behavioral family.
 
+## Reward and structure
+
+The true and recovered rewards sit side by side as state-by-action heatmaps on one color scale. The 216 states are the factored mileage combinations. The replace action is flat. The keep action darkens as aggregate mileage rises.
+
+![True and recovered reward heatmaps](../_static/simulation_studies/fleet_maintenance_reward.png)
+
+The raw state index is not ordered, because the state is a factored combination of three component mileages. Plotting reward against aggregate mileage $x(s) = \sum_k m_k / M$ recovers the structural shape: the keep cost falls with mileage, the replace cost is flat, and the recovered reward (dashed) tracks the truth.
+
+![Reward against aggregate mileage, keep versus replace](../_static/simulation_studies/fleet_maintenance_reward_curve.png)
+
 ## Notes per estimator
 
 **NFXP.** Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum. All three parameters are identified from the action-dependent replacement indicator: the keep action has features [0, -x, -x^2] and the replace action has feature [-1, 0, 0], so the action-contrast varies across states and all three coordinates are recoverable.

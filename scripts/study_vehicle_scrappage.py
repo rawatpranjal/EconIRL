@@ -35,6 +35,10 @@ FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                           "vehicle_scrappage_dgp.png")
 RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                            "vehicle_scrappage_results.png")
+CURVE_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                         "vehicle_scrappage_reward_curve.png")
+REWARD_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                          "vehicle_scrappage_reward.png")
 
 # ---- DGP configuration ----
 # 25 age bins x 3 defect levels = 75 states, 2 actions (keep/scrap).
@@ -306,7 +310,55 @@ NARRATIVE = {
     },
     "script": "scripts/study_vehicle_scrappage.py",
     "results_rel": "validation/results/study_vehicle_scrappage.json",
+    "extra_sections": (
+        "## Reward and structure\n"
+        "\n"
+        "Reward plots against vehicle age. Each age carries three defect levels, "
+        "so the keep line spreads into a band as defects raise the running cost. "
+        "The scrap line is flat. The recovered reward (dashed) tracks the truth, "
+        "and the optimal value falls as the car ages.\n"
+        "\n"
+        "![Reward against vehicle age, keep versus scrap, with optimal value]"
+        "(../_static/simulation_studies/vehicle_scrappage_reward_curve.png)\n"
+        "\n"
+        "The same reward as a state-by-action heatmap puts the true and recovered "
+        "rewards side by side on one color scale.\n"
+        "\n"
+        "![True and recovered reward heatmaps]"
+        "(../_static/simulation_studies/vehicle_scrappage_reward.png)\n"
+    ),
 }
+
+_ACTIONS = ["keep", "scrap"]
+
+
+def _ages(env):
+    """Per-state age in years: s = 3*age + defect, so age = s // 3."""
+    return np.arange(int(env.num_states)) // 3
+
+
+def _make_curve_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_curve)
+
+    _, theta = _structural_mean_params(data, "vehicle_scrappage")
+    env = _env()
+    reward_curve(env, CURVE_FIG, params=theta, action_labels=_ACTIONS,
+                 state_label="vehicle age (years)", x=_ages(env))
+
+
+def _make_reward_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_heatmap)
+
+    name, theta = _structural_mean_params(data, "vehicle_scrappage")
+    if theta is None:
+        return
+    reward_heatmap(_env(), theta, REWARD_FIG,
+                   title=f"Recovered reward from {name}")
+
+
+EXTRA_FIGURES = [(CURVE_FIG, _make_curve_fig), (REWARD_FIG, _make_reward_fig)]
 
 
 if __name__ == "__main__":
@@ -318,4 +370,5 @@ if __name__ == "__main__":
         excluded=EXCLUDED,
         results_json=RESULTS_JSON,
         page_path=PAGE_PATH,
+        extra_figures=EXTRA_FIGURES,
     )

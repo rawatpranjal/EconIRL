@@ -35,6 +35,10 @@ FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                           "stockpiling_dgp.png")
 RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
                            "stockpiling_results.png")
+CURVE_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                         "stockpiling_reward_curve.png")
+REWARD_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
+                          "stockpiling_reward.png")
 
 # ---- DGP configuration ----
 # 10 inventory levels x 2 price regimes = 20 states, 2 actions. Small enough for
@@ -280,7 +284,50 @@ NARRATIVE = {
     },
     "script": "scripts/study_stockpiling.py",
     "results_rel": "validation/results/study_stockpiling.json",
+    "extra_sections": (
+        "## Reward and structure\n"
+        "\n"
+        "The state index is $s = 2i + p$: inventory $i$ rises in steps of two, "
+        "and the sale and regular price regimes interleave. The reward against "
+        "$s$ shows the buy and no-buy lines, with the recovered reward dashed "
+        "over the true reward. The zigzag is the price regime alternating. The "
+        "optimal value falls as inventory and holding cost rise.\n"
+        "\n"
+        "![Reward against the inventory-price state index, buy versus no-buy]"
+        "(../_static/simulation_studies/stockpiling_reward_curve.png)\n"
+        "\n"
+        "The same reward as a state-by-action heatmap puts the true and recovered "
+        "rewards side by side on one color scale.\n"
+        "\n"
+        "![True and recovered reward heatmaps]"
+        "(../_static/simulation_studies/stockpiling_reward.png)\n"
+    ),
 }
+
+_ACTIONS = ["no buy", "buy"]
+
+
+def _make_curve_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_curve)
+
+    _, theta = _structural_mean_params(data, "stockpiling")
+    reward_curve(_env(), CURVE_FIG, params=theta, action_labels=_ACTIONS,
+                 state_label="state index $s = 2i + p$")
+
+
+def _make_reward_fig(data):
+    from validation.benchmark.figures import (_structural_mean_params,
+                                              reward_heatmap)
+
+    name, theta = _structural_mean_params(data, "stockpiling")
+    if theta is None:
+        return
+    reward_heatmap(_env(), theta, REWARD_FIG,
+                   title=f"Recovered reward from {name}")
+
+
+EXTRA_FIGURES = [(CURVE_FIG, _make_curve_fig), (REWARD_FIG, _make_reward_fig)]
 
 
 if __name__ == "__main__":
@@ -292,4 +339,5 @@ if __name__ == "__main__":
         excluded=EXCLUDED,
         results_json=RESULTS_JSON,
         page_path=PAGE_PATH,
+        extra_figures=EXTRA_FIGURES,
     )

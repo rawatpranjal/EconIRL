@@ -86,6 +86,16 @@ Coverage is the share of replications whose 95% interval contains the truth, sho
 
 The structural family (NFXP, CCP, MPEC, UFXP, NNES) recovers all four parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL here uses the same linear features and recovers the same values, but its weights stay out of the recovery table because an IRL reward is only partially identified in general. Policy TV and regret are the right scorecards for the behavioral family.
 
+## Reward and structure
+
+Reward plots against vehicle age. Each age carries three defect levels, so the keep line spreads into a band as defects raise the running cost. The scrap line is flat. The recovered reward (dashed) tracks the truth, and the optimal value falls as the car ages.
+
+![Reward against vehicle age, keep versus scrap, with optimal value](../_static/simulation_studies/vehicle_scrappage_reward_curve.png)
+
+The same reward as a state-by-action heatmap puts the true and recovered rewards side by side on one color scale.
+
+![True and recovered reward heatmaps](../_static/simulation_studies/vehicle_scrappage_reward.png)
+
 ## Notes per estimator
 
 **NFXP.** Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum. All four parameters are identified because the scrap action has a constant feature vector while the keep action varies with age and defect level, so the action-contrast covers all four reward dimensions.

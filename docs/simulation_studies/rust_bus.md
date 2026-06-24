@@ -81,6 +81,16 @@ The same study at three mileage-grid sizes (15, 20, 30 bins). Each line is one e
 
 ![Fit time and policy total variation against the number of states](../_static/simulation_studies/rust_bus_scaling.png)
 
+## Reward and structure
+
+Mileage is the natural ordering, so reward plots cleanly against the state index. The keep cost slopes down with mileage. The replacement cost is flat. Where they cross is near the replacement threshold. The recovered reward (dashed) tracks the true reward, and the optimal value falls as mileage rises.
+
+![Reward against mileage, keep versus replace, with optimal value](../_static/simulation_studies/rust_bus_reward_curve.png)
+
+The same reward as a state-by-action heatmap puts the true and recovered rewards side by side on one color scale.
+
+![True and recovered reward heatmaps](../_static/simulation_studies/rust_bus_reward.png)
+
 ## Notes per estimator
 
 **UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting. The value function is eliminated before any parameter search, so the linear case is closed form and as efficient as maximum likelihood.
