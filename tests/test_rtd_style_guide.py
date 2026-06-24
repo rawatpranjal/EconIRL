@@ -287,38 +287,34 @@ def test_estimator_pages_name_source_papers_up_front() -> None:
     assert offenders == []
 
 
-def test_under_the_hood_pages_order_model_before_pseudocode() -> None:
-    """Lock the 2026-06-12 house style for under_the_hood pages.
+def test_estimator_pages_order_model_before_algorithm() -> None:
+    """Lock the academic estimator-page template (2026-06-23 rebuild).
 
-    The old style required ``## Optimization Setup`` before ``## Model``
-    before ``## Pseudocode``.  The June 2026 restyle dropped the setup
-    section; the new invariants are:
+    Each public estimator main page is a self-contained academic reference: the
+    model and the math live on the page, not in a separate under_the_hood
+    subpage. The invariants:
 
-    1. Every page has a ``## Model`` section containing LaTeX math (``$$``).
-       A page with no model math section is under-specified.
-    2. Every page has a ``## Pseudocode`` section followed immediately by a
-       fenced code block.  A page without pseudocode leaves the algorithm
-       opaque.
-    3. ``## Model`` appears before ``## Pseudocode``.
-
-    These checks would fail on a page that contains only prose (no math),
-    or skips the pseudocode entirely.
+    1. A ``## Model`` section containing display math (``$$``). A page with no
+       model math is under-specified.
+    2. A ``## Algorithm`` section with a fenced pseudocode block. A page without
+       pseudocode leaves the algorithm opaque.
+    3. ``## Model`` appears before ``## Algorithm``.
     """
 
-    pages = sorted((DOCS / "estimators").glob("*/under_the_hood.md"))
+    pages = [
+        page
+        for page in sorted((DOCS / "estimators").glob("*.md"))
+        if page.name != "comparison.md" and not _is_excluded_from_rtd(page)
+    ]
     assert pages
 
-    pseudocode_block = re.compile(
-        r"## Pseudocode\s*\n\s*```", flags=re.IGNORECASE
-    )
     offenders = []
     for page in pages:
         text = page.read_text(encoding="utf-8")
-        model_match = re.search(
-            r"^## Model\b", text, flags=re.MULTILINE
-        )
+        model_match = re.search(r"^## Model\b", text, flags=re.MULTILINE)
         model_pos = model_match.start() if model_match else -1
-        pseudocode_pos = text.find("## Pseudocode")
+        algorithm_match = re.search(r"^## Algorithm\b", text, flags=re.MULTILINE)
+        algorithm_pos = algorithm_match.start() if algorithm_match else -1
 
         if model_pos == -1:
             offenders.append(f"{page.relative_to(ROOT)}: missing Model section")
@@ -326,16 +322,16 @@ def test_under_the_hood_pages_order_model_before_pseudocode() -> None:
         if "$$" not in text:
             offenders.append(f"{page.relative_to(ROOT)}: Model section has no display math")
             continue
-        if pseudocode_pos == -1:
-            offenders.append(f"{page.relative_to(ROOT)}: missing Pseudocode")
+        if algorithm_pos == -1:
+            offenders.append(f"{page.relative_to(ROOT)}: missing Algorithm")
             continue
-        if not model_pos < pseudocode_pos:
+        if not model_pos < algorithm_pos:
             offenders.append(
-                f"{page.relative_to(ROOT)}: expected Model before Pseudocode"
+                f"{page.relative_to(ROOT)}: expected Model before Algorithm"
             )
             continue
-        if not pseudocode_block.search(text):
-            offenders.append(f"{page.relative_to(ROOT)}: missing fenced code block after Pseudocode")
+        if text.find("```", algorithm_pos) == -1:
+            offenders.append(f"{page.relative_to(ROOT)}: missing fenced code block in Algorithm")
 
     assert offenders == []
 

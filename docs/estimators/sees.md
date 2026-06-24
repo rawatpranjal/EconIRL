@@ -1,31 +1,202 @@
 # SEES
 
-Sieve estimation for economic structural models estimates dynamic discrete
-choice rewards while approximating the value function with a deterministic
-basis. It keeps the structural likelihood target, but avoids solving a full
-nested fixed point inside every likelihood evaluation.
-
-Use SEES when the model is structural, transitions are known or estimated
-first, and the value function can be represented well by a sieve. It is the
-deterministic-basis counterpart to MPEC and the nearest stepping stone before
-NNES.
+Sieve estimation of economic structural models (SEES) estimates dynamic
+discrete choice reward parameters while approximating the Bellman value
+function with a finite basis expansion. It keeps the structural likelihood as
+its identification target while avoiding the costly inner fixed-point loop of
+the nested fixed-point algorithm. Joint optimization over structural parameters
+and sieve coefficients, penalized by a Bellman-equilibrium residual, yields
+consistent and asymptotically normal estimates under a growing sieve and
+strengthening penalty.
 
 ## Source Papers
 
-This page draws on {ref}`Luo and Sang (2024) <luo-sang-2024>` for sieve-based
-structural estimation.
+The estimator follows {ref}`Luo and Sang (2024) <luo-sang-2024>`, which
+introduces the sieve-based penalized maximum likelihood approach for structural
+models and establishes consistency and asymptotic normality under smoothness,
+identification, sieve-approximation, and penalty-rate conditions.
 
-## Quick Decision
+## Notation
 
-| Use SEES when | Prefer another estimator when |
+Throughout, $s$ indexes the discrete state and $a$ the discrete action,
+observed for individual $i$ in period $t$. The vector $\phi(s, a)$ collects the
+known reward features and $\theta$ the reward parameters to be estimated. The
+discount factor is $\beta$ and the logit shock scale is $\sigma$. The
+transition kernel $P_a(s, s')$ gives the probability of moving to $s'$ from $s$
+under action $a$, stored in $(A, S, S)$ orientation. The sieve basis matrix
+$\Psi(s) \in \mathbb{R}^{K}$ collects $K$ basis functions evaluated at state
+$s$, and $\alpha \in \mathbb{R}^{K}$ is the vector of sieve coefficients. The
+sieve value approximation is $V_\alpha(s) = \Psi(s)^\top \alpha$. The
+choice-specific value under the sieve is $Q_{\theta,\alpha}(s, a)$, the
+conditional choice probability is $\pi_{\theta,\alpha}(a \mid s)$, $\omega$ is
+the Bellman-equilibrium penalty weight, and $T_\theta$ is the soft Bellman
+operator.
+
+## Model
+
+The observed data are state, action, and next-state trajectories
+$(s_{it}, a_{it}, s_{i,t+1})$. The flow payoff is linear in the features:
+
+$$
+u_\theta(s, a) = \phi(s, a)^\top \theta.
+$$
+
+In V-SEES, the integrated value function is approximated by the sieve
+expansion:
+
+$$
+V_\alpha(s) = \Psi(s)^\top \alpha.
+$$
+
+The choice-specific value under the sieve approximation is:
+
+$$
+Q_{\theta,\alpha}(s, a)
+= u_\theta(s, a) + \beta \sum_{s'} P_a(s, s') V_\alpha(s').
+$$
+
+The implied conditional choice probability follows the logit rule:
+
+$$
+\pi_{\theta,\alpha}(a \mid s)
+= \frac{\exp(Q_{\theta,\alpha}(s, a) / \sigma)}
+       {\sum_b \exp(Q_{\theta,\alpha}(s, b) / \sigma)}.
+$$
+
+The canonical instance is the Rust bus-engine replacement model. A bus
+operator decides each period whether to keep a deteriorating engine or pay a
+flat cost to replace it. The sieve approximates the integrated value function
+of this decision problem without solving it exactly at each likelihood
+evaluation.
+
+## Identification
+
+SEES point-identifies the reward parameters $\theta$ under the following
+assumptions.
+
+- **Conditional independence (CI).** The observed state transition is Markov in
+  the current state and action and does not depend on the current logit shock.
+- **Additive separability (AS).** The per-period payoff is the systematic reward
+  plus an additive choice-specific shock, drawn independently across choices as
+  Type-I extreme value with fixed scale $\sigma$.
+- **Exogenous transitions.** The transition kernel $P_a(s, s')$ is supplied or
+  estimated in a first stage, outside the payoff likelihood. Transitions must be
+  separated from payoff estimation.
+- **Reward normalization.** The reward level and scale need an anchor. An exit or
+  absorbing action with payoff fixed to zero pins the level, and the logit scale
+  $\sigma$ is held fixed.
+- **Action-dependent feature rank.** The reward features must vary across
+  actions. State-only features collapse the action contrasts and leave $\theta$
+  unidentified.
+
+These hold inside a finite discrete state space, a stationary environment with
+expected-utility maximization, and a known fixed discount factor $\beta$. Given
+them, $\theta$ is point-identified. Identification weakens under thin action
+support, an invalid normalization, or a rank-deficient reward design.
+
+## Estimator
+
+SEES maximizes a penalized conditional log likelihood jointly over the reward
+parameters $\theta$ and the sieve coefficients $\alpha$:
+
+$$
+(\hat{\theta}, \hat{\alpha})
+= \arg\max_{\theta,\alpha}
+    \ell(\theta, \alpha)
+    - \omega \bigl\| V_\alpha - T_\theta(V_\alpha) \bigr\|^2,
+$$
+
+where $\ell(\theta,\alpha) = \sum_{i,t} \log \pi_{\theta,\alpha}(a_{it} \mid
+s_{it})$ is the conditional log likelihood and the second term penalizes the
+Bellman equilibrium residual. The unpenalized log likelihood is reported at the
+final point; the Bellman violation is reported separately.
+
+Standard errors for $\theta$ are obtained by marginalizing out the sieve
+coefficients as a nuisance block via the Schur complement of the joint Hessian.
+With the joint Hessian partitioned as
+
+$$
+H =
+\begin{pmatrix}
+H_{\theta\theta} & H_{\theta\alpha} \\
+H_{\alpha\theta} & H_{\alpha\alpha}
+\end{pmatrix},
+$$
+
+the marginal information for $\theta$ is:
+
+$$
+\tilde{H}_\theta
+= H_{\theta\theta}
+  - H_{\theta\alpha} H_{\alpha\alpha}^{-1} H_{\alpha\theta}.
+$$
+
+A non-singular $\tilde{H}_\theta$ is required for finite standard errors. The
+implementation lives in `econirl.estimation.sees`.
+
+**Consistency note.** The sieve-approximation requirement is a consistency and
+asymptotic-normality condition, not an identification condition. Luo and Sang
+(2024) establish that $\hat{\theta}$ converges to the identified $\theta_0$
+when the sieve dimension $K_n$ grows with sample size and the penalty weight
+$\omega_n \to \infty$ at the appropriate rate. If the basis cannot approximate
+the true value function, the Bellman residual has a non-zero floor and
+consistency breaks down; the identification argument from CI, AS, normalization,
+and feature rank is unaffected.
+
+## Algorithm
+
+```text
+Algorithm  V-SEES (sieve value approximation, penalized MLE)
+Input   panel {(s_it, a_it, s_{i,t+1})}, features phi, transitions P,
+        basis Psi (K columns), discount beta, logit scale sigma,
+        penalty weight omega
+Output  theta_hat, alpha_hat, standard errors, policy pi, sieve value V_alpha
+
+1   construct basis matrix Psi of dimension K over the state space
+2   initialize theta from the supplied start or the utility default
+3   warm-start alpha: solve Bellman at theta_0, project V onto Psi
+4   repeat                                       # outer loop: L-BFGS-B
+5       V_alpha(s) := Psi(s)' alpha              # sieve value approximation
+6       Q(s,a) := phi(s,a)' theta
+                  + beta * sum_{s'} P_a(s,s') V_alpha(s')
+7       pi(a|s) := exp(Q(s,a)/sigma) / sum_b exp(Q(s,b)/sigma)
+8       L := sum_{i,t} log pi(a_it | s_it)      # conditional log likelihood
+9       R := omega * || V_alpha - T_theta(V_alpha) ||^2   # Bellman penalty
+10      update (theta, alpha) by one L-BFGS-B step on  L - R
+11  until gradient norm < tol  or  iterations >= max_iter
+12  compute marginal Hessian tilde_H via Schur complement in alpha
+13  return theta_hat, alpha_hat, standard errors from tilde_H, policy pi, V_alpha
+```
+
+The default solution mode is `solution="value"` (V-SEES): the sieve
+approximates the integrated value function. Four additional modes are available
+by their exact code names. `solution="q"` approximates the choice-specific
+value function, an equivalent Bellman representation. `solution="ev"`
+approximates the expected continuation value by state and action.
+`solution="policy"` approximates centered policy logits. `solution="collocation"`
+is V-SEES with the Bellman penalty evaluated on a deterministic collocation
+subset rather than all states. The strongest direct connection to Luo and Sang
+(2024) is `solution="value"`; the other modes are exposed for diagnostics and
+numerical experiments. The outer optimizer is L-BFGS-B throughout.
+
+## Applicability
+
+| Applicable when | Prefer an alternative when |
 | --- | --- |
-| Choices are discrete and forward-looking. | The state-action space is small enough for exact NFXP. |
-| Transitions are known or can be estimated first. | Transition estimation is the main modeling problem. |
-| Rewards are finite-dimensional and parametric. | The reward itself needs a neural or nonparametric form. |
-| A deterministic value basis is credible. | The value basis cannot approximate the Bellman solution. |
-| You want a scalable structural check after MPEC. | You need a pure CCP or behavioral-cloning baseline. |
+| States and actions are discrete. | The state space is small enough for repeated exact Bellman solves (prefer NFXP). |
+| Transitions are known or can be estimated first. | Transition estimation is the main modeling challenge. |
+| The reward has a compact parametric form. | The reward must be high-dimensional or neural (prefer NNES). |
+| A deterministic basis can represent the value function compactly. | The value basis cannot reliably approximate the Bellman solution. |
+| A Bellman-residual check is the primary diagnostic target. | Only fitted choice probabilities are required (prefer CCP). |
 
-## Quick Start
+SEES sits between MPEC and NNES in the structural family. MPEC enforces the
+Bellman equation as an equality constraint with one value variable per state.
+SEES replaces the full solution object with a deterministic sieve expansion and
+penalizes equilibrium residuals. NNES replaces the deterministic sieve with a
+neural value approximation. When the sieve spans the value vector and the
+penalty is strong, SEES approaches the MPEC formulation in finite state spaces.
+
+## Usage
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -37,6 +208,7 @@ model = SEES(
     n_states=90,
     discount=0.9999,
     utility="linear_cost",
+    solution="value",
     basis_type="fourier",
     basis_dim=8,
     penalty_weight=10.0,
@@ -47,35 +219,108 @@ print(model.params_)
 print(model.summary())
 ```
 
-The dataframe wrapper is a package smoke path. The simulation-study evidence below
-uses the lower-level estimator with explicit finite-state penalty weights.
+The fitted policy gives the replacement probability by state, readable at
+selected states:
 
-Use `econirl.estimation.sees.SEESEstimator` when you need direct control over
-the `Panel`, utility object, `DDCProblem`, transition tensor, basis choice, or
-Bellman penalty.
+```python
+print(model.predict_proba([0, 20, 40, 60, 80]))
+```
+
+Structural counterfactuals re-solve the dynamic program under a modified
+primitive using the lower-level `SEESEstimator` interface. The fitted
+structural parameter vector $\hat{\theta}$ supplies the reward specification;
+a changed reward or transition feeds into a new Bellman solve to obtain the
+intervened policy. See the [Counterfactuals](sees/counterfactuals.md) subpage
+for the three counterfactual families and their results.
+
+The [Quick Start](sees/quick_start.md) page documents the full set of fitted
+attributes and the lower-level `SEESEstimator` interface.
 
 ## Evidence
 
-SEES is reported on the high-dimensional action-dependent synthetic data-generating process.
-The low-dimensional cell is retained as a sanity check, while the primary
-cell uses encoded states and a richer reward-feature basis. Both cells have
-known rewards, transitions, policies, values, Q functions, and Type A, Type B,
-and Type C counterfactual oracles.
+Parameter recovery is measured on the `canonical_high_action` synthetic cell,
+which has known rewards, transitions, policies, values, Q functions, and Type A,
+Type B, and Type C counterfactual oracles. The cell has 81 states, 3 actions,
+and 32 reward parameters. The figure below is a Monte-Carlo parameter-recovery
+study: the panel is resimulated and refit on a fresh seed each time, and each
+parameter is plotted as its recovered mean and 95% interval against the true
+value.
 
-| Evidence | Current state |
-| --- | --- |
-| Scope | Synthetic encoded-state simulation. |
-| Primary cell | `canonical_high_action`. |
-| Results file | [sees_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/sees.json). |
-| Primary Bellman check | Reported violation `3.08e-6`. |
-| Primary recovery checks | Parameter, reward, policy, value, Q, and counterfactual checks are reported in the results file. |
-| Public example | Uses `SEES` with `utility="linear_cost"` and the package default penalty; the simulation study uses `SEESEstimator` with explicit finite-state penalties. |
+![SEES parameter recovery, Monte Carlo](../_static/estimators/sees_recovery.png)
 
-## SEES Guide
+Recovery numbers are pending completion of the Monte-Carlo run.
 
-- [Context](sees/context.md)
+| Parameter | True | Recovered (mean) | 95% interval |
+| --- | ---: | ---: | --- |
+| `theta_0` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_1` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_2` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_3` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_4` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_5` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_6` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_7` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_8` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_9` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_10` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_11` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_12` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_13` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_14` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_15` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_16` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_17` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_18` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_19` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_20` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_21` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_22` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_23` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_24` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_25` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_26` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_27` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_28` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_29` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_30` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_31` | _pending MC_ | _pending MC_ | _pending MC_ |
+
+Behavioral fit and counterfactual regret on the `canonical_high_action` cell,
+measured against the known oracle objects from `validation/results/sees.json`.
+The optimizer reached the iteration limit without meeting the gradient
+tolerance; all structural recovery gates pass.
+
+| Metric | Value |
+| --- | ---: |
+| Policy total variation | 0.0021 |
+| Value RMSE | 0.0378 |
+| Type A regret (reward shift) | 0.000113 |
+| Type B regret (transition change) | 0.000183 |
+| Type C regret (action removed) | 1.35e-05 |
+
+All three regret values pass the 0.01 gate. The Bellman violation is
+$3.08 \times 10^{-6}$, inside the 0.05 threshold. For the cross-estimator
+comparison on the bus-engine panel, see the
+[bus engine simulation study](../simulation_studies/rust_bus.md).
+
+## References
+
+Source papers:
+
+- Luo, Y., and Sang, P. (2024). "Efficient Estimation of Structural Models via
+  Sieves." Working paper, University of Toronto.
+  {ref}`reference entry <luo-sang-2024>`.
+
+Implementation and reproduction:
+
+- Estimator source: [`econirl.estimation.sees`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/sees.py).
+- sklearn wrapper: [`econirl.SEES`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/sees.py).
+- Validation runner: [`validation/estimators/sees/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/sees/run.py).
+- Results file: [`sees.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/sees.json).
+
+Pages:
+
 - [Quick Start](sees/quick_start.md)
-- [Under the Hood](sees/under_the_hood.md)
 - [Pre-Estimation Checks](sees/pre_estimation.md)
 - [Simulation Study](sees/validation.md)
 - [Counterfactuals](sees/counterfactuals.md)
@@ -84,9 +329,7 @@ and Type C counterfactual oracles.
 ```{toctree}
 :hidden:
 
-sees/context
 sees/quick_start
-sees/under_the_hood
 sees/pre_estimation
 sees/validation
 sees/counterfactuals

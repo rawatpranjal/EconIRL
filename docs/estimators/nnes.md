@@ -1,32 +1,214 @@
 # NNES
 
-NNES estimates structural dynamic discrete choice models with a neural
-value-function approximation inside an NPL-style policy iteration. It keeps the
-reward finite-dimensional while using a flexible value approximation to avoid
-exact dynamic programming in larger state spaces.
-
-Use NNES when the reward is still structural and finite-dimensional, but the
-state representation is large, encoded, smooth, or multi-dimensional enough
-that repeated exact Bellman solves are no longer the best default.
+NNES (Neural Network Estimation of Structural models) is a structural dynamic
+discrete choice estimator that recovers finite-dimensional reward parameters
+while representing the continuation value with a trained neural network. The
+estimator embeds this approximation inside a nested pseudo-likelihood
+policy-iteration loop: at the true conditional choice probabilities,
+value-approximation errors are Neyman-orthogonal to the structural score, so
+the pseudo-likelihood Hessian is the correct variance estimator despite the
+neural nuisance object. The structural estimate supports counterfactual policy
+analysis; the neural network approximates the continuation value, not the reward.
 
 ## Source Papers
 
-This page draws on {ref}`Nguyen (2025) <nguyen-2025>` for NNES and uses the
-CCP/NPL logic of {ref}`Hotz and Miller (1993) <hotz-miller-1993>` and
-{ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>`.
+The estimator follows {ref}`Nguyen (2025) <nguyen-2025>`, which introduces
+neural value approximation for structural dynamic discrete choice estimation and
+establishes the Neyman-orthogonality property of the nested pseudo-likelihood
+mapping. {ref}`Hotz and Miller (1993) <hotz-miller-1993>` supply the
+conditional-choice-probability inversion underlying the profiled NPL step, and
+{ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>` develop the
+nested pseudo-likelihood policy-iteration framework on which NNES builds.
 
-## Quick Decision
+## Notation
 
-| Use NNES when | Prefer another estimator when |
+Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed
+for individual $i$ in period $t$. The vector $\phi(s, a)$ collects the known
+reward features and $\theta$ the finite-dimensional reward parameters to be
+estimated. The discount factor is $\beta$ and the logit shock scale is $\sigma$.
+The transition kernel $P_a(s, s')$ gives the probability of moving to $s'$ from
+$s$ under action $a$, stored in $(A, S, S)$ orientation. The integrated value
+function is $V_\theta(s)$, its neural approximation is $V_\psi(s)$ with network
+parameters $\psi$, and the choice-specific value under the approximation is
+$Q_{\theta,\psi}(s, a)$. The conditional choice probability, the policy, is
+$\pi_{\theta,\psi}(a \mid s)$. The NPL policy iterate is $\hat{P}(a \mid s)$,
+and the profiled value components are $W_z(\hat{P})$ and $W_e(\hat{P})$.
+
+## Model
+
+The observed data are state, action, and next-state trajectories
+$(s_{it}, a_{it}, s_{i,t+1})$. The flow payoff is linear in the features:
+
+$$
+u_\theta(s, a) = \phi(s, a)^\top \theta.
+$$
+
+The integrated value function satisfies the soft Bellman fixed point:
+
+$$
+V_\theta(s)
+= \sigma \log \sum_a \exp\!\left(
+    \frac{u_\theta(s, a) + \beta \sum_{s'} P_a(s, s') V_\theta(s')}{\sigma}
+\right).
+$$
+
+NNES replaces the exact value object with a trained ReLU network
+$V_\psi(s) \approx V_\theta(s)$, anchored so that $V_\psi(s_0) = 0$ for a
+fixed anchor state $s_0$. The choice-specific value under the approximation is:
+
+$$
+Q_{\theta,\psi}(s, a) = u_\theta(s, a) + \beta \sum_{s'} P_a(s, s') V_\psi(s').
+$$
+
+The implied conditional choice probability follows the logit rule:
+
+$$
+\pi_{\theta,\psi}(a \mid s) =
+\frac{\exp(Q_{\theta,\psi}(s, a) / \sigma)}
+     {\sum_b \exp(Q_{\theta,\psi}(s, b) / \sigma)}.
+$$
+
+The primary package evidence uses the `canonical_high_action` synthetic cell:
+81 states (80 regular, 1 absorbing), a 16-dimensional encoded state
+representation, 3 actions, and 32 reward parameters. This cell tests whether
+the NPL-profiled neural value path recovers a finite-dimensional structural
+reward when the state representation is richer than a small tabular reference.
+
+## Identification
+
+NNES point-identifies the reward parameters $\theta$ under the following
+assumptions.
+
+- **Conditional independence (CI).** The observed state transition is Markov in
+  the current state and action and does not depend on the current logit shock.
+  This separates the transition dynamics from the payoff.
+- **Additive separability (AS).** The per-period payoff is the systematic reward
+  plus an additive choice-specific shock, drawn independently across choices as
+  Type-I extreme value with fixed scale $\sigma$. The paper's NPL orthogonality
+  result is stated for this logit DDC structure.
+- **Exogenous transitions.** The transition kernel $P_a(s, s')$ is supplied or
+  estimated in a first stage, outside the payoff likelihood. NNES is model-based;
+  without an available transition law, a transition-free estimator is required.
+- **Reward normalization.** The reward level and scale need an anchor. An
+  absorbing or exit action with payoff fixed to zero pins the level, and the
+  logit scale $\sigma$ is held fixed.
+- **Action-dependent feature rank.** The reward features must vary across
+  actions. The feature rank must equal the number of parameters; state-only
+  features copied across actions collapse the action contrasts and leave
+  $\theta$ unidentified.
+- **NPL Neyman-orthogonality.** At the true conditional choice probabilities,
+  first-order errors in the value approximation $V_\psi$ drop out of the NPL
+  structural score. This zero-Jacobian / Neyman-orthogonality property (Nguyen 2025)
+  means the pseudo-likelihood Hessian is the correct semiparametrically
+  efficient variance estimator without an explicit debiasing correction.
+- **Value-approximation regularity.** The value-network approximation error must
+  be small enough to enter the structural score only at second order. This is an
+  asymptotic fourth-root-style requirement, not a finite-sample guarantee; a
+  poor-fitting value network can contaminate recovery even when the data
+  likelihood looks acceptable.
+
+These hold inside a finite discrete state space, a stationary environment with
+expected-utility maximization, and a known, fixed discount factor $\beta$.
+Identification weakens under thin action support, an invalid normalization,
+or a misoriented transition tensor. An unanchored value network can drift in
+high-discount problems because the absolute value level is weakly identified
+by choice data alone.
+
+## Estimator
+
+For a fixed NPL policy iterate $\hat{P}$, the policy-evaluation equation is
+affine in $\theta$:
+
+$$
+W_\theta[\hat{P}] = W_z(\hat{P})\,\theta + W_e(\hat{P}),
+$$
+
+where $W_z(\hat{P})$ is the expected discounted feature matrix under the fixed
+iterate and $W_e(\hat{P})$ is the expected discounted logit-entropy term.
+The value network $V_\psi$ is trained by supervised regression on this
+profiled target, and the structural parameters are recovered by maximizing
+the profiled pseudo-likelihood:
+
+$$
+\hat{\theta}(\hat{P})
+= \arg\max_\theta \sum_{i,t} \log \pi_{\theta,\psi}(a_{it} \mid s_{it}).
+$$
+
+The outer optimizer is L-BFGS-B. After the maximization step, conditional choice
+probabilities are updated from the implied logit policy and the loop repeats.
+The NPL score has the logit form:
+
+$$
+\psi_i(\theta)
+=
+\frac{1}{\sigma}
+\left[
+    \frac{\partial Q_{\theta,\psi}(s_i, a_i)}{\partial \theta}
+    -
+    \sum_a \pi_{\theta,\psi}(a \mid s_i)
+    \frac{\partial Q_{\theta,\psi}(s_i, a)}{\partial \theta}
+\right],
+$$
+
+where the $Q$-gradient with respect to $\theta$ flows through the profiled
+value components $W_z(\hat{P})$ rather than through the Bellman fixed point,
+so no inner-loop differentiation is required.
+
+## Algorithm
+
+```text
+Algorithm  NNES-NPL (neural nested pseudo-likelihood, default variant)
+Input   panel {(s_it, a_it, s_{i,t+1})}, features phi, transitions P,
+        discount beta, logit scale sigma, value network V_psi,
+        outer iterations K
+Output  theta_hat, policy pi, value approximation V_psi
+
+1   initialize theta
+2   initialize hat_P(a | s) from empirical state-action frequencies
+3   repeat K times                          # outer NPL loop
+4       W_z, W_e := profiled_value_components(hat_P, P, phi, beta, sigma)
+5       target_V := W_z * theta + W_e       # value profiled as affine in theta
+6       target_V := target_V - target_V[anchor_state]   # anchor normalization
+7       train V_psi on target_V by supervised regression
+8       Q(s, a) := phi(s, a)' theta + beta * sum_{s'} P_a(s, s') V_psi(s')
+9       pi(a | s) := exp(Q(s, a)/sigma) / sum_b exp(Q(s, b)/sigma)
+10      theta := argmax_theta sum_{i,t} log pi_theta(a_it | s_it)
+11                                          # outer: L-BFGS-B on profiled LL
+12      hat_P := pi                         # update policy iterate
+13  return theta_hat, standard errors from the profiled Hessian, pi, V_psi
+```
+
+The default variant is `bellman="npl"` (the `NNESEstimator` class in
+`econirl.estimation.nnes`). This is the path with the Neyman-orthogonality
+property; standard errors from the profiled Hessian are semiparametrically
+efficient. The alternative `bellman="nfxp"` invokes `NNESNFXPEstimator`, which
+trains the value network to satisfy the NFXP soft-Bellman residual rather than
+the NPL profiled target. This variant does not carry the orthogonality guarantee:
+value-approximation errors enter the structural score directly, so standard errors
+from its Hessian are not semiparametrically efficient. The `"nfxp"` variant is
+available as a diagnostic but is not the reported inference path.
+
+## Applicability
+
+| Applicable when | Prefer an alternative when |
 | --- | --- |
-| The value object is too large, smooth, or encoded for repeated exact DP. | The state-action space is small enough for exact NFXP or tabular CCP. |
-| Rewards are parametric and structural. | The reward itself must be an unrestricted neural function. |
-| Transitions are known or can be estimated before estimation. | Transition estimation is the main modeling problem. |
-| You want counterfactuals from a recovered structural object. | You only need fitted choice probabilities. |
-| Neural value approximation is the point of the exercise. | You need the cleanest exact likelihood reference. |
-| Use `bellman="npl"` for the reported path. | `bellman="nfxp"` is a diagnostic variant and does not carry the NPL orthogonality claim. |
+| States and actions are discrete. | The state space is small enough for exact NFXP or tabular CCP. |
+| The reward is finite-dimensional and parametric. | The reward itself must be unrestricted or neural. |
+| The value object is too large, encoded, or smooth for repeated exact Bellman solves. | Transitions are unavailable; use TD-CCP or a transition-free estimator. |
+| Transitions are known or can be estimated first. | Only in-sample choice probabilities are required. |
+| Counterfactual policy analysis under changed primitives is required. | Only a fast imitation baseline is required. |
+| A flexible value approximation is the modeling objective. | The cleanest exact-likelihood structural reference is required. |
 
-## Quick Start
+NNES targets the same finite-dimensional structural object as NFXP, CCP, and
+MPEC, but replaces the exact tabular Bellman solve with a neural value
+approximation. CCP and MPEC use tabular continuation objects; SEES uses a
+deterministic basis-function sieve. NNES becomes attractive when encoded states
+or high-dimensional state representations make a neural value function the
+natural modeling choice. On small tabular problems, exact NFXP or CCP can still
+dominate because the neural training overhead exceeds the savings from avoiding
+exact dynamic programming.
+
+## Usage
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -48,49 +230,119 @@ model = NNES(
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
-print(model.policy_.shape)
-print(model.v_network_.shape)
+print(model.summary())
 ```
 
-Output from the package smoke run:
+The fitted policy gives action probabilities by state and can be read at
+specific states:
 
-```text
-{'theta_c': 0.001034, 'RC': 3.073617}
-(90, 2)
-(90,)
+```python
+print(model.predict_proba([0, 20, 40, 60, 80]))   # shape (5, n_actions)
 ```
 
-Set `bellman="npl"` for the reported NNES path. Set `bellman="nfxp"` for the
-neural soft-Bellman diagnostic variant, which does not carry the same
-orthogonality claim.
+Counterfactual policy analysis re-solves the structural model under changed
+primitives using the simulation harness. The public wrapper does not expose a
+`counterfactual()` method; the lower-level `NNESEstimator` interface is the
+route for counterfactual re-solves in research workflows. The
+[Counterfactuals](nnes/counterfactuals.md) subpage documents the three
+counterfactual types and the harness-level results.
+
+The [Quick Start](nnes/quick_start.md) page documents the full set of fitted
+attributes and the lower-level `NNESEstimator` interface.
 
 ## Evidence
 
-NNES is reported on low-dimensional and high-dimensional action-dependent
-synthetic data-generating processes. The high-dimensional cell is the primary study because
-it uses encoded states and a richer reward-feature basis.
+Parameter recovery is measured on the `canonical_high_action` synthetic cell,
+which has 81 states, a 16-dimensional encoded state representation, 3 actions,
+and 32 reward parameters, with known oracle reward, policy, value, Q, and
+counterfactual objects. The figure below will be a Monte-Carlo study over 200
+replications once the recovery driver is run: the panel is resimulated and
+refit on a fresh seed each time, and each parameter is plotted as its recovered
+mean and 95% interval against the true value.
 
-| Evidence | Current state |
-| --- | --- |
-| Question | Recover finite-dimensional structural reward and counterfactual behavior with a neural value approximation. |
-| Study scope | Synthetic low- and high-dimensional structural DDC simulations. |
-| Primary cell | `canonical_high_action`. |
-| Results file | [nnes_results.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nnes.json). |
-| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
-| Public example | Uses `NNES` with `utility="linear_cost"` and `bellman="npl"`. |
+![NNES parameter recovery, Monte Carlo](../_static/estimators/nnes_recovery.png)
 
-The caveat is the approximation boundary. The study reports recovery within
-the numerical checks for the finite-dimensional structural reward
-and the NNES value-approximation path. It is paper-consistent evidence for the
-neural value route, not a claim that arbitrary neural reward models are
-identified or that the EconIRL harness literally replicates Nguyen's Monte
-Carlo design.
+Recovery numbers are from a Monte-Carlo study over 200 replications; values are
+pending the serial Monte-Carlo run.
 
-## NNES Guide
+| Parameter | True | Recovered (mean) | 95% interval |
+| --- | ---: | ---: | --- |
+| `theta_0` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_1` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_2` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_3` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_4` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_5` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_6` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_7` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_8` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_9` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_10` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_11` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_12` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_13` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_14` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_15` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_16` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_17` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_18` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_19` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_20` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_21` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_22` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_23` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_24` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_25` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_26` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_27` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_28` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_29` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_30` | _pending MC_ | _pending MC_ | _pending MC_ |
+| `theta_31` | _pending MC_ | _pending MC_ | _pending MC_ |
 
-- [Context](nnes/context.md)
+Behavioral fit and counterfactual regret on the `canonical_high_action` primary
+cell, against the known oracle objects from `validation/results/nnes.json`:
+
+| Metric | Value |
+| --- | ---: |
+| Policy total variation | 0.0238 |
+| Value RMSE | 0.1156 |
+| Type A regret (reward shift) | 0.004865 |
+| Type B regret (transition change) | 0.005559 |
+| Type C regret (action removed) | 0.001314 |
+
+All three regret values fall below the 0.05 threshold. The behavioral metrics
+are from a single-fit oracle-comparison run, not a Monte-Carlo average; they will be
+updated when the recovery study is complete. Current standard errors are not
+available in the results file; that entry remains pending the Monte-Carlo run.
+For the full cross-estimator comparison on the bus-engine panel, see the
+[bus engine simulation study](../simulation_studies/rust_bus.md).
+
+## References
+
+Source papers:
+
+- Nguyen, H. (2025). "Neural Networks for Efficient Estimation of
+  High-Dimensional Dynamic Discrete Choice Models." Working paper, Georgetown
+  University. {ref}`reference entry <nguyen-2025>`.
+- Hotz, V. J., and Miller, R. A. (1993). "Conditional Choice Probabilities and
+  the Estimation of Dynamic Models." _Review of Economic Studies_, 60(3),
+  497-529. {ref}`reference entry <hotz-miller-1993>`.
+- Aguirregabiria, V., and Mira, P. (2002). "Swapping the Nested Fixed Point
+  Algorithm: A Class of Estimators for Discrete Markov Decision Models."
+  _Econometrica_, 70(4), 1519-1543. {ref}`reference entry <aguirregabiria-mira-2002>`.
+
+Implementation and reproduction:
+
+- Estimator source: [`econirl.estimation.nnes`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/nnes.py).
+- sklearn wrapper: [`econirl.NNES`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/nnes.py).
+- Validation runner: [`validation/estimators/nnes/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nnes/run.py).
+- Recovery study: `validation/estimators/nnes/recovery_mc.py` (pending; adapt from `validation/estimators/nfxp/recovery_mc.py`).
+- Results file: [`nnes.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nnes.json).
+
+Pages:
+
 - [Quick Start](nnes/quick_start.md)
-- [Under the Hood](nnes/under_the_hood.md)
 - [Pre-Estimation Checks](nnes/pre_estimation.md)
 - [Simulation Study](nnes/validation.md)
 - [Counterfactuals](nnes/counterfactuals.md)
@@ -99,9 +351,7 @@ Carlo design.
 ```{toctree}
 :hidden:
 
-nnes/context
 nnes/quick_start
-nnes/under_the_hood
 nnes/pre_estimation
 nnes/validation
 nnes/counterfactuals

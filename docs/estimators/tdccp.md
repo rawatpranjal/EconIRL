@@ -1,34 +1,203 @@
 # TD-CCP
 
-TD-CCP estimates structural reward parameters in dynamic discrete choice models
-without modeling the transition density. It learns the continuation terms that
-enter the CCP likelihood directly from observed current and next state-action
-pairs, using temporal-difference recursions. The flow utility is linear in known
-features; the estimator recovers the finite-dimensional weight vector with
-cross-fitted, locally robust standard errors.
-
-Start here when the reward target is finite-dimensional, the panel contains
-current and successor state-action information, and building a transition-density
-model is the difficult part of the problem.
+TD-CCP estimates finite-dimensional structural reward parameters in dynamic
+discrete choice models using conditional choice probabilities and
+temporal-difference recursions. The parameter-estimation stage recovers the
+linear reward weight vector $\theta$ without constructing a model for the
+transition density. Observed current and successor state-action pairs identify
+two recursive continuation objects, which enter a CCP pseudo-log-likelihood in
+place of the transition integral. Cross-fitted, locally robust standard errors
+correct for first-stage estimation error in those objects and deliver valid
+inference at parametric rates.
 
 ## Source Papers
 
-This page draws on {ref}`Adusumilli and Eckardt (2025)
-<adusumilli-eckardt-2025>` for the TD fixed-point construction and locally
-robust inference and on {ref}`Hotz and Miller (1993) <hotz-miller-1993>` for
-the CCP foundation.
+The estimator follows {ref}`Adusumilli and Eckardt (2025)
+<adusumilli-eckardt-2025>`, which introduces the temporal-difference CCP
+construction, the semigradient closed-form solve for the continuation
+accumulators, the locally robust correction recursion, and Algorithm 2
+cross-fitting for valid inference. The CCP foundation is
+{ref}`Hotz and Miller (1993) <hotz-miller-1993>`, which first expresses the
+dynamic programming problem in terms of conditional choice probabilities and
+inverts the CCP mapping to recover structural parameters.
 
-## Quick Decision
+## Notation
 
-| Use TD-CCP when | Prefer another estimator when |
+Throughout, $x$ indexes the discrete state and $a$ the discrete action,
+following the notation of Adusumilli and Eckardt (2025). Observations are
+recorded for individual $i$ in period $t$ as current and successor tuples
+$(a_t, x_t, a_{t+1}, x_{t+1})$. The vector $z(a, x)$ collects the known
+reward features and $\theta$ the finite-dimensional reward parameter vector.
+The discount factor is $\beta$ and the logit shock scale is $\sigma$. The
+transition kernel $P_a(x, x')$ gives the probability of moving to $x'$ from
+$x$ under action $a$, stored in $(A, S, S)$ orientation; the
+parameter-estimation stage does not model this kernel. The first-stage
+conditional choice probability is $P(a \mid x)$. The reward-feature
+accumulator is $h(a, x)$ and the choice-shock accumulator is $g(a, x)$; both
+are identified from observed successor pairs without a density model. The
+integrated value function is $V_\theta(x)$ and the choice-specific value is
+$\tilde{Q}_\theta(a, x) = h(a, x)^\top \theta + g(a, x)$.
+
+## Model
+
+The data are current and successor state-action tuples
+$(a_t, x_t, a_{t+1}, x_{t+1})$ from a stationary infinite-horizon discrete
+choice model. The flow payoff is linear in known reward features:
+
+$$
+u_\theta(a, x) = z(a, x)^\top \theta.
+$$
+
+The reward-feature accumulator $h$ satisfies the Bellman-style recursion:
+
+$$
+h(a, x) = z(a, x) + \beta\,\mathbb{E}\bigl[h(a', x') \mid a, x\bigr].
+$$
+
+The choice-shock accumulator $g$ satisfies:
+
+$$
+g(a, x) = \beta\,\mathbb{E}\bigl[e(a', x') + g(a', x') \mid a, x\bigr],
+\qquad e(a, x) = \gamma_{\mathrm{E}} - \log P(a \mid x),
+$$
+
+where $\gamma_{\mathrm{E}}$ is the Euler-Mascheroni constant. Neither recursion
+requires modeling the transition density; both are identified from observed
+successor pairs. The implied choice-specific value is:
+
+$$
+\tilde{Q}_\theta(a, x) = h(a, x)^\top \theta + g(a, x),
+$$
+
+and the conditional choice probability follows the logit rule:
+
+$$
+\pi_\theta(a \mid x)
+= \frac{\exp\{\tilde{Q}_\theta(a, x)\}}
+       {\sum_b \exp\{\tilde{Q}_\theta(b, x)\}}.
+$$
+
+The canonical evaluation instance is the encoded-state design: 81 states,
+3 actions, and 6 reward parameters. Reward features are polynomial functions
+of two encoded state coordinates; action 0 serves as the reward-normalized
+baseline.
+
+## Identification
+
+TD-CCP point-identifies the reward parameters $\theta$ under the following
+assumptions.
+
+- **Conditional Independence (CI).** The observed state transition is Markov
+  in the current state and action and does not depend on the current logit
+  shock.
+- **Additive Separability (AS).** The per-period payoff is the systematic
+  reward plus an additive choice-specific shock, drawn independently across
+  choices as Type-I extreme value with fixed scale $\sigma$.
+- **Finite Linear Reward.** The flow utility is a known finite-dimensional
+  linear function $z(a, x)^\top \theta$ of the reward features. The reward
+  target is the finite parameter vector $\theta$; the estimator does not
+  recover an unrestricted functional form.
+- **Reward Normalization.** A baseline action with reward features fixed to
+  zero anchors the reward level and pins the logit scale.
+- **Action-Dependent Feature Rank.** The reward features must vary across
+  actions; the action-contrast rank must equal the number of parameters.
+  State-only features copied identically across actions difference out of the
+  choice probabilities and leave $\theta$ on a ridge.
+
+These hold in a finite discrete state space, a stationary environment, and
+with a known fixed discount factor $\beta$. Given these conditions, $\theta$
+is point-identified. Identification weakens under thin action support (which
+destabilizes first-stage CCPs), an invalid reward normalization, or a
+near-singular basis for the continuation accumulators.
+
+## Estimator
+
+The preliminary estimator maximizes the CCP pseudo-log-likelihood:
+
+$$
+\tilde{\theta}
+= \arg\max_\theta \sum_{i,t} \log \pi_\theta(a_{it} \mid x_{it}),
+$$
+
+where $\pi_\theta$ uses the semigradient estimates $\hat{h}$ and $\hat{g}$ in
+place of the transition integral. The semigradient solve for $h$ takes the
+closed form:
+
+$$
+\hat{\omega}
+= \Bigl[\mathbb{E}_n\bigl\{\phi(a,x)
+    \bigl(\phi(a,x) - \beta\phi(a',x')\bigr)^\top\bigr\}\Bigr]^{-1}
+  \mathbb{E}_n\bigl\{\phi(a,x)\,z(a,x)\bigr\},
+$$
+
+with an analogous equation for $g$. The plug-in score ignores estimation error
+in $\hat{h}$ and $\hat{g}$. The locally robust correction adds the term
+$\lambda(a, x)$, which satisfies a backward fixed-point recursion and accounts
+for that first-stage error. With cross-fitting (Algorithm 2 of the paper), the
+correction is computed on one fold using objects learned on the complementary
+fold, giving valid inference at parametric rates with standard errors clustered
+by individual.
+
+## Algorithm
+
+```text
+Algorithm  TD-CCP (semigradient, Algorithm 2 locally robust cross-fitting)
+Input   panel {(a_it, x_it, a_{i,t+1}, x_{i,t+1})}, reward features z,
+        basis phi, discount beta, fold count K
+Output  theta_hat, standard errors, policy pi, value V
+
+1   estimate first-stage CCPs P(a | x) from observed choices          # logit or frequency
+2   partition individuals into K folds
+3   for k = 1, ..., K:
+4       using data from folds != k, solve for h_k by semigradient TD:
+            omega_k = [E_n{phi(a,x)(phi(a,x) - beta phi(a',x'))'}]^{-1}
+                       E_n{phi(a,x) z(a,x)}
+5       using data from folds != k, solve for g_k analogously
+            with target beta (gamma_E - log P(a' | x'))
+6       on fold k data, solve the preliminary CCP pseudo-likelihood for tilde_theta_k
+7       on fold k data, compute the correction recursion lambda_k
+8       on fold k data, solve the locally robust moment equation for theta_k
+9   theta_hat := average_k(theta_k)
+10  standard errors from the fold covariances, clustered by individual
+11  return theta_hat, standard errors, policy pi_theta, value V_theta
+```
+
+The parameter-estimation stage does not model the transition kernel; the
+accumulators $\hat{h}$ and $\hat{g}$ are identified entirely from observed
+successor pairs $(a_t, x_t, a_{t+1}, x_{t+1})$.
+
+The default estimator uses `method="semigradient"`, `cross_fitting=True`, and
+`robust_se=True`, implementing Algorithm 2 of Adusumilli and Eckardt (2025).
+The semigradient steps (4 and 5) reduce to single matrix solves, making
+recursive-term estimation fast. The alternative `method="neural"` replaces the
+semigradient closed-form solves with neural approximate value iteration
+(Algorithm 1), which trains neural networks for $h$ and $g$ iteratively; it
+is more flexible for high-dimensional state spaces and does not use
+cross-fitting or locally robust standard errors in the current implementation.
+The implementation lives in `econirl.estimation.td_ccp`.
+
+## Applicability
+
+| Applicable when | Prefer an alternative when |
 | --- | --- |
-| Choices are discrete and agents are forward-looking. | The state space is small and tabular likelihood methods are easy to run. |
-| The panel contains current and next state-action pairs. | The panel does not record successor states or actions. |
-| Transition-density modeling is the difficult part. | Transitions are known or easily estimated. |
-| The reward is a finite linear function of known features. | The target is an unrestricted neural reward map (use the IRL family). |
-| Valid inference with locally robust standard errors is required. | Observed action support is very sparse at key states. |
+| Choices are discrete and agents are forward-looking. | The state space is small and tabular Bellman solves are feasible (NFXP). |
+| The panel records current and next state-action pairs. | The panel does not record successor states or actions. |
+| Transition-density modeling is the main bottleneck. | Transitions are known or easily estimated (CCP or NFXP). |
+| The reward is a finite linear function of known features. | The reward target is an unrestricted neural map (IRL family). |
+| Locally robust standard errors are required for inference. | Observed action support is very sparse at key states. |
 
-## Quick Start
+TD-CCP occupies the niche between exact tabular methods and IRL. NFXP and
+MPEC nest the Bellman solve inside the likelihood and require the full
+transition tensor; CCP inverts the CCP mapping and needs the transition object
+for the future-value terms. TD-CCP sidesteps the transition-density modeling
+step entirely for reward-parameter estimation, at the cost of requiring
+observed successor state-action pairs in the panel. NNES and UFXP are
+attractive when Bellman solves are feasible but the main goal is computation
+speed. Counterfactual evaluation under an intervened transition process still
+requires a transition environment; TD-CCP's advantage is confined to the
+parameter-estimation stage.
+
+## Usage
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -49,35 +218,82 @@ print(model.params_)
 print(model.summary())
 ```
 
-For custom reward features, panel objects, basis settings, cross-fitting, robust
-standard errors, or supplied transition tensors, use
-`econirl.estimation.TDCCPEstimator`.
+The fitted policy gives the action probability at each state:
+
+```python
+states = [0, 10, 50, 89]
+print(model.predict_proba(states))
+```
+
+Counterfactual evaluation re-solves the dynamic program under a changed reward
+or transition primitive. The public wrapper exposes the fitted parameters,
+policy, and confidence intervals; re-solution under an intervened environment
+uses `econirl.estimation.td_ccp.TDCCPEstimator` with a supplied transition
+tensor. See the [Counterfactuals](tdccp/counterfactuals.md) subpage for the
+counterfactual taxonomy and reported regret values.
+
+The [Quick Start](tdccp/quick_start.md) page documents the full set of fitted
+attributes and the lower-level `TDCCPEstimator` interface.
 
 ## Evidence
 
-TD-CCP is reported on the `shapeshifter_encoded_state_locally_robust` synthetic
-cell: 81 states, 3 actions, two encoded state coordinates, and 6 reward
-parameters. The data-generating process is fully specified, so recovered
-parameters, policy, value function, Q function, and Type A, Type B, and Type C
-counterfactual outcomes are all compared against oracle objects. The
-results file records the reported results. TD-CCP also
-appears on the [bus engine](../simulation_studies/rust_bus.md) and
-[taxi gridworld](../simulation_studies/taxi_gridworld.md) pages of
-the simulation studies.
+Parameter recovery is measured on the `shapeshifter_encoded_state_locally_robust`
+synthetic cell, which has known rewards, transitions, policies, values, Q
+functions, and Type A, Type B, and Type C counterfactual oracles. The figure
+below is a Monte-Carlo study: the panel is resimulated on a fresh seed each
+replication, and each parameter is plotted as its recovered mean and 95%
+interval against the true value.
 
-| Evidence | Current state |
-| --- | --- |
-| Scope | Synthetic tabular simulation with encoded state features. |
-| Primary cell | `shapeshifter_encoded_state_locally_robust`. |
-| Results file | [tdccp.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json). |
-| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
-| Public example | Uses `TDCCP` with `utility="linear_cost"` on the bundled bus dataset. |
+![tdccp parameter recovery, Monte Carlo](../_static/estimators/tdccp_recovery.png)
 
-## TD-CCP Guide
+Parameter recovery is over a Monte-Carlo run on the `shapeshifter_encoded_state_locally_robust` cell; numbers are pending the full run.
 
-- [Context](tdccp/context.md)
+| Parameter | True | Recovered (mean) | 95% interval |
+| --- | ---: | ---: | --- |
+| `action_1_intercept` | 1.471089 | _pending MC_ | _pending MC_ |
+| `action_1_x0` | -1.174561 | _pending MC_ | _pending MC_ |
+| `action_1_x1` | 0.776064 | _pending MC_ | _pending MC_ |
+| `action_2_intercept` | -0.392696 | _pending MC_ | _pending MC_ |
+| `action_2_x0` | 0.290661 | _pending MC_ | _pending MC_ |
+| `action_2_x1` | -0.285572 | _pending MC_ | _pending MC_ |
+
+Behavioral fit and counterfactual regret on the same cell, against the known
+oracle objects:
+
+| Metric | Value |
+| --- | ---: |
+| Policy total variation | 0.004658 |
+| Value RMSE | 0.020109 |
+| Type A regret (reward shift) | 0.001883 |
+| Type B regret (transition change) | 0.001864 |
+| Type C regret (action removed) | 0.003200 |
+
+The regrets are small because the recovered reward is close enough to the truth
+that re-solving under the intervened primitive reproduces almost the same
+policy as the oracle. For the full cross-estimator comparison on a bus-engine
+panel, see the [bus engine simulation study](../simulation_studies/rust_bus.md).
+
+## References
+
+Source papers:
+
+- Adusumilli, K., and Eckardt, D. (2025). "Temporal-Difference Estimation of
+  Dynamic Discrete Choice Models." Working paper.
+  {ref}`reference entry <adusumilli-eckardt-2025>`.
+- Hotz, V. J., and Miller, R. A. (1993). "Conditional Choice Probabilities and
+  the Estimation of Dynamic Models." _Review of Economic Studies_, 60(3),
+  497-529. {ref}`reference entry <hotz-miller-1993>`.
+
+Implementation and reproduction:
+
+- Estimator source: [`econirl.estimation.td_ccp`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/td_ccp.py).
+- sklearn wrapper: [`econirl.TDCCP`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/tdccp.py).
+- Validation runner: [`validation/estimators/tdccp/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/tdccp/run.py).
+- Results file: [`tdccp.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json).
+
+Pages:
+
 - [Quick Start](tdccp/quick_start.md)
-- [Under the Hood](tdccp/under_the_hood.md)
 - [Pre-Estimation Checks](tdccp/pre_estimation.md)
 - [Simulation Study](tdccp/validation.md)
 - [Counterfactuals](tdccp/counterfactuals.md)
@@ -86,9 +302,7 @@ the simulation studies.
 ```{toctree}
 :hidden:
 
-tdccp/context
 tdccp/quick_start
-tdccp/under_the_hood
 tdccp/pre_estimation
 tdccp/validation
 tdccp/counterfactuals

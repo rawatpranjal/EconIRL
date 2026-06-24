@@ -1,36 +1,209 @@
 # MCE-IRL
 
-Maximum causal entropy IRL estimates reward parameters by matching the feature
-counts in demonstrations to the feature counts implied by a soft dynamic
-policy. In EconIRL, the tabular simulation uses known transitions and
-action-dependent reward features supplied by the user.
-
-Use this page for finite-dimensional tabular IRL. Use Deep MCE-IRL when the
-target is a neural reward map instead of a fixed feature vector.
+Maximum causal entropy inverse reinforcement learning recovers reward
+parameters from demonstrated state-action trajectories by matching discounted
+feature expectations under a soft-optimal causal policy. For each candidate
+reward, the estimator solves a forward soft dynamic program, computes the
+implied feature moments, and updates the parameters until the model moments
+equal the expert moments. Counterfactuals are meaningful only through the
+fitted MDP primitives.
 
 ## Source Papers
 
-This page draws on {ref}`Ziebart et al. (2008) <ziebart-2008>` for
-maximum-entropy IRL and {ref}`Ziebart (2010) <ziebart-2010>` for the maximum
-causal entropy formulation.
+The estimator follows {ref}`Ziebart et al. (2008) <ziebart-2008>`, which
+introduces maximum-entropy inverse reinforcement learning through feature-count
+matching, and {ref}`Ziebart (2010) <ziebart-2010>`, which formulates the
+maximum causal entropy objective. The causal entropy formulation conditions
+each action only on the current state and continuation values, not on future
+realized states. That is the critical distinction from trajectory
+maximum-entropy IRL and is why MCE-IRL is the reference entropy IRL route for
+dynamic discrete choice comparisons in this package.
 
-## Quick Decision
+## Notation
 
-| Use MCE-IRL when | Prefer another estimator when |
+Throughout, $s$ indexes the discrete state and $a$ the discrete action,
+observed for individual $i$ in period $t$. The vector $\phi(s, a)$ collects
+the action-dependent reward features and $\theta$ the reward parameters to be
+estimated. The discount factor is $\beta$ and the logit shock scale is
+$\sigma$. The transition kernel $P_a(s, s')$ gives the probability of moving
+to $s'$ from $s$ under action $a$, stored in $(A, S, S)$ orientation. The
+soft value function is $V_\theta(s)$, the choice-specific value is
+$Q_\theta(s, a)$, and the causal policy is $\pi_\theta(a \mid s)$. The
+empirical discounted expert occupancy is $D_E(s, a)$ and the model occupancy
+is $D_\theta(s, a)$. The expert and model feature moments are $\mu_E$ and
+$\mu_\theta$.
+
+## Model
+
+The observed data are state, action, and next-state trajectories
+$(s_{it}, a_{it}, s_{i,t+1})$. The reward is linear in the action-dependent
+features:
+
+$$
+r_\theta(s, a) = \phi(s, a)^\top \theta.
+$$
+
+The choice-specific value satisfies:
+
+$$
+Q_\theta(s, a) = r_\theta(s, a) + \beta \sum_{s'} P_a(s, s') V_\theta(s').
+$$
+
+The soft value function solves:
+
+$$
+V_\theta(s)
+= \sigma \log \sum_a \exp\!\left(\frac{Q_\theta(s, a)}{\sigma}\right).
+$$
+
+The causal policy is the softmax of the choice-specific values:
+
+$$
+\pi_\theta(a \mid s)
+= \frac{\exp(Q_\theta(s, a) / \sigma)}
+       {\sum_b \exp(Q_\theta(s, b) / \sigma)}.
+$$
+
+Action probabilities at time $t$ depend on the current state and continuation
+values, not on future realized states. This causal structure connects MCE-IRL
+to logit dynamic discrete choice: both use the same soft choice form, but
+MCE-IRL estimates the reward through feature moments rather than through a
+conditional likelihood alone.
+
+## Identification
+
+MCE-IRL identifies a reward representation under the following assumptions.
+
+- **Known transitions.** The transition kernel $P_a(s, s')$ is supplied or
+  estimated outside the estimator. It does not depend on the reward parameters.
+- **Causal behavioral model.** The agent's policy is the soft-optimal policy
+  of the maximum causal entropy objective. The action distribution at each
+  state follows the softmax of the choice-specific values from the soft Bellman
+  recursion.
+- **Additive linear reward.** The reward is linear in the supplied feature
+  matrix: $r_\theta(s, a) = \phi(s, a)^\top \theta$. Structural
+  counterfactuals require this parametric form.
+- **Reward normalization.** The reward is identified only up to
+  transformations that leave behavior unchanged, including additive constants
+  and reward shaping. A normalization anchor must be applied consistently when
+  comparing estimated and reference rewards.
+- **Action-dependent feature rank.** The feature design must have full rank
+  after applying the normalization. For multi-action reward recovery, features
+  must vary across actions. State-only features broadcast across actions and
+  leave action-specific payoff differences unidentified.
+- **Sufficient action support.** Each action must have enough observed support
+  for the occupancy comparison. States with only one feasible action, or rare
+  actions in the data, leave the corresponding reward directions weakly
+  pinned.
+- **Consistent encoding.** Observations must be encoded in the same
+  state-action indexing system as the transition tensor.
+
+These hold inside a finite discrete state space with a stationary environment
+and a known discount factor $\beta$. Under them, the feature-moment condition
+$\mu_E = \mu_\theta$ uniquely determines $\theta$ within the supplied feature
+basis and normalization. Identification weakens under a rank-deficient or
+state-only feature matrix, thin action support, or an invalid normalization.
+
+## Estimator
+
+MCE-IRL matches discounted feature expectations. The empirical and model
+feature moments are:
+
+$$
+\mu_E = \sum_{s,a} D_E(s, a)\,\phi(s, a),
+\qquad
+\mu_\theta = \sum_{s,a} D_\theta(s, a)\,\phi(s, a).
+$$
+
+The estimator solves the moment condition:
+
+$$
+\mu_E - \mu_\theta = 0.
+$$
+
+Equivalently, this is the stationarity condition of the causal-entropy dual
+objective:
+
+$$
+\nabla_\theta L(\theta) = \mu_E - \mu_\theta.
+$$
+
+In the default L-BFGS-B path, the estimator maximizes the conditional log
+likelihood of the demonstrations under $\pi_\theta$, with the gradient
+computed by implicit differentiation through the soft Bellman fixed point. The
+score differentiates through the value function via:
+
+$$
+(I - \beta P_\pi)\frac{\partial V}{\partial \theta_k}
+= \sum_a \pi_\theta(a \mid s)\,\phi_k(s, a),
+$$
+
+where $P_\pi = \sum_a \operatorname{diag}(\pi_\theta(\cdot, a)) P_a$ is the
+policy-weighted transition matrix. The resulting gradient has the same logit
+form as the structural conditional likelihood score.
+
+## Algorithm
+
+```text
+Algorithm  MCE-IRL (default: L-BFGS-B outer, hybrid inner solver)
+Input   panel {(s_it, a_it, s_{i,t+1})}, features phi, transitions P,
+        discount beta, logit scale sigma
+Output  theta_hat, policy pi, value V
+
+1   compute expert feature moments mu_E from the demonstration occupancy
+2   compute initial state distribution rho_0 from the data
+3   initialize theta
+4   repeat                                         # outer loop: L-BFGS-B
+5       r_theta(s, a) := phi(s, a)' theta
+6       solve  V_theta = T_theta V_theta           # inner loop: hybrid soft Bellman
+7       Q_theta(s, a) := r_theta(s, a) + beta * sum_{s'} P_a(s, s') V_theta(s')
+8       pi_theta(a | s) := exp(Q_theta(s, a)/sigma) / sum_b exp(Q_theta(s, b)/sigma)
+9       L(theta) := sum_{i,t} log pi_theta(a_it | s_it)
+10      solve  (I - beta P_pi) dV/dtheta_k = sum_a pi_theta phi_k(s, a)  for each k
+11      compute grad L from dV/dtheta_k via the logit score
+12      update theta using L-BFGS-B
+13  until the gradient norm is below tolerance
+14  return theta_hat, pi_theta, V_theta
+```
+
+The inner solve in step 6 defaults to `inner_solver="hybrid"`: value iteration
+(contraction) while far from the fixed point, then Newton-Kantorovich steps
+near the solution. Two pure variants are also available. `"value"` (successive
+approximation) converges linearly and is robust from any start. `"policy"`
+(policy iteration with matrix-inversion evaluation) converges faster near the
+solution but requires a good starting point.
+
+An alternative outer path, used in the package's own simulation study, is
+`optimizer="root"`: a direct root-finding solver (HYBR method) that solves
+$\mu_E - \mu_\theta = 0$ without maximizing the log likelihood. The root path
+converged in 25 iterations on the primary validation cell. A gradient-descent
+path (`optimizer="gradient"`) is also available, using Adam or plain SGD as
+the outer update. The implementation lives in `econirl.estimation.mce_irl`.
+
+## Applicability
+
+| Applicable when | Prefer an alternative when |
 | --- | --- |
-| Demonstrations come from a discrete sequential decision problem. | You need likelihood-based structural standard errors. |
-| Transitions are known or can be supplied. | Transition estimation is the main difficulty. |
-| Reward features are supplied and action-dependent. | Reward features are unknown or purely neural. |
-| The behavioral model is maximum causal entropy. | The target is deterministic optimal control without entropy regularization. |
-| You want reward, policy, value, Q, and counterfactual recovery checks. | You only need fitted conditional choice probabilities. |
+| Demonstrations come from a discrete sequential decision problem. | Likelihood-based structural standard errors are required. |
+| Transitions are known or can be supplied. | Transition estimation is the main modeling challenge. |
+| Reward features are supplied and action-dependent. | Reward features are unknown or require a neural representation. |
+| The behavioral model is maximum causal entropy. | The target is deterministic control without entropy regularization. |
+| Reward, policy, value, and counterfactual recovery are the goals. | Only fitted conditional choice probabilities are required. |
 
-## Quick Start
+MCE-IRL is the reference entropy IRL estimator for tabular discrete choice.
+The structural estimators (NFXP, CCP, MPEC, NNES, TD-CCP) target the same
+reward through likelihood or estimating-equation paths and report standard
+errors for $\theta$. Deep MCE-IRL keeps the causal-entropy objective but
+replaces the tabular feature basis with a neural reward map.
+
+## Usage
 
 ```python
 import numpy as np
 
+from econirl import MCEIRL
+
 from econirl.datasets import load_rust_bus
-from econirl.estimators import MCEIRL
 
 n_states = 90
 n_actions = 2
@@ -53,33 +226,78 @@ print(model.params_)
 print(model.policy_.shape)
 ```
 
-Multi-action MCE-IRL needs an explicit reward specification. Pass a
-`RewardSpec` to `fit()` or provide `feature_matrix` at construction time. The
-wrapper no longer treats `feature_matrix=None` as a structural default.
+The fitted policy gives action probabilities by state:
+
+```python
+print(model.predict_proba([0, 10, 50, 89]))
+```
+
+Counterfactual analysis requires re-solving the dynamic program under changed
+primitives. The fitted primitives available for this are `model.reward_matrix_`,
+`model.policy_`, and `model.value_function_`. For controlled payoff, transition,
+or action-set interventions, use the lower-level simulation and evaluation
+utilities with an explicit problem and transition environment. The
+[Counterfactuals](mce_irl/counterfactuals.md) page documents the three
+counterfactual families and the reported regret figures.
+
+The [Quick Start](mce_irl/quick_start.md) page documents the full set of fitted
+attributes and the lower-level `MCEIRLEstimator` interface.
 
 ## Evidence
 
-MCE-IRL is reported on two action-dependent synthetic cells whose reward,
-transitions, policy, value, Q functions, and counterfactual oracles are all
-specified before any data are generated. The primary cell has 25 states, 3
-actions, and 8 reward features. The results file records the
-reported results. MCE-IRL also runs on the bus engine and gridworld pages of
-the [simulation studies](../simulation_studies/index.md) alongside the full
-IRL roster.
+Behavioral recovery is measured on the `mce_low_high_reward` synthetic cell,
+which has 25 states, 3 actions, and 8 action-dependent reward features. The
+reward, transitions, policy, value, Q functions, and counterfactual oracles are
+fully specified before any data are generated. The estimator sees only the
+300,000 generated observations, the transition tensor, and the feature matrix.
+The root feature-matching path reaches a solution in 25 iterations.
 
-| Evidence | Current state |
-| --- | --- |
-| Scope | Synthetic tabular simulation. |
-| Primary cell | `mce_low_high_reward`. |
-| Results file | [mce_irl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json). |
-| Counterfactual checks | Type A, Type B, and Type C are reported in the results file. |
-| Public example | Uses `MCEIRL` with explicit action-dependent features. |
+Behavioral fit against the known oracle policy:
 
-## MCE-IRL Guide
+| Metric | Value |
+| --- | ---: |
+| Policy total variation | 0.00698 |
+| Value RMSE | 0.0319 |
+| Type A regret (reward shift) | 0.000433 |
+| Type B regret (transition change) | 0.000410 |
+| Type C regret (action removed) | 9.44e-05 |
 
-- [Context](mce_irl/context.md)
+Counterfactual recovery under three perturbation families:
+
+| Counterfactual | Policy TV | Value RMSE | Regret |
+| --- | ---: | ---: | ---: |
+| Type A (reward shift) | 0.006456 | 0.000742 | 0.000433 |
+| Type B (transition change) | 0.006284 | 0.000523 | 0.000410 |
+| Type C (action removed) | 0.004211 | 0.000145 | 9.44e-05 |
+
+All ten release checks pass. These results are local to the known simulation
+environment and depend on the same transition law, support, reward
+representation, and policy-response assumptions used in fitting. For the
+cross-estimator comparison on multiple dynamic choice problems, see the
+[bus engine simulation study](../simulation_studies/rust_bus.md).
+
+## References
+
+Source papers:
+
+- Ziebart, B. D., Maas, A. L., Bagnell, J. A., and Dey, A. K. (2008). Maximum
+  Entropy Inverse Reinforcement Learning. _Proceedings of the 23rd AAAI
+  Conference on Artificial Intelligence_, 1433-1438.
+  {ref}`reference entry <ziebart-2008>`.
+- Ziebart, B. D. (2010). _Modeling Purposeful Adaptive Behavior with the
+  Principle of Maximum Causal Entropy_. PhD thesis, Carnegie Mellon University.
+  {ref}`reference entry <ziebart-2010>`.
+
+Implementation and reproduction:
+
+- Estimator source: [`econirl.estimation.mce_irl`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/mce_irl.py).
+- sklearn wrapper: [`econirl.MCEIRL`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/mce_irl.py).
+- Validation runner: [`validation/estimators/mce_irl/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/run.py).
+- Results file: [`mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json).
+
+Pages:
+
 - [Quick Start](mce_irl/quick_start.md)
-- [Under the Hood](mce_irl/under_the_hood.md)
 - [Pre-Estimation Checks](mce_irl/pre_estimation.md)
 - [Simulation Study](mce_irl/validation.md)
 - [Counterfactuals](mce_irl/counterfactuals.md)
@@ -88,9 +306,7 @@ IRL roster.
 ```{toctree}
 :hidden:
 
-mce_irl/context
 mce_irl/quick_start
-mce_irl/under_the_hood
 mce_irl/pre_estimation
 mce_irl/validation
 mce_irl/counterfactuals

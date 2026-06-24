@@ -43,4 +43,5 @@ IRL method such as MaxEnt-IRL.
 `reward_scope="state"` is not supported and raises a configuration error.
 Action-dependent marginal matching paired with an action-dependent reward
 (`reward_scope="state_action"`) is supported but is a diagnostic exercise under
-current evidence; see [Context](context.md).
+current evidence; see the Identification and Applicability sections of the
+[main f-IRL page](../f_irl.md).
