@@ -18,7 +18,7 @@ The simulation follows the data generating process:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 import jax
@@ -91,6 +91,113 @@ def simulate_panel(
             "n_periods": n_periods,
             "seed": seed,
             "true_parameters": env.true_parameters,
+        },
+    )
+
+
+def simulate_mixture_panel(
+    segment_envs: Sequence[DDCEnvironment],
+    segment_probs: Sequence[float] | np.ndarray,
+    n_individuals: int = 100,
+    n_periods: int = 100,
+    seed: int | None = None,
+) -> Panel:
+    """Simulate a heterogeneous panel from a finite mixture of viewer types.
+
+    Each individual is assigned a latent segment drawn from ``segment_probs``,
+    then their whole trajectory is simulated from that segment's optimal policy.
+    The latent segment is recorded as ground truth: panel-level
+    ``metadata["segment_labels"]`` is a length-``n_individuals`` list, and each
+    trajectory carries ``metadata["segment"]``.
+
+    All segment environments must share the same state and action space (the
+    types differ only in their reward ``theta``).  This is the public,
+    homogeneous-space counterpart of the known-truth latent-segment DGP in
+    ``validation/known_truth.py``; the homogeneous :func:`simulate_panel` is left
+    unchanged.
+
+    Args:
+        segment_envs: One :class:`DDCEnvironment` per latent segment.  They must
+            agree on ``num_states`` and ``num_actions``.
+        segment_probs: Mixture weights over the segments.  Normalized internally;
+            must be non-negative with positive mass and match ``segment_envs`` in
+            length.
+        n_individuals: Number of individuals to simulate.
+        n_periods: Number of time periods per individual.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Panel object whose ``metadata`` carries ``segment_labels`` (the per-agent
+        latent type) plus the per-segment true parameters and mixture weights.
+
+    Example:
+        >>> from econirl.environments import content_consumption
+        >>> binge = content_consumption(theta=[2.0, 0.2, 0.5, 0.3])
+        >>> sampler = content_consumption(theta=[1.0, 1.5, 0.5, 2.0])
+        >>> panel = simulate_mixture_panel(
+        ...     [binge, sampler], [0.5, 0.5],
+        ...     n_individuals=200, n_periods=40, seed=0,
+        ... )
+        >>> labels = panel.metadata["segment_labels"]
+        >>> len(labels) == 200
+        True
+    """
+    if len(segment_envs) == 0:
+        raise ValueError("segment_envs must contain at least one environment")
+    probs = np.asarray(segment_probs, dtype=np.float64).reshape(-1)
+    if probs.shape[0] != len(segment_envs):
+        raise ValueError(
+            f"segment_probs has length {probs.shape[0]} but there are "
+            f"{len(segment_envs)} segment environments; they must match."
+        )
+    if (probs < 0).any() or probs.sum() <= 0:
+        raise ValueError("segment_probs must be non-negative with positive mass")
+    probs = probs / probs.sum()
+
+    n_states = segment_envs[0].num_states
+    n_actions = segment_envs[0].num_actions
+    for g, env in enumerate(segment_envs):
+        if env.num_states != n_states or env.num_actions != n_actions:
+            raise ValueError(
+                "all segment environments must share the same state/action "
+                f"space; segment {g} has ({env.num_states}, {env.num_actions}) "
+                f"vs ({n_states}, {n_actions})."
+            )
+
+    rng = np.random.default_rng(seed)
+
+    # Solve each segment's optimal policy once, then reuse it across that
+    # segment's individuals.
+    policies = [_compute_optimal_policy(env) for env in segment_envs]
+
+    trajectories: list[Trajectory] = []
+    segment_labels: list[int] = []
+
+    for i in range(n_individuals):
+        segment = int(rng.choice(len(segment_envs), p=probs))
+        segment_labels.append(segment)
+        traj = _simulate_trajectory(
+            env=segment_envs[segment],
+            policy=policies[segment],
+            n_periods=n_periods,
+            individual_id=i,
+            rng=rng,
+        )
+        traj.metadata["segment"] = segment
+        trajectories.append(traj)
+
+    return Panel(
+        trajectories=trajectories,
+        metadata={
+            "n_individuals": n_individuals,
+            "n_periods": n_periods,
+            "seed": seed,
+            "num_segments": len(segment_envs),
+            "segment_probabilities": probs.tolist(),
+            "segment_labels": segment_labels,
+            "segment_true_parameters": [
+                dict(env.true_parameters) for env in segment_envs
+            ],
         },
     )
 

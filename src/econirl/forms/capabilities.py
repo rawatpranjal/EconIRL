@@ -103,6 +103,10 @@ CAPABILITIES: dict[str, EstimatorCapability] = {
         _structural("SEES", "other", False),
         # Linear IRL (behavioral metrics; reward partially identified).
         _linear_irl("MCEIRL", "causal-entropy", True),
+        # RHIP: horizon-parameterised MaxEnt-family IRL (Barnes et al. 2024).
+        # H=inf reproduces MCE-IRL exactly; finite H interpolates to MMP (H=0).
+        # Not in the curated headline roster (evidence lives in its own study).
+        _linear_irl("RHIP", "other", False),
         _linear_irl("MaxEntIRL", "other", False),
         _linear_irl("MaxMarginIRL", "other", False),
         # Legacy / not identified: tabular Q, no generalization to unvisited states.

@@ -64,6 +64,7 @@ from econirl.preferences.linear import LinearUtility
 
 # Sklearn-style Estimators (JAX backend)
 from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES, SEES, TDCCP, UFXP
+from econirl.estimators import RHIP
 from econirl.estimators import GLADIUS, NeuralGLADIUS
 from econirl.estimators import AIRL, NeuralAIRL
 from econirl.estimation import IQLearnEstimator as IQLearn
@@ -107,6 +108,7 @@ __all__ = [
     "MaxEntIRL",
     "MaxMarginIRL",
     "MCEIRL",
+    "RHIP",
     "NNES",
     "SEES",
     "TDCCP",

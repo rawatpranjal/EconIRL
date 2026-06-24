@@ -8,10 +8,13 @@ import econirl
 from econirl.forms import CAPABILITIES, EstimatorCapability, Form, FormSpec
 
 # Public classes that expose a fit/estimate API but are NOT registry choice
-# estimators: a transition-matrix utility, and the two deprecated legacy
-# estimate()-only aliases of NFXP/CCP. Anything else with such an API must be
+# estimators: a transition-matrix utility, the two deprecated legacy
+# estimate()-only aliases of NFXP/CCP, and MPEC (exported at top level but
+# deliberately kept out of CAPABILITIES so run_form does not surface it
+# automatically; it runs via the direct .estimate() path -- see
+# scripts/study_route_choice.py). Anything else with such an API must be
 # registered (this is what makes the drift guard module-agnostic).
-_NOT_REGISTRY_ESTIMATORS = {"TransitionEstimator", "NFXPEstimator", "CCPEstimator"}
+_NOT_REGISTRY_ESTIMATORS = {"TransitionEstimator", "NFXPEstimator", "CCPEstimator", "MPEC"}
 
 
 def _public_choice_estimators() -> set[str]:

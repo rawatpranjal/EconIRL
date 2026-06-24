@@ -48,6 +48,7 @@ from econirl.estimators.maxent_irl import MaxEntIRL
 from econirl.estimators.mce_irl import MCEIRL
 from econirl.estimators.nfxp import NFXP
 from econirl.estimators.nnes import NNES
+from econirl.estimators.rhip import RHIP
 from econirl.estimators.sees import SEES
 from econirl.estimators.tdccp import TDCCP
 from econirl.estimators.ufxp import UFXP
@@ -92,6 +93,7 @@ __all__ = [
     "MaxEntIRL",
     "MaxMarginIRL",
     "MCEIRL",
+    "RHIP",
     "GLADIUS",
     "AIRL",
     "NeuralGLADIUS",

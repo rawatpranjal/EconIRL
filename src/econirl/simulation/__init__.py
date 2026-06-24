@@ -23,7 +23,7 @@ from econirl.simulation.counterfactual import (
     state_extrapolation,
     welfare_decomposition,
 )
-from econirl.simulation.synthetic import simulate_panel
+from econirl.simulation.synthetic import simulate_mixture_panel, simulate_panel
 
 __all__ = [
     "CounterfactualType",
@@ -45,6 +45,7 @@ __all__ = [
     "neural_sieve_compression",
     "neural_transition_counterfactual",
     "simulate_counterfactual",
+    "simulate_mixture_panel",
     "simulate_panel",
     "state_extrapolation",
     "welfare_decomposition",

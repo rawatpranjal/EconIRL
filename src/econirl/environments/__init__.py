@@ -5,6 +5,7 @@ from econirl.environments.base import DDCEnvironment
 from econirl.environments.binaryworld import BinaryworldEnvironment
 from econirl.environments.citibike_route import CitibikeRouteEnvironment
 from econirl.environments.citibike_usage import CitibikeUsageEnvironment
+from econirl.environments.content_consumption import content_consumption
 from econirl.environments.entry_exit import EntryExitEnvironment
 from econirl.environments.frozen_lake import FrozenLakeEnvironment
 from econirl.environments.gridworld import GridworldEnvironment
@@ -43,6 +44,7 @@ __all__ = [
     "ShapeshifterConfig",
     "ShapeshifterEnvironment",
     "SupermarketEnvironment",
+    "content_consumption",
     "random_mdp",
     "road_network",
     "storable_goods",

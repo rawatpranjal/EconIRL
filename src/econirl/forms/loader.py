@@ -156,6 +156,16 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
             inner_max_iter=2000, compute_se=False, verbose=False,
         ))
 
+    if name == "RHIP":
+        from econirl.estimators.rhip import RHIPEstimator
+        # Default to the H=inf endpoint (= MCE-IRL) for the registry roster; a
+        # study sweeping the horizon constructs RHIPEstimator(horizon=...)
+        # directly rather than through this generic recipe.
+        return RHIPEstimator(
+            horizon=float("inf"), learning_rate=0.05, outer_max_iter=100,
+            inner_max_iter=2000, compute_se=False, verbose=False,
+        )
+
     if name == "MaxEntIRL":
         from econirl.contrib.maxent_irl import MaxEntIRLEstimator
         return MaxEntIRLEstimator(
