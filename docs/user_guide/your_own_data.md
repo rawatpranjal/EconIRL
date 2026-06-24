@@ -20,26 +20,36 @@ One row per observed decision. Three columns name the pieces.
 A `next_state` column is optional. When it is missing, the tabular estimators
 read transitions from the order of states within each `id`.
 
-## Two ways to call econirl
+## Check the assumptions first
 
-Most users hand econirl a DataFrame and name the columns.
+Before you fit, your data has to fit the model. These estimators recover a
+reward from choices under a short list of assumptions. Read them as a readiness
+checklist, not a list of traps. If your problem satisfies them, the estimate
+means what you want it to mean.
 
-```python
-from econirl.datasets import load_rust_bus
-from econirl import NFXP
+- **Markov transitions.** Where you land next depends only on the current state
+  and the action you took, not on the whole past. If your real dynamics have
+  memory, fold what matters into the state.
+- **Additive choice shocks.** Each choice carries an extra private payoff the
+  analyst does not see. These estimators model it as a logit shock added to the
+  payoff. This is the standard discrete-choice setup.
+- **Transitions estimated first.** The probability of each next state is supplied
+  or estimated in a first step, separately from the reward. The reward fit treats
+  it as given.
+- **A reward anchor.** A reward is only recovered relative to a baseline. Fix one
+  action to zero payoff, usually an exit or absorbing action, and hold the logit
+  scale fixed. This pins the level and the scale so the rest of the reward is
+  pinned down too.
 
-df = load_rust_bus()                        # your DataFrame goes here
-model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
-model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
-```
+The estimator pages spell these out per method. The [NFXP identification
+section](../estimators/nfxp.md) is the worked example.
 
-If you are replicating a paper or running a simulation study, you can build the
-model from transition and feature arrays instead. The estimator pages under
-[Estimators](../estimators.md) show that path where it applies.
+## Run the diagnostics
 
-## Check the data before you fit
+Three checks tell you whether the data can support a fit. Each one says what it
+means and what to do if it fails.
 
-First, confirm the panel is well formed.
+### Is the panel well formed?
 
 ```python
 from econirl.preprocessing import check_panel_structure
@@ -55,10 +65,14 @@ True 90 9410
 ['Unbalanced panel: 80-120 periods per individual']
 ```
 
-The panel is usable. The warning notes that individuals are observed for
-different lengths, which these estimators allow.
+`report.valid` is `True`, so the panel is usable. The warning notes that
+individuals are observed for different lengths, which these estimators allow. If
+`report.valid` is `False`, read `report.warnings` and fix the flagged columns
+before going on.
 
-Next, look for states where only one action ever appears.
+### Does every state show more than one action?
+
+Look for states where only one action ever appears.
 
 ```python
 counts = df.groupby("mileage_bin")["replaced"].nunique()
@@ -69,13 +83,20 @@ print((counts < 2).sum(), "of", df["mileage_bin"].nunique(), "states show one ac
 14 of 52 states show one action
 ```
 
-NFXP still fits these states from the likelihood. The choice-probability
-estimators, CCP and UFXP, read action frequencies directly, so they need states
-with some variation.
+What it means. A state where only one action is ever taken carries no choice
+contrast at that state.
 
-Last, check that your reward features can be recovered from choices. A feature
-that never changes with the action cancels out of every choice comparison, so
-its parameter is not identified. `feature_diagnostics` reports this.
+What to do. CCP and UFXP read action frequencies directly, so they need more than
+one action at each state to fit. NFXP pools every observation through the
+likelihood, so single-action states do not break it. They just add no
+information. If many states are single-action, prefer NFXP, or collect more
+varied data.
+
+### Can the reward be recovered from choices?
+
+A feature that never changes with the action cancels out of every choice
+comparison, so its parameter cannot be recovered. The check is the action
+contrast, not the raw design. `feature_diagnostics` reports both.
 
 ```python
 import numpy as np
@@ -87,8 +108,8 @@ phi = np.zeros((S, A, 2))
 phi[:, :, 0] = rng.normal(size=(S, A))   # varies with the action
 phi[:, :, 1] = rng.normal(size=(S, 1))   # same for every action in a state
 
-print({k: round(v, 2) if isinstance(v, float) else v
-       for k, v in feature_diagnostics(phi).items()})
+diag = feature_diagnostics(phi)
+print({k: round(v, 2) if isinstance(v, float) else v for k, v in diag.items()})
 ```
 
 ```text
@@ -96,21 +117,78 @@ print({k: round(v, 2) if isinstance(v, float) else v
  'contrast_rank': 1, 'contrast_condition_number': 1.0}
 ```
 
-The design has full rank, but `contrast_rank` is 1, not 2. The second feature is
-constant across actions, so one parameter cannot be recovered. When
-`contrast_rank` equals `num_features`, every parameter is identified from
-behavior.
+Read three things from this.
 
-## Fit and read the outputs
+- **`contrast_rank` against `num_features`.** Here the raw design is full rank,
+  but `contrast_rank` is 1, not 2. The second feature is constant across actions,
+  so one parameter cannot be recovered. When `contrast_rank` is below
+  `num_features`, some reward parameters are not identified. Drop the
+  unidentified feature, or change the reward form so every feature moves with the
+  action.
+- **`contrast_condition_number`.** Even at full rank, a high condition number
+  means the fit is numerically fragile. Features whose effects span orders of
+  magnitude are close to unidentified on a small panel: the data cannot tell them
+  apart. Rescale the features to comparable magnitudes, or simplify the reward.
+- **`condition_number`.** The same reading for the raw design. A large value
+  warns of instability before optimization even starts.
+
+Only fit once `contrast_rank` equals `num_features` and both condition numbers
+are moderate.
+
+## Choosing your estimator
+
+Two families fit the same kind of panel but recover different objects. Pick by
+what you need from the answer.
+
+| Family | Estimators | Recovers | Counterfactuals | Assumptions |
+| --- | --- | --- | --- | --- |
+| Structural | NFXP, CCP, MPEC | Finite reward parameters with a fixed meaning. | Supported: re-solve the model under a changed primitive. | Stronger: a parametric reward and the anchor above. |
+| IRL / behavioral | MCE-IRL, AIRL | A reward only up to behavior-preserving transformations. | Not always: some methods recover behavior without a re-solvable primitive. | Weaker: less structure on the reward. |
+
+Structural estimators are the choice when you need parameters with units and
+want to ask what happens under a new policy. IRL estimators trade that for
+weaker assumptions, and recover a reward that matches behavior but is not pinned
+to a single scale. See the [estimator map](../estimators.md) for the full set and
+the [comparison page](../estimators/comparison.md) for a side-by-side table.
+
+## A full run, start to finish
+
+This is the whole path on the bundled panel: load, diagnose, choose, fit, read
+the outputs, run one counterfactual.
 
 ```python
+import numpy as np
+from econirl import NFXP
+from econirl.datasets import load_rust_bus
+from econirl.preprocessing import check_panel_structure
+
+# 1. Load the panel. Swap in your own DataFrame here.
+df = load_rust_bus()
+
+# 2. Diagnose.
+report = check_panel_structure(df, id_col="bus_id", period_col="period",
+                               state_col="mileage_bin", action_col="replaced")
+print(report.valid)
+
+# 3. Choose. We want reward parameters and a counterfactual, so structural.
+model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+
+# 4. Fit.
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 print(model.params_)
+
+# 5. Counterfactual: raise the replacement cost, read the new policy.
+cf = model.counterfactual(RC=4.0)
+print("replace probability at state 50:", float(np.asarray(cf.policy)[50, 1]))
 ```
 
 ```text
+True
 {'theta_c': 0.0010028828858836278, 'RC': 3.0722093435989524}
+replace probability at state 50: 0.05519477716656161
 ```
+
+## Read the outputs
 
 A fitted estimator exposes a common set of attributes.
 
@@ -137,6 +215,11 @@ replace probability at state 50: 0.05519477716656161
 ```
 
 A higher replacement cost lowers the chance of replacing at a given mileage.
+
+Not every estimator supports a counterfactual call. The structural family
+re-solves the model under a changed primitive. Several IRL methods recover
+behavior without a re-solvable primitive, so they have no `.counterfactual()`.
+See [Choosing your estimator](#choosing-your-estimator) above.
 
 ## Next steps
 
