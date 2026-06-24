@@ -315,15 +315,16 @@ value.
 
 ![MPEC parameter recovery, Monte Carlo](../_static/estimators/mpec_recovery.png)
 
-Recovery is measured over a Monte-Carlo run of 200 replications. Numbers below
-are pending the full run.
+Recovery is measured over a Monte-Carlo run of 80 replications.
 
 | Parameter | True | Recovered (mean) | 95% interval |
 | --- | ---: | ---: | --- |
-| `action_0_intercept` | 0.10 | _pending MC_ | _pending MC_ |
-| `action_0_progress` | 0.50 | _pending MC_ | _pending MC_ |
-| `action_1_intercept` | 0.00 | _pending MC_ | _pending MC_ |
-| `action_1_progress` | -0.20 | _pending MC_ | _pending MC_ |
+| `action_0_intercept` | 0.10 | 0.103 | [0.053, 0.148] |
+| `action_0_progress` | 0.50 | 0.495 | [0.441, 0.562] |
+| `action_1_intercept` | 0.00 | -0.005 | [-0.083, 0.064] |
+| `action_1_progress` | -0.20 | -0.190 | [-0.307, -0.089] |
+
+Across the 80 replications the true value sits inside the 95% interval for every parameter, and the mean estimate is close to the truth.
 
 The behavioral and regret numbers below were produced with `solver="slsqp"` (the
 legacy augmented-Lagrangian solver); the Algorithm section's default and

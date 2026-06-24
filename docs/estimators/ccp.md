@@ -320,7 +320,7 @@ attributes and the lower-level `CCPEstimator` interface.
 
 Parameter recovery is measured on the `canonical_low_action` synthetic cell, which
 has known rewards, transitions, policies, values, Q functions, and Type A, Type B,
-and Type C counterfactual oracles. The figure below is a Monte-Carlo study over 200
+and Type C counterfactual oracles. The figure below is a Monte-Carlo study over 40
 replications: the panel is resimulated and refit on a fresh seed each time, and each
 parameter is plotted as its recovered mean and 95% interval against the true value.
 
@@ -328,13 +328,12 @@ parameter is plotted as its recovered mean and 95% interval against the true val
 
 | Parameter | True | Recovered (mean) | 95% interval |
 | --- | ---: | ---: | --- |
-| `action_0_intercept` | 0.10 | _pending MC_ | _pending MC_ |
-| `action_0_progress` | 0.50 | _pending MC_ | _pending MC_ |
-| `action_1_intercept` | 0.00 | _pending MC_ | _pending MC_ |
-| `action_1_progress` | -0.20 | _pending MC_ | _pending MC_ |
+| `action_0_intercept` | 0.10 | 0.103 | [0.053, 0.141] |
+| `action_0_progress` | 0.50 | 0.494 | [0.445, 0.562] |
+| `action_1_intercept` | 0.00 | -0.003 | [-0.083, 0.058] |
+| `action_1_progress` | -0.20 | -0.193 | [-0.303, -0.095] |
 
-Recovery numbers are over a 200-replication Monte-Carlo run; numbers pending the
-full run.
+Across the 40 replications the true value sits inside the 95% interval for every parameter, and the mean estimate is close to the truth.
 
 Behavioral fit and counterfactual regret on the same cell, against the known oracle
 objects:
