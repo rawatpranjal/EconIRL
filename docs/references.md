@@ -73,6 +73,12 @@ usage examples.
   Adversarial Inverse Reinforcement Learning." *International Conference on
   Learning Representations*.
 
+(barnes-2024)=
+- Barnes, M., Abueg, M., Lange, O. F., Deeds, M., Trader, J., Molitor, D.,
+  Wulfmeier, M., and O'Banion, S. (2024). "Massively Scalable Inverse
+  Reinforcement Learning in Google Maps." *International Conference on Learning
+  Representations*. arXiv:2305.11290.
+
 (lee-sudhir-wang-2026)=
 - Lee, P. S., Sudhir, K., and Wang, T. (2026). "Consumer Engagement with
   Sequential Content: A Content-Aware Dynamic Choice Model." SSRN working
