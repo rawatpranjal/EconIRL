@@ -31,8 +31,31 @@ $s$ under action $a$, stored in $(A, S, S)$ orientation. The integrated value
 function is $V_\theta(s)$, its neural approximation is $V_\psi(s)$ with network
 parameters $\psi$, and the choice-specific value under the approximation is
 $Q_{\theta,\psi}(s, a)$. The conditional choice probability, the policy, is
-$\pi_{\theta,\psi}(a \mid s)$. The NPL policy iterate is $\hat{P}(a \mid s)$,
-and the profiled value components are $W_z(\hat{P})$ and $W_e(\hat{P})$.
+$\pi_{\theta,\psi}(a \mid s)$. The NPL policy iterate is $\hat{P}(a \mid s)$.
+The dummy action index $b$ ranges over the same action set as $a$ and appears
+in softmax denominators.
+
+The profiled integrated value $W_\theta(\hat{P})$ is the solution to the
+policy-evaluation equation at fixed CCPs $\hat{P}$; it equals $V_\theta$ when
+$\hat{P}$ coincides with the structural policy $\pi_{\theta,\psi}$. The
+profiled value components $W_z(\hat{P})$ and $W_e(\hat{P})$ are defined by
+
+$$
+W_z(\hat{P}) = (I - \beta F_\pi)^{-1} b_z,
+\qquad
+W_e(\hat{P}) = (I - \beta F_\pi)^{-1} b_e,
+$$
+
+where $F_\pi[s,t] = \sum_a \hat{P}(a \mid s)\,P_a(s,t)$ is the
+transition matrix induced by the fixed CCP iterate,
+$b_z[s,k] = \sum_a \hat{P}(a \mid s)\,\phi(s,a,k)$ is the
+policy-weighted feature vector, and
+$b_e[s] = \sigma\,H\!\left(\hat{P}(\cdot \mid s)\right)$ is
+$\sigma$ times the Shannon entropy at state $s$:
+
+$$
+H(s) = -\sum_a \hat{P}(a \mid s)\,\log \hat{P}(a \mid s).
+$$
 
 ## Model
 
@@ -60,13 +83,45 @@ $$
 Q_{\theta,\psi}(s, a) = u_\theta(s, a) + \beta \sum_{s'} P_a(s, s') V_\psi(s').
 $$
 
-The implied conditional choice probability follows the logit rule:
+The implied conditional choice probability follows the logit rule, where $b$
+runs over all actions in the denominator:
 
 $$
 \pi_{\theta,\psi}(a \mid s) =
 \frac{\exp(Q_{\theta,\psi}(s, a) / \sigma)}
      {\sum_b \exp(Q_{\theta,\psi}(s, b) / \sigma)}.
 $$
+
+When $V_\psi = V_\theta$, the choice-specific value recovers the
+Bellman-consistent $Q$-function and $\pi_{\theta,\psi}$ coincides with
+the structural policy.
+
+**Connection to the linear system.** The soft Bellman fixed point implies a
+policy-evaluation identity (Aguirregabiria and Mira 2002, logit social-surplus
+form): at the structural policy $\hat{P} = \pi_\theta$, the expected integrated
+value satisfies
+
+$$
+V_\theta(s)
+= \sum_a \hat{P}(a \mid s)\,Q_{\theta,\hat{P}}(s, a)
+  + \sigma\,H(s),
+$$
+
+where $H(s) = -\sum_a \hat{P}(a \mid s)\log\hat{P}(a \mid s)$ is the Shannon
+entropy of $\hat{P}(\cdot \mid s)$. Substituting
+$Q_{\theta,\hat{P}}(s,a) = u_\theta(s,a) + \beta\sum_{s'} P_a(s,s')\,V_\theta(s')$,
+writing $u_\theta = \phi^\top\theta$, and rearranging yields the linear system
+
+$$
+(I - \beta F_\pi)\,W_\theta = b_z\,\theta + b_e,
+$$
+
+where $b_z[s,k] = \sum_a \hat{P}(a\mid s)\phi(s,a,k)$ and $b_e[s] = \sigma H(s)$.
+The linear system defines $W_\theta$ by policy evaluation at the current CCP
+$\hat{P}$; it equals the structural value $V_\theta$ only when $\hat{P} = \pi_\theta$,
+and approaches it as the NPL iterates converge. Because the right-hand side is
+affine in $\theta$, the solution splits as $W_\theta = W_z\theta + W_e$ via a
+single matrix solve.
 
 The primary package evidence uses the `canonical_high_action` synthetic cell:
 81 states (80 regular, 1 absorbing), a 16-dimensional encoded state
@@ -98,8 +153,21 @@ assumptions.
   $\theta$ unidentified.
 - **NPL Neyman-orthogonality.** At the true conditional choice probabilities,
   first-order errors in the value approximation $V_\psi$ drop out of the NPL
-  structural score. This zero-Jacobian / Neyman-orthogonality property (Nguyen 2025)
-  means the pseudo-likelihood Hessian is the correct semiparametrically
+  structural score. Formally,
+
+  $$
+  \frac{\partial}{\partial \delta}
+  \left[
+    \sum_i
+    \frac{\partial \log \pi_{\theta,\, V_\psi + \delta}(a_i \mid s_i)}
+         {\partial \theta}
+  \right]_{\delta=0,\; \hat{P}=\pi_{\rm true}}
+  = 0,
+  $$
+
+  where $\delta$ represents a first-order perturbation to $V_\psi$
+  (Nguyen 2025, Propositions 3–4). This zero-Jacobian / Neyman-orthogonality
+  property means the pseudo-likelihood Hessian is the correct semiparametrically
   efficient variance estimator without an explicit debiasing correction.
 - **Value-approximation regularity.** The value-network approximation error must
   be small enough to enter the structural score only at second order. This is an
@@ -116,43 +184,83 @@ by choice data alone.
 
 ## Estimator
 
-For a fixed NPL policy iterate $\hat{P}$, the policy-evaluation equation is
-affine in $\theta$:
+For a fixed NPL policy iterate $\hat{P}$, the policy-evaluation equation under
+the fixed CCPs is the linear system
 
 $$
-W_\theta[\hat{P}] = W_z(\hat{P})\,\theta + W_e(\hat{P}),
+(I - \beta F_\pi)\,W_\theta = b_z\,\theta + b_e,
 $$
 
-where $W_z(\hat{P})$ is the expected discounted feature matrix under the fixed
-iterate and $W_e(\hat{P})$ is the expected discounted logit-entropy term.
-The value network $V_\psi$ is trained by supervised regression on this
-profiled target, and the structural parameters are recovered by maximizing
-the profiled pseudo-likelihood:
+where $F_\pi[s,t] = \sum_a \hat{P}(a \mid s)\,P_a(s,t)$,
+$b_z[s,k] = \sum_a \hat{P}(a \mid s)\,\phi(s,a,k)$, and
+$b_e[s] = \sigma\,H(\hat{P}(\cdot \mid s))$ are as defined in the Notation
+block. Because the flow payoff $u_\theta(s,a) = \phi(s,a)^\top\theta$ is
+linear in $\theta$, the right-hand side is affine in $\theta$, so the
+solution splits by linearity of the matrix solve:
+
+$$
+W_\theta[\hat{P}]
+= W_z(\hat{P})\,\theta + W_e(\hat{P}),
+\qquad
+W_z = (I - \beta F_\pi)^{-1} b_z,
+\quad
+W_e = (I - \beta F_\pi)^{-1} b_e.
+$$
+
+This affine structure is what makes NPL profiling possible: the value target is
+computed once per outer iteration by a single matrix solve, with no inner
+Bellman loop.
+
+Differentiating $W_\theta[\hat{P}] = W_z\,\theta + W_e$ with respect to
+$\theta$ at fixed $\hat{P}$ gives $\partial W / \partial\theta = W_z$ (since
+$W_z$ depends only on $\hat{P}$ and the transitions, not on $\theta$).
+Substituting into the choice-specific value
+$Q_{\theta,\psi}(s,a) = \phi(s,a)^\top\theta + \beta\sum_{s'} P_a(s,s')\,V_\psi(s')$,
+and replacing $V_\psi$ with the profiled target $W_\theta[\hat{P}]$, gives:
+
+$$
+\frac{\partial Q_{\theta,\hat{P}}(s,a)}{\partial\theta}
+= \phi(s,a) + \beta\sum_{s'} P_a(s,s')\,W_z(s')
+=: \tilde{z}(s,a).
+$$
+
+The profiled choice value is therefore $Q^{\hat{P}}(s,a) = \tilde{z}(s,a)^\top\theta + \tilde{e}(s,a)$,
+where $\tilde{z}(s,a) = \phi(s,a) + \beta\,\mathbb{E}[W_z(s') \mid s,a]$ and
+$\tilde{e}(s,a) = \beta\,\mathbb{E}[W_e(s') \mid s,a]$.
+No Bellman fixed-point differentiation is needed; the implicit-differentiation
+analog $(I - \beta F_\pi)\,\partial W/\partial\theta = b_z$ is solved once via
+$W_z$.
+
+The value network $V_\psi$ is trained by supervised regression on the profiled
+target $W_\theta[\hat{P}]$, and the structural parameters are recovered by
+maximizing the profiled pseudo-likelihood over $\tilde{z}$ and $\tilde{e}$:
 
 $$
 \hat{\theta}(\hat{P})
-= \arg\max_\theta \sum_{i,t} \log \pi_{\theta,\psi}(a_{it} \mid s_{it}).
+= \arg\max_\theta \sum_{i,t}
+  \log \operatorname{softmax}\!\left(
+    \frac{\tilde{z}(s_{it},\cdot)^\top\theta + \tilde{e}(s_{it},\cdot)}{\sigma}
+  \right)\![a_{it}].
 $$
 
 The outer optimizer is L-BFGS-B. After the maximization step, conditional choice
 probabilities are updated from the implied logit policy and the loop repeats.
-The NPL score has the logit form:
+The per-observation score from this profiled pseudo-likelihood has the logit form:
 
 $$
-\psi_i(\theta)
+\ell_i'(\theta)
 =
 \frac{1}{\sigma}
 \left[
-    \frac{\partial Q_{\theta,\psi}(s_i, a_i)}{\partial \theta}
+    \tilde{z}(s_i, a_i)
     -
-    \sum_a \pi_{\theta,\psi}(a \mid s_i)
-    \frac{\partial Q_{\theta,\psi}(s_i, a)}{\partial \theta}
+    \sum_a \pi_{\theta,\hat{P}}(a \mid s_i)\,\tilde{z}(s_i, a)
 \right],
 $$
 
-where the $Q$-gradient with respect to $\theta$ flows through the profiled
-value components $W_z(\hat{P})$ rather than through the Bellman fixed point,
-so no inner-loop differentiation is required.
+where the gradient flows through $W_z(\hat{P})$ rather than through the Bellman
+fixed point, so no inner-loop differentiation is required. The estimator solves
+$\sum_{i,t} \ell_{it}'(\theta) = 0$, equivalently the argmax above.
 
 ## Algorithm
 
@@ -172,8 +280,9 @@ Output  theta_hat, policy pi, value approximation V_psi
 7       train V_psi on target_V by supervised regression
 8       Q(s, a) := phi(s, a)' theta + beta * sum_{s'} P_a(s, s') V_psi(s')
 9       pi(a | s) := exp(Q(s, a)/sigma) / sum_b exp(Q(s, b)/sigma)
-10      theta := argmax_theta sum_{i,t} log pi_theta(a_it | s_it)
-11                                          # outer: L-BFGS-B on profiled LL
+10      theta := argmax_theta sum_{i,t}
+              log softmax((z_tilde(s_it,.) theta + e_tilde(s_it,.)) / sigma)[a_it]
+              # uses Q^P_hat = z_tilde theta + e_tilde (profiled, not Bellman-fixed)
 12      hat_P := pi                         # update policy iterate
 13  return theta_hat, standard errors from the profiled Hessian, pi, V_psi
 ```

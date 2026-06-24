@@ -29,8 +29,14 @@ probability of moving to $s'$ from $s$ under action $a$, stored in $(A, S, S)$
 orientation. The empirical conditional choice probability is $\hat{P}_a(s)$, the
 CCP-weighted transition is
 $F_{\hat{P}} = \sum_a \operatorname{diag}(\hat{P}_a) F_a$, and $V_{\hat{P}}(s)$
-is the value of following the empirical policy. The dual vector $\lambda$ satisfies
-$\lambda = w + \beta F_{\hat{P}}^\top \lambda$ for a given functional weight $w$.
+is the value of following the empirical policy. The CCP-weighted feature matrix is
+$\Phi_{\hat{P}} = \sum_a \operatorname{diag}(\hat{P}_a) \Phi_a$, where $\Phi_a$ is
+the $(S, K)$ slice of $\phi(s, a)$ at action $a$ (source: `ufxp.py` line 136,
+`phi_P = einsum('sa,sak->sk', P, phi)`). The policy-entropy correction is
+$\operatorname{ent}(s) = -\sigma \sum_a \hat{P}_a(s) \log \hat{P}_a(s)$
+(source: `ufxp.py` line 134, `ent = -sigma * (P * log_p).sum(axis=1)`). The dual
+vector $\lambda$ satisfies $\lambda = w + \beta F_{\hat{P}}^\top \lambda$ for a
+given functional weight $w$.
 The integrated value function is $V_\theta(s)$, the choice-specific value is
 $Q_\theta(s, a)$, and the conditional choice probability, the policy, is
 $\pi_\theta(a \mid s)$.
@@ -77,6 +83,11 @@ V_P = (I - \beta F_P)^{-1}
 F_P = \textstyle\sum_a \operatorname{diag}(P_a) F_a .
 $$
 
+Under policy $P$, the soft-Bellman equation
+$V_P(s) = \sum_a P_a(s)[u_\theta(s,a) - \sigma \log P_a(s)] + \beta \sum_{s'} F_P(s,s') V_P(s')$
+is a linear system in $V_P$. In matrix form:
+$(I - \beta F_P) V_P = \sum_a P_a \circ (u_\theta(\cdot, a) - \sigma \log P_a)$,
+which inverts to the stated formula.
 This is the representation used to derive the estimating equations when $P$ is replaced
 by the empirical CCPs $\hat{P}$.
 
@@ -134,7 +145,11 @@ w^\top V_{\hat{P}} = \lambda^\top u_{\hat{P}},
 $$
 
 where $\lambda$ depends only on $\hat{P}$, $\beta$, and the transitions, not on
-$\theta$. One matrix factorization of $(I - \beta F_{\hat{P}}^\top)$, computed once
+$\theta$. The identity follows from the policy-value equation
+$(I - \beta F_{\hat{P}}) V_{\hat{P}} = u_{\hat{P}}$: left-multiplying by $\lambda^\top$
+and using the dual fixed point $\lambda = w + \beta F_{\hat{P}}^\top \lambda$ gives
+$w^\top V_{\hat{P}} = \lambda^\top u_{\hat{P}}$ directly.
+One matrix factorization of $(I - \beta F_{\hat{P}}^\top)$, computed once
 before the parameter search, removes the value function entirely. Substituting this
 dual representation, the first-order condition at state $s$ and action $a \neq A$ becomes
 affine in $\theta$:
@@ -155,7 +170,37 @@ with $\rho(s) = \sigma\log(\hat{P}_a(s)/\hat{P}_A(s))$ the log-odds vector
 (stacked over $a \neq A$), $\Delta F(s) = (F_a - F_A)$ the differenced transitions,
 $v_{\text{ent}} = (I - \beta F_{\hat{P}})^{-1}\,\text{ent}$ the entropy-correction
 value, and $dV = (I - \beta F_{\hat{P}})^{-1}\Phi_{\hat{P}}$ the value gradient
-with respect to $\theta$. Both $v_{\text{ent}}$ and $dV$ are independent of
+with respect to $\theta$.
+
+The value gradient $dV$ comes from differentiating the policy-value identity.
+The linear policy-value identity is
+$V_{\hat{P}} = (I - \beta F_{\hat{P}})^{-1}[\sum_a \hat{P}_a \circ (\phi(\cdot,a)^\top\theta - \sigma \log \hat{P}_a)]$.
+Differentiating with respect to $\theta$ at fixed $\hat{P}$ gives
+
+$$
+\frac{\partial V_{\hat{P}}}{\partial \theta}
+= (I - \beta F_{\hat{P}})^{-1} \Phi_{\hat{P}},
+$$
+
+because the only $\theta$-dependent term inside the brackets is
+$\sum_a \hat{P}_a \circ \phi(\cdot,a)^\top\theta = \Phi_{\hat{P}}\,\theta$, so its
+$\theta$-derivative is $\Phi_{\hat{P}}$ exactly. This is the shared
+implicit-differentiation step: the matrix $(I - \beta F_{\hat{P}})$ is
+$\theta$-free, so no chain rule through the inverse is needed. The result makes
+$dV$ constant in $\theta$, which is what enables the closed-form solve (source:
+`ufxp.py` lines 242--246; internal\_docs `§OUFXP upgrade`).
+
+Separating the $\theta$-dependent part of $V_{\hat{P}}$ using
+$\partial V_{\hat{P}}/\partial\theta = dV$ and the constant entropy-correction value
+$v_{\text{ent}} = (I - \beta F_{\hat{P}})^{-1}\,\text{ent}$, write
+$V_{\hat{P}} = dV\,\theta + v_{\text{ent}}$. Substituting into the first-order
+condition gives
+$\sigma \log(\hat{P}_a/\hat{P}_A) = \Delta\phi(s)^\top\theta + \beta\,\Delta F(s)(dV\,\theta + v_{\text{ent}})$,
+which rearranges to $y(s) = G(s)\,\theta + \varepsilon(s)$ with $G$ and $y$ as
+defined above (source: `ufxp.py` lines 247--249; internal\_docs
+`§Derivation as implemented`).
+
+Both $v_{\text{ent}}$ and $dV$ are independent of
 $\theta$ and are precomputed from a single factorization of $(I - \beta
 F_{\hat{P}})$.
 
@@ -167,7 +212,12 @@ $$
 
 where $\Sigma(s) = \operatorname{diag}(\hat{P}(s)) - \hat{P}(s)\hat{P}(s)^\top$
 is the multinomial covariance of the empirical CCPs, $\Gamma(s)$ is the Jacobian
-of the inverse-CCP map, and $\eta(s) = N(s)/N$ is the state's sample share. The
+of the inverse-CCP map with
+$\Gamma_{a,b}(s) = \sigma\,\delta_{a,b}/\hat{P}_a(s) - \sigma\,\delta_{b,A}/\hat{P}_A(s)$
+(where $\delta$ is the Kronecker delta, $a$ indexes the $A-1$ non-reference actions,
+and $b$ indexes all $A$ actions; source: `ufxp.py` lines 261--263),
+and $\eta(s) = N(s)/N$ is the state's sample share. Setting the weighted moments to
+zero gives $\sum_s z(s)^\top G(s)\,\theta = \sum_s z(s)^\top y(s)$, so the
 closed-form solution is:
 
 $$
@@ -183,6 +233,10 @@ variance:
 $$
 \widehat{\operatorname{Var}}(\hat{\theta}) = D^{-1} / N.
 $$
+
+At optimal weights, the efficient-GMM sandwich $V = J^{-1}\Omega J^{-\top}$
+collapses to $D^{-1}/N$ because the moment variance $\Omega = D/N$ at the
+optimum (Theorem 2 of Oguz and Bray 2026).
 
 Thin states are downweighted by $\eta(s)$; unvisited states drop out of the moment
 system entirely.

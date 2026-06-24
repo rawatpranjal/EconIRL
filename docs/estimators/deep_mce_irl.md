@@ -31,7 +31,9 @@ $(A, S, S)$ orientation. The soft value function is $V(s)$, the
 choice-specific value is $Q(s, a)$, and the conditional choice probability is
 $\pi(a \mid s)$. The empirical discounted state-action occupancy from
 demonstrations is $D_\text{data}(s, a)$ and the model occupancy under the
-current policy is $D_\pi(s, a)$.
+current policy is $D_\pi(s, a)$. $N$ denotes the total number of
+agent-period observations. The initial-state distribution is $\rho_0(s)$,
+giving the probability of starting in state $s$.
 
 ## Model
 
@@ -52,10 +54,14 @@ The choice-specific value and soft value function satisfy
 $$
 Q(s, a) = r_\eta(s, a) + \beta \sum_{s'} P(s' \mid s, a)\, V(s'),
 \qquad
-V(s) = \log \sum_a \exp\bigl(Q(s, a)\bigr),
+V(s) = \log \sum_a \exp\bigl(Q(s, a)\bigr).
 $$
 
-and the conditional choice probability follows the logit form:
+The log-sum-exp form of $V$ follows from entropy-regularized planning
+(Ziebart 2010, ch. 5): the agent maximizes expected reward minus the KL
+divergence to a uniform policy, and the resulting soft Bellman backup has
+log-sum-exp as its fixed-point operator. The conditional choice probability
+follows the logit form:
 
 $$
 \pi(a \mid s) = \exp\bigl(Q(s, a) - V(s)\bigr).
@@ -107,11 +113,46 @@ well-conditioned; see the
 ## Estimator
 
 The MCE-IRL objective matches the expert and model state-action occupancies.
+Under the maximum causal entropy model, the probability of a trajectory is
+proportional to the exponentiated sum of rewards along it
+(Ziebart 2008; Wulfmeier 2015, eq. 1), so the log-likelihood of
+demonstrations $\mathcal{D}$ is
+
+$$
+L(\eta) = \sum_{i,t} r_\eta(s_{it}, a_{it}) - \log Z(\eta),
+$$
+
+where $Z(\eta)$ is the partition function over all trajectories
+(Ziebart 2010, ch. 5; Wulfmeier 2015, eq. 8). Maximizing $L(\eta)$ with
+respect to the network weights $\eta$ is the MCE-IRL objective. The surrogate
+below is used in place of differentiating through $Z$ directly, which would
+require backpropagating through the soft Bellman solve.
+
 The empirical discounted occupancy from demonstrations is
 
 $$
 D_\text{data}(s, a)
-= \frac{1}{N} \sum_{i,t} \beta^t \,\mathbf{1}[s_{it} = s,\; a_{it} = a].
+= \frac{1}{N} \sum_{i,t} \beta^t \,\mathbf{1}[s_{it} = s,\; a_{it} = a],
+$$
+
+where $N$ is the total number of agent-period observations. The discounted
+$\beta^t$ weighting follows the DDC convention; Wulfmeier (2015) and Ziebart
+(2008) state the gradient for undiscounted visitation counts. The same
+chain-rule argument extends to the discounted case. Define the discounted
+model occupancy $D_\pi^\beta(s,a) = (1-\beta)\sum_{t=0}^\infty \beta^t
+P(s_t=s,\, a_t=a \mid \pi,\rho_0)$. The MaxEnt log-likelihood is the data
+reward minus the log-partition term $\log Z^\beta$, and the partition gradient
+is the model occupancy,
+
+$$
+\frac{\partial \log Z^\beta}{\partial r(s,a)} = D_\pi^\beta(s,a),
+$$
+
+so the occupancy-matching gradient identity becomes
+
+$$
+\frac{\partial L}{\partial r(s,a)}
+= D_\text{data}(s,a) - D_\pi^\beta(s,a).
 $$
 
 The model occupancy $D_\pi(s, a)$ is computed by the discounted forward pass:
@@ -134,14 +175,34 @@ L_\text{surrogate}(\eta)
   \bigl(D_\pi(s, a) - D_\text{data}(s, a)\bigr).
 $$
 
-The gradient of this surrogate with respect to $\eta$ equals the gradient of
-the occupancy mismatch through the reward network:
+Minimizing $L_\text{surrogate}$ over $\eta$ is equivalent to maximizing the
+MCE log-likelihood; the sign convention here is for gradient descent (model
+minus data), matching Wulfmeier (2015) eq. 11 up to sign. The chain-rule
+decomposition (Wulfmeier 2015, eqs. 10–11) shows that
 
 $$
 \nabla_\eta L_\text{surrogate}
+= \frac{\partial L}{\partial r} \cdot \frac{\partial r}{\partial \eta}
 = \sum_{s,a} \bigl(D_\pi(s, a) - D_\text{data}(s, a)\bigr)
-  \frac{\partial r_\eta(s, a)}{\partial \eta}.
+  \frac{\partial r_\eta(s, a)}{\partial \eta},
 $$
+
+where $\partial L / \partial r(s,a) = D_\pi(s,a) - D_\text{data}(s,a)$ is the
+occupancy mismatch at each $(s,a)$ cell (Ziebart 2008 for the occupancy-matching
+gradient identity) and $\partial r_\eta(s,a)/\partial \eta$ is obtained by
+backpropagating through the reward network $f_\eta$.
+
+By the occupancy-matching identity (Ziebart 2008), the gradient of the MCE
+log-likelihood with respect to $r(s,a)$ equals the negative occupancy mismatch,
+so the surrogate gradient equals the negative log-likelihood gradient:
+
+$$
+\nabla_\eta L_\text{surrogate}(\eta)
+= -\nabla_\eta L(\eta).
+$$
+
+Minimizing $L_\text{surrogate}$ by gradient descent is therefore equivalent to
+maximizing the MCE log-likelihood; no additional approximation is involved.
 
 ## Algorithm
 
@@ -163,7 +224,7 @@ Output  reward matrix R_hat(s,a), policy pi, value V
 10      compute D_pi(s,a) via discounted forward pass using pi and P
 11      grad_R(s,a) := D_pi(s,a) - D_data(s,a)         # occupancy mismatch
 12      loss := sum_{s,a} R(s,a) * grad_R(s,a)          # surrogate loss
-13      backpropagate grad_R through f_eta;  AdamW step
+13      backpropagate grad_R through f_eta;  mask gradients for R(s,a_0) to zero;  AdamW step
 14      if loss < best_loss - tol:  update checkpoint;  patience_counter := 0
 15      else:  patience_counter := patience_counter + 1
 16      if patience_counter >= patience:  break           # early stopping
@@ -171,6 +232,10 @@ Output  reward matrix R_hat(s,a), policy pi, value V
 18  re-solve V, pi at best R via hybrid soft value iteration
 19  return R_hat := R(s,a), pi, V
 ```
+
+Gradients with respect to entries $R(s, a_0)$ are masked to zero before the
+AdamW step (step 13), so the anchor normalization is enforced throughout
+training, not only at inference.
 
 The inner solve in steps 9 and 18 defaults to `inner_solver="hybrid"`:
 successive approximation while the Bellman residual is above a switch

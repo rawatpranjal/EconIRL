@@ -35,7 +35,10 @@ the action-value function, and $\zeta_\xi$ with parameters $\xi$ approximates
 the expected continuation value $\mathbb{E}[V(s') \mid s, a]$. The implied
 reward is $\hat{r}(s, a) = Q_\eta(s, a) - \beta\,\zeta_\xi(s, a)$. The
 anchor action $a_{\text{anch}}$ carries known rewards $r_{\text{anch}}(s)$
-for each state, and $\lambda$ is the Bellman penalty weight.
+for each state, and $\lambda$ is the Bellman penalty weight. The softmax
+probability over actions implied by $Q$ is
+$\hat{p}_Q(a \mid s) = \exp(Q(s,a)/\sigma) / \sum_{b} \exp(Q(s,b)/\sigma)$,
+which equals $\pi(a \mid s)$ when $Q = Q^*$.
 
 ## Model
 
@@ -63,6 +66,11 @@ $$
      {\sum_b \exp(Q(s, b) / \sigma)}.
 $$
 
+The paper derives all results under $\sigma = 1$ (standard T1EV with unit
+logit scale, equivalent to setting $\lambda = 1$ in the paper's notation;
+see Kang et al. 2025, Section 3.1). The package generalises this to
+arbitrary $\sigma$; the equations on this page use the general form.
+
 GLADIUS approximates $Q(s, a)$ and $\mathbb{E}[V(s') \mid s, a]$ by neural
 networks rather than solving the Bellman fixed point at each candidate
 $\theta$. The canonical evaluation uses synthetic high-dimensional-state
@@ -83,13 +91,27 @@ contrasts under the following assumptions.
   periods.
 - **Anchor availability (the anchor availability condition of Kang et al. (2025)).** An anchor action
   $a_{\text{anch}}$ must exist with known rewards $r_{\text{anch}}(s)$ for every
-  state. The anchor Bellman loss pins the absolute level of $Q_\eta$; without it,
-  $Q$ is identified only up to a state-dependent additive constant that propagates
-  into implied rewards through asymmetric transitions.
+  state (Assumption 3 of Kang et al. 2025: for all $s \in \mathcal{S}$ there
+  exists $a_s$ such that $r(s, a_s)$ is known). To see why this is needed,
+  suppose the true Q-function is $Q^*(s, a)$ and consider the shifted function
+  $\tilde{Q}(s, a) = Q^*(s, a) + c(s)$ for an arbitrary state-dependent
+  constant $c(s)$. The soft value shifts as
+  $\tilde{V}(s) = \sigma \log \sum_a \exp\!\bigl((\tilde{Q}(s,a))/\sigma\bigr)
+  = V^*(s) + c(s)$, so $c(s)$ cancels in the softmax numerator and denominator
+  and $\pi(a \mid s)$ is unchanged: $L_{\text{NLL}}$ alone cannot distinguish
+  $Q^*$ from $\tilde{Q}$. The implied reward under $\tilde{Q}$ is
+  $\tilde{r}(s, a) = \tilde{Q}(s, a) - \beta\,\mathbb{E}[\tilde{V}(s') \mid s, a]
+  = r^*(s, a) + c(s) - \beta\sum_{s'} P(s, a, s')\,c(s')$,
+  which does not collapse to $r^*(s, a) + \text{const}$ when the transition
+  kernel $P(s, a, \cdot)$ is asymmetric across states. The anchor Bellman loss
+  pins $Q_\eta$ at $a_{\text{anch}}$ and eliminates this freedom.
 - **Action-dependent feature rank.** The action-difference feature matrix
   $\Delta\phi(s, a) = \phi(s, a) - \phi(s, 0)$, stacked over states and
-  non-reference actions, must be full column rank. A rank-deficient matrix
-  leaves a direction of $\theta$ undetermined in the projection.
+  non-reference actions, must be full column rank. Because
+  $\Delta r(s, a) = \Delta\phi(s, a)^\top \theta$ by the linearity of $u$,
+  the OLS normal equations have a unique solution if and only if
+  $\Delta\phi$ has full column rank $K$; a rank-deficient matrix leaves the
+  projection underdetermined in the direction(s) of the null space.
 
 These hold inside a finite discrete state space with expected-utility
 maximization and a known, fixed discount factor $\beta$. Under them, the
@@ -99,6 +121,30 @@ state-dependent additive constant; the anchor pins the level of $Q$ for
 transitions involving the anchor action. Identification weakens if the anchor
 action is absent from some states, the action-difference feature matrix is
 rank deficient, or training data provide thin state-action coverage.
+
+**Identification result (Kang et al. 2025, Thm. 3).** Under Additive
+Separability, Stationarity, and Anchor Availability, the minimiser of the
+expected empirical-risk objective uniquely identifies $Q^*$ over the observed
+state-action support. Reward recovery follows as
+$r(s, a) = Q^*(s, a) - \beta\,\zeta^*(s, a)$
+where $\zeta^*(s, a) = \mathbb{E}[V_{Q^*}(s') \mid s, a]$. The imitation
+policy $\pi^*$ is then recovered trivially by taking the softmax of $Q^*$
+(this step is not part of Thm. 3). Full column rank of the action-difference
+feature matrix $\Delta\phi$ is required for the subsequent OLS projection to
+uniquely determine $\theta$; this is a package-level requirement for
+structural parameter recovery, not a condition of Thm. 3.
+
+**Minimax reformulation (Kang et al. 2025, Thm. 5).** The minimax empirical-risk
+problem (Eq. 12) uniquely identifies $Q^*$ and establishes that the optimal
+inner maximiser is $\zeta^*(s,a) = \mathbb{E}[V_{Q^*}(s') \mid s, a]$.
+
+**Convergence result (Kang et al. 2025, Section 6).** Under a
+Polyak–Łojasiewicz (PL) condition on the objective landscape,
+gradient-based optimisation converges to the global minimiser. The empirical
+objective gap decreases at $O(T^{-1})$ in the number of gradient iterations
+$T$ (Kang et al. 2025, Thm. 12), and the $L^2(d^*)$ estimation error in $Q^*$
+decreases at $O(T^{-1/4})$ at $\alpha = 1/2$ (Thm. 13). No proof is reproduced
+here; see Kang et al. (2025) for the full argument.
 
 ## Estimator
 
@@ -114,7 +160,46 @@ $$
 L_{\text{NLL}} = -\mathbb{E}\!\left[\log \pi_\eta(a \mid s)\right],
 $$
 
-and the anchor Bellman term pins the Q-level at the anchor action:
+with $\log \pi_\eta(a \mid s)
+= Q_\eta(s, a)/\sigma - \log \sum_b \exp(Q_\eta(s, b)/\sigma)$
+(the softmax log-probability; this expansion is equivalent to lines 11–13
+of the Algorithm below). The anchor Bellman term pins the Q-level at the
+anchor action. The paper's primary form of this term (Eq. 12 of Kang et al. 2025)
+is the minimax objective
+
+$$
+\min_{Q}\,\max_{\zeta}\;
+\mathbb{E}\!\left[
+-\log \hat{p}_Q(a \mid s)
++ \mathbf{1}_{a = a_{\text{anch}}}\!\left(
+  (\mathcal{T}Q(s,a,s') - Q(s,a))^2
+  - \beta^2(V_Q(s') - \zeta(s,a))^2
+\right)
+\right],
+$$
+
+where $\mathcal{T}Q(s,a,s') = r_{\text{anch}}(s) + \beta V_Q(s')$ is the
+sampled Bellman operator on the anchor action. The correction term
+$-\beta^2(V_Q(s') - \zeta(s,a))^2$ is the key structural contribution of
+the paper: the naive squared TD error
+$\mathbb{E}[(\mathcal{T}Q - Q)^2 \mid s, a]$ has a double-sampling
+bias equal to $\beta^2 \operatorname{Var}[V(s') \mid s, a]$ because the same
+next-state draw $s'$ appears in both $\mathcal{T}Q$ and $V_Q(s')$.
+Lemma 4 of Kang et al. (2025) shows that the bi-conjugate decomposition
+$\mathbb{E}[(\mathcal{T}Q - Q)^2 \mid s, a]
+= \mathbb{E}[\ell_{\text{TD}}^2 \mid s, a, s'] - \beta^2 D(Q)(s,a)$,
+where $\ell_{\text{TD}}(s,a,s') = \mathcal{T}Q(s,a,s') - Q(s,a)$
+is the per-sample TD residual (the signed difference between the sampled
+Bellman target and the current Q value) and
+$D(Q)(s,a) = \min_\zeta \mathbb{E}[(V_Q(s') - \zeta)^2 \mid s, a]$,
+corrects for this bias. The inner $\max$ over $\zeta$ in Eq. 12 exploits
+this decomposition: the optimal $\zeta^*$ that solves the inner max is the
+conditional expectation $\zeta^*(s, a) = \mathbb{E}[V_{Q^*}(s') \mid s, a]$
+(Theorem 5), and the $-\beta^2(V_Q(s') - \zeta)^2$ term cancels the
+double-sampling bias when $\zeta$ is at its optimum.
+
+The package defaults to `anchor_bellman_mode="anchor_moment"`, which replaces
+the minimax correction with the continuation-moment residual
 
 $$
 L_{\text{anch}} =
@@ -123,8 +208,21 @@ L_{\text{anch}} =
 \right].
 $$
 
-The zeta network is trained separately to approximate the expected
-continuation value:
+This variant avoids the explicit minimax and is more stable in the latent-reward
+IRL setting (where the paper's observed-reward anchor is not available in
+the same form). Setting `anchor_bellman_mode="paper_minimax"` retains the
+literal Eq. 12 objective. The two modes differ in sign and structure: the
+paper_minimax mode subtracts the variance correction $\beta^2(V_Q(s')-\zeta)^2$
+from the squared TD error, whereas the anchor_moment mode treats
+$Q - r_{\text{anch}} - \beta\zeta$ as a direct residual
+(see Kang et al. 2025, Eq. 12 vs. package implementation notes).
+
+In the paper, $\zeta(s, a) = \mathbb{E}[V_Q(s') \mid s, a]$ is the
+closed-form conditional expectation that solves the inner maximisation in
+Theorem 5 — it is an analytic object, not a separate network. The package
+approximates this conditional expectation with a neural network $\zeta_\xi$
+trained by MSE regression (the bi-conjugate EV representation of the internal
+docs):
 
 $$
 L_\zeta = \mathbb{E}\!\left[
@@ -133,8 +231,13 @@ L_\zeta = \mathbb{E}\!\left[
 $$
 
 where $V_{Q_\eta}(s') = \sigma \log \sum_b \exp(Q_\eta(s', b) / \sigma)$
-is the soft value of the next state under the current Q-network. After
-training, the implied reward $\hat{r}(s, a) = Q_\eta(s, a) - \beta\,\zeta_\xi(s, a)$
+is the soft value of the next state under the current Q-network. The
+minimiser of $L_\zeta$ over $\zeta_\xi$ is precisely $\mathbb{E}[V_{Q_\eta}(s') \mid s, a]$,
+so the learned network targets the analytic object; the distinction from the
+paper is that the package replaces the closed-form inner max with a
+learned approximation.
+
+After training, the implied reward $\hat{r}(s, a) = Q_\eta(s, a) - \beta\,\zeta_\xi(s, a)$
 is projected onto structural features via action-difference least squares:
 
 $$
@@ -146,6 +249,17 @@ where $\Delta\hat{r}(s, a) = \hat{r}(s, a) - \hat{r}(s, 0)$ and
 $\Delta\phi(s, a) = \phi(s, a) - \phi(s, 0)$ are stacked over all states
 and all non-reference actions. The projection is solved in closed form.
 
+The action-difference is taken because $Q(s, a)$ — and therefore
+$\hat{r}(s, a)$ — contains a state-dependent additive constant $c(s)$
+that is unidentified without the anchor (Kim et al. 2021; Cao et al. 2021):
+subtracting the reference action $a = 0$ eliminates $c(s)$ from both
+$\Delta\hat{r}$ and $\Delta\phi$, leaving $\Delta r(s,a) = \Delta\phi(s,a)^\top\theta$
+as the identified object. Note that the reference action (index 0, a package
+convention) and the anchor action $a_{\text{anch}}$ serve distinct roles:
+the reference action is the OLS baseline for differencing; the anchor action
+pins the absolute level of $Q_\eta$ via the Bellman loss. They need not
+be the same action.
+
 ## Algorithm
 
 ```text
@@ -155,7 +269,12 @@ Input   panel {(s_it, a_it, s_{i,t+1})}, features phi, discount beta,
         Bellman penalty weight lambda, patience P
 Output  theta_hat, imitation policy pi, soft value V
 
-1   initialize Q_eta and zeta_xi as MLPs with value_scale = 1 / (1 - beta)
+1   initialize Q_eta and zeta_xi as MLPs
+    # value_scale = 1/(1-beta): implementation trick that rescales MLP outputs
+    # to the range of V, keeping gradients well-conditioned (not part of the
+    # mathematical formulation)
+    # state_encoder: fixed function mapping integer state s to a real feature
+    # vector (e.g., one-hot or learned embedding)
 2   initialize Adam optimizers with learning-rate decay and gradient clipping
 3   for each epoch until max_epochs:
 4       shuffle panel into mini-batches

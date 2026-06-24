@@ -20,13 +20,16 @@ disentanglement result for state-only rewards in decomposable MDPs.
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action,
 observed for individual $i$ in period $t$. The discount factor is $\beta$ and
-the logit shock scale is $\sigma$. The transition kernel $F_a(s' \mid s)$
-gives the probability of moving from $s$ to $s'$ under action $a$, stored in
-$(A, S, S)$ orientation. The integrated value function is $V(s)$, the
-choice-specific value is $Q(s, a)$, and the conditional choice probability is
-$\pi(a \mid s)$. The reward candidate is $g_\theta$, a function of state in
-the validated identification setting. The shaping potential is $h_\phi(s)$, a
-learned function of the current state. The discriminator logit is
+the logit shock scale is $\sigma$. This page uses $\beta$ for the discount
+factor; Fu et al. (2018) use $\gamma$. These are the same object. The
+transition kernel $F_a(s' \mid s)$ gives the probability of moving from $s$
+to $s'$ under action $a$, stored in $(A, S, S)$ orientation. The integrated
+value function is $V(s)$, the choice-specific value is $Q(s, a)$, and the
+conditional choice probability is $\pi(a \mid s)$. The per-period flow utility
+is $u(s, a)$, which in the identification setting equals $g_\theta(s)$
+(state-only reward). The reward candidate is $g_\theta$, a function of state
+in the validated identification setting. The shaping potential is $h_\phi(s)$,
+a learned function of the current state. The discriminator logit is
 $f_{\theta,\phi}(s, a, s') = g_\theta(s) + \beta\, h_\phi(s') - h_\phi(s)$,
 and the discriminator probability is $D(s, a, s')$.
 
@@ -58,8 +61,25 @@ $$
 In the original identification setting of Fu et al. (2018), the reward
 candidate is constrained to be state-only: $u(s, a) = g_\theta(s)$ for all
 $a$. The shaping potential $h_\phi(s)$ absorbs value-like dynamics terms that
-would otherwise contaminate the reward estimate. The discriminator probability
-is:
+would otherwise contaminate the reward estimate.
+
+At the adversarial optimum, $f^*(s,a,s') = Q^*(s,a) - V^*(s) = A^*(s,a)$
+(the soft advantage; Appendix A.4 of Fu et al. 2018). Substituting the
+constrained form of $f$ into this identity gives the unnesting step:
+
+$$
+g^*(s) + \gamma h^*(s') - h^*(s) = r(s) + \gamma V^*(s') - V^*(s).
+$$
+
+This bridges $f^*(s,a,s') = A^*(s,a)$ to the component-level result: by
+applying Lemma B.1 (the decomposability lemma) to both sides, the left
+side separates into a state term and a next-state term, forcing
+$h^*_\phi(s) = V^*(s) + \text{const}$ and $g^*_\theta(s) = r^*(s) +
+\text{const}$ (Theorem C.1 of Fu et al. 2018). The shaping term
+$\beta h_\phi(s') - h_\phi(s)$ therefore converges to $\gamma V^*(s') -
+V^*(s)$, the dynamics-dependent component of the advantage.
+
+The discriminator probability is:
 
 $$
 D(s, a, s') = \frac{\exp(f_{\theta,\phi}(s, a, s'))}{\exp(f_{\theta,\phi}(s, a, s')) + \pi(a \mid s)}.
@@ -81,10 +101,21 @@ AIRL recovers $g_\theta$ under the following assumptions.
 - **MDP decomposability.** The MDP satisfies the decomposability condition of
   Fu et al. (2018): the optimal Bellman value at the adversarial equilibrium
   separates into a reward term and a continuation-value term, enabling
-  $h_\phi$ to absorb the dynamics-dependent component.
+  $h_\phi$ to absorb the dynamics-dependent component. Formally (Fu et al.
+  2018, Def. B.1), the dynamics satisfy decomposability if all states are
+  linked — every pair of states can be reached from a common predecessor in
+  one step (transitively). Under this condition, Lemma B.1 guarantees that
+  any identity $a(s) + b(s') = c(s) + d(s')$ for all $s, s'$ implies
+  $a(s) = c(s) + \text{const}$ and $b(s') = d(s') + \text{const}$, enabling
+  the $f^* = g^* + \beta h^*(s') - h^*(s)$ decomposition.
 - **Adversarial optimum.** The discriminator reaches the point $D = 1/2$
   everywhere, which forces $f_{\theta,\phi}(s,a,s') = \log \pi(a \mid s)$
-  and pins $g_\theta$ to the true reward up to a constant.
+  and pins $g_\theta$ to the true reward up to a constant. The algebra is:
+  at $D = 1/2$, $\exp\{f_{\theta,\phi}\} / (\exp\{f_{\theta,\phi}\} +
+  \pi(a \mid s)) = 1/2$, so $\exp\{f_{\theta,\phi}\} = \pi(a \mid s)$,
+  giving $f^*(s,a,s') = \log \pi_E(a \mid s) = A^{\pi_E}(s,a)$, the optimum and
+  its advantage interpretation both established in Appendix A.4 of Fu et al.
+  (2018).
 - **Additive separability.** The per-period payoff is the systematic reward
   plus an additive i.i.d. logit shock, which produces the soft Bellman
   equation and the logit policy.
@@ -94,16 +125,22 @@ AIRL recovers $g_\theta$ under the following assumptions.
 - **Feature rank.** For a linear reward parameterization, the state feature
   matrix must have full column rank over the observed state support.
 
+**Theorem** (Fu et al. 2018, Appendix C, Theorem C.1). Under deterministic
+dynamics and the decomposability condition, if $g_\theta$ is constrained to
+state-only and the discriminator reaches its adversarial optimum, then
+$g^*_\theta(s) = r(s) + \text{const}$ and $h^*_\phi(s) = V^*(s) +
+\text{const}$.
+
 These hold inside a finite discrete state space, a stationary environment, and
 a known fixed discount $\beta$. Given them, $g_\theta$ is identified up to a
 constant. The potential-based shaping ambiguity — any
 $r'(s,a,s') = r(s,a,s') + \beta h(s') - h(s)$ is behaviorally equivalent
 under the original dynamics — is absorbed by $h_\phi$ under the state-only
-condition. Identification fails when the DGP has action-dependent payoffs: a
-state-only $g_\theta(s)$ cannot represent the action contrast, and switching
-to $g_\theta(s,a)$ causes the shaping structure to lose the disentanglement
-property. The [Identification Boundary](airl/identification.md) page details
-both failure modes.
+condition. Identification fails under two modes: (i) a state-only $g_\theta(s)$ cannot
+represent the action contrast when the DGP has action-dependent payoffs; (ii)
+expanding to $g_\theta(s,a)$ breaks the decomposability of $f^*$ and
+$h_\phi$ no longer absorbs the shaping. Details at
+[Identification Boundary](airl/identification.md).
 
 ## Estimator
 
@@ -124,8 +161,17 @@ $$
 
 maximizing $\log \sigma(\ell)$ on expert transitions and
 $\log(1-\sigma(\ell))$ on policy transitions, where $\sigma$ is the logistic
-function. A small $\ell_2$ penalty $\lambda(\|\theta\|^2 + \|h_\phi\|^2)$
-suppresses parameter drift along directions that leave behavior unchanged.
+function. This log-odds $\ell$ is also the reward signal for policy
+optimization: $\hat{r}(s,a,s') = \log D - \log(1-D) = f_{\theta,\phi}(s,a,s')
+- \log \pi(a \mid s)$ (Appendix A.3 of Fu et al. 2018). In the Algorithm
+below, step 14 builds $Q_g$ from $g_\text{state}$ rather than $\ell$ directly;
+the connection is that $g_\text{state}$ is the state component of $\hat{r}$
+after absorbing $h_\phi$ into the value solve. A small $\ell_2$ penalty
+$\lambda(\|\theta\|^2 + \|h_\phi\|^2)$ suppresses parameter drift along
+directions that leave behavior unchanged.
+
+In the Algorithm, $L$ is the negative of the adversarial objective above;
+minimizing $L$ is equivalent to the maximization stated here.
 
 ## Algorithm
 

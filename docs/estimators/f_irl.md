@@ -24,9 +24,12 @@ orientation. The discount factor is $\beta$. The integrated value function is
 $V(s)$ and the soft-optimal policy is $\pi(a \mid s)$. The expert state
 marginal is $\rho_E(s)$, the model state marginal under the current reward is
 $\rho_\pi(s)$, and the initial-state distribution from the panel is $\mu_0$.
-The rollout horizon is $H$, the learning rate is $\alpha$, the clip bound is
-$c$, and the f-divergence gradient direction with respect to the reward is
-$g(s)$.
+The rollout horizon is $H$, the trajectory length is $T$ (the number of
+time steps summed over in the gradient covariance formula, Eq. 3 of
+Ni et al. 2020), the learning rate is $\alpha$, the clip bound is
+$c$, and $g(s)$ is the per-state reward update direction, equal to the
+instantiation of $h_f\!\bigl(\rho_E(s)/\rho_\pi(s)\bigr)$ from Theorem 4.1
+of Ni et al. (2020) in the tabular case (see Estimator section).
 
 ## Model
 
@@ -40,7 +43,11 @@ V(s) = \log \sum_a \exp\!\Bigl(R(s) + \beta \sum_{s'} F_a(s' \mid s)\, V(s')\Big
 $$
 
 The log-sum-exp form uses unit logit scale, matching the package convention
-throughout. Choice probabilities follow the softmax of choice-specific values:
+throughout. The package fixes the entropy temperature $\alpha = 1$
+throughout; the general $\alpha$ form appears in Ni et al. (2020) Section 3
+as the MaxEnt RL objective $V(s) = \tfrac{1}{\alpha}\log\sum_a \exp\!\bigl(\alpha(R(s) + \beta\sum_{s'} F_a(s'\mid s)\,V(s'))\bigr)$.
+
+Choice probabilities follow the softmax of choice-specific values:
 
 $$
 \pi(a \mid s) \propto \exp\!\Bigl(R(s) + \beta \sum_{s'} F_a(s' \mid s)\, V(s')\Bigr).
@@ -54,12 +61,14 @@ $$
 \rho_\pi(s)
 \;\propto\;
 \mu_0(s)
-+ \sum_{t=1}^{H} \beta^t\,(P_\pi^t \mu_0)(s),
++ \sum_{t=1}^{H} \beta^t\,(\mu_0^\top P_\pi^t)(s),
 \qquad
 [P_\pi]_{ss'} = \sum_a \pi(a \mid s)\, F_a(s' \mid s),
 $$
 
-normalized to sum to one over $s$. The canonical instance is the paper-faithful
+normalized to sum to one over $s$. Here $\mu_0$ is treated as a row vector
+and $\mu_0^\top P_\pi^t$ denotes right-multiplication, matching the
+implementation's `mu @ P_pi` convention. The canonical instance is the paper-faithful
 synthetic cell: eight states, three actions, a state-only reward, and
 deterministic transitions that fully specify the data-generating process.
 
@@ -97,16 +106,92 @@ $$
 \min_R\; D_f\!\bigl(\rho_E \;\|\; \rho_\pi(R)\bigr).
 $$
 
-Five divergence families are supported. Each has a closed-form gradient
-direction $g(s) = \partial D_f / \partial R(s)$:
+**Analytic gradient (Theorem 4.1, Ni et al. 2020).** The analytic gradient of
+the f-divergence objective $L_f(\theta) = D_f(\rho_E \| \rho_\theta)$ with
+respect to the reward parameters $\theta$ is (Ni et al. 2020, Eq. 3):
 
-| Divergence | Gradient $g(s)$ |
-| --- | --- |
-| Forward KL (default, `"fkl"`) | $\log \rho_E(s) - \log \rho_\pi(s)$ |
-| Reverse KL (`"rkl"`) | $\log \rho_\pi(s) - \log \rho_E(s)$ |
-| Jensen-Shannon (`"js"`) | $\log(\rho_E(s)/m(s)) - \log(\rho_\pi(s)/m(s))$, $m = (\rho_E + \rho_\pi)/2$ |
-| Chi-squared (`"chi2"`) | $\rho_E(s)/\rho_\pi(s) - 1$ |
-| Total variation (`"tv"`) | $\operatorname{sign}(\rho_E(s) - \rho_\pi(s))$ |
+$$
+\nabla_\theta L_f(\theta)
+= \frac{1}{\alpha T}
+\operatorname{cov}_{\tau \sim \rho_\theta(\tau)}\!\!\left(
+  \sum_{t=1}^T h_f\!\!\left(\frac{\rho_E(s_t)}{\rho_\theta(s_t)}\right),\;
+  \sum_{t=1}^T \nabla_\theta r_\theta(s_t)
+\right),
+$$
+
+where $h_f(u) \triangleq f(u) - f'(u)\,u$ is the generator-derived function
+for each f-divergence family (Ni et al. 2020, Table 2; proof in Appendix A).
+In the tabular case with a fixed state-only reward the covariance simplifies:
+the per-state reward update direction $g(s) = h_f(\rho_E(s)/\rho_\pi(s))$
+is the instantiation of $h_f$ at the density ratio for that state.
+
+Two instantiations from the paper:
+
+- **Forward KL**: $f(u) = u\log u$, so $f'(u) = 1 + \log u$ and
+  $h_\text{FKL}(u) = u\log u - (1+\log u)u = -u$.
+  Then $g(s) = h_\text{FKL}(\rho_E/\rho_\pi) = -(\rho_E/\rho_\pi)$.
+  Under gradient *descent* on $D_f$ the update is
+  $R(s) \leftarrow R(s) - \alpha \cdot (-\rho_E(s)/\rho_\pi(s))$,
+  i.e., reward increases where $\rho_E(s) > \rho_\pi(s)$.
+  In the tabular case the reward at each state $s$ is a scalar
+  parameter, so $\nabla_\theta r_\theta(s_t) = \mathbf{e}_{s_t}$ (the
+  unit basis vector for state $s_t$). Substituting into the covariance
+  formula and switching to gradient *ascent* gives the update direction
+  $+\rho_E(s)/\rho_\pi(s)$ per state. Because the covariance is linear
+  in the first argument and $\rho_E,\rho_\pi > 0$, taking the log of
+  the ratio yields an equivalent monotone direction:
+  $g(s) = \log\rho_E(s) - \log\rho_\pi(s)$.
+  This log form is numerically stabler (avoids large ratio spikes) and
+  is the update used in the package implementation.
+
+- **Reverse KL**: $f(u) = -\log u$, so $f'(u) = -1/u$ and
+  $h_\text{RKL}(u) = -\log u - (-1/u)u = 1 - \log u$.
+  The constant 1 drops under the covariance (it does not covary with
+  $\nabla_\theta r_\theta$), giving update direction
+  $g(s) = -\log(\rho_E(s)/\rho_\pi(s)) = \log\rho_\pi(s) - \log\rho_E(s)$.
+
+Five divergence families are supported. The table shows the generator $f(u)$,
+the derived $h_f(u) \triangleq f(u) - f'(u)\,u$, and the resulting
+per-state gradient direction $g(s)$ used in the package. The FKL, RKL, and JS
+entries are from Ni et al. (2020) Table 2; the chi-squared and total variation
+entries are standard f-divergence generators derived by the same formula:
+
+| Divergence | $f(u)$ | $h_f(u)$ | Gradient $g(s)$ |
+| --- | --- | --- | --- |
+| Forward KL (default, `"fkl"`) | $u\log u$ | $-u$ | $\log \rho_E(s) - \log \rho_\pi(s)$ |
+| Reverse KL (`"rkl"`) | $-\log u$ | $1 - \log u$ | $\log \rho_\pi(s) - \log \rho_E(s)$ |
+| Jensen-Shannon (`"js"`) | $u\log u - (1+u)\log\tfrac{1+u}{2}$ | $-\log(1+u)$ | $-\log\!\bigl(1 + \rho_E(s)/\rho_\pi(s)\bigr)$ |
+| Chi-squared (`"chi2"`) | $(u-1)^2$ | $1 - u^2$ | $\rho_E(s)/\rho_\pi(s) - 1$ |
+| Total variation (`"tv"`) | $\tfrac{1}{2}\lvert u-1\rvert$ | $\tfrac{1}{2}\operatorname{sign}(1-u)$ | $\operatorname{sign}(\rho_E(s) - \rho_\pi(s))$ |
+
+**Note on Jensen-Shannon.** The JS gradient $g(s) = -\log(1 + \rho_E/\rho_\pi)$ from
+$h_\text{JS}(u) = -\log(1+u)$ (Ni et al. 2020, Table 2) is *not* the same as
+the FKL gradient $\log(\rho_E/\rho_\pi)$. The current package implementation
+computes $\log(\rho_E/m) - \log(\rho_\pi/m)$ with $m = (\rho_E + \rho_\pi)/2$,
+which simplifies algebraically to $\log(\rho_E/\rho_\pi)$, the same direction as FKL.
+This is a known implementation divergence from the paper's Table 2 formula; the
+JS and FKL variants produce identical update directions in the current code.
+The JS and FKL divergences differ in their Hessian (curvature at optimum) but
+not in their gradient direction under this implementation.
+
+**Density Ratio Estimation (sample regime).** When expert state samples
+$s_E$ are provided rather than the analytic density $\rho_E(s)$, the paper
+fits a discriminator $D_\omega(s)$ in each iteration by maximizing the binary
+cross-entropy (Ni et al. 2020, Section 4.2, Eq. 4):
+
+$$
+\max_{D_\omega}\;
+\mathbb{E}_{s \sim s_E}\!\bigl[\log D_\omega(s)\bigr]
++ \mathbb{E}_{s \sim \rho_\theta}\!\bigl[\log(1 - D_\omega(s))\bigr].
+$$
+
+The optimal discriminator satisfies $D^*_\omega(s) = \rho_E(s)/(\rho_E(s) +
+\rho_\theta(s))$ (the standard logit solution for binary density-ratio
+estimation), so the density ratio entering $h_f$ is recovered as
+$\rho_E(s)/\rho_\theta(s) \approx D_\omega(s)/(1 - D_\omega(s))$.
+The package's current implementation uses the empirical-frequency path
+(analytic $\rho_E$ from the panel) and does not implement the discriminator
+path.
 
 The reward is updated by gradient ascent with a clip bound $c$:
 
@@ -134,6 +219,9 @@ Output  R_star (tabular reward), pi_star (policy), V_star (value)
 3   for t = 1 .. T do
 4       tile R^(t-1) across actions to get reward matrix (if reward_scope="state")
 5       solve soft Bellman under R^(t-1) via value iteration to get V^(t) and pi^(t)
+        [package adaptation: tabular value iteration replaces the paper's MaxEnt RL / SAC
+         inner loop from Algorithm 1 of Ni et al. (2020); the substitution is exact in the
+         finite discrete case]
 6       compute P_pi^(t)(s,s') := sum_a pi^(t)(a|s) * F_a(s,s')
 7       propagate rho_pi^(t) via H steps from mu_0 under P_pi^(t), then normalize
 8       compute g^(t)(s) := log rho_E(s) - log rho_pi^(t)(s)     [forward KL]

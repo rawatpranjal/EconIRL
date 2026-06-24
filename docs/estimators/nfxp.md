@@ -18,11 +18,13 @@ solver used in the package.
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed
-for individual $i$ in period $t$. The vector $\phi(s, a)$ collects the known
+for individual $i$ in period $t$. The index $b$ is a dummy action variable used
+in sums over the action set. The vector $\phi(s, a)$ collects the known
 reward features and $\theta$ the reward parameters to be estimated. The discount
 factor is $\beta$ and the logit shock scale is $\sigma$. The transition kernel
 $P_a(s, s')$ gives the probability of moving to $s'$ from $s$ under action $a$,
-stored in $(A, S, S)$ orientation. The integrated value function is
+stored in $(A, S, S)$ orientation, with $S$ states and $A$ actions. The
+integrated value function is
 $V_\theta(s)$, the choice-specific value is $Q_\theta(s, a)$, and the conditional
 choice probability, the policy, is $\pi_\theta(a \mid s)$.
 
@@ -36,7 +38,8 @@ u_\theta(s, a) = \phi(s, a)^\top \theta.
 $$
 
 With discount factor $\beta$ and logit shock scale $\sigma$, the integrated value
-function solves the soft Bellman fixed point:
+function solves the soft Bellman fixed point $V_\theta = T_\theta V_\theta$,
+where the Bellman operator $T_\theta$ is defined by:
 
 $$
 V_\theta(s)
@@ -99,8 +102,31 @@ $$
 = \arg\max_\theta \sum_{i,t} \log \pi_\theta(a_{it} \mid s_{it}).
 $$
 
-The gradient of the log likelihood differentiates through the fixed point. For
-observation $i$, the score has the logit form:
+Because $V_\theta = T_\theta V_\theta$ is an implicit equation in $\theta$, the
+derivative $\partial V/\partial\theta$ is obtained by the implicit function
+theorem rather than by differentiating through the iteration.
+
+The score follows from differentiating $\log \pi_\theta(a \mid s)$ directly.
+Writing out the softmax log:
+
+$$
+\frac{\partial}{\partial\theta} \log \pi_\theta(a \mid s)
+= \frac{\partial}{\partial\theta}
+  \!\left[
+    \frac{Q_\theta(s,a)}{\sigma}
+    - \log \sum_b \exp\!\left(\frac{Q_\theta(s,b)}{\sigma}\right)
+  \right].
+$$
+
+Applying the chain rule and the log-sum-exp derivative $\partial \log\sum_b e^{f_b}/\partial\theta = \sum_b \pi_b \,\partial f_b/\partial\theta$:
+
+$$
+= \frac{1}{\sigma}\frac{\partial Q_\theta(s,a)}{\partial\theta}
+  - \frac{1}{\sigma}\sum_b \pi_\theta(b \mid s)
+    \frac{\partial Q_\theta(s,b)}{\partial\theta}.
+$$
+
+The per-observation score at observation $i$ is:
 
 $$
 \psi_i(\theta)
@@ -109,21 +135,43 @@ $$
 \left[
     \frac{\partial Q_\theta(s_i, a_i)}{\partial \theta}
     -
-    \sum_a \pi_\theta(a \mid s_i)
-    \frac{\partial Q_\theta(s_i, a)}{\partial \theta}
+    \sum_b \pi_\theta(b \mid s_i)
+    \frac{\partial Q_\theta(s_i, b)}{\partial \theta}
 \right].
 $$
 
-The Q-gradient propagates through the value function. The total derivative
-solves:
+The MLE first-order condition is $\sum_{i,t} \psi_i(\theta) = 0$, which BHHH
+iterates to solve.
+
+The Q-gradient follows from the chain rule on
+$Q_\theta(s,a) = u_\theta(s,a) + \beta\sum_{s'} P_a(s,s') V_\theta(s')$:
+
+$$
+\frac{\partial Q_\theta(s,a)}{\partial\theta}
+= \phi(s,a)
+  + \beta \sum_{s'} P_a(s,s')\frac{\partial V_\theta(s')}{\partial\theta}.
+$$
+
+The soft Bellman value $V_\theta(s) = \sigma \log \sum_a \exp(Q_\theta(s,a)/\sigma)$
+differentiates by the log-sum-exp envelope (soft-max envelope theorem):
+
+$$
+\frac{\partial V_\theta(s)}{\partial\theta}
+= \sum_a \pi_\theta(a \mid s)
+  \frac{\partial Q_\theta(s,a)}{\partial\theta}.
+$$
+
+Substituting the Q-gradient into this envelope equation and collecting
+$\partial V/\partial\theta$ terms on the left yields the linear system:
 
 $$
 (I - \beta P_\pi)\frac{\partial V}{\partial \theta}
 = \sum_a \pi_\theta(a \mid s)\,\phi(s, a),
 $$
 
-where $P_\pi = \sum_a \operatorname{diag}(\pi_\theta(\cdot, a)) P_a$ is the
-policy-weighted transition matrix.
+where $P_\pi = \sum_a \operatorname{diag}_s(\pi_\theta(a \mid s))\, P_a \in \mathbb{R}^{S \times S}$
+is the policy-weighted transition matrix, with $\operatorname{diag}_s(\pi_\theta(a \mid s))$
+denoting the $S \times S$ diagonal matrix whose $(s,s)$ entry is $\pi_\theta(a \mid s)$.
 
 ## Algorithm
 
@@ -140,7 +188,8 @@ Output  theta_hat, standard errors, policy pi, value V
 5       Q_theta(s, a) := u_theta(s, a) + beta * sum_{s'} P_a(s, s') V_theta(s')
 6       pi_theta(a | s) := exp(Q_theta(s, a)/sigma) / sum_b exp(Q_theta(s, b)/sigma)
 7       L(theta) := sum_{i,t} log pi_theta(a_it | s_it)
-8       update theta by BHHH using the per-observation scores psi_i(theta)
+8a      H <- sum_i psi_i(theta) psi_i(theta)^T   # BHHH information matrix
+8b      theta <- theta + H^{-1} (sum_i psi_i(theta))  # Newton-like ascent step
 9   until the gradient norm is below tolerance
 10  return theta_hat, standard errors from the BHHH information, pi_theta, V_theta
 ```

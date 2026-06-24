@@ -27,7 +27,11 @@ combination of reward features $\varphi(s, a)^\top \theta$, or a small feedforwa
 network. The soft value function is $V(s) = \sigma \log \sum_a \exp(Q(s,a)/\sigma)$,
 the implied policy is $\pi(a \mid s) = \exp((Q(s,a) - V(s))/\sigma)$, and the
 Bellman-implied reward is $r_{\mathrm{IB}}(s, a) = Q(s, a) - \beta \sum_{s'}
-F_a(s' \mid s)\, V(s')$. The divergence penalty strength is $\alpha$.
+F_a(s' \mid s)\, V(s')$. The divergence penalty strength is $\alpha$. The expert
+occupancy measure $\rho_E(s, a) = (1 - \beta)\,\pi_E(a \mid s)\sum_{t \geq 0}
+\beta^t P(s_t = s \mid \pi_E)$ is the discounted state-action visitation frequency
+under the expert policy. In practice $\mathbb{E}_\rho[\cdot]$ is approximated by the
+sample mean over the expert panel.
 
 ## Model
 
@@ -62,8 +66,10 @@ conditions.
 
 - **Max-entropy policy framework.** The expert policy is the logit softmax of the true
   Q-function; the adversarial min-max over reward-policy pairs collapses to a concave
-  optimization over $Q$ alone. This observation is the central construction of Garg et
-  al. (2021).
+  optimization over $Q$ alone. This is the content of Propositions 3.4 and 3.6 in Garg
+  et al. (2021): the IRL saddle-point $(\pi^*, Q^*)$ is recovered by maximizing
+  $\mathcal{J}^*(Q) = \mathcal{J}(\pi_Q, Q)$ over $Q$ alone, and $\mathcal{J}^*$ is
+  concave in $Q$.
 - **Known transitions.** The transition kernel $F_a(s' \mid s)$ is supplied externally
   in $(A, S, S)$ orientation. Rows must be stochastic; an incorrect orientation
   invalidates the Bellman-implied reward.
@@ -82,6 +88,109 @@ These hold inside a finite discrete state space with stationary dynamics. The es
 recovers the imitation policy on expert support. Structural counterfactual
 interpretation requires all coverage and Bellman-object gates to pass.
 
+## Derivation
+
+The IRL min-max objective (Garg et al. 2021, Eq. 3) is
+
+$$
+\max_{r \in \mathcal{R}}\;\min_{\pi \in \Pi}\;
+L(\pi, r)
+= \mathbb{E}_{\rho_E}[r(s,a)] - \mathbb{E}_{\rho_\pi}[r(s,a)] - H(\pi) - \psi(r),
+$$
+
+where $\psi(r)$ is a convex reward regularizer and $H(\pi)$ is the causal entropy of
+$\pi$. Naively solving this requires alternating between reward and policy updates.
+The key insight is a three-step collapse.
+
+**Step 1: reparameterize via the inverse soft-Bellman operator.**
+Define the inverse soft-Bellman operator $\mathcal{T}^\pi : \mathbb{R}^{S \times A}
+\to \mathbb{R}^{S \times A}$ by
+
+$$
+(\mathcal{T}^\pi Q)(s, a)
+= Q(s, a) - \beta\,\mathbb{E}_{s' \sim P(\cdot \mid s, a)}\bigl[V^\pi(s')\bigr],
+$$
+
+where $V^\pi(s) = \mathbb{E}_{a \sim \pi(\cdot \mid s)}[Q(s,a) - \sigma\log\pi(a \mid s)]$
+is the soft value (Garg et al. 2021, before Lemma 3.2). The operator $\mathcal{T}^\pi$
+inverts the soft Bellman operator $\mathcal{B}^\pi$, giving a bijection between
+Q-functions and rewards (Lemma 3.2). This lets us re-parameterize the reward-policy
+space $\Pi \times \mathcal{R}$ as a Q-policy space, defining the new objective
+$\mathcal{J}(\pi, Q)$ (Lemma 3.3):
+
+$$
+\mathcal{J}(\pi, Q)
+= \mathbb{E}_{\rho_E}\bigl[(\mathcal{T}^\pi Q)(s,a)\bigr]
+  - \mathbb{E}_{\rho_\pi}\bigl[(\mathcal{T}^\pi Q)(s,a)\bigr]
+  - H(\pi) - \psi(\mathcal{T}^\pi Q),
+$$
+
+with the identity $L(\pi, r) = \mathcal{J}(\pi, \mathcal{T}^{-1}r)$ for all
+$r \in \mathcal{R}$ (Lemma 3.3). Simplifying using the initial state distribution
+$p_0$ (Lemma A.2) yields Eq. 5 of the paper:
+
+$$
+\mathcal{J}(\pi, Q)
+= \mathbb{E}_{(s,a) \sim \rho_E}\!\bigl[Q(s,a) - \beta\,\mathbb{E}_{s'}\bigl[V^\pi(s')\bigr]\bigr]
+  - (1 - \beta)\,\mathbb{E}_{s_0 \sim p_0}\bigl[V^\pi(s_0)\bigr]
+  - \psi(\mathcal{T}^\pi Q).
+$$
+
+**Step 2: substitute the optimal policy in closed form.**
+For any fixed $Q$, $\operatorname{argmin}_{\pi \in \Pi} \mathcal{J}(\pi, Q)$ is attained
+at $\pi_Q(a \mid s) = \frac{1}{Z_s}\exp(Q(s,a)/\sigma)$ with
+$Z_s = \sum_b \exp(Q(s,b)/\sigma)$, the max-entropy policy for reward
+$\mathcal{T}^\pi Q$ (Proposition 3.5, written here in the page's $\sigma$-scaled
+convention). Substituting this policy collapses
+the saddle-point to a single objective $\mathcal{J}^*(Q) = \mathcal{J}(\pi_Q, Q)$
+that depends only on $Q$.
+
+**Step 3: chi-squared substitution and the practical loss.**
+For the chi-squared regularizer $\psi(r) = \alpha r^2$ we have
+$\phi(x) = x - \frac{1}{4\alpha}x^2$ (Garg et al. 2021, Table 2). Substituting
+$\pi_Q$ and using the offline approximation (Section 5.1 of the paper, which
+replaces the initial-state term with expert samples) gives the maximization
+objective (Eq. 9 $\to$ Eq. 12):
+
+$$
+\mathcal{J}^*(Q)
+= \mathbb{E}_{\rho_E}\!\left[\phi\!\left(r_{\mathrm{IB}}(s,a)\right)\right]
+= \mathbb{E}_{\rho_E}\!\left[r_{\mathrm{IB}}(s,a) - \frac{1}{4\alpha}\,r_{\mathrm{IB}}(s,a)^2\right],
+$$
+
+where $r_{\mathrm{IB}}(s,a) = (\mathcal{T}^{\pi_Q}Q)(s,a) = Q(s,a) - \beta
+\mathbb{E}_{s'}[V^{\pi_Q}(s')]$. Rewriting as a minimization loss and using
+$Q(s,a) - V^{\pi_Q}(s) = \sigma\log\pi_Q(a \mid s)$ gives Eq. 12 of the paper:
+
+$$
+\mathcal{L}(Q)
+= -\mathbb{E}_{\rho_E}\!\bigl[Q(s,a) - V^{\pi_Q}(s)\bigr]
+  + \frac{1}{4\alpha}\,\mathbb{E}_{\rho_E}\!\bigl[r_{\mathrm{IB}}(s,a)^2\bigr].
+$$
+
+**First-order condition.** Differentiating $\mathcal{L}(Q)$ with respect to $Q(s,a)$
+and setting to zero (holding $V$ fixed at the softmax value):
+
+$$
+\frac{\partial \mathcal{L}}{\partial Q(s,a)} = 0
+\;\Longrightarrow\;
+-1 + \frac{1}{2\alpha}\,r_{\mathrm{IB}}(s,a) = 0
+\;\Longrightarrow\;
+r_{\mathrm{IB}}^*(s,a) = 2\alpha.
+$$
+
+At the optimum the implied reward on expert support equals $2\alpha$; the
+divergence penalty $\alpha$ controls the implied-reward scale, not just
+regularization strength.
+
+**Note on implicit differentiation.** The implicit-differentiation step
+$(I - \beta P_\pi)\,\mathrm{d}V/\mathrm{d}\theta$ arises in structural estimators
+(NFXP, MPEC) where a Bellman fixed point is enforced as a hard constraint and
+$\theta$ parameterizes the Bellman operator. IQ-Learn has no such constraint:
+$Q$ is a free object (a table or a network), not a fixed point of any operator.
+No implicit differentiation applies here; gradients flow directly through $V(s)
+= \sigma\log\sum_a \exp(Q(s,a)/\sigma)$.
+
 ## Estimator
 
 IQ-Learn minimizes over $Q$ the chi-squared objective:
@@ -92,14 +201,16 @@ $$
 + \frac{1}{4\alpha}\,\mathbb{E}_\rho\bigl[r_{\mathrm{IB}}(s, a)^2\bigr],
 $$
 
-where $\mathbb{E}_\rho$ averages over expert $(s, a)$ pairs. Since $Q(s, a) - V(s) =
-\sigma \log \pi(a \mid s)$, the first term is the conditional log-likelihood of expert
-actions under the implied policy scaled by $\sigma$. The second term penalizes large
+where $\mathbb{E}_\rho$ averages over expert $(s, a)$ pairs. The identity
+$Q(s, a) - V(s) = \sigma \log \pi(a \mid s)$ follows directly from
+$V(s) = \sigma \log \sum_{a'} \exp(Q(s,a')/\sigma)$, so the first term equals
+$\sigma\,\mathbb{E}_\rho[\log \pi(a \mid s)]$, the $\sigma$-scaled behavioral-cloning
+log-likelihood (Garg et al. 2021, Section 5.3). The second term penalizes large
 implied rewards on expert support and ensures the objective is bounded from below.
-Setting $\alpha \to \infty$ removes the penalty and recovers a pure conditional
-log-likelihood over the Q-induced logit probabilities, which is equivalent to
-behavioral cloning. Standard errors are not computed; the returned standard-error
-array is NaN.
+Setting $\alpha \to \infty$ removes the penalty: $\mathcal{L}(Q) \to
+-\mathbb{E}_\rho[Q(s,a) - V(s)] = -\sigma\,\mathbb{E}_\rho[\log \pi(a \mid s)]$,
+which is the behavioral-cloning log-likelihood (Garg et al. 2021, Section 5.3).
+Standard errors are not computed; the returned standard-error array is NaN.
 
 **Estimator note (numerical stability).** The chi-squared divergence with quadratic
 temporal-difference penalty is required for bounded optimization on a free tabular
@@ -110,7 +221,9 @@ $$
 $$
 
 has no upper bound on a free tabular $Q$ and drives the optimizer to numerical
-overflow; it should not be used with the tabular parameterization.
+overflow; it should not be used with the tabular parameterization. This is the
+negation of the paper's Eq. 9 TV objective (Garg et al. 2021), written as a
+minimization; $\beta$ here corresponds to $\gamma$ in the paper.
 
 ## Algorithm
 

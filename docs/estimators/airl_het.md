@@ -29,7 +29,8 @@ the posterior probability that trajectory $i$ belongs to segment $k$ is
 $q_{ik}$. Segment $k$ has flow reward $g_k(s, a)$ and shaping potential
 $h_k(s)$; the discriminator score is
 $f_k(s, a, s') = g_k(s, a) + \beta h_k(s') - h_k(s)$, where $\beta$ is the
-discount factor. The logit shock scale is $\sigma$. The transition kernel
+discount factor. The logit shock scale is $\tau > 0$. The logistic function is
+written $\ell(x) = 1/(1 + e^{-x})$. The transition kernel
 $P_a(s, s')$ gives the probability of moving to $s'$ from $s$ under action $a$,
 stored in $(A, S, S)$ orientation. The integrated value function for segment
 $k$ is $V_k(s)$, the choice-specific value is $Q_k(s, a)$, and the
@@ -49,10 +50,14 @@ The segment-$k$ integrated value function satisfies the soft Bellman fixed
 point:
 
 $$
-V_k(s) = \sigma \log \sum_a \exp\!\left(
-    \frac{g_k(s, a) + \beta \sum_{s'} P_a(s, s')\, V_k(s')}{\sigma}
+V_k(s) = \tau \log \sum_a \exp\!\left(
+    \frac{g_k(s, a) + \beta \sum_{s'} P_a(s, s')\, V_k(s')}{\tau}
 \right).
 $$
+
+This follows from additive separability (AS) and Type-I extreme-value logit
+shocks with scale $\tau$: integrating out the shock yields the log-sum-exp
+inclusive value (Rust 1987; Ziebart 2008).
 
 The choice-specific value and logit policy follow:
 
@@ -60,7 +65,7 @@ $$
 Q_k(s, a) = g_k(s, a) + \beta \sum_{s'} P_a(s, s')\, V_k(s'),
 \qquad
 \pi_k(a \mid s) =
-\frac{\exp(Q_k(s, a) / \sigma)}{\sum_b \exp(Q_k(s, b) / \sigma)}.
+\frac{\exp(Q_k(s, a) / \tau)}{\sum_b \exp(Q_k(s, b) / \tau)}.
 $$
 
 The mixture layer links the segment objects to the observed data through segment
@@ -68,7 +73,7 @@ priors $\lambda_k$ and trajectory-level posteriors $q_{ik}$. The mixture
 log-likelihood is:
 
 $$
-\ell = \sum_i \log \sum_k \lambda_k \prod_t \pi_k(a_{it} \mid s_{it}).
+\mathcal{L}_{\mathrm{mix}} = \sum_i \log \sum_k \lambda_k \prod_t \pi_k(a_{it} \mid s_{it}).
 $$
 
 The canonical instance is a serialized-content panel: individuals decide each
@@ -87,7 +92,7 @@ together uniquely resolve that ambiguity (Lee, Sudhir, and Wang 2026).
   the current state and action and does not depend on the current logit shock.
 - **Additive separability (AS).** The per-period payoff is the systematic reward
   plus an additive choice-specific shock, drawn independently across choices as
-  Type-I extreme value with fixed scale $\sigma$.
+  Type-I extreme value with fixed scale $\tau$.
 - **Exogenous transitions.** The transition kernel $P_a(s, s')$ is supplied or
   estimated in a first stage, outside the adversarial objective.
 - **Exit-action reward anchor.** The exit action carries zero flow reward in
@@ -115,32 +120,48 @@ behavioral separation is small.
 
 ## Estimator
 
-The discriminator for segment $k$ is trained by weighted binary cross-entropy.
-The classification logit for a transition $(s, a, s')$ is
-$f_k(s, a, s') - \log \pi_k(a \mid s)$. Expert transitions are weighted by
-the current posterior $q_{ik}$:
+The discriminator output for segment $k$ is
+
+$$
+D_k(s, a, s') = \frac{\exp(f_k(s, a, s'))}{\exp(f_k(s, a, s')) + \pi_k(a \mid s)},
+$$
+
+so the log-odds equal $\log D_k - \log(1-D_k) = f_k - \log \pi_k$, which is
+the binary classification logit used in both terms of $\mathcal{L}_k$ (Fu et
+al. 2018, §3). The discriminator for segment $k$ is trained by weighted binary
+cross-entropy. Expert transitions are weighted by the current posterior
+$q_{ik}$:
 
 $$
 \mathcal{L}_k
-= -\sum_i q_{ik} \sum_t \log \sigma\!\bigl(f_k(s_{it}, a_{it}, s_{i,t+1})
+= -\sum_i q_{ik} \sum_t \log \ell\!\bigl(f_k(s_{it}, a_{it}, s_{i,t+1})
     - \log \pi_k(a_{it} \mid s_{it})\bigr)
   - \mathbb{E}_{\pi_k}\!\bigl[\log(1 - D_k)\bigr],
 $$
 
-where $\sigma$ denotes the logistic function. The E-step posterior is:
+where $\ell(x) = 1/(1+e^{-x})$ is the logistic function. Substituting
+$D_k = \ell(f_k - \log \pi_k)$ gives
+$\log(1 - D_k) = -\log(1 + \exp(f_k - \log \pi_k))$, so the policy term
+is $\mathbb{E}_{\pi_k}[\log(1 - D_k)] = -\mathbb{E}_{\pi_k}[\operatorname{logaddexp}(0,\, f_k - \log \pi_k)]$,
+matching the implementation (`airl_het.py`, line 730). The E-step posterior is:
 
 $$
 q_{ik} \propto \lambda_k \prod_t \pi_k(a_{it} \mid s_{it}),
 $$
 
 computed via log-sum-exp for numerical stability. Segment priors are updated
-by the average posterior with Dirichlet smoothing:
+by the average posterior with Dirichlet smoothing ($N$ = number of
+trajectories):
 
 $$
 \lambda_k \leftarrow
-\frac{\textstyle\sum_i q_{ik} + \alpha}
-     {\textstyle\sum_j \bigl(\sum_i q_{ij} + \alpha\bigr)}.
+\frac{\textstyle\frac{1}{N}\sum_i q_{ik} + \alpha}
+     {\textstyle\sum_j \bigl(\frac{1}{N}\sum_i q_{ij} + \alpha\bigr)}.
 $$
+
+Here $\alpha > 0$ is the Dirichlet concentration (smoothing pseudocount) and
+$j$ ranges over all segments $\{1, \ldots, K\}$ so the denominator sums each
+segment's smoothed average posterior to ensure the updated priors sum to one.
 
 Standard errors for the reward parameters are not available; the adversarial
 objective does not produce a likelihood Hessian, and the `standard_errors`
@@ -152,7 +173,7 @@ field is filled with `nan`.
 Algorithm  AIRL-Het (EM adversarial IRL with anchor identification)
 Input   panel {(s_it, a_it, s_{i,t+1})}, transitions P in (A,S,S),
         K segments, exit_action index, absorbing_state index,
-        discount beta, logit scale sigma, EM tolerance em_tol
+        discount beta, logit scale tau, EM tolerance em_tol
 Output  segment rewards {g_k}, shaping potentials {h_k},
         segment policies {pi_k}, priors {lambda_k}, posteriors {q_ik}
 
