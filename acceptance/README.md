@@ -23,11 +23,28 @@ papers/        the paper handed to Joe per estimator                            
 reports/       Joe's transcripts, findings.json, and the grades                     (gitignored)
 ```
 
-## The loop
+## Running Joe
+
+Two ways to drive Joe. Default is a Claude Code session in a sandbox folder (free, no API key).
+
+**A. Claude Code in a sandbox (default).** Provision a folder outside the repo, then run Claude
+Code in it; it reads `CLAUDE.md` and becomes Joe.
 
 ```
-./run.sh nfxp          # generate the problem, build + seal the container, prove isolation (free)
-./run.sh nfxp joe      # also launch Joe (needs an Anthropic API key + budget)
+./provision_sandbox.sh nfxp ~/joe-sandbox
+cd ~/joe-sandbox && source .venv/bin/activate && claude     # Joe works, writes findings.json
+python grade.py --truth problems/nfxp/truth.json --joe ~/joe-sandbox/findings.json
+```
+
+Caveat: a Claude Code session still loads the user's global `~/.claude/CLAUDE.md`, so Joe is not a
+perfectly clean stranger. The answer key is kept out of the sandbox, so the blindness that matters
+holds. For a fully clean Joe, run Claude Code inside the container instead (path B).
+
+**B. Sealed container (most isolated; needs an Anthropic key for the Opus loop).**
+
+```
+./run.sh nfxp          # generate, build + seal the container, prove isolation (free)
+./run.sh nfxp joe      # launch the Opus Joe loop (needs ANTHROPIC_API_KEY + budget)
 python grade.py --truth problems/nfxp/truth.json --joe reports/nfxp_findings.json
 ```
 
