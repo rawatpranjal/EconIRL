@@ -641,7 +641,11 @@ class GLADIUSEstimator(BaseEstimator):
                     if anchor_bellman_mode == "paper_minimax":
                         anchor_td = anchor_r_batch + beta * v_sp - q_sa
                         zeta_residual = v_sp - zeta_sa
-                        bellman_terms = (
+                        # Enoch's reference takes the ABSOLUTE value (MAE) of the
+                        # bi-conjugate residual (Zurcher_train.py:490,502): the signed
+                        # mean is unbounded below (Q inflates the variance term to make
+                        # it -inf), which diverges. abs bounds it at >= 0.
+                        bellman_terms = jnp.abs(
                             anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
                         )
                     else:
@@ -707,7 +711,8 @@ class GLADIUSEstimator(BaseEstimator):
                     if anchor_bellman_mode == "paper_minimax":
                         anchor_td = anchor_r_batch + beta * v_sp - q_sa
                         zeta_residual = v_sp - zeta_sa
-                        anchor_terms = (
+                        # abs(MAE) per Enoch's reference (see q_step note).
+                        anchor_terms = jnp.abs(
                             anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
                         )
                     else:
