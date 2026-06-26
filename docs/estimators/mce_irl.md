@@ -309,6 +309,51 @@ The fitted policy gives action probabilities by state:
 print(model.predict_proba([0, 10, 50, 89]))
 ```
 
+### General MDP
+
+The example above is the Rust bus, where `transitions=None` estimates the
+two-action keep/replace kernel from the data. For any other problem, supply the
+dynamics explicitly. Pass a transition tensor of shape `(n_actions, n_states,
+n_states)` and the observed next-state column. A two-dimensional matrix fills
+the non-keep actions with the bus reset-to-state-0 kernel. A model with more
+than two actions and no explicit tensor is rejected.
+
+```python
+from econirl import MCEIRL
+from econirl.estimators import estimate_empirical_transitions
+
+# transitions[a, s, s2] = P(s2 | s, a)
+# features[s, a, k]      = phi_k(s, a)
+model = MCEIRL(
+    n_states=n_states,
+    n_actions=n_actions,
+    discount=0.95,
+    feature_matrix=features,
+    feature_names=feature_names,
+)
+model.fit(
+    df,
+    state="state",
+    action="action",
+    id="id",
+    next_state="next_state",
+    transitions=transitions,
+)
+```
+
+When the kernel is unknown, estimate it from the observed transitions in a
+`Panel` and pass the result:
+
+```python
+transitions = estimate_empirical_transitions(panel, n_actions, n_states)
+```
+
+Reward parameters are identified only when the action-contrast features have
+full rank and each action has enough observed support. The estimator warns at
+fit time when the action-contrast design is rank deficient, which means
+action-specific payoffs are not identified even with correct transitions. See
+[Pre-Estimation Checks](mce_irl/pre_estimation.md).
+
 Counterfactual analysis requires re-solving the dynamic program under changed
 primitives. The fitted primitives available for this are `model.reward_matrix_`,
 `model.policy_`, and `model.value_function_`. For controlled payoff, transition,

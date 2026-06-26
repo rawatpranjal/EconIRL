@@ -31,6 +31,26 @@ print(model.params_)
 print(model.policy_.shape)
 ```
 
+For a problem other than the Rust bus, pass the dynamics explicitly. Supply a
+transition tensor of shape `(n_actions, n_states, n_states)` and the observed
+next-state column.
+
+```python
+model.fit(
+    df,
+    state="state",
+    action="action",
+    id="id",
+    next_state="next_state",
+    transitions=transitions,
+)
+```
+
+`transitions=None` estimates only the two-action Rust-bus keep/replace kernel. A
+model with more than two actions requires an explicit tensor. Build one from
+observed transitions with `estimate_empirical_transitions(panel, n_actions,
+n_states)` from `econirl.estimators`.
+
 Estimates depend on the supplied reward features, transition specification, and
 inference settings, so no canonical output is shown here. The fitted estimator
 exposes reward parameters, standard errors when requested,

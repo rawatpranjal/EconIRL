@@ -278,7 +278,7 @@ class MCEIRL:
                     f"{self.n_actions}-action MDP. Pass transitions=<(n_actions, "
                     "n_states, n_states) array>, or build one with "
                     "estimate_empirical_transitions(panel, n_actions, n_states) "
-                    "from econirl.estimators.mce_irl. The built-in increment "
+                    "from econirl.estimators. The built-in increment "
                     "estimator only models the Rust-bus keep/replace dynamics and "
                     "is not valid for a general MDP."
                 )

@@ -38,3 +38,7 @@ failing to identify action-specific payoffs. Sparse demonstrations can match
 the dominant actions while leaving rare-action rewards weak. Transition tensors
 with the wrong orientation can have valid row sums and still produce the wrong
 occupancy measure.
+
+The wrapper checks the action-contrast feature rank at fit time and warns when
+it is deficient. A fit that cannot identify action-specific payoffs is flagged
+before the estimates are read.
