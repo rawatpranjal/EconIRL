@@ -303,6 +303,7 @@ class NeuralAIRL(NeuralEstimatorMixin):
         self._state_dim: int | None = None
         self._context_dim: int | None = None
         self._n_states: int | None = None
+        self._n_obs: int | None = None
 
     def fit(
         self,
@@ -320,6 +321,8 @@ class NeuralAIRL(NeuralEstimatorMixin):
 
         n_states = int(np.asarray(all_states).max()) + 1
         self._n_states = n_states
+        # Number of (s, a) observations in the panel, for an honest summary count.
+        self._n_obs = int(np.asarray(all_states).shape[0])
 
         self._build_encoders(all_states, all_contexts, n_states)
 
@@ -727,11 +730,34 @@ class NeuralAIRL(NeuralEstimatorMixin):
         actions: object,
         contexts: object | None = None,
     ) -> np.ndarray:
+        """Reward for already-encoded state-feature vectors.
+
+        ``state_features`` must be in the reward network's STATE-ENCODER space,
+        of width ``self.state_dim`` (the output of the fitted state encoder), not
+        a raw reward-feature vector ``phi(s, a)``. To score by state index, use
+        :meth:`predict_reward` instead, which runs the encoder for you.
+
+        Parameters
+        ----------
+        state_features : array of shape (n, state_dim) or (state_dim,)
+            Encoded state features.
+        actions : array of shape (n,) or scalar
+            Action indices in ``[0, n_actions)``.
+        contexts : array of shape (n,), optional
+            Context indices; defaults to zeros.
+        """
         if self._reward_net is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         s_feat = _to_jax_float(state_features)
         if s_feat.ndim == 1:
             s_feat = s_feat[None, :]
+        if s_feat.shape[1] != self._state_dim:
+            raise ValueError(
+                f"state_features must be in the encoder space of width "
+                f"state_dim={self._state_dim}, got width {s_feat.shape[1]}. "
+                f"Pass encoded features, or use predict_reward(states, actions) "
+                f"to score by state index."
+            )
         actions_j = _to_jax_int(actions)
         if actions_j.ndim == 0:
             actions_j = actions_j[None]
@@ -785,9 +811,7 @@ class NeuralAIRL(NeuralEstimatorMixin):
         if self.policy_ is None:
             return "NeuralAIRL: Not fitted yet. Call fit() first."
 
-        n_obs = None
-        if self._n_states is not None and self.policy_ is not None:
-            n_obs = self._n_states
+        n_obs = self._n_obs
 
         return self._format_neural_summary(
             method_name="NeuralAIRL",

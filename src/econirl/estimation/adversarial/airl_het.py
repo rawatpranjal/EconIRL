@@ -200,6 +200,11 @@ class AIRLHetEstimator(AdversarialEstimatorBase):
         """Estimate heterogeneous reward functions using EM-AIRL."""
         start_time = time.time()
 
+        # Coerce transitions to a JAX array. A plain numpy (A, S, S) array (e.g.
+        # straight from np.load) otherwise crashes deep in the traced scan with a
+        # cryptic TracerArrayConversionError instead of a clear message.
+        transitions = jnp.asarray(transitions, dtype=jnp.float32)
+
         result = self._optimize(
             panel=panel,
             utility=utility,

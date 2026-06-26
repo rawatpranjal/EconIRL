@@ -182,6 +182,10 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
         start_time = time_module.time()
 
+        # Coerce transitions to a JAX array so a plain numpy (A, S, S) array does
+        # not crash deep in the traced scan with a cryptic TracerArrayConversionError.
+        transitions = jnp.asarray(transitions, dtype=jnp.float32)
+
         # Run optimization
         result = self._optimize(
             panel=panel,
