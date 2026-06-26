@@ -10,6 +10,10 @@ usage examples.
 - Rust, J. (1987). "Optimal Replacement of GMC Bus Engines: An Empirical Model
   of Harold Zurcher." *Econometrica*, 55(5), 999-1033.
 
+(rust-1994)=
+- Rust, J. (1994). "Structural Estimation of Markov Decision Processes." In
+  *Handbook of Econometrics*, Vol. 4, ch. 51, 3081-3143. North-Holland.
+
 (hotz-miller-1993)=
 - Hotz, V. J., and Miller, R. A. (1993). "Conditional Choice Probabilities and
   the Estimation of Dynamic Models." *Review of Economic Studies*, 60(3),
