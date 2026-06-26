@@ -178,6 +178,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         context_dim: int = 0,
         feature_names: list[str] | None = None,
         verbose: bool = False,
+        _ablate: dict | None = None,
     ):
         self.n_actions = n_actions
         self.discount = discount
@@ -205,6 +206,9 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.context_dim = context_dim
         self.feature_names = feature_names
         self.verbose = verbose
+        # Research-only ablation switches (default off -> shipped behavior).
+        # Keys: "class_weighting" (bool), "weight_decay" (float), "q_init_bias" (float).
+        self._ablate = dict(_ablate or {})
 
         self.params_: dict[str, float] | None = None
         self.se_: dict[str, float] | None = None
@@ -284,6 +288,20 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             key=ev_key,
             value_scale=value_scale,
         )
+
+        q_init_bias = self._ablate.get("q_init_bias")
+        if q_init_bias is not None:
+            # Start Q/zeta near the value level (output = mlp * value_scale), so the
+            # anchor need not drag Q up from ~0. Sets the output-layer bias.
+            b = float(q_init_bias) / value_scale
+
+            def _set_bias(net):
+                return eqx.tree_at(
+                    lambda m: m.net.output_layer.bias, net,
+                    jnp.full_like(net.net.output_layer.bias, b),
+                )
+            self._q_net = _set_bias(self._q_net)
+            self._ev_net = _set_bias(self._ev_net)
 
         self._train(all_states, all_actions, all_next, all_contexts)
         self._extract_policy_and_value(all_states, all_contexts, n_states)
@@ -440,8 +458,10 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         if self.gradient_clip > 0:
             q_transforms.append(optax.clip_by_global_norm(self.gradient_clip))
             ev_transforms.append(optax.clip_by_global_norm(self.gradient_clip))
-        q_transforms.append(optax.adam(lr_schedule))
-        ev_transforms.append(optax.adam(lr_schedule))
+        _wd = float(self._ablate.get("weight_decay", 0.0))
+        _core = (lambda: optax.adamw(lr_schedule, weight_decay=_wd)) if _wd > 0 else (lambda: optax.adam(lr_schedule))
+        q_transforms.append(_core())
+        ev_transforms.append(_core())
 
         q_optimizer = optax.chain(*q_transforms)
         ev_optimizer = optax.chain(*ev_transforms)
@@ -454,9 +474,12 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         best_loss = float("inf")
         patience_counter = 0
 
-        action_counts = np.bincount(np.asarray(actions), minlength=self.n_actions).astype(np.float32)
-        action_counts = np.clip(action_counts, a_min=1.0, a_max=None)
-        class_weights = jnp.asarray(N / (self.n_actions * action_counts), dtype=jnp.float32)
+        if self._ablate.get("class_weighting", True):
+            action_counts = np.bincount(np.asarray(actions), minlength=self.n_actions).astype(np.float32)
+            action_counts = np.clip(action_counts, a_min=1.0, a_max=None)
+            class_weights = jnp.asarray(N / (self.n_actions * action_counts), dtype=jnp.float32)
+        else:
+            class_weights = jnp.ones(self.n_actions, dtype=jnp.float32)
 
         def q_all(net: _ContextQNetwork, s_feat: jax.Array, ctx_feat: jax.Array) -> jax.Array:
             return jnp.asarray(net.all_actions(s_feat, ctx_feat, self.n_actions), dtype=jnp.float32)
