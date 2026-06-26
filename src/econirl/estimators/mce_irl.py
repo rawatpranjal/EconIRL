@@ -5,6 +5,7 @@ Maximum Causal Entropy Inverse Reinforcement Learning with sklearn-style API.
 
 from __future__ import annotations
 
+import warnings
 from typing import Literal
 
 import numpy as np
@@ -19,6 +20,52 @@ from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.reward import LinearReward
 from econirl.transitions import TransitionEstimator
+
+
+def estimate_empirical_transitions(
+    panel: Panel | TrajectoryPanel,
+    n_actions: int,
+    n_states: int,
+) -> np.ndarray:
+    """Estimate a per-action transition kernel ``P(s'|s,a)`` from observed data.
+
+    Counts every observed ``(state, action, next_state)`` triple in the panel
+    into an ``(n_actions, n_states, n_states)`` tensor and row-normalizes.  This
+    is the general-MDP counterpart to the Rust-bus increment estimator: pass the
+    result as ``transitions=`` to :meth:`MCEIRL.fit`.  Unobserved ``(state,
+    action)`` rows fall back to staying in place.
+
+    Parameters
+    ----------
+    panel : Panel or TrajectoryPanel
+        Demonstrations with ``states``, ``actions``, and ``next_states``.
+    n_actions, n_states : int
+        Shape of the kernel to build.
+
+    Returns
+    -------
+    numpy.ndarray
+        Row-stochastic kernel of shape ``(n_actions, n_states, n_states)``.
+    """
+    trajectories = getattr(panel, "trajectories", None)
+    if trajectories is None:
+        raise TypeError("panel must be a Panel/TrajectoryPanel with .trajectories")
+
+    counts = np.zeros((n_actions, n_states, n_states), dtype=np.float64)
+    for traj in trajectories:
+        s = np.asarray(traj.states, dtype=int)
+        a = np.asarray(traj.actions, dtype=int)
+        sp = np.asarray(traj.next_states, dtype=int)
+        np.add.at(counts, (a, s, sp), 1.0)
+
+    row_sums = counts.sum(axis=2, keepdims=True)
+    kernel = np.divide(
+        counts, row_sums, out=np.zeros_like(counts), where=row_sums > 0
+    )
+    empty = row_sums[..., 0] == 0
+    rows, cols = np.nonzero(empty)
+    kernel[rows, cols, cols] = 1.0  # unobserved (a, s): stay in place
+    return kernel
 
 
 class MCEIRL:
@@ -95,6 +142,17 @@ class MCEIRL:
     >>> model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
     >>> print(model.summary())
 
+    Notes
+    -----
+    For a general (non-bus) MDP, do not rely on the wrapper to infer dynamics.
+    Pass a full 3D transition tensor ``transitions`` of shape ``(n_actions,
+    n_states, n_states)`` (or build one from data with
+    :func:`estimate_empirical_transitions`) and supply the observed next state
+    via ``fit(..., next_state="next_state_col")``.  ``transitions=None`` only
+    estimates the 2-action Rust-bus keep/replace kernel; a 2D matrix fills the
+    non-keep actions with the bus "reset to state 0" kernel (a warning is
+    raised); and a ``>2``-action MDP without explicit transitions is rejected.
+
     References
     ----------
     Ziebart, B. D. (2010). Modeling purposeful adaptive behavior with the
@@ -150,6 +208,7 @@ class MCEIRL:
         state: str | None = None,
         action: str | None = None,
         id: str | None = None,
+        next_state: str | None = None,
         transitions: np.ndarray | None = None,
         reward: RewardSpec | None = None,
     ) -> "MCEIRL":
@@ -168,9 +227,19 @@ class MCEIRL:
         id : str, optional
             Column name for individual/trajectory identifier (required for
             DataFrame input).
+        next_state : str, optional
+            Column name for the observed next state (DataFrame input only).
+            When given, these observed transitions are used directly.  When
+            omitted, interior next-states are taken from the following row and
+            the final period is synthesized from the action (Rust-bus rule),
+            which is only correct for a bus-shaped problem.
         transitions : numpy.ndarray, optional
-            Pre-estimated transition matrix (n_states, n_states).
-            If None, estimated from data.
+            Transition kernel.  Either a full 3D ``(n_actions, n_states,
+            n_states)`` tensor (used as given) or a 2D ``(n_states, n_states)``
+            keep-action kernel (the other actions are filled with the Rust-bus
+            replacement kernel, with a warning).  If None, a 2-action bus kernel
+            is estimated from the data; a >2-action MDP must supply transitions
+            explicitly.
         reward : RewardSpec, optional
             Reward/utility specification.  If provided, overrides the
             ``feature_matrix`` and ``feature_names`` parameters passed at
@@ -192,7 +261,7 @@ class MCEIRL:
                     "state, action, and id column names are required "
                     "when data is a DataFrame"
                 )
-            self._panel = self._dataframe_to_panel(data, state, action, id)
+            self._panel = self._dataframe_to_panel(data, state, action, id, next_state)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
@@ -203,6 +272,16 @@ class MCEIRL:
 
         # Estimate transitions
         if transitions is None:
+            if self.n_actions > 2:
+                raise ValueError(
+                    "MCEIRL cannot infer per-action transitions from data for a "
+                    f"{self.n_actions}-action MDP. Pass transitions=<(n_actions, "
+                    "n_states, n_states) array>, or build one with "
+                    "estimate_empirical_transitions(panel, n_actions, n_states) "
+                    "from econirl.estimators.mce_irl. The built-in increment "
+                    "estimator only models the Rust-bus keep/replace dynamics and "
+                    "is not valid for a general MDP."
+                )
             trans_est = TransitionEstimator(n_states=self.n_states, max_increase=2)
             trans_est.fit(self._panel)
             self.transitions_ = trans_est.matrix_
@@ -225,6 +304,8 @@ class MCEIRL:
             self._reward_fn = self.reward_spec_.to_linear_reward()
         else:
             self._reward_fn = self._create_reward()
+
+        self._warn_if_unidentified()
 
         # Create estimator with config
         config = MCEIRLConfig(
@@ -254,6 +335,7 @@ class MCEIRL:
         state: str,
         action: str,
         id: str,
+        next_state: str | None = None,
     ) -> Panel:
         """Convert DataFrame to Panel."""
         trajectories = []
@@ -264,15 +346,20 @@ class MCEIRL:
             states = sorted_group[state].values.astype(np.int64)
             actions = sorted_group[action].values.astype(np.int64)
 
-            # Compute next states
-            next_states = np.zeros_like(states)
-            next_states[:-1] = states[1:]
-            if len(states) > 0:
-                last_action = actions[-1]
-                if last_action == 1:
-                    next_states[-1] = 0
-                else:
-                    next_states[-1] = min(states[-1] + 1, self.n_states - 1)
+            if next_state is not None:
+                # Use the observed next-states directly.
+                next_states = sorted_group[next_state].values.astype(np.int64)
+            else:
+                # No observed next-state: interior from the following row, final
+                # period synthesized from the action (Rust-bus rule).
+                next_states = np.zeros_like(states)
+                next_states[:-1] = states[1:]
+                if len(states) > 0:
+                    last_action = actions[-1]
+                    if last_action == 1:
+                        next_states[-1] = 0
+                    else:
+                        next_states[-1] = min(states[-1] + 1, self.n_states - 1)
 
             traj = Trajectory(
                 states=np.array(states, dtype=np.int64),
@@ -296,20 +383,65 @@ class MCEIRL:
                 )
             return jnp.array(keep_transitions)
 
+        # 2D input specifies only the keep-action (a=0) kernel.
+        if self.n_actions > 2:
+            raise ValueError(
+                "A 2D transition matrix only specifies the keep-action (a=0) "
+                f"kernel, but n_actions={self.n_actions}. Pass a full 3D "
+                "(n_actions, n_states, n_states) tensor so every action's "
+                "dynamics are defined."
+            )
+
+        warnings.warn(
+            "MCEIRL received a 2D transition matrix (keep-action kernel only). "
+            "Action 1 transitions are set to the Rust-bus replacement kernel "
+            "(reset to state 0). For a general MDP pass a 3D (n_actions, "
+            "n_states, n_states) `transitions` array to fit().",
+            UserWarning,
+            stacklevel=2,
+        )
+
         n = self.n_states
         transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
 
         # Action 0 (keep): use provided transitions
         transitions[0] = keep_transitions
 
-        # Non-keep actions: reset to state 0, then transition. This preserves
-        # the historical bus-replacement wrapper behavior for action 1 and
-        # avoids zero transition rows when callers set n_actions > 2.
+        # Action 1 (replace): Rust-bus reset-to-state-0 kernel.
         for action in range(1, self.n_actions):
             for s in range(n):
                 transitions[action, s, :] = transitions[0, 0, :]
 
         return jnp.array(transitions)
+
+    def _warn_if_unidentified(self) -> None:
+        """Warn when action-dependent features have a rank-deficient contrast.
+
+        Action-specific reward parameters are identified only if the
+        action-contrast design phi(s, a) - phi(s, 0) has full column rank.
+        When it does not, the parameters lie on a ridge and recovery can fail
+        even with correct transitions, which is a feature-design problem rather
+        than an estimator bug.
+        """
+        feature_matrix = getattr(self._reward_fn, "feature_matrix", None)
+        if feature_matrix is None:
+            return  # state-only reward: identification is through the dynamics
+        fm = np.asarray(feature_matrix)
+        if fm.ndim != 3:
+            return
+        _, _, k = fm.shape
+        contrast = (fm[:, 1:, :] - fm[:, :1, :]).reshape(-1, k)
+        rank = int(np.linalg.matrix_rank(contrast))
+        if rank < k:
+            warnings.warn(
+                f"Action-contrast feature rank is {rank} < {k} features. "
+                "Action-specific reward parameters are not identified (they lie "
+                "on a ridge); recovered coefficients and per-action feature "
+                "residuals may be unreliable even with correct transitions. "
+                "Check the feature design before trusting parameter estimates.",
+                UserWarning,
+                stacklevel=2,
+            )
 
     def _create_reward(self) -> LinearReward | ActionDependentReward:
         """Create reward function."""
@@ -405,10 +537,17 @@ class MCEIRL:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues
 
-        # Reward function R(s)
+        # Reward function R(s): policy-weighted over actions,
+        # R(s) = sum_a pi(a|s) R(s,a). For a state-only (linear) reward every
+        # action column is identical, so this reduces to that reward; for an
+        # action-dependent reward it is the correct per-state summary.
         reward_params = jnp.array(params, dtype=jnp.float32)
-        reward_matrix = self._reward_fn.compute(reward_params)
-        self.reward_ = np.asarray(reward_matrix[:, 0])
+        reward_matrix = np.asarray(self._reward_fn.compute(reward_params))
+        if self._result.policy is not None:
+            policy = np.asarray(self._result.policy)
+            self.reward_ = (policy * reward_matrix).sum(axis=1)
+        else:
+            self.reward_ = reward_matrix[:, 0]
 
         # Policy
         if self._result.policy is not None:
