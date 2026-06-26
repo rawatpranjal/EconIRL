@@ -482,12 +482,18 @@ def test_gladius_artifacts_keep_failed_structural_gates_visible() -> None:
 
 
 def test_structural_estimator_docs_topology_matches_nfxp_ccp() -> None:
-    """Structural estimator pages should keep the shared reader path."""
+    """Structural estimator pages should keep the shared reader path.
+
+    The locked academic template (NFXP reference, 2026-06-23) folds the old
+    ``context`` and ``under_the_hood`` subpages into the main page, leaving five
+    subpages in a fixed order. The canonical reader order is the hidden toctree at
+    the foot of the page, so order is checked there rather than by first mention in
+    the body (estimator pages cross-link their own subpages inline, which is not the
+    reader path).
+    """
 
     expected = [
-        "context",
         "quick_start",
-        "under_the_hood",
         "pre_estimation",
         "validation",
         "counterfactuals",
@@ -503,9 +509,12 @@ def test_structural_estimator_docs_topology_matches_nfxp_ccp() -> None:
         parent = (ROOT / "docs" / "estimators" / f"{slug}.md").read_text(
             encoding="utf-8"
         )
+        toctree_start = parent.find("{toctree}")
+        assert toctree_start != -1, (slug, "no toctree")
+        toctree = parent[toctree_start:]
         cursor = -1
         for item in expected:
             needle = f"{slug}/{item}"
-            position = parent.find(needle)
-            assert position > cursor, needle
+            position = toctree.find(needle)
+            assert position > cursor, (slug, needle)
             cursor = position
