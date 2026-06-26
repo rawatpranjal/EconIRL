@@ -340,12 +340,44 @@ class NFXPEstimator(BaseEstimator):
             grad_norm = float(jnp.abs(grad).max())
             ll_change = abs(ll - prev_ll) if prev_ll > -float("inf") else float("inf")
 
-            # BHHH direction and quadratic-form statistic. The canonical NFXP
-            # outer-loop stopping rule (Rust NFXP Manual v6 2000 p.24; BHHH 1974)
-            # is grad' H^{-1} grad < tol, the predicted remaining log-likelihood
-            # gain along the BHHH step. The H^{-1} weighting makes it scale-aware
-            # (invariant to reparameterization, insensitive to sample size), unlike
-            # a raw gradient norm. This direction is reused by the line search below.
+            # --- Convergence statistic: the BHHH quadratic form, not the raw gradient ---
+            #
+            # The outer loop stops on  q = grad' H^{-1} grad < outer_tol, where H is
+            # the BHHH information matrix (the outer product of per-observation scores).
+            # This is the criterion in Rust's own Nested Fixed Point Documentation
+            # Manual (v6, 2000, flowchart p.24) and the original BHHH paper (Berndt,
+            # Hall, Hall, Hausman 1974). q is the predicted remaining gain in the
+            # log-likelihood along the Newton/BHHH step, so it is the natural "how far
+            # are we from the optimum" measure for a maximum-likelihood problem.
+            #
+            # Do NOT replace this with a raw gradient norm |grad| < tol. The raw norm
+            # is the wrong scale and gives both false negatives and false positives:
+            #
+            #   * False negative (a true optimum mislabeled as not converged). The
+            #     gradient is the SUM of scores over observations, and a parameter on
+            #     a very different scale inflates its raw partial. On the canonical
+            #     Rust bus fit theta_c is about 0.001, which drives the raw gradient
+            #     to |grad| ~ 2.1 at the optimum, far above any sane tol, while the
+            #     scale-aware q = grad' H^{-1} grad ~ 9e-7 correctly reports
+            #     convergence. The H^{-1} weighting divides the gradient by the
+            #     curvature, which is exactly the per-parameter rescaling the raw norm
+            #     lacks. q is invariant to reparameterization and roughly insensitive
+            #     to sample size; |grad| is neither.
+            #
+            #   * False positive (a stuck point mislabeled as converged). The old code
+            #     also stopped when the log-likelihood stalled (ll_change tiny). A
+            #     stall happens both at a real optimum AND when step-halving can no
+            #     longer find an uphill move on a flat or ridged likelihood, where the
+            #     gradient is still large and the estimate is garbage. Treating the
+            #     stall as convergence returned those garbage estimates with a green
+            #     flag. Below, a stall is a SEPARATE branch that stops but reports
+            #     converged=False and warns (see the `ll_change` block).
+            #
+            # H_bhhh adds 1e-8 I for numerical PSD-safety. The solve gives the BHHH
+            # search direction H^{-1} grad, reused by the line search below (computed
+            # once per iteration). q = grad . direction = grad' H^{-1} grad; it is
+            # non-negative in exact arithmetic (H is PSD), so a small negative value
+            # is rounding noise and is clamped to 0 for the comparison.
             H_bhhh = scores.T @ scores + 1e-8 * jnp.eye(n_params)
             direction = jnp.linalg.solve(H_bhhh, grad)
             if not bool(jnp.all(jnp.isfinite(direction))):
