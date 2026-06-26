@@ -490,6 +490,156 @@ class TestRepr:
         assert "fitted=True" in r
 
 
+class TestConvergedFlag:
+    """converged_ must reflect early stopping, not exhausting max_epochs (#1)."""
+
+    def test_not_converged_when_max_epochs_exhausted(self, small_data):
+        """A run that exhausts max_epochs without early stopping is not converged."""
+        model = NeuralGLADIUS(
+            n_actions=3,
+            discount=0.95,
+            max_epochs=4,
+            patience=1000,  # never trips early stopping
+            q_hidden_dim=16,
+            q_num_layers=1,
+            ev_hidden_dim=16,
+            ev_num_layers=1,
+        )
+        model.fit(data=small_data, state="state", action="action", id="id")
+        assert model.converged_ is False
+        assert model.n_epochs_ == 4
+
+
+class TestSummaryObsCount:
+    """summary() reports the observation count, not the state count (#8)."""
+
+    def test_reports_panel_rows(self, fitted_model_with_features, small_data):
+        s = fitted_model_with_features.summary()
+        assert f"Observations:    {len(small_data)}" in s
+        # n_states (10) must not be reported as the observation count.
+        assert "Observations:    10\n" not in s
+
+
+class TestPredictFromFeaturesGuard:
+    """predict_*_from_features must reject raw features of the wrong width (#3/#9)."""
+
+    def test_q_from_features_wrong_width_raises(self, fitted_model):
+        # Default encoder has state_dim=1; a raw 3-wide feature vector is invalid.
+        with pytest.raises(ValueError, match="encoder space"):
+            fitted_model.predict_q_from_features(np.zeros((4, 3)))
+
+    def test_q_from_features_correct_width_ok(self, fitted_model):
+        q = fitted_model.predict_q_from_features(np.zeros((4, 1)))
+        assert q.shape == (4, 3)
+
+    def test_reward_from_features_wrong_width_raises(self, fitted_model):
+        with pytest.raises(ValueError, match="encoder space"):
+            fitted_model.predict_reward_from_features(np.zeros((4, 3)), np.zeros(4))
+
+
+class TestPredictProbaContext:
+    """predict_proba honors a context argument (#12)."""
+
+    def test_context_zero_matches_stored_policy(self, fitted_model):
+        states = np.array([0, 3, 7])
+        recomputed = fitted_model.predict_proba(states, context=0)
+        np.testing.assert_allclose(recomputed, fitted_model.policy_[states], atol=1e-5)
+
+    def test_context_path_returns_valid_distribution(self, fitted_model):
+        states = np.array([0, 5, 9])
+        proba = fitted_model.predict_proba(states, context=1)
+        assert proba.shape == (3, 3)
+        np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-5)
+
+
+class TestAnchorValidation:
+    """Anchor argument validation and the dead-anchor warning (#2)."""
+
+    def test_anchor_action_without_rewards_warns(self, small_data):
+        model = NeuralGLADIUS(
+            n_actions=3, discount=0.95, max_epochs=4, patience=2,
+            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
+            anchor_action=0,
+        )
+        with pytest.warns(UserWarning, match="anchor has no effect"):
+            model.fit(data=small_data, state="state", action="action", id="id")
+
+    def test_rewards_without_action_raises(self, small_data):
+        model = NeuralGLADIUS(
+            n_actions=3, discount=0.95, max_epochs=4, patience=2,
+            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
+            anchor_rewards=tuple([0.0] * 10),
+        )
+        with pytest.raises(ValueError, match="anchor_action is None"):
+            model.fit(data=small_data, state="state", action="action", id="id")
+
+    def test_wrong_length_rewards_raises(self, small_data):
+        model = NeuralGLADIUS(
+            n_actions=3, discount=0.95, max_epochs=4, patience=2,
+            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
+            anchor_action=0, anchor_rewards=(0.0, 0.0, 0.0),
+        )
+        with pytest.raises(ValueError, match="one known reward per state"):
+            model.fit(data=small_data, state="state", action="action", id="id")
+
+
+class TestTransitionsWarning:
+    """transitions= is a no-op and warns (#11)."""
+
+    def test_transitions_warns(self, small_data):
+        model = NeuralGLADIUS(
+            n_actions=3, discount=0.95, max_epochs=4, patience=2,
+            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
+        )
+        with pytest.warns(UserWarning, match="does not use a transition matrix"):
+            model.fit(
+                data=small_data, state="state", action="action", id="id",
+                transitions=np.eye(10),
+            )
+
+
+@pytest.mark.slow
+class TestAnchorScaleRecovery:
+    """The anchor recovers reward scale on the ss-spine DGP (the acceptance gate)."""
+
+    def test_anchor_recovers_scale(self):
+        from econirl.environments.shapeshifter import (
+            ShapeshifterConfig,
+            ShapeshifterEnvironment,
+        )
+        from econirl.simulation.synthetic import simulate_panel
+
+        env = ShapeshifterEnvironment(ShapeshifterConfig())
+        true_theta = np.asarray(env.get_true_parameter_vector())
+        phi = np.asarray(env.feature_matrix, dtype=np.float32)  # (S, A, K)
+        K = phi.shape[-1]
+        phi_state = phi[:, 1, :]
+        panel = simulate_panel(env, n_individuals=600, n_periods=30, seed=0)
+
+        model = NeuralGLADIUS(
+            n_actions=env.num_actions,
+            discount=0.95,
+            state_encoder=lambda s: phi_state[np.asarray(s)],
+            state_dim=K,
+            anchor_action=0,
+            anchor_rewards=tuple(
+                float(x) for x in np.asarray(env.true_reward_matrix)[:, 0]
+            ),
+            q_hidden_dim=128, q_num_layers=3,
+            ev_hidden_dim=128, ev_num_layers=3,
+            max_epochs=400, batch_size=512,
+        )
+        model.fit(panel, features=jnp.asarray(phi))
+        theta_hat = np.asarray(model.coef_)
+        cos = float(
+            theta_hat @ true_theta
+            / (np.linalg.norm(theta_hat) * np.linalg.norm(true_theta))
+        )
+        scale = float(np.linalg.norm(theta_hat) / np.linalg.norm(true_theta))
+        assert cos >= 0.9, f"direction not recovered: cosine={cos:.3f}"
+        assert 0.75 <= scale <= 1.3, f"scale not recovered: ratio={scale:.3f}"
+
+
 class TestRawTensorFeatures:
     """Test using raw tensor features (not RewardSpec)."""
 

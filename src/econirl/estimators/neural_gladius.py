@@ -12,7 +12,8 @@ Reference:
 
 from __future__ import annotations
 
-from typing import Callable
+import warnings
+from typing import Callable, Sequence
 
 import equinox as eqx
 import jax
@@ -80,6 +81,7 @@ class _MLP(eqx.Module):
 
 class _ContextQNetwork(eqx.Module):
     n_actions: int = eqx.field(static=True)
+    value_scale: float = eqx.field(static=True)
     net: _MLP
 
     def __init__(
@@ -91,8 +93,10 @@ class _ContextQNetwork(eqx.Module):
         num_layers: int,
         *,
         key: jax.Array,
+        value_scale: float = 1.0,
     ):
         self.n_actions = n_actions
+        self.value_scale = value_scale
         self.net = _MLP(
             state_dim + context_dim + n_actions,
             1,
@@ -112,7 +116,7 @@ class _ContextQNetwork(eqx.Module):
         ao = _to_jax_float(action_onehot)
         x = jnp.concatenate([sf, cf, ao], axis=-1)
         out = jnp.squeeze(self.net(x), axis=-1)
-        return out
+        return out * self.value_scale
 
     def all_actions(
         self,
@@ -128,14 +132,23 @@ class _ContextQNetwork(eqx.Module):
         a_exp = jnp.repeat(actions[None, :, :], sf.shape[0], axis=0)
         x = jnp.concatenate([sf_exp, cf_exp, a_exp], axis=-1)
         out = jnp.squeeze(jax.vmap(self.net)(x), axis=-1)
-        return out
+        return out * self.value_scale
 
     def eval(self) -> _ContextQNetwork:
         return self
 
 
 class NeuralGLADIUS(NeuralEstimatorMixin):
-    """Context-aware GLADIUS estimator with sklearn-style API."""
+    """Context-aware GLADIUS estimator with sklearn-style API.
+
+    ``GLADIUS`` (exported from :mod:`econirl.estimators`) is an alias for this
+    class, so ``GLADIUS`` and ``NeuralGLADIUS`` are the same estimator.
+
+    Scale of the recovered reward is identified by the anchor: set
+    ``anchor_action`` and pass a per-state ``anchor_rewards`` vector for that
+    action. Without ``anchor_rewards`` the estimator recovers reward direction
+    but understates the magnitude.
+    """
 
     def __init__(
         self,
@@ -157,6 +170,8 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         tikhonov_annealing: bool = False,
         tikhonov_initial_weight: float = 100.0,
         anchor_action: int | None = None,
+        anchor_rewards: Sequence[float] | None = None,
+        value_scale: float | None = None,
         state_encoder: Callable[[object], object] | None = None,
         context_encoder: Callable[[object], object] | None = None,
         state_dim: int | None = None,
@@ -182,6 +197,8 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.tikhonov_annealing = tikhonov_annealing
         self.tikhonov_initial_weight = tikhonov_initial_weight
         self.anchor_action = anchor_action
+        self.anchor_rewards = anchor_rewards
+        self.value_scale = value_scale
         self.state_encoder = state_encoder
         self.context_encoder = context_encoder
         self.state_dim = state_dim
@@ -206,6 +223,9 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self._state_dim: int | None = None
         self._context_dim: int | None = None
         self._n_states: int | None = None
+        self._n_obs: int | None = None
+        self._use_anchor: bool = False
+        self._anchor_r: jax.Array | None = None
 
     def fit(
         self,
@@ -217,13 +237,32 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         features: RewardSpec | object | None = None,
         transitions: object = None,
     ) -> NeuralGLADIUS:
+        if transitions is not None:
+            warnings.warn(
+                "GLADIUS does not use a transition matrix; the transitions= "
+                "argument is ignored.",
+                stacklevel=2,
+            )
+
         all_states, all_actions, all_next, all_contexts = self._extract_data(
             data, state, action, id, context
         )
 
         n_states = int(np.asarray(all_states).max()) + 1
         self._n_states = n_states
+        # Number of (s, a) observations in the panel, for an honest summary count.
+        self._n_obs = int(np.asarray(all_states).shape[0])
         self._build_encoders(all_states, all_contexts, n_states)
+        self._build_anchor(n_states)
+
+        # Predict in per-period utility units and multiply by value_scale, so the
+        # MLP works in a well-conditioned range even at high discount factors
+        # (true Q-values are order 1/(1-beta)). Mirrors the paper-API estimator.
+        value_scale = (
+            self.value_scale
+            if self.value_scale is not None
+            else 1.0 / (1.0 - self.discount)
+        )
 
         key = jr.PRNGKey(np.random.randint(0, 2**31 - 1))
         q_key, ev_key = jr.split(key, 2)
@@ -234,6 +273,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             self.q_hidden_dim,
             self.q_num_layers,
             key=q_key,
+            value_scale=value_scale,
         )
         self._ev_net = _ContextQNetwork(
             self._state_dim,
@@ -242,6 +282,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             self.ev_hidden_dim,
             self.ev_num_layers,
             key=ev_key,
+            value_scale=value_scale,
         )
 
         self._train(all_states, all_actions, all_next, all_contexts)
@@ -345,6 +386,41 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             ).reshape(-1, 1)
             self._context_dim = 1
 
+    def _build_anchor(self, n_states: int) -> None:
+        """Set up the anchor-action Bellman identification.
+
+        When ``anchor_action`` and ``anchor_rewards`` are both supplied, the Q
+        objective gains a Bellman term on the anchor action that pins the reward
+        level (the paper's Assumption 3). Without ``anchor_rewards`` the
+        ``anchor_action`` parameter has no effect.
+        """
+        self._use_anchor = False
+        self._anchor_r = None
+        if self.anchor_rewards is None:
+            if self.anchor_action is not None:
+                warnings.warn(
+                    "anchor_action is set but anchor_rewards is None, so the "
+                    "anchor has no effect; the recovered reward direction is "
+                    "identified but its scale is not. Pass anchor_rewards (the "
+                    "known reward for anchor_action in each state) to identify "
+                    "the scale.",
+                    stacklevel=3,
+                )
+            return
+        if self.anchor_action is None:
+            raise ValueError(
+                "anchor_rewards was supplied but anchor_action is None; set "
+                "anchor_action to the action index the rewards correspond to."
+            )
+        anchor_r = np.asarray(self.anchor_rewards, dtype=np.float32)
+        if anchor_r.shape != (n_states,):
+            raise ValueError(
+                "anchor_rewards must contain one known reward per state; "
+                f"expected shape ({n_states},), got {anchor_r.shape}."
+            )
+        self._anchor_r = jnp.asarray(anchor_r, dtype=jnp.float32)
+        self._use_anchor = True
+
     def _train(
         self,
         states: jax.Array,
@@ -352,6 +428,10 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         next_states: jax.Array,
         contexts: jax.Array,
     ) -> None:
+        use_anchor = self._use_anchor
+        anchor_action = self.anchor_action
+        anchor_r = self._anchor_r
+
         def lr_schedule(step: jax.Array) -> jax.Array:
             return self.lr / (1.0 + self.lr_decay_rate * step)
 
@@ -399,9 +479,11 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         @eqx.filter_value_and_grad
         def q_nll_loss_fn(
             q_model: _ContextQNetwork,
+            ev_model: _ContextQNetwork,
             s_feat: jax.Array,
             ctx_feat: jax.Array,
             actions_j: jax.Array,
+            anchor_r_batch: jax.Array,
             ce_weight: float,
         ) -> jax.Array:
             qvals = q_all(q_model, s_feat, ctx_feat)
@@ -409,7 +491,23 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             per_obs_nll = -log_probs[jnp.arange(actions_j.shape[0]), actions_j]
             weights = class_weights[actions_j]
             nll = jnp.mean(per_obs_nll * weights)
-            return ce_weight * nll
+            loss = ce_weight * nll
+            if use_anchor:
+                # Anchor-action Bellman term pins the reward level (Assumption 3):
+                # r_anchor = Q(s, a0) - beta * EV(s, a0) = anchor_r. EV is frozen
+                # here so the level pressure lands on Q.
+                a_oh = jax.nn.one_hot(actions_j, self.n_actions, dtype=jnp.float32)
+                q_sa = jnp.sum(qvals * a_oh, axis=1)
+                ev_sa = jax.lax.stop_gradient(
+                    jnp.asarray(ev_model(s_feat, ctx_feat, a_oh), dtype=jnp.float32)
+                )
+                anchor_td = anchor_r_batch + self.discount * ev_sa - q_sa
+                mask = (actions_j == anchor_action).astype(jnp.float32)
+                anchor_loss = jnp.sum(mask * anchor_td ** 2) / jnp.maximum(
+                    mask.sum(), 1.0
+                )
+                loss = loss + self.bellman_weight * anchor_loss
+            return loss
 
         @eqx.filter_value_and_grad
         def joint_loss_fn(
@@ -419,6 +517,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             ctx_feat: jax.Array,
             actions_j: jax.Array,
             ns_feat: jax.Array,
+            anchor_r_batch: jax.Array,
             ce_weight: float,
         ) -> jax.Array:
             qvals = q_all(q_model, s_feat, ctx_feat)
@@ -431,7 +530,16 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             q_next_all = q_all(q_model, ns_feat, ctx_feat)
             v_next = self.scale * jax.nn.logsumexp(q_next_all / self.scale, axis=1)
             bellman = jnp.mean((ev_sa - jax.lax.stop_gradient(v_next)) ** 2)
-            return ce_weight * nll + self.bellman_weight * bellman
+            loss = ce_weight * nll + self.bellman_weight * bellman
+            if use_anchor:
+                q_sa = jnp.sum(qvals * a_oh, axis=1)
+                anchor_td = anchor_r_batch + self.discount * ev_sa - q_sa
+                mask = (actions_j == anchor_action).astype(jnp.float32)
+                anchor_loss = jnp.sum(mask * anchor_td ** 2) / jnp.maximum(
+                    mask.sum(), 1.0
+                )
+                loss = loss + self.bellman_weight * anchor_loss
+            return loss
 
         @eqx.filter_jit
         def ev_step(
@@ -452,12 +560,16 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         def q_step(
             q_model: _ContextQNetwork,
             q_state: optax.OptState,
+            ev_model: _ContextQNetwork,
             s_feat: jax.Array,
             ctx_feat: jax.Array,
             actions_j: jax.Array,
+            anchor_r_batch: jax.Array,
             ce_weight: float,
         ) -> tuple[_ContextQNetwork, optax.OptState, jax.Array]:
-            loss, grads = q_nll_loss_fn(q_model, s_feat, ctx_feat, actions_j, ce_weight)
+            loss, grads = q_nll_loss_fn(
+                q_model, ev_model, s_feat, ctx_feat, actions_j, anchor_r_batch, ce_weight
+            )
             updates, q_state = q_optimizer.update(grads, q_state, q_model)
             q_model = eqx.apply_updates(q_model, updates)
             return q_model, q_state, loss
@@ -472,10 +584,11 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             ctx_feat: jax.Array,
             actions_j: jax.Array,
             ns_feat: jax.Array,
+            anchor_r_batch: jax.Array,
             ce_weight: float,
         ) -> tuple[_ContextQNetwork, optax.OptState, _ContextQNetwork, optax.OptState, jax.Array]:
             loss, (q_grads, ev_grads) = eqx.filter_value_and_grad(joint_loss_fn, arg=(0, 1))(
-                q_model, ev_model, s_feat, ctx_feat, actions_j, ns_feat, ce_weight
+                q_model, ev_model, s_feat, ctx_feat, actions_j, ns_feat, anchor_r_batch, ce_weight
             )
             q_updates, q_state = q_optimizer.update(q_grads, q_state, q_model)
             ev_updates, ev_state = ev_optimizer.update(ev_grads, ev_state, ev_model)
@@ -507,6 +620,10 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 s_feat = self._state_encoder(s)
                 ns_feat = self._state_encoder(ns)
                 ctx_feat = self._context_encoder(ctx)
+                if use_anchor:
+                    anchor_r_batch = anchor_r[s]
+                else:
+                    anchor_r_batch = jnp.zeros(a.shape[0], dtype=jnp.float32)
 
                 if self.alternating_updates and batch_idx % 2 == 0:
                     ev_net, ev_opt_state, loss = ev_step(
@@ -514,7 +631,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                     )
                 elif self.alternating_updates and batch_idx % 2 == 1:
                     q_net, q_opt_state, loss = q_step(
-                        q_net, q_opt_state, s_feat, ctx_feat, a, ce_weight
+                        q_net, q_opt_state, ev_net, s_feat, ctx_feat, a, anchor_r_batch, ce_weight
                     )
                 else:
                     q_net, q_opt_state, ev_net, ev_opt_state, loss = joint_step(
@@ -526,6 +643,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                         ctx_feat,
                         a,
                         ns_feat,
+                        anchor_r_batch,
                         ce_weight,
                     )
 
@@ -552,7 +670,9 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
 
         self._q_net = best_q
         self._ev_net = best_ev
-        self.converged_ = patience_counter >= self.patience or epoch == self.max_epochs - 1
+        # Converged means early stopping fired; exhausting max_epochs is not
+        # convergence.
+        self.converged_ = patience_counter >= self.patience
         self.n_epochs_ = epoch + 1
 
     def _extract_policy_and_value(
@@ -639,22 +759,62 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         ev_all = jax.vmap(ev_for_action)(action_oh).T
         return np.asarray(q_all - self.discount * ev_all)
 
-    def predict_proba(self, states: np.ndarray) -> np.ndarray:
+    def predict_proba(
+        self, states: np.ndarray, context: object | None = None
+    ) -> np.ndarray:
+        """Action probabilities for the given states.
+
+        Parameters
+        ----------
+        states : array of state indices.
+        context : optional context index or per-state context array. When None
+            (default), returns the stored policy, which is computed at context 0.
+            Pass a scalar to score all states at one context, or a per-state
+            array to vary context across states.
+        """
         if self.policy_ is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         states = np.asarray(states, dtype=np.int64)
-        return self.policy_[states]
+        if context is None:
+            return self.policy_[states]
+        states_j = _to_jax_int(states)
+        contexts_j = _to_jax_int(context)
+        if contexts_j.ndim == 0:
+            contexts_j = jnp.broadcast_to(contexts_j, states_j.shape)
+        s_feat = self._state_encoder(states_j)
+        ctx_feat = self._context_encoder(contexts_j)
+        qvals = jnp.asarray(
+            self._q_net.all_actions(s_feat, ctx_feat, self.n_actions),
+            dtype=jnp.float32,
+        )
+        probs = jax.nn.softmax(qvals / self.scale, axis=1)
+        return np.asarray(probs)
 
     def predict_q_from_features(
         self,
         state_features: object,
         contexts: object | None = None,
     ) -> np.ndarray:
+        """Q values for already-encoded state-feature vectors.
+
+        ``state_features`` must be in the STATE-ENCODER space, of width
+        ``self.state_dim`` (the output of the fitted state encoder), not a raw
+        reward-feature vector ``phi(s, a)``. To score by state index, encode
+        first or use :meth:`predict_proba` / :meth:`predict_reward`, which run
+        the encoder for you.
+        """
         if self._q_net is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         s_feat = _to_jax_float(state_features)
         if s_feat.ndim == 1:
             s_feat = s_feat[None, :]
+        if s_feat.shape[1] != self._state_dim:
+            raise ValueError(
+                f"state_features must be in the encoder space of width "
+                f"state_dim={self._state_dim}, got width {s_feat.shape[1]}. "
+                f"Pass encoded features (the output of the state encoder), not "
+                f"the raw reward-feature matrix."
+            )
         if contexts is None:
             contexts = jnp.zeros(s_feat.shape[0], dtype=jnp.int32)
         ctx_feat = self._context_encoder(contexts)
@@ -667,11 +827,25 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         actions: object,
         contexts: object | None = None,
     ) -> np.ndarray:
+        """Reward for already-encoded state-feature vectors.
+
+        ``state_features`` must be in the STATE-ENCODER space, of width
+        ``self.state_dim`` (the output of the fitted state encoder), not a raw
+        reward-feature vector ``phi(s, a)``. To score by state index, use
+        :meth:`predict_reward`, which runs the encoder for you.
+        """
         if self._q_net is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         s_feat = _to_jax_float(state_features)
         if s_feat.ndim == 1:
             s_feat = s_feat[None, :]
+        if s_feat.shape[1] != self._state_dim:
+            raise ValueError(
+                f"state_features must be in the encoder space of width "
+                f"state_dim={self._state_dim}, got width {s_feat.shape[1]}. "
+                f"Pass encoded features, or use predict_reward(states, actions) "
+                f"to score by state index."
+            )
         actions_j = _to_jax_int(actions)
         if actions_j.ndim == 0:
             actions_j = actions_j[None]
@@ -725,7 +899,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
     def summary(self) -> str:
         if self.policy_ is None:
             return "NeuralGLADIUS: Not fitted yet. Call fit() first."
-        n_obs = self._n_states if self._n_states is not None else None
+        n_obs = self._n_obs if self._n_obs is not None else None
         return self._format_neural_summary(
             method_name="NeuralGLADIUS",
             params=self.params_,

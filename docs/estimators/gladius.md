@@ -343,6 +343,7 @@ model = GLADIUS(
     n_actions=3,
     discount=0.95,
     anchor_action=2,
+    anchor_rewards=known_r2,   # known reward for action 2 in each state
     max_epochs=300,
 )
 model.fit(df, state="state_bin", action="action", id="individual_id",
@@ -351,6 +352,13 @@ model.fit(df, state="state_bin", action="action", id="individual_id",
 print(model.params_)     # projected structural parameters (dict)
 print(model.policy_)     # imitation policy, shape (n_states, n_actions)
 ```
+
+The anchor sets the scale of the recovered reward. Pick an action whose
+per-state reward is known, pass its index as `anchor_action`, and pass the
+known reward vector as `anchor_rewards`. Without `anchor_rewards` the recovered
+reward points in the right direction but its magnitude is understated. When the
+state index is not the state, pass a `state_encoder` that maps each state to
+its feature vector and set `state_dim` to that width.
 
 The fitted attributes give the projected structural parameters, projection
 diagnostics, and the implied policy and value function:
