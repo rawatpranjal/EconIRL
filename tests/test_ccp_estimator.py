@@ -156,32 +156,11 @@ class TestHotzMillerEstimation:
         estimator = CCPEstimator(num_policy_iterations=1)
         assert estimator.name == "Hotz-Miller (CCP)"
 
-    def test_hotz_miller_faster_than_nfxp(self, rust_env_small, utility_small,
-                                          problem_spec_small, transitions_small):
-        """Test that Hotz-Miller is faster than NFXP."""
-        panel = simulate_panel(rust_env_small, n_individuals=100, n_periods=50, seed=42)
-
-        hm_estimator = CCPEstimator(num_policy_iterations=1, verbose=False)
-        nfxp_estimator = NFXPEstimator(verbose=False, outer_max_iter=100)
-
-        import time
-
-        # Time Hotz-Miller
-        start = time.time()
-        hm_estimator.estimate(
-            panel, utility_small, problem_spec_small, transitions_small
-        )
-        hm_time = time.time() - start
-
-        # Time NFXP
-        start = time.time()
-        nfxp_estimator.estimate(
-            panel, utility_small, problem_spec_small, transitions_small
-        )
-        nfxp_time = time.time() - start
-
-        # Hotz-Miller should be faster
-        assert hm_time < nfxp_time, f"HM: {hm_time:.2f}s, NFXP: {nfxp_time:.2f}s"
+    # A CCP-faster-than-NFXP wall-clock assertion was removed here. CCP's speed
+    # advantage over NFXP is asymptotic in the state count; on a 90-state toy it
+    # does not hold (CCP carries fixed JAX overhead, NFXP converges in a few BHHH
+    # steps), so the ordering is not a meaningful correctness gate. The real
+    # runtime comparison belongs in the cross-estimator runtime-vs-scale study.
 
 
 class TestNPLEstimation:
