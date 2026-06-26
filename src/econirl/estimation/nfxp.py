@@ -25,6 +25,7 @@ References:
 from __future__ import annotations
 
 import time
+import warnings
 from typing import Literal
 
 import jax
@@ -339,24 +340,63 @@ class NFXPEstimator(BaseEstimator):
             grad_norm = float(jnp.abs(grad).max())
             ll_change = abs(ll - prev_ll) if prev_ll > -float("inf") else float("inf")
 
-            postfix = {"LL": f"{ll:.2f}", "|g|": f"{grad_norm:.1e}", "dLL": f"{ll_change:.1e}"}
-            for j, nm in enumerate(utility.parameter_names[:3]):
-                postfix[nm] = f"{float(params[j]):.5f}"
-            pbar.set_postfix(postfix)
-
-            if grad_norm < self._outer_tol or (iteration > 10 and ll_change < 1e-10):
-                converged = True
-                pbar.set_postfix({**postfix, "status": "converged"})
-                pbar.close()
-                self._log(f"BHHH converged at iter {iteration+1}: |grad| = {grad_norm:.2e}")
-                break
-
-            prev_ll = ll
-
+            # BHHH direction and quadratic-form statistic. The canonical NFXP
+            # outer-loop stopping rule (Rust NFXP Manual v6 2000 p.24; BHHH 1974)
+            # is grad' H^{-1} grad < tol, the predicted remaining log-likelihood
+            # gain along the BHHH step. The H^{-1} weighting makes it scale-aware
+            # (invariant to reparameterization, insensitive to sample size), unlike
+            # a raw gradient norm. This direction is reused by the line search below.
             H_bhhh = scores.T @ scores + 1e-8 * jnp.eye(n_params)
             direction = jnp.linalg.solve(H_bhhh, grad)
             if not bool(jnp.all(jnp.isfinite(direction))):
                 direction = grad
+            bhhh_stat = float(grad @ direction)
+            if bhhh_stat < 0.0:  # numerical noise only; H is PSD
+                bhhh_stat = 0.0
+
+            postfix = {
+                "LL": f"{ll:.2f}",
+                "q": f"{bhhh_stat:.1e}",
+                "|g|": f"{grad_norm:.1e}",
+                "dLL": f"{ll_change:.1e}",
+            }
+            for j, nm in enumerate(utility.parameter_names[:3]):
+                postfix[nm] = f"{float(params[j]):.5f}"
+            pbar.set_postfix(postfix)
+
+            if bhhh_stat < self._outer_tol:
+                converged = True
+                pbar.set_postfix({**postfix, "status": "converged"})
+                pbar.close()
+                self._log(
+                    f"BHHH converged at iter {iteration+1}: "
+                    f"g'H^-1 g = {bhhh_stat:.2e} (|grad| = {grad_norm:.2e})"
+                )
+                break
+
+            if iteration > 10 and ll_change < 1e-10:
+                # Log-likelihood has stalled but the BHHH statistic is still above
+                # tolerance. The optimizer cannot make further progress and the
+                # point is not a true optimum. Stop, but do NOT claim convergence.
+                pbar.set_postfix({**postfix, "status": "stalled"})
+                pbar.close()
+                self._log(
+                    f"BHHH stalled at iter {iteration+1}: g'H^-1 g = {bhhh_stat:.2e} "
+                    f"(dLL = {ll_change:.2e}, |grad| = {grad_norm:.2e}) still above "
+                    f"tol = {self._outer_tol:.2e}"
+                )
+                warnings.warn(
+                    f"NFXP BHHH stopped without convergence: the log-likelihood "
+                    f"stalled (dLL = {ll_change:.2e}) at iteration {iteration+1} while "
+                    f"the BHHH statistic g'H^-1 g = {bhhh_stat:.2e} (|grad| = "
+                    f"{grad_norm:.2e}) remains above outer_tol = {self._outer_tol:.2e}. "
+                    f"The estimate is not at a local optimum and should not be trusted.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                break
+
+            prev_ll = ll
 
             # Step-halving line search
             step_size = 1.0
@@ -379,6 +419,19 @@ class NFXPEstimator(BaseEstimator):
                 step_size *= 0.5
 
             params = new_params
+        else:
+            # Loop ran to outer_max_iter without ever breaking. The BHHH
+            # statistic never reached outer_tol, so this is not a converged estimate.
+            pbar.close()
+            warnings.warn(
+                f"NFXP BHHH reached the iteration cap (outer_max_iter = "
+                f"{self._outer_max_iter}) without convergence: the final BHHH "
+                f"statistic g'H^-1 g = {bhhh_stat:.2e} (|grad| = {grad_norm:.2e}) is "
+                f"still above outer_tol = {self._outer_tol:.2e}. The estimate is not "
+                f"at a local optimum and should not be trusted.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
         return params, ll, iteration + 1, n_evals, total_inner, converged
 

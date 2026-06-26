@@ -34,6 +34,7 @@ Example:
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Literal
 
@@ -221,7 +222,12 @@ class NFXP:
             Column name for the individual identifier (required for DataFrame
             input).
         transitions : numpy.ndarray, optional
-            Pre-estimated transition matrix of shape (n_states, n_states).
+            Pre-estimated transition probabilities. Two forms are accepted.
+            A 2D array of shape (n_states, n_states) is the keep-kernel for
+            action 0; the replace action is built by resetting to state 0
+            (the Rust reset-on-replace default). A 3D array of shape
+            (n_actions, n_states, n_states) is a full per-action transition
+            tensor and is used as given, for action-dependent transitions.
             If None, transitions are estimated from the data.
         reward : RewardSpec, optional
             Reward/utility specification.  If provided, overrides the
@@ -245,6 +251,7 @@ class NFXP:
             self._panel = TrajectoryPanel.from_dataframe(
                 data, state=state, action=action, id=id
             )
+            self._validate_dataframe(data, state=state, action=action)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
@@ -309,6 +316,76 @@ class NFXP:
         self._extract_results()
 
         return self
+
+    def _validate_dataframe(
+        self,
+        data: pd.DataFrame,
+        state: str,
+        action: str,
+    ) -> None:
+        """Validate the state and action columns of a DataFrame before fitting.
+
+        Raises a clear ``ValueError`` on NaN entries, non-integer or negative
+        actions, actions outside ``[0, n_actions)``, or states outside
+        ``[0, n_states)``.  Catches malformed input that would otherwise be
+        silently coerced to integers and produce meaningless estimates.
+
+        Parameters
+        ----------
+        data : pandas.DataFrame
+            Input data.
+        state : str
+            Column name for the state variable.
+        action : str
+            Column name for the action variable.
+        """
+        state_col = data[state]
+        action_col = data[action]
+
+        # NaN in either column.
+        if state_col.isna().any():
+            raise ValueError(f"state column '{state}' contains NaN values")
+        if action_col.isna().any():
+            raise ValueError(f"action column '{action}' contains NaN values")
+
+        # Actions must be non-negative integers (reject float-coded like 0.5).
+        action_values = np.asarray(action_col.values)
+        non_integer = action_values != np.floor(action_values)
+        if non_integer.any():
+            bad = action_values[non_integer][0]
+            raise ValueError(
+                f"action column '{action}' contains non-integer value {bad}; "
+                "actions must be non-negative integers"
+            )
+        action_int = action_values.astype(np.int64)
+        if (action_int < 0).any():
+            bad = action_int[action_int < 0][0]
+            raise ValueError(
+                f"action column '{action}' contains negative value {bad}; "
+                "actions must be non-negative integers"
+            )
+
+        # Actions in range [0, n_actions).
+        out_of_range = action_int >= self.n_actions
+        if out_of_range.any():
+            bad = action_int[out_of_range][0]
+            raise ValueError(
+                f"action column contains out-of-range value {bad}; "
+                f"n_actions={self.n_actions} expects actions in "
+                f"[0, {self.n_actions})"
+            )
+
+        # States in range [0, n_states).
+        state_values = np.asarray(state_col.values)
+        state_int = state_values.astype(np.int64)
+        state_oob = (state_int < 0) | (state_int >= self.n_states)
+        if state_oob.any():
+            bad = state_int[state_oob][0]
+            raise ValueError(
+                f"state column contains out-of-range value {bad}; "
+                f"n_states={self.n_states} expects states in "
+                f"[0, {self.n_states})"
+            )
 
     def _dataframe_to_panel(
         self,
@@ -462,6 +539,14 @@ class NFXP:
         # Other attributes
         self.log_likelihood_ = float(self._result.log_likelihood)
         self.converged_ = bool(self._result.converged)
+
+        if not self.converged_:
+            warnings.warn(
+                "NFXP optimization did not converge; parameter estimates and "
+                "standard errors may be unreliable.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
 
         if self._result.value_function is not None:
             self.value_function_ = np.asarray(self._result.value_function)
