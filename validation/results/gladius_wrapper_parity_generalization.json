@@ -1,0 +1,38 @@
+{
+  "meta": {
+    "note": "shipped defaults, no _ablate, no init",
+    "updated": "2026-06-26T09:39:03+00:00"
+  },
+  "ss_spine": [
+    {
+      "seed": 0,
+      "theta_cosine": 0.9927795043582827,
+      "scale_ratio": 0.9607848697904032,
+      "policy_tv": 0.025113838885675213
+    },
+    {
+      "seed": 1,
+      "theta_cosine": 0.9994095632241169,
+      "scale_ratio": 1.1009237426097753,
+      "policy_tv": 0.026552718451052077
+    },
+    {
+      "seed": 2,
+      "theta_cosine": 0.9991464952962572,
+      "scale_ratio": 0.9182318248721678,
+      "policy_tv": 0.02400541755063762
+    }
+  ],
+  "ss_spine_oracle": true,
+  "fleet": {
+    "theta_cosine": 0.9972824051972385,
+    "scale_ratio": 1.0670424843973028,
+    "policy_tv": 0.0069237725565854105,
+    "theta": [
+      3.1548845767974854,
+      1.2560182809829712,
+      0.3735812306404114
+    ]
+  },
+  "fleet_ok": true
+}
