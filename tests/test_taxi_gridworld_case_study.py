@@ -241,7 +241,10 @@ class TestMCEIRLNeuralOnSmallGrid:
         assert model.policy_ is not None
         assert model.policy_.shape == (25, 5)
         assert model.reward_ is not None
-        assert model.reward_.shape == (25,)
+        # Neural MCE-IRL defaults to reward_type="state_action", so reward_ is the
+        # structural R(s,a) of shape (n_states, n_actions) - the canonical MCE
+        # reward (Gleave & Toyer 2022, Eq. 57). reward_type="state" gives (n_states,).
+        assert model.reward_.shape == (25, 5)
         assert model.n_epochs_ is not None
         assert model.n_epochs_ > 0
 

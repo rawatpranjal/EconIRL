@@ -108,7 +108,9 @@ class MCEIRL:
     coef_ : numpy.ndarray
         Coefficients as array.
     reward_ : numpy.ndarray
-        Recovered reward R(s) for each state.
+        Policy-weighted state reward summary R(s) = sum_a pi(a|s) R(s,a), shape
+        (n_states,). The structural state-action reward R(s,a) - the canonical MCE
+        object (Gleave & Toyer 2022) - is in ``reward_matrix_``.
     policy_ : numpy.ndarray
         Learned policy π(a|s), shape (n_states, n_actions).
     value_function_ : numpy.ndarray
