@@ -138,8 +138,8 @@ class TestPanelConversion:
         # Check that states and actions match
         for traj in panel.trajectories:
             ind_df = df[df["id"] == traj.individual_id].sort_values("period")
-            assert list(traj.states.numpy()) == list(ind_df["state"].values)
-            assert list(traj.actions.numpy()) == list(ind_df["action"].values)
+            assert list(traj.states.tolist()) == list(ind_df["state"].values)
+            assert list(traj.actions.tolist()) == list(ind_df["action"].values)
 
 
 class TestDataQuality:

@@ -201,8 +201,8 @@ class TestPanelConversion:
         # Check that states and actions match
         for traj in panel.trajectories:
             machine_df = df[df["id"] == traj.individual_id].sort_values("period")
-            assert list(traj.states.numpy()) == list(machine_df["state"].values)
-            assert list(traj.actions.numpy()) == list(machine_df["action"].values)
+            assert list(traj.states.tolist()) == list(machine_df["state"].values)
+            assert list(traj.actions.tolist()) == list(machine_df["action"].values)
 
     def test_panel_for_each_variant(self) -> None:
         """Panel conversion works for all variants."""
