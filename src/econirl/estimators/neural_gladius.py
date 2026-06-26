@@ -474,7 +474,14 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         best_loss = float("inf")
         patience_counter = 0
 
-        if self._ablate.get("class_weighting", True):
+        # Unweighted NLL (plain conditional MLE). Inverse-frequency class weighting
+        # biases the fitted choice probabilities away from the empirical
+        # frequencies, which corrupts the implied reward r = Q - beta*zeta and
+        # collapses structural recovery on near-identified problems (ablation:
+        # class weighting -> parameter cosine ~0.4; unweighted -> ~0.999 on
+        # ss-spine). Set _ablate={"class_weighting": True} to restore the old
+        # behavior for research only.
+        if self._ablate.get("class_weighting", False):
             action_counts = np.bincount(np.asarray(actions), minlength=self.n_actions).astype(np.float32)
             action_counts = np.clip(action_counts, a_min=1.0, a_max=None)
             class_weights = jnp.asarray(N / (self.n_actions * action_counts), dtype=jnp.float32)

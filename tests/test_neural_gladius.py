@@ -600,7 +600,12 @@ class TestTransitionsWarning:
 
 @pytest.mark.slow
 class TestAnchorScaleRecovery:
-    """The anchor recovers reward scale on the ss-spine DGP (the acceptance gate)."""
+    """NeuralGLADIUS recovers the reward on the near-identified ss-spine DGP.
+
+    Guards the unweighted-NLL fix: with the old inverse-frequency class weighting
+    the parameter cosine collapsed to ~0 here (ablation), so this test fails if
+    the weighting is re-introduced as the default.
+    """
 
     def test_anchor_recovers_scale(self):
         from econirl.environments.shapeshifter import (
@@ -636,7 +641,7 @@ class TestAnchorScaleRecovery:
             / (np.linalg.norm(theta_hat) * np.linalg.norm(true_theta))
         )
         scale = float(np.linalg.norm(theta_hat) / np.linalg.norm(true_theta))
-        assert cos >= 0.9, f"direction not recovered: cosine={cos:.3f}"
+        assert cos >= 0.93, f"direction not recovered: cosine={cos:.3f}"
         assert 0.75 <= scale <= 1.3, f"scale not recovered: ratio={scale:.3f}"
 
 
