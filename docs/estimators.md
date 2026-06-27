@@ -42,7 +42,19 @@ Deep MaxEnt IRL, Bayesian IRL.
 
 estimators/landscape
 estimators/comparison
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Core
+
 estimators/nfxp
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Other
+
 estimators/ccp
 estimators/mpec
 estimators/ufxp
