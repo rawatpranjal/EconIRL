@@ -23,7 +23,7 @@ print(model.params_)
 ```
 
 ```text
-{'theta_c': 0.0010028828858836278, 'RC': 3.0722093435989524}
+{'theta_c': 0.0010029257006533541, 'RC': 3.072263842893654}
 ```
 
 ## Read the results
@@ -46,7 +46,7 @@ print(cf.policy[50, 1])
 ```
 
 ```text
-0.05519477716656161
+0.055196291500871957
 ```
 
 Next, check the data and the design before trusting a fit. See
