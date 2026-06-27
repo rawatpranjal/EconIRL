@@ -1,6 +1,7 @@
-# Deep MCE-IRL
+# Neural MCE-IRL
 
-Deep MCE-IRL recovers a neural reward map from observed choices by matching
+Neural MCE-IRL (also called Deep MCE-IRL) recovers a neural reward map from
+observed choices by matching
 the discounted state-action occupancy of an entropy-regularized policy to the
 occupancy observed in demonstrations. It uses the same soft Bellman planning
 and occupancy-matching objective as MCE-IRL, but the reward is a feedforward

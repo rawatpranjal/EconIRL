@@ -1,62 +1,61 @@
 # Estimators
 
-Use this page to choose an estimator for your data and decision problem. The
-core list focuses on the most useful, identified or explicitly normalized
-targets, while still covering the main application domains.
+EconIRL is a research build. It centers on one reference estimator, the nested
+fixed point (NFXP), and treats the rest as answers to specific complications that
+break NFXP's canonical case. For the reasoning behind this split, see
+[Choosing an Estimator](estimators/landscape.md). For a side-by-side decision
+table, see [Comparing Estimators](estimators/comparison.md).
 
-For a side-by-side decision table, see [Comparing Estimators](estimators/comparison.md).
-
-## Core estimators
+## Core estimator
 
 | Estimator | Best for | Scope |
 | --- | --- | --- |
-| [NFXP](estimators/nfxp.md) | Exact tabular dynamic discrete choice. | Synthetic tabular simulation. |
-| [CCP](estimators/ccp.md) | Hotz-Miller and NPL-style tabular DDC. | Synthetic tabular simulation with support conditions. |
-| [NNES](estimators/nnes.md) | Neural value approximation inside NPL. | Synthetic low- and high-dimensional simulations. |
-| [TD-CCP](estimators/tdccp.md) | Transition-density-free CCP parameter estimation with TD recursion. | Encoded-state finite-theta hard case with Algorithm 2 locally robust SEs. |
-| [MCE-IRL](estimators/mce_irl.md) | Maximum causal entropy reward-feature matching. | Synthetic supplied-feature simulations. |
-| [RHIP](estimators/rhip.md) | Horizon-parameterised entropy IRL spanning MCE-IRL to Max-Margin Planning. | Synthetic route-choice horizon spectrum. |
-| [AIRL](estimators/airl.md) | AIRL-1: adversarial state-reward recovery under original AIRL assumptions. | Synthetic state-only AIRL simulation. |
-| [AIRL-Het](estimators/airl_het.md) | AIRL-2: anchored adversarial recovery with latent segments. | Synthetic serialized-content simulation. |
-| [GLADIUS](estimators/gladius.md) | Neural Q and continuation modeling with anchor moments. | Preview: projected reward diagnostics. |
-
-Each core page states the target, evidence, and current scope.
+| [NFXP](estimators/nfxp.md) | Exact tabular dynamic discrete choice, replicated to Rust (1987) Table IX. | Synthetic tabular simulation and the Rust bus replication. |
 
 ## Other estimators
 
-These estimators remain available for advanced users, checks, and method
-development, but they are not the default paper-replication or release-focus
-surface.
+Each of these relaxes one assumption that makes NFXP exact and cheap. They remain
+available for advanced users, checks, and method development. The grouping follows
+the sources of complexity in [Choosing an Estimator](estimators/landscape.md).
 
-| Estimator | Use | Current role |
+| Estimator | Source of complexity it answers | Use |
 | --- | --- | --- |
-| [MPEC](estimators/mpec.md) | Constrained-optimization check on the DDC likelihood. | Secondary structural check; overlaps with NFXP/CCP and has higher solver complexity. |
-| [UFXP](estimators/ufxp.md) | Structural estimates at maximum-likelihood efficiency without nested solves. | Secondary structural speed/FOC variant. |
-| [Deep MCE-IRL](estimators/deep_mce_irl.md) | Nonlinear reward-map recovery from known transitions. | Neural extension of the core MCE-IRL path. |
-| [f-IRL](estimators/f_irl.md) | f-divergence state-marginal matching. | Narrower state-marginal method. |
-| [IQ-Learn](estimators/iq_learn.md) | Inverse soft-Q learning. | Preview: imitation and Q diagnostics. |
-| Max Margin Planning (MMP) | `econirl.contrib.max_margin_planning` | Research baseline. |
-| GCL | `econirl.contrib.gcl` | Research baseline. |
-| GAIL | `econirl.contrib.gail` | Research baseline. |
-| Deep MaxEnt IRL | `econirl.contrib.deep_maxent_irl` | Research baseline. |
-| Bayesian IRL | `econirl.contrib.bayesian_irl` | Research baseline. |
+| [CCP](estimators/ccp.md) | Large state space | Hotz-Miller and NPL tabular DDC without a nested solve. |
+| [MPEC](estimators/mpec.md) | Large state space | Constrained-optimization form of the DDC likelihood. |
+| [UFXP](estimators/ufxp.md) | Large state space | Structural estimates without nesting a fixed point. |
+| [SEES](estimators/sees.md) | Large state space | Sieve-basis value approximation. |
+| [NNES](estimators/nnes.md) | Large state space | Neural continuation value with finite reward parameters. |
+| [TD-CCP](estimators/tdccp.md) | Hard-to-model transition density | Reward parameters without modeling the transition density. |
+| [MCE-IRL](estimators/mce_irl.md) | Unknown reward form | Maximum causal entropy reward-feature matching. |
+| [Neural MCE-IRL](estimators/deep_mce_irl.md) | Unknown reward form | Unrestricted neural reward map under the MCE objective. |
+| [AIRL](estimators/airl.md) | Unknown reward form | Adversarial transferable state-only reward. |
+| [GLADIUS](estimators/gladius.md) | Unknown reward form | Neural Q and continuation reward recovery at scale. |
+| [AIRL-Het](estimators/airl_het.md) | Latent heterogeneity | Segment-specific rewards under an anchor. |
+| [RHIP](estimators/rhip.md) | Bounded or finite-horizon planning | Horizon-parameterised entropy IRL for route choice. |
+| [f-IRL](estimators/f_irl.md) | Reward recovery via state-marginal matching | f-divergence state-marginal method. |
+| [IQ-Learn](estimators/iq_learn.md) | Imitation and inverse soft-Q | Inverse soft-Q learning diagnostics. |
+
+Research baselines under `econirl.contrib`: Max Margin Planning, GCL, GAIL,
+Deep MaxEnt IRL, Bayesian IRL.
 
 ```{toctree}
 :maxdepth: 1
 
+estimators/landscape
 estimators/comparison
 estimators/nfxp
 estimators/ccp
+estimators/mpec
+estimators/ufxp
+estimators/sees
 estimators/nnes
 estimators/tdccp
 estimators/mce_irl
-estimators/rhip
-estimators/airl
-estimators/airl_het
-estimators/gladius
-estimators/mpec
-estimators/ufxp
 estimators/deep_mce_irl
+estimators/airl
+estimators/gladius
+estimators/airl_het
+estimators/rhip
 estimators/f_irl
 estimators/iq_learn
 ```

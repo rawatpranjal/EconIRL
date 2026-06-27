@@ -270,7 +270,7 @@ the outer update. The implementation lives in `econirl.estimation.mce_irl`.
 MCE-IRL is the reference entropy IRL estimator for tabular discrete choice.
 The structural estimators (NFXP, CCP, MPEC, NNES, TD-CCP) target the same
 reward through likelihood or estimating-equation paths and report standard
-errors for $\theta$. Deep MCE-IRL keeps the causal-entropy objective but
+errors for $\theta$. Neural MCE-IRL keeps the causal-entropy objective but
 replaces the tabular feature basis with a neural reward map.
 
 ## Usage

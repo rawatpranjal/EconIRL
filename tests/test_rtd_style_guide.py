@@ -256,8 +256,9 @@ def test_estimator_pages_name_source_papers_up_front() -> None:
 
     offenders = []
     for page in pages:
-        # comparison.md is a cross-estimator overview with no single source paper
-        if page.name == "comparison.md":
+        # comparison.md and landscape.md are cross-estimator overviews with no
+        # single source paper
+        if page.name in {"comparison.md", "landscape.md"}:
             continue
         text = page.read_text(encoding="utf-8")
         source_pos = text.find("## Source Papers")
@@ -304,7 +305,8 @@ def test_estimator_pages_order_model_before_algorithm() -> None:
     pages = [
         page
         for page in sorted((DOCS / "estimators").glob("*.md"))
-        if page.name != "comparison.md" and not _is_excluded_from_rtd(page)
+        if page.name not in {"comparison.md", "landscape.md"}
+        and not _is_excluded_from_rtd(page)
     ]
     assert pages
 

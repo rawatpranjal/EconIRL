@@ -15,18 +15,21 @@ Install
 Estimators
 ----------
 
-Open the estimator that matches your decision problem.
+Start with `Choosing an Estimator <estimators/landscape.html>`__, then open the
+estimator that matches your decision problem.
 
 `NFXP <estimators/nfxp.html>`__ ·
 `CCP <estimators/ccp.html>`__ ·
 `MPEC <estimators/mpec.html>`__ ·
 `UFXP <estimators/ufxp.html>`__ ·
+`SEES <estimators/sees.html>`__ ·
 `NNES <estimators/nnes.html>`__ ·
 `TD-CCP <estimators/tdccp.html>`__ ·
 `MCE-IRL <estimators/mce_irl.html>`__ ·
-`Deep MCE-IRL <estimators/deep_mce_irl.html>`__ ·
+`Neural MCE-IRL <estimators/deep_mce_irl.html>`__ ·
 `AIRL <estimators/airl.html>`__ ·
 `AIRL-Het <estimators/airl_het.html>`__ ·
+`RHIP <estimators/rhip.html>`__ ·
 `f-IRL <estimators/f_irl.html>`__ ·
 `GLADIUS <estimators/gladius.html>`__ ·
 `IQ-Learn <estimators/iq_learn.html>`__

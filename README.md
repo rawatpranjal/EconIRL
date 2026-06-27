@@ -40,24 +40,21 @@ Example output:
 
 ## Public Estimator Guides
 
-The public docs lead with a focused core roster: estimators with the clearest
-identification story, broadest application coverage, or most important method
-lineage.
+The public docs center on one reference estimator, the nested fixed point (NFXP),
+the exact estimator we replicate to Rust (1987) Table IX. Every other estimator
+answers a specific complication that breaks NFXP's canonical case. See
+[Choosing an Estimator](https://econirl.readthedocs.io/en/latest/estimators/landscape.html)
+for the full map.
 
 | Estimator | Best for | Public evidence scope |
 | --- | --- | --- |
-| [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact tabular dynamic discrete choice. | Synthetic tabular validation. |
-| [CCP / NPL](https://econirl.readthedocs.io/en/latest/estimators/ccp.html) | Hotz-Miller and NPL-style tabular DDC. | Synthetic tabular validation with support conditions. |
-| [NNES](https://econirl.readthedocs.io/en/latest/estimators/nnes.html) | Neural value approximation inside NPL. | Low- and high-dimensional synthetic validation. |
-| [TD-CCP](https://econirl.readthedocs.io/en/latest/estimators/tdccp.html) | Transition-density-free CCP estimation. | Encoded-state finite-theta validation. |
-| [MCE-IRL](https://econirl.readthedocs.io/en/latest/estimators/mce_irl.html) | Maximum causal entropy reward-feature matching. | Supplied-feature simulation validation. |
-| [RHIP](https://econirl.readthedocs.io/en/latest/estimators/rhip.html) | Horizon-parameterised entropy IRL for route choice. | Route-choice horizon spectrum. |
-| [AIRL](https://econirl.readthedocs.io/en/latest/estimators/airl.html) | AIRL-1: state-only adversarial reward recovery. | State-only AIRL validation. |
-| [AIRL-Het](https://econirl.readthedocs.io/en/latest/estimators/airl_het.html) | AIRL-2: anchored heterogeneous dynamic choice. | Serialized-content simulation validation. |
-| [GLADIUS](https://econirl.readthedocs.io/en/latest/estimators/gladius.html) | Neural Q and continuation modeling. | Preview diagnostics. |
+| [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact tabular dynamic discrete choice, replicated to Rust (1987) Table IX. | Synthetic tabular validation and the Rust bus replication. |
 
-Other estimators remain available for advanced users and method development,
-including MPEC, UFXP, Deep MCE-IRL, f-IRL, IQ-Learn, and contrib baselines.
+The other estimators are grouped by the source of complexity they answer: large or
+continuous state spaces (CCP, MPEC, UFXP, SEES, NNES), hard-to-model transitions
+(TD-CCP), unknown reward form (MCE-IRL, Neural MCE-IRL, AIRL, GLADIUS), latent
+heterogeneity (AIRL-Het), and finite-horizon planning (RHIP), with f-IRL, IQ-Learn,
+and the contrib baselines alongside.
 
 ## Package Surface
 
