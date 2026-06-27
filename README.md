@@ -40,30 +40,31 @@ Example output:
 
 ## Public Estimator Guides
 
-The public docs describe the supported estimator surface and the current
-validation scope for each method.
+The public docs lead with a focused core roster: estimators with the clearest
+identification story, broadest application coverage, or most important method
+lineage.
 
 | Estimator | Best for | Public evidence scope |
 | --- | --- | --- |
 | [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact tabular dynamic discrete choice. | Synthetic tabular validation. |
 | [CCP / NPL](https://econirl.readthedocs.io/en/latest/estimators/ccp.html) | Hotz-Miller and NPL-style tabular DDC. | Synthetic tabular validation with support conditions. |
-| [MPEC](https://econirl.readthedocs.io/en/latest/estimators/mpec.html) | Constrained likelihood formulation. | Synthetic constrained-likelihood validation. |
 | [NNES](https://econirl.readthedocs.io/en/latest/estimators/nnes.html) | Neural value approximation inside NPL. | Low- and high-dimensional synthetic validation. |
 | [TD-CCP](https://econirl.readthedocs.io/en/latest/estimators/tdccp.html) | Transition-density-free CCP estimation. | Encoded-state finite-theta validation. |
 | [MCE-IRL](https://econirl.readthedocs.io/en/latest/estimators/mce_irl.html) | Maximum causal entropy reward-feature matching. | Supplied-feature simulation validation. |
-| [Deep MCE-IRL](https://econirl.readthedocs.io/en/latest/estimators/deep_mce_irl.html) | Neural reward-map recovery with known transitions. | Anchored neural reward-map validation. |
-| [AIRL](https://econirl.readthedocs.io/en/latest/estimators/airl.html) | Adversarial state-reward recovery under AIRL assumptions. | State-only AIRL validation. |
-| [AIRL-Het](https://econirl.readthedocs.io/en/latest/estimators/airl_het.html) | Anchored adversarial recovery with latent segments. | Serialized-content simulation validation. |
-| [f-IRL](https://econirl.readthedocs.io/en/latest/estimators/f_irl.html) | f-divergence state-marginal matching. | State-marginal simulation validation. |
+| [RHIP](https://econirl.readthedocs.io/en/latest/estimators/rhip.html) | Horizon-parameterised entropy IRL for route choice. | Route-choice horizon spectrum. |
+| [AIRL](https://econirl.readthedocs.io/en/latest/estimators/airl.html) | AIRL-1: state-only adversarial reward recovery. | State-only AIRL validation. |
+| [AIRL-Het](https://econirl.readthedocs.io/en/latest/estimators/airl_het.html) | AIRL-2: anchored heterogeneous dynamic choice. | Serialized-content simulation validation. |
 | [GLADIUS](https://econirl.readthedocs.io/en/latest/estimators/gladius.html) | Neural Q and continuation modeling. | Preview diagnostics. |
-| [IQ-Learn](https://econirl.readthedocs.io/en/latest/estimators/iq_learn.html) | Inverse soft-Q learning. | Preview diagnostics. |
+
+Other estimators remain available for advanced users and method development,
+including MPEC, UFXP, Deep MCE-IRL, f-IRL, IQ-Learn, and contrib baselines.
 
 ## Package Surface
 
 The recommended API is sklearn-style:
 
 ```python
-from econirl import NFXP, CCP, MPEC, NNES, TDCCP, MCEIRL
+from econirl import NFXP, CCP, NNES, TDCCP, MCEIRL, RHIP, AIRL, GLADIUS
 ```
 
 Additional estimators and lower-level configuration objects are available under
