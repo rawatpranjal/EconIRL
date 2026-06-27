@@ -1,4 +1,4 @@
-# Using your own data
+# Loading Data
 
 EconIRL fits a panel of decisions. Each row is one observed choice: who decided,
 the state they were in, and the action they took. This page takes a panel from

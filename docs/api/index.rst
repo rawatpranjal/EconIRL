@@ -1,6 +1,6 @@
-=============
-API Reference
-=============
+==============
+API References
+==============
 
 This page lists the public ``econirl`` API. Each entry links to a page with the
 full signature, constructor parameters, attributes, and methods. Import paths

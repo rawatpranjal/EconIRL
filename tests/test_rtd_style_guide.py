@@ -169,39 +169,50 @@ def test_estimator_docs_use_simulation_study_links_and_terms() -> None:
     assert offenders == []
 
 
-def test_estimator_navigation_is_owned_by_estimators_page() -> None:
-    """Keep estimator links under the Estimators section, not hardcoded at root."""
+def test_estimator_navigation_is_owned_by_section_pages() -> None:
+    """Estimator links live in the Core/Other section pages, not hardcoded at root."""
 
     index = (DOCS / "index.rst").read_text(encoding="utf-8")
-    estimator_overview = (DOCS / "estimators.md").read_text(encoding="utf-8")
+    core = (DOCS / "estimators" / "core.md").read_text(encoding="utf-8")
+    other = (DOCS / "estimators" / "other.md").read_text(encoding="utf-8")
     config = runpy.run_path(str(DOCS / "conf.py"))
-    expected = [
-        "estimators/nfxp",
-        "estimators/ccp",
-        "estimators/mpec",
-        "estimators/nnes",
-        "estimators/tdccp",
-        "estimators/mce_irl",
-        "estimators/deep_mce_irl",
-        "estimators/airl",
-        "estimators/airl_het",
-        "estimators/f_irl",
-        "estimators/gladius",
-        "estimators/iq_learn",
-    ]
 
-    root_entries = [entry for entry in expected if f"   {entry}\n" in index]
-    estimator_entries = [
-        entry for entry in expected if f"{entry}\n" not in estimator_overview
+    # NFXP is the sole Core estimator; every other estimator lives under Other.
+    assert "\nnfxp\n" in core
+    expected_other = [
+        "ccp",
+        "mpec",
+        "ufxp",
+        "nnes",
+        "tdccp",
+        "mce_irl",
+        "deep_mce_irl",
+        "airl",
+        "gladius",
+        "airl_het",
+        "rhip",
+        "f_irl",
+        "iq_learn",
+    ]
+    missing = [entry for entry in expected_other if f"\n{entry}\n" not in other]
+    assert missing == []
+
+    # Estimator pages are not hardcoded directly in the root toctree.
+    root_entries = [
+        entry
+        for entry in (["nfxp"] + expected_other)
+        if f"   estimators/{entry}\n" in index
     ]
     assert root_entries == []
-    assert estimator_entries == []
+
+    # The two section pages are the top-level estimator entries.
+    assert "   estimators/core\n" in index
+    assert "   estimators/other\n" in index
+
     assert config["html_theme_options"]["navigation_depth"] == 2
     assert "Estimator Map" not in index
-    assert "Estimator Map" not in estimator_overview
-    assert "Structural Econometrics" not in estimator_overview
-    assert "Inverse Reinforcement Learning" not in estimator_overview
-    assert "```{toctree}" in estimator_overview
+    assert "```{toctree}" in core
+    assert "```{toctree}" in other
     assert "   references\n" in index
     assert "   user_guide/your_own_data\n" in index
 
@@ -209,10 +220,13 @@ def test_estimator_navigation_is_owned_by_estimators_page() -> None:
 def test_estimator_landing_pages_do_not_expand_sidebar_guides() -> None:
     """Keep per-estimator guide pages out of the RTD sidebar tree."""
 
+    # core.md and other.md are section index pages; their toctrees are meant to
+    # be visible in the sidebar, unlike per-estimator guide pages.
     pages = [
         page
         for page in sorted((DOCS / "estimators").glob("*.md"))
-        if not _is_excluded_from_rtd(page)
+        if page.name not in {"core.md", "other.md"}
+        and not _is_excluded_from_rtd(page)
     ]
     assert pages
 
@@ -256,9 +270,9 @@ def test_estimator_pages_name_source_papers_up_front() -> None:
 
     offenders = []
     for page in pages:
-        # comparison.md and landscape.md are cross-estimator overviews with no
-        # single source paper
-        if page.name in {"comparison.md", "landscape.md"}:
+        # comparison.md, landscape.md, core.md, other.md are cross-estimator
+        # overview/section pages with no single source paper
+        if page.name in {"comparison.md", "landscape.md", "core.md", "other.md"}:
             continue
         text = page.read_text(encoding="utf-8")
         source_pos = text.find("## Source Papers")
@@ -305,7 +319,7 @@ def test_estimator_pages_order_model_before_algorithm() -> None:
     pages = [
         page
         for page in sorted((DOCS / "estimators").glob("*.md"))
-        if page.name not in {"comparison.md", "landscape.md"}
+        if page.name not in {"comparison.md", "landscape.md", "core.md", "other.md"}
         and not _is_excluded_from_rtd(page)
     ]
     assert pages

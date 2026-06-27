@@ -67,9 +67,13 @@ Output
    :maxdepth: 2
 
    user_guide/overview
+   user_guide/quick_start
    user_guide/your_own_data
-   estimators
+   user_guide/pre_estimation
+   estimators/core
+   estimators/other
+   user_guide/post_estimation
    replications
-   api/index
    simulation_studies/index
+   api/index
    references
