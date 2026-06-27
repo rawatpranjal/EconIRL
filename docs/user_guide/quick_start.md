@@ -50,5 +50,4 @@ print(cf.policy[50, 1])
 ```
 
 Next, check the data and the design before trusting a fit. See
-[Loading Data](your_own_data.md) and
-[Pre-Estimation Diagnostics](pre_estimation.md).
+[Loading Data and Pre-Estimation](your_own_data.md).

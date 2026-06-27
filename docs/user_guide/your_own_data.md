@@ -1,4 +1,4 @@
-# Loading Data
+# Loading Data and Pre-Estimation
 
 EconIRL fits a panel of decisions. Each row is one observed choice: who decided,
 the state they were in, and the action they took. This page takes a panel from
@@ -185,8 +185,8 @@ print("replace probability at state 50:", float(np.asarray(cf.policy)[50, 1]))
 
 ```text
 True
-{'theta_c': 0.0010028828858836278, 'RC': 3.0722093435989524}
-replace probability at state 50: 0.05519477716656161
+{'theta_c': 0.0010029257006533541, 'RC': 3.072263842893654}
+replace probability at state 50: 0.055196291500871957
 ```
 
 ## Read the outputs
@@ -211,8 +211,8 @@ print("replace probability at state 50:", float(np.asarray(cf.policy)[50, 1]))
 ```
 
 ```text
-{'theta_c': 0.0010028828858836278, 'RC': 4.0}
-replace probability at state 50: 0.05519477716656161
+{'theta_c': 0.0010029257006533541, 'RC': 4.0}
+replace probability at state 50: 0.055196291500871957
 ```
 
 A higher replacement cost lowers the chance of replacing at a given mileage.
