@@ -98,7 +98,13 @@ class NFXP:
         bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
         ``RewardSpec`` for custom features.
     se_method : str, default="robust"
-        Method for computing standard errors. Options: "robust", "asymptotic".
+        Method for computing standard errors. Options: "asymptotic", "robust",
+        "clustered", "bootstrap", and "full_likelihood_bhhh".
+    n_bootstrap : int, default=400
+        Number of pairs-cluster bootstrap replications when
+        ``se_method="bootstrap"``.
+    se_seed : int, optional
+        Random seed for bootstrap standard errors.
     verbose : bool, default=False
         Whether to print progress messages during estimation.
 
@@ -150,7 +156,15 @@ class NFXP:
         n_actions: int = 2,
         discount: float = 0.9999,
         utility: str | RewardSpec = "linear_cost",
-        se_method: Literal["robust", "asymptotic"] = "robust",
+        se_method: Literal[
+            "asymptotic",
+            "robust",
+            "clustered",
+            "bootstrap",
+            "full_likelihood_bhhh",
+        ] = "robust",
+        n_bootstrap: int = 400,
+        se_seed: int | None = None,
         verbose: bool = False,
     ):
         """Initialize the NFXP estimator.
@@ -168,6 +182,11 @@ class NFXP:
             classic Rust bus model, or a ``RewardSpec`` for custom features.
         se_method : str, default="robust"
             Method for computing standard errors.
+        n_bootstrap : int, default=400
+            Number of pairs-cluster bootstrap replications when
+            ``se_method="bootstrap"``.
+        se_seed : int, optional
+            Random seed for bootstrap standard errors.
         verbose : bool, default=False
             Whether to print progress messages.
         """
@@ -175,12 +194,21 @@ class NFXP:
         self.n_actions = n_actions
         self.discount = discount
         self.utility = utility
+        # White (1982), Cameron-Miller (2015), and Horowitz (2001) back the
+        # robust, clustered, and bootstrap choices; asymptotic and the
+        # full-likelihood BHHH replication profile follow Rust.
         self.se_method = se_method
+        self.n_bootstrap = n_bootstrap
+        self.se_seed = se_seed
         self.verbose = verbose
 
         # Fitted attributes (set after fit())
         self.params_: dict[str, float] | None = None
         self.se_: dict[str, float] | None = None
+        self.transition_se_: dict[str, float] | None = None
+        self.joint_se_: dict[str, float] | None = None
+        self.joint_covariance_: np.ndarray | None = None
+        self.joint_parameter_names_: list[str] | None = None
         self.pvalues_: dict[str, float] | None = None
         self.coef_: np.ndarray | None = None
         self.log_likelihood_: float | None = None
@@ -196,6 +224,8 @@ class NFXP:
         self._panel = None
         self._utility_fn = None
         self._problem = None
+        self._transition_probabilities = None
+        self._transition_increments = None
 
     def fit(
         self,
@@ -274,6 +304,16 @@ class NFXP:
         else:
             raise ValueError(f"Unknown reward/utility specification: {reward_spec}")
 
+        # Validate the feature matrix matches the declared state/action space so a
+        # mismatch raises a clear error instead of a cryptic broadcasting TypeError.
+        feat = np.asarray(self._utility_fn.feature_matrix)
+        if feat.ndim != 3 or feat.shape[0] != self.n_states or feat.shape[1] != self.n_actions:
+            raise ValueError(
+                f"reward/feature matrix has shape {feat.shape}; expected "
+                f"(n_states={self.n_states}, n_actions={self.n_actions}, n_features). "
+                "Check that n_states and n_actions match your RewardSpec features."
+            )
+
         # Estimate transitions if not provided
         if transitions is None:
             trans_estimator = TransitionEstimator(
@@ -281,9 +321,23 @@ class NFXP:
                 max_increase=2,
             )
             trans_estimator.fit(self._panel)
+            # First stage. The standard errors condition on this transition
+            # estimate; the two-step correction for its estimation error
+            # (Rust 1994 p.3109; Amemiya 1976) is omitted, usually negligible.
             self.transitions_ = trans_estimator.matrix_
+            self._transition_probabilities = trans_estimator.probs_
+            self._transition_increments = trans_estimator.transition_increments_
         else:
+            if self.se_method == "full_likelihood_bhhh":
+                raise ValueError(
+                    "se_method='full_likelihood_bhhh' requires transitions to be "
+                    "estimated from the fitted panel by NFXP.fit(). Use the core "
+                    "NFXPEstimator API to pass transition_probabilities and "
+                    "transition_increments with an explicit transition matrix."
+                )
             self.transitions_ = np.asarray(transitions)
+            self._transition_probabilities = None
+            self._transition_increments = None
 
         # Build full transition matrices (for both actions)
         # Action 0 (keep): use estimated transitions
@@ -305,11 +359,24 @@ class NFXP:
         )
 
         # Run estimation
+        estimate_kwargs = {
+            "n_bootstrap": self.n_bootstrap,
+            "se_seed": self.se_seed,
+        }
+        if self.se_method == "full_likelihood_bhhh":
+            estimate_kwargs.update(
+                {
+                    "transition_probabilities": self._transition_probabilities,
+                    "transition_increments": self._transition_increments,
+                }
+            )
+
         self._result = estimator.estimate(
             panel=self._panel,
             utility=self._utility_fn,
             problem=self._problem,
             transitions=transition_tensor,
+            **estimate_kwargs,
         )
 
         # Extract results
@@ -536,6 +603,36 @@ class NFXP:
         se = np.asarray(self._result.standard_errors)
         self.se_ = {name: float(val) for name, val in zip(param_names, se)}
 
+        self.transition_se_ = None
+        self.joint_se_ = None
+        self.joint_covariance_ = None
+        self.joint_parameter_names_ = None
+        full_metadata = self._result.metadata.get("full_likelihood_bhhh")
+        se_details = self._result.metadata.get("se_details", {})
+        if full_metadata is not None:
+            joint_names = list(full_metadata["joint_parameter_names"])
+            joint_se_raw = se_details.get("joint_standard_errors")
+            joint_cov_raw = se_details.get("joint_variance_covariance")
+            if joint_se_raw is not None:
+                joint_se = np.asarray(joint_se_raw, dtype=float)
+            else:
+                joint_se = np.array([])
+            if joint_cov_raw is not None:
+                joint_cov = np.asarray(joint_cov_raw, dtype=float)
+            else:
+                joint_cov = np.array([])
+            if joint_se.size == len(joint_names):
+                self.joint_parameter_names_ = joint_names
+                self.joint_se_ = {
+                    name: float(val) for name, val in zip(joint_names, joint_se)
+                }
+                self.transition_se_ = {
+                    name: self.joint_se_[name]
+                    for name in full_metadata["transition_score_columns"]
+                }
+            if joint_cov.shape == (len(joint_names), len(joint_names)):
+                self.joint_covariance_ = joint_cov
+
         # Other attributes
         self.log_likelihood_ = float(self._result.log_likelihood)
         self.converged_ = bool(self._result.converged)
@@ -660,13 +757,14 @@ class NFXP:
         n_agents: int,
         n_periods: int,
         seed: int | None = None,
+        init_states: np.ndarray | None = None,
     ) -> pd.DataFrame:
         """Simulate choices under the estimated policy.
 
         Generates synthetic data by simulating agents making decisions
-        according to the fitted model. Each agent starts at state 0 and
-        evolves according to the estimated transition probabilities and
-        choice probabilities.
+        according to the fitted model. Each agent starts from ``init_states``
+        (state 0 for everyone by default) and evolves according to the
+        estimated transition probabilities and choice probabilities.
 
         Parameters
         ----------
@@ -676,6 +774,10 @@ class NFXP:
             Number of time periods per agent.
         seed : int, optional
             Random seed for reproducibility.
+        init_states : numpy.ndarray, optional
+            Initial states. None starts every agent at state 0. A length
+            ``n_states`` vector is treated as a start distribution and sampled.
+            A length ``n_agents`` array sets each agent's start state directly.
 
         Returns
         -------
@@ -705,6 +807,24 @@ class NFXP:
         if seed is not None:
             np.random.seed(seed)
 
+        # Resolve per-agent initial states. None keeps the historical behaviour
+        # (everyone starts at state 0); a length-n_states vector is a start
+        # distribution; a length-n_agents vector is explicit per-agent states.
+        if init_states is None:
+            initial = np.zeros(n_agents, dtype=int)
+        else:
+            init_states = np.asarray(init_states)
+            if init_states.shape == (self.n_states,):
+                initial = np.random.choice(self.n_states, size=n_agents, p=init_states)
+            elif init_states.shape == (n_agents,):
+                initial = init_states.astype(int)
+            else:
+                raise ValueError(
+                    f"init_states must be a length-{self.n_states} distribution "
+                    f"or a length-{n_agents} array of state indices; "
+                    f"got shape {init_states.shape}"
+                )
+
         # Get the policy (choice probabilities)
         policy = np.asarray(self._result.policy)  # shape: (n_states, n_actions)
 
@@ -715,7 +835,7 @@ class NFXP:
         data = []
 
         for agent_id in range(n_agents):
-            state = 0  # All agents start at state 0
+            state = int(initial[agent_id])
 
             for period in range(n_periods):
                 # Sample action from policy

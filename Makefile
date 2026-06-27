@@ -1,4 +1,4 @@
-.PHONY: tests docs docs-test distclean build publish-test publish
+.PHONY: tests docs docs-test rust-table-ix mce-gridworld distclean build publish-test publish
 
 tests:
 	pytest -q
@@ -20,6 +20,15 @@ docs-test:
 	print('proba:', proba); \
 	print('Quickstart smoke test passed') \
 	"
+
+rust-table-ix:
+	mkdir -p downloads acceptance/loop/nfxp/table_ix
+	test -f downloads/nfxp.zip || curl -L -o downloads/nfxp.zip https://editorialexpress.com/jrust/nfxp.zip
+	test -f downloads/nfxp_unzip/nfxp/dat/a530875.asc || unzip -q downloads/nfxp.zip -d downloads/nfxp_unzip
+	PYTHONPATH=src uv run python -m econirl.replication.rust1987.table_ix --raw-path downloads/nfxp_unzip/nfxp/dat/a530875.asc --out acceptance/loop/nfxp/table_ix
+
+mce-gridworld:
+	PYTHONPATH=src uv run python examples/ziebart-mce-irl/run_gridworld.py --grid-size 5 --n-traj 500 --n-periods 30
 
 distclean:
 	rm -rf dist build *.egg-info

@@ -4,10 +4,10 @@ Tests the NFXP estimator class which provides a scikit-learn style
 interface for the Nested Fixed Point algorithm from Rust (1987, 1988).
 """
 
-import pytest
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
+import pytest
 
 from econirl.core.types import Panel, Trajectory
 
@@ -26,6 +26,8 @@ class TestNFXPInit:
         assert estimator.discount == 0.9999
         assert estimator.utility == "linear_cost"
         assert estimator.se_method == "robust"
+        assert estimator.n_bootstrap == 400
+        assert estimator.se_seed is None
         assert estimator.verbose is False
 
     def test_nfxp_init_custom(self):
@@ -37,7 +39,9 @@ class TestNFXPInit:
             n_actions=3,
             discount=0.95,
             utility="linear_cost",
-            se_method="asymptotic",
+            se_method="clustered",
+            n_bootstrap=17,
+            se_seed=123,
             verbose=True,
         )
 
@@ -45,7 +49,9 @@ class TestNFXPInit:
         assert estimator.n_actions == 3
         assert estimator.discount == 0.95
         assert estimator.utility == "linear_cost"
-        assert estimator.se_method == "asymptotic"
+        assert estimator.se_method == "clustered"
+        assert estimator.n_bootstrap == 17
+        assert estimator.se_seed == 123
         assert estimator.verbose is True
 
 
@@ -132,6 +138,143 @@ class TestNFXPFit:
         assert result is estimator
         # Transitions should match what we provided
         np.testing.assert_allclose(estimator.transitions_, transitions, atol=1e-6)
+
+    @pytest.fixture
+    def small_se_dataframe(self):
+        """Create a small but non-degenerate panel for standard-error smoke tests."""
+        n_individuals = 6
+        n_periods = 6
+        n_states = 8
+        data = []
+        for i in range(n_individuals):
+            state = i % 3
+            for t in range(n_periods):
+                action = 1 if state >= 5 or (i + t) % 7 == 0 else 0
+                increment = (i + 2 * t) % 3
+                next_state = 0 if action == 1 else min(state + increment, n_states - 1)
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                    }
+                )
+                state = next_state
+        return pd.DataFrame(data)
+
+    @staticmethod
+    def _small_keep_transitions(n_states=8):
+        transitions = np.zeros((n_states, n_states))
+        for s in range(n_states):
+            for delta, p in [(0, 0.35), (1, 0.55), (2, 0.10)]:
+                transitions[s, min(s + delta, n_states - 1)] += p
+        return transitions
+
+    @pytest.mark.parametrize("se_method", ["asymptotic", "robust", "clustered"])
+    def test_nfxp_se_methods_fit_from_wrapper(self, small_se_dataframe, se_method):
+        """Public NFXP wrapper should expose the core analytic SE methods."""
+        from econirl.estimators import NFXP
+
+        estimator = NFXP(
+            n_states=8,
+            discount=0.9,
+            se_method=se_method,
+            verbose=False,
+        )
+        estimator.fit(
+            data=small_se_dataframe,
+            state="mileage_bin",
+            action="replaced",
+            id="bus_id",
+            transitions=self._small_keep_transitions(),
+        )
+
+        assert estimator._result.metadata["se_method"] == se_method
+        assert np.all(np.isfinite(np.asarray(list(estimator.se_.values()))))
+        if se_method == "clustered":
+            assert estimator._result.metadata["se_details"]["n_clusters"] == 6
+
+    def test_nfxp_bootstrap_se_method_uses_wrapper_controls(self, small_se_dataframe):
+        """Bootstrap SEs should use wrapper n_bootstrap and se_seed controls."""
+        from econirl.estimators import NFXP
+
+        estimator = NFXP(
+            n_states=8,
+            discount=0.9,
+            se_method="bootstrap",
+            n_bootstrap=3,
+            se_seed=11,
+            verbose=False,
+        )
+        estimator.fit(
+            data=small_se_dataframe,
+            state="mileage_bin",
+            action="replaced",
+            id="bus_id",
+            transitions=self._small_keep_transitions(),
+        )
+
+        details = estimator._result.metadata["se_details"]
+        assert estimator._result.metadata["se_method"] == "bootstrap"
+        assert details["n_bootstrap"] == 3
+        assert details["seed"] == 11
+        assert details["successful_bootstraps"] >= 2
+        assert np.all(np.isfinite(np.asarray(list(estimator.se_.values()))))
+
+    def test_nfxp_full_likelihood_bhhh_se_method_estimates_transition_uncertainty(
+        self, small_se_dataframe
+    ):
+        """Full-likelihood BHHH should expose structural and transition SEs."""
+        from econirl.estimators import NFXP
+
+        estimator = NFXP(
+            n_states=8,
+            discount=0.9,
+            se_method="full_likelihood_bhhh",
+            verbose=False,
+        )
+        estimator.fit(
+            data=small_se_dataframe,
+            state="mileage_bin",
+            action="replaced",
+            id="bus_id",
+        )
+
+        assert estimator._result.metadata["se_method"] == "full_likelihood_bhhh"
+        assert estimator.transition_se_ is not None
+        assert estimator.joint_se_ is not None
+        assert estimator.joint_covariance_ is not None
+        assert estimator.joint_parameter_names_ == [
+            "theta_c",
+            "RC",
+            "transition_p0",
+            "transition_p1",
+        ]
+        assert np.all(np.isfinite(np.asarray(list(estimator.se_.values()))))
+        assert np.all(np.isfinite(np.asarray(list(estimator.transition_se_.values()))))
+
+    def test_nfxp_full_likelihood_bhhh_rejects_explicit_transition_matrix(
+        self, small_se_dataframe
+    ):
+        """A fixed matrix alone is not enough for joint transition inference."""
+        from econirl.estimators import NFXP
+
+        estimator = NFXP(
+            n_states=8,
+            discount=0.9,
+            se_method="full_likelihood_bhhh",
+            verbose=False,
+        )
+
+        with pytest.raises(ValueError, match="requires transitions to be estimated"):
+            estimator.fit(
+                data=small_se_dataframe,
+                state="mileage_bin",
+                action="replaced",
+                id="bus_id",
+                transitions=self._small_keep_transitions(),
+            )
 
 
 class TestNFXPAttributes:

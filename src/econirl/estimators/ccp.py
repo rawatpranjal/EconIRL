@@ -65,7 +65,12 @@ class CCP(NFXP):
         bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
         ``RewardSpec`` for custom features.
     se_method : str, default="robust"
-        Method for computing standard errors. Options: "robust", "asymptotic".
+        Method for computing standard errors.
+    n_bootstrap : int, default=400
+        Number of pairs-cluster bootstrap replications when
+        ``se_method="bootstrap"``.
+    se_seed : int, optional
+        Random seed for bootstrap standard errors.
     verbose : bool, default=False
         Whether to print progress messages during estimation.
     num_policy_iterations : int, default=1
@@ -131,7 +136,9 @@ class CCP(NFXP):
         n_actions: int = 2,
         discount: float = 0.9999,
         utility: str | RewardSpec = "linear_cost",
-        se_method: Literal["robust", "asymptotic"] = "robust",
+        se_method: Literal["asymptotic", "robust", "clustered", "bootstrap"] = "robust",
+        n_bootstrap: int = 400,
+        se_seed: int | None = None,
         verbose: bool = False,
         num_policy_iterations: int = 1,
     ):
@@ -150,6 +157,11 @@ class CCP(NFXP):
             classic Rust bus model, or a ``RewardSpec`` for custom features.
         se_method : str, default="robust"
             Method for computing standard errors.
+        n_bootstrap : int, default=400
+            Number of pairs-cluster bootstrap replications when
+            ``se_method="bootstrap"``.
+        se_seed : int, optional
+            Random seed for bootstrap standard errors.
         verbose : bool, default=False
             Whether to print progress messages.
         num_policy_iterations : int, default=1
@@ -162,6 +174,8 @@ class CCP(NFXP):
             discount=discount,
             utility=utility,
             se_method=se_method,
+            n_bootstrap=n_bootstrap,
+            se_seed=se_seed,
             verbose=verbose,
         )
         # CCP-specific parameter
@@ -273,6 +287,8 @@ class CCP(NFXP):
             utility=self._utility_fn,
             problem=self._problem,
             transitions=transition_tensor,
+            n_bootstrap=self.n_bootstrap,
+            se_seed=self.se_seed,
         )
 
         # Extract results

@@ -148,3 +148,6 @@ acceptance/joe_agent.py
 acceptance/problems/
 acceptance/papers/
 acceptance/reports/
+
+# Raw NFXP source data + PDFs (downloaded on demand by `make rust-table-ix`)
+downloads/

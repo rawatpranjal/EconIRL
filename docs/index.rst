@@ -31,6 +31,11 @@ Open the estimator that matches your decision problem.
 `GLADIUS <estimators/gladius.html>`__ ·
 `IQ-Learn <estimators/iq_learn.html>`__
 
+Replications
+------------
+
+See `Replications <replications.html>`__ for the terse paper-number ledger.
+
 Example
 -------
 
@@ -62,6 +67,7 @@ Output
    user_guide/overview
    user_guide/your_own_data
    estimators
+   replications
    api/index
    simulation_studies/index
    references

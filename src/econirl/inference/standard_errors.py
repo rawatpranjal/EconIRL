@@ -23,8 +23,13 @@ import numpy as np
 
 from econirl.core.types import Panel
 
-
-SEMethod = Literal["asymptotic", "robust", "bootstrap", "clustered"]
+SEMethod = Literal[
+    "asymptotic",
+    "robust",
+    "bootstrap",
+    "clustered",
+    "full_likelihood_bhhh",
+]
 
 
 @dataclass
@@ -51,7 +56,7 @@ def compute_standard_errors(
     panel: Panel | None = None,
     log_likelihood_fn: Callable | None = None,
     method: SEMethod = "asymptotic",
-    n_bootstrap: int = 200,
+    n_bootstrap: int = 400,
     seed: int | None = None,
     estimate_fn: Callable[[Panel], jnp.ndarray] | None = None,
 ) -> StandardErrorResult:
@@ -81,6 +86,8 @@ def compute_standard_errors(
         return _bootstrap_se(parameters, panel, log_likelihood_fn, n_bootstrap, seed, estimate_fn)
     elif method == "clustered":
         return _clustered_se(parameters, hessian, gradient_contributions, panel)
+    elif method == "full_likelihood_bhhh":
+        return _full_likelihood_bhhh_se(parameters, gradient_contributions)
     else:
         raise ValueError(f"Unknown SE method: {method}")
 
@@ -101,7 +108,7 @@ def _asymptotic_se(
 
     n_params = hessian.shape[0]
 
-    # Variance-covariance is inverse of negative Hessian
+    # Rust (1994) / Newey-McFadden (1994): MLE variance is inverse information.
     var_cov = None
     for ridge_factor in [0, 1e-8, 1e-6, 1e-4, 1e-2]:
         ridge = ridge_factor * jnp.eye(n_params, dtype=hessian.dtype)
@@ -172,7 +179,7 @@ def _robust_se(
             details={"n_observations": gradient_contributions.shape[0], "singular": True},
         )
 
-    # B = sum_i g_i g_i'
+    # White (1982): misspecification-robust sandwich uses OPG meat.
     B = gradient_contributions.T @ gradient_contributions
 
     # Sandwich: H^{-1} B H^{-1}
@@ -214,10 +221,11 @@ def _bootstrap_se(
     rng = np.random.default_rng(seed)
     n_individuals = panel.num_individuals
     n_params = len(parameters)
+    bootstrap_estimates: list[np.ndarray] = []
+    failed_bootstraps = 0
 
-    bootstrap_estimates = np.zeros((n_bootstrap, n_params))
-    successful_bootstraps = 0
-
+    # Pairs cluster bootstrap: resample whole individuals (clusters), not
+    # observations (Cameron and Miller 2015, p.12). B>=400 advised for SEs.
     for b in range(n_bootstrap):
         indices = rng.choice(n_individuals, size=n_individuals, replace=True)
         resampled_trajectories = [panel.trajectories[i] for i in indices]
@@ -225,15 +233,17 @@ def _bootstrap_se(
 
         try:
             bootstrap_params = estimate_fn(bootstrap_panel)
-            bootstrap_estimates[b] = np.asarray(bootstrap_params)
-            successful_bootstraps += 1
+            bootstrap_estimates.append(np.asarray(bootstrap_params, dtype=float))
         except Exception:
-            bootstrap_estimates[b] = np.asarray(parameters)
+            failed_bootstraps += 1
 
-    if successful_bootstraps > 1:
-        boot_jnp = jnp.array(bootstrap_estimates)
-        var_cov = jnp.cov(boot_jnp.T)
-        se = jnp.std(boot_jnp, axis=0)
+    if len(bootstrap_estimates) > 1:
+        boot_matrix = np.stack(bootstrap_estimates)
+        se = jnp.array(np.std(boot_matrix, axis=0, ddof=1))
+        if n_params == 1:
+            var_cov = jnp.array([[float(np.var(boot_matrix[:, 0], ddof=1))]])
+        else:
+            var_cov = jnp.array(np.cov(boot_matrix, rowvar=False))
     else:
         var_cov = jnp.full((n_params, n_params), float("nan"), dtype=jnp.float64)
         se = jnp.full((n_params,), float("nan"), dtype=jnp.float64)
@@ -244,7 +254,8 @@ def _bootstrap_se(
         method="bootstrap",
         details={
             "n_bootstrap": n_bootstrap,
-            "successful_bootstraps": successful_bootstraps,
+            "successful_bootstraps": len(bootstrap_estimates),
+            "failed_bootstraps": failed_bootstraps,
             "seed": seed,
         },
     )
@@ -308,13 +319,14 @@ def _clustered_se(
 
     cluster_gradients = jnp.array(cluster_gradients)
 
-    # B_cluster = sum_c g_c g_c'
+    # Cameron-Miller (2015): cluster meat sums scores within each cluster first.
     B_cluster = cluster_gradients.T @ cluster_gradients
 
     # Small sample correction
     G = n_clusters
     N = panel.num_observations
     K = n_params
+    # Stata's standard finite-cluster correction (Cameron and Miller 2015, p.11).
     correction = (G / (G - 1)) * (N - 1) / (N - K) if G > 1 and N > K else 1.0
 
     var_cov = correction * (H_inv @ B_cluster @ H_inv)
@@ -330,6 +342,78 @@ def _clustered_se(
             "n_clusters": n_clusters,
             "n_observations": N,
             "small_sample_correction": correction,
+        },
+    )
+
+
+def _full_likelihood_bhhh_se(
+    parameters: jnp.ndarray,
+    gradient_contributions: jnp.ndarray | None,
+) -> StandardErrorResult:
+    """Compute structural SEs from a joint full-likelihood BHHH matrix.
+
+    ``gradient_contributions`` must contain per-observation scores for the
+    joint parameter vector, with the structural parameters first and nuisance
+    transition probabilities after them. The returned covariance is the
+    structural block of ``inv(G'G)``.
+    """
+    if gradient_contributions is None:
+        raise ValueError(
+            "Gradient contributions required for full_likelihood_bhhh SEs"
+        )
+
+    n_structural = len(parameters)
+    if gradient_contributions.ndim != 2:
+        raise ValueError("gradient_contributions must be a two-dimensional matrix")
+    if gradient_contributions.shape[1] < n_structural:
+        raise ValueError(
+            "gradient_contributions must include all structural score columns"
+        )
+
+    scores = jnp.asarray(gradient_contributions, dtype=jnp.float64)
+    n_joint = int(scores.shape[1])
+    opg = scores.T @ scores
+
+    joint_cov = None
+    for ridge_factor in [0, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2]:
+        ridge = ridge_factor * jnp.eye(n_joint, dtype=opg.dtype)
+        candidate = jnp.linalg.inv(opg + ridge)
+        diag = jnp.diag(candidate)
+        if bool(jnp.all(diag > 0)) and bool(jnp.all(jnp.isfinite(candidate))):
+            joint_cov = candidate
+            break
+
+    if joint_cov is None:
+        structural_cov = jnp.full(
+            (n_structural, n_structural), float("nan"), dtype=scores.dtype
+        )
+        se = jnp.full((n_structural,), float("nan"), dtype=scores.dtype)
+        return StandardErrorResult(
+            standard_errors=se,
+            variance_covariance=structural_cov,
+            method="full_likelihood_bhhh",
+            details={
+                "n_observations": scores.shape[0],
+                "n_joint_parameters": n_joint,
+                "n_structural_parameters": n_structural,
+                "singular": True,
+            },
+        )
+
+    structural_cov = joint_cov[:n_structural, :n_structural]
+    joint_se = jnp.sqrt(jnp.maximum(jnp.diag(joint_cov), 0.0))
+    se = joint_se[:n_structural]
+
+    return StandardErrorResult(
+        standard_errors=se,
+        variance_covariance=structural_cov,
+        method="full_likelihood_bhhh",
+        details={
+            "n_observations": scores.shape[0],
+            "n_joint_parameters": n_joint,
+            "n_structural_parameters": n_structural,
+            "joint_standard_errors": joint_se,
+            "joint_variance_covariance": joint_cov,
         },
     )
 

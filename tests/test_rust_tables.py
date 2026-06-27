@@ -1,9 +1,17 @@
 """Tests for Rust (1987) table replication."""
 
-import pytest
+from pathlib import Path
+
 import numpy as np
-import pandas as pd
+import pytest
+
+from econirl.replication.rust1987.table_ix import (
+    load_stordat_group4_panel,
+    table_ix_group4,
+)
 from econirl.replication.rust1987.tables import table_ii_descriptives, table_iv_transitions
+
+OFFICIAL_GROUP4_RAW = Path("downloads/nfxp_unzip/nfxp/dat/a530875.asc")
 
 
 class TestTableII:
@@ -110,13 +118,68 @@ class TestTableV:
         assert table['converged'].all()
 
 
+class TestTableIXProfile:
+    """Tests for the exact Rust Table IX replication profile."""
+
+    def test_stordat_group4_panel_matches_official_counts(self):
+        """STORDAT mirror should reproduce the official group-4 sample."""
+        if not OFFICIAL_GROUP4_RAW.exists():
+            pytest.skip("official NFXP archive not downloaded")
+
+        df, metadata = load_stordat_group4_panel(OFFICIAL_GROUP4_RAW)
+
+        assert len(df) == 4292
+        assert metadata["sample_observations"] == 4292
+        assert metadata["replacement_count"] == 33
+        assert metadata["transition_counts"] == {0: 1682, 1: 2555, 2: 55}
+        assert metadata["transition_probabilities"][0] == pytest.approx(0.3918918919)
+        assert metadata["transition_probabilities"][1] == pytest.approx(0.5952935694)
+        assert metadata["transition_probabilities"][2] == pytest.approx(0.0128145387)
+        assert df["mileage_bin"].between(0, 89).all()
+        assert set(df["replaced"].unique()) <= {0, 1}
+
+    @pytest.mark.slow
+    def test_table_ix_profile_matches_paper_values(self, tmp_path):
+        """Strict BHHH profile should match Rust's reported group-4 estimates."""
+        if not OFFICIAL_GROUP4_RAW.exists():
+            pytest.skip("official NFXP archive not downloaded")
+
+        note_path = tmp_path / "nfxp_rust1987_table_ix.md"
+        table = table_ix_group4(
+            OFFICIAL_GROUP4_RAW,
+            replication_note_path=note_path,
+            command="make rust-table-ix",
+        )
+
+        beta_9999 = table[np.isclose(table["beta"], 0.9999)].iloc[0]
+        beta_0 = table[np.isclose(table["beta"], 0.0)].iloc[0]
+
+        assert bool(beta_9999["converged"])
+        assert beta_9999["theta_1_paper_units"] == pytest.approx(2.2930, abs=5e-4)
+        assert beta_9999["theta_1_se_paper_units"] == pytest.approx(0.639, abs=5e-4)
+        assert beta_9999["RC"] == pytest.approx(10.0750, abs=5e-4)
+        assert beta_9999["RC_se"] == pytest.approx(1.582, abs=5e-4)
+        assert beta_9999["full_log_likelihood"] == pytest.approx(-3304.155, abs=5e-3)
+
+        assert bool(beta_0["converged"])
+        assert beta_0["theta_1_paper_units"] == pytest.approx(71.5133, abs=5e-4)
+        assert beta_0["theta_1_se_paper_units"] == pytest.approx(13.778, abs=1e-3)
+        assert beta_0["RC"] == pytest.approx(7.6358, abs=5e-4)
+        assert beta_0["RC_se"] == pytest.approx(0.7197, abs=5e-4)
+        assert beta_0["choice_log_likelihood"] == pytest.approx(-165.458, abs=5e-3)
+        receipt = note_path.read_text(encoding="utf-8")
+        assert "Verdict: pass" in receipt
+        assert "Command: `make rust-table-ix`" in receipt
+        assert "Rust (1987), Table IX" in receipt
+
+
 class TestExport:
     """Tests for LaTeX export."""
 
     def test_table_ii_latex(self):
         """Table II should export to LaTeX."""
-        from econirl.replication.rust1987.export import table_to_latex
         from econirl.replication.rust1987 import table_ii_descriptives
+        from econirl.replication.rust1987.export import table_to_latex
 
         table = table_ii_descriptives(original=False)
         latex = table_to_latex(table, caption="Table II: Descriptive Statistics")
@@ -126,8 +189,9 @@ class TestExport:
 
     def test_save_all_tables(self):
         """save_all_tables should create output files."""
-        import tempfile
         import os
+        import tempfile
+
         from econirl.replication.rust1987.export import save_all_tables
 
         with tempfile.TemporaryDirectory() as tmpdir:

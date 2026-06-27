@@ -191,7 +191,7 @@ Output  theta_hat, standard errors, policy pi, value V
 8a      H <- sum_i psi_i(theta) psi_i(theta)^T   # BHHH information matrix
 8b      theta <- theta + H^{-1} (sum_i psi_i(theta))  # Newton-like ascent step
 9   until the gradient norm is below tolerance
-10  return theta_hat, standard errors from the BHHH information, pi_theta, V_theta
+10  return theta_hat, standard errors from the information matrix, pi_theta, V_theta
 ```
 
 The inner solve in step 4 defaults to `inner_solver="polyalgorithm"`: safe
@@ -203,6 +203,17 @@ converges quadratically near the solution but needs a good starting point. The
 outer optimizer is BHHH, which builds a positive semi-definite Hessian
 approximation from the outer products of the per-observation scores. The
 implementation lives in `econirl.estimation.nfxp`.
+
+The standard errors come from maximum-likelihood asymptotics. The `se_method`
+argument selects the covariance estimator. `asymptotic` inverts the
+observed-information matrix. `robust`, the default, returns the sandwich form, the
+inverse information with the outer product of the per-observation scores in the
+middle. `clustered` sums scores by individual before forming the sandwich meat, and
+`bootstrap` resamples whole trajectories. `full_likelihood_bhhh` is the Rust Table
+IX replication option: it forms the BHHH outer product for the joint structural and
+transition-probability likelihood and reports the structural covariance block. The
+conditional and robust SEs agree under correct specification and separate under
+misspecification.
 
 ## Applicability
 

@@ -15,8 +15,9 @@ Reference:
 
 from __future__ import annotations
 
-import numpy as np
 from typing import Tuple
+
+import numpy as np
 
 from econirl.core.types import Panel
 
@@ -43,6 +44,11 @@ class TransitionEstimator:
         Transition probability matrix ``P(s'|s, a=keep)`` after fitting.
     n_transitions_ : int
         Number of valid transitions used for estimation.
+    increment_counts_ : ndarray of shape (max_increase + 1,)
+        Counts of observed increments used for the first-stage transition MLE.
+    transition_increments_ : ndarray of shape (n_observations,)
+        Per-row increment codes; rows not used in the first-stage transition
+        likelihood are marked ``-1``.
 
     Examples
     --------
@@ -65,6 +71,8 @@ class TransitionEstimator:
         self.probs_: Tuple[float, float, float] | None = None
         self.matrix_: np.ndarray | None = None
         self.n_transitions_: int | None = None
+        self.increment_counts_: np.ndarray | None = None
+        self.transition_increments_: np.ndarray | None = None
 
     def fit(self, data: Panel, state: str | None = None, id: str | None = None,
             action: str | None = None) -> "TransitionEstimator":
@@ -91,6 +99,7 @@ class TransitionEstimator:
         """
         # Count increments from valid transitions (action=0, i.e., keep)
         increment_counts = np.zeros(self.max_increase + 1)
+        transition_increments: list[int] = []
         n_transitions = 0
 
         for traj in data.trajectories:
@@ -105,9 +114,14 @@ class TransitionEstimator:
                     # Clamp to valid range [0, max_increase]
                     increment = max(0, min(increment, self.max_increase))
                     increment_counts[increment] += 1
+                    transition_increments.append(int(increment))
                     n_transitions += 1
+                else:
+                    transition_increments.append(-1)
 
         self.n_transitions_ = n_transitions
+        self.increment_counts_ = increment_counts.astype(int)
+        self.transition_increments_ = np.asarray(transition_increments, dtype=int)
 
         # Compute probabilities (handle edge case of no transitions)
         if n_transitions > 0:

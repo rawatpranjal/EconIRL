@@ -12,9 +12,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
-import numpy as np
 import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel
@@ -185,6 +184,8 @@ class BaseEstimator(ABC):
         from econirl.inference.results import GoodnessOfFit
         from econirl.inference.standard_errors import compute_standard_errors
 
+        n_bootstrap = kwargs.pop("n_bootstrap", 400)
+        se_seed = kwargs.pop("se_seed", None)
         start_time = time.time()
 
         # Run optimization
@@ -198,19 +199,32 @@ class BaseEstimator(ABC):
         )
 
         # Compute standard errors
-        if result.hessian is not None or self._se_method == "bootstrap":
+        needs_bootstrap_se = self._se_method == "bootstrap"
+        needs_full_likelihood_se = (
+            self._se_method == "full_likelihood_bhhh"
+            and result.gradient_contributions is not None
+        )
+        if result.hessian is not None or needs_bootstrap_se or needs_full_likelihood_se:
             # For bootstrap, create a function that re-estimates on a new panel
             estimate_fn = None
             if self._se_method == "bootstrap":
                 def _bootstrap_estimate_fn(bootstrap_panel: Panel) -> jnp.ndarray:
                     """Re-estimate on bootstrap sample (silent, fast settings)."""
-                    bootstrap_result = self._optimize(
-                        panel=bootstrap_panel,
-                        utility=utility,
-                        problem=problem,
-                        transitions=transitions,
-                        initial_params=result.parameters,  # Warm start
-                    )
+                    saved_compute_hessian = self._compute_hessian
+                    saved_verbose = self._verbose
+                    self._compute_hessian = False
+                    self._verbose = False
+                    try:
+                        bootstrap_result = self._optimize(
+                            panel=bootstrap_panel,
+                            utility=utility,
+                            problem=problem,
+                            transitions=transitions,
+                            initial_params=result.parameters,  # Warm start
+                        )
+                    finally:
+                        self._compute_hessian = saved_compute_hessian
+                        self._verbose = saved_verbose
                     return bootstrap_result.parameters
                 estimate_fn = _bootstrap_estimate_fn
 
@@ -220,13 +234,17 @@ class BaseEstimator(ABC):
                 gradient_contributions=result.gradient_contributions,
                 panel=panel,
                 method=self._se_method,
+                n_bootstrap=n_bootstrap,
+                seed=se_seed,
                 estimate_fn=estimate_fn,
             )
             standard_errors = se_result.standard_errors
             variance_covariance = se_result.variance_covariance
+            se_details = se_result.details
         else:
             standard_errors = jnp.full_like(result.parameters, float("nan"))
             variance_covariance = None
+            se_details = {"unavailable": True}
 
         # Identification diagnostics
         if result.hessian is not None:
@@ -275,7 +293,11 @@ class BaseEstimator(ABC):
             value_function=result.value_function,
             policy=result.policy,
             estimation_time=total_time,
-            metadata=result.metadata,
+            metadata={
+                **result.metadata,
+                "se_method": self._se_method,
+                "se_details": se_details,
+            },
         )
 
     def _compute_prediction_accuracy(
