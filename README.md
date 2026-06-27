@@ -51,7 +51,7 @@ for the full map.
 | [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact tabular dynamic discrete choice, replicated to Rust (1987) Table IX. | Synthetic tabular validation and the Rust bus replication. |
 
 The other estimators are grouped by the source of complexity they answer: large or
-continuous state spaces (CCP, MPEC, UFXP, SEES, NNES), hard-to-model transitions
+continuous state spaces (CCP, MPEC, UFXP, NNES), hard-to-model transitions
 (TD-CCP), unknown reward form (MCE-IRL, Neural MCE-IRL, AIRL, GLADIUS), latent
 heterogeneity (AIRL-Het), and finite-horizon planning (RHIP), with f-IRL, IQ-Learn,
 and the contrib baselines alongside.

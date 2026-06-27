@@ -22,7 +22,6 @@ estimator that matches your decision problem.
 `CCP <estimators/ccp.html>`__ ·
 `MPEC <estimators/mpec.html>`__ ·
 `UFXP <estimators/ufxp.html>`__ ·
-`SEES <estimators/sees.html>`__ ·
 `NNES <estimators/nnes.html>`__ ·
 `TD-CCP <estimators/tdccp.html>`__ ·
 `MCE-IRL <estimators/mce_irl.html>`__ ·

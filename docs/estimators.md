@@ -23,7 +23,6 @@ the sources of complexity in [Choosing an Estimator](estimators/landscape.md).
 | [CCP](estimators/ccp.md) | Large state space | Hotz-Miller and NPL tabular DDC without a nested solve. |
 | [MPEC](estimators/mpec.md) | Large state space | Constrained-optimization form of the DDC likelihood. |
 | [UFXP](estimators/ufxp.md) | Large state space | Structural estimates without nesting a fixed point. |
-| [SEES](estimators/sees.md) | Large state space | Sieve-basis value approximation. |
 | [NNES](estimators/nnes.md) | Large state space | Neural continuation value with finite reward parameters. |
 | [TD-CCP](estimators/tdccp.md) | Hard-to-model transition density | Reward parameters without modeling the transition density. |
 | [MCE-IRL](estimators/mce_irl.md) | Unknown reward form | Maximum causal entropy reward-feature matching. |
@@ -47,7 +46,6 @@ estimators/nfxp
 estimators/ccp
 estimators/mpec
 estimators/ufxp
-estimators/sees
 estimators/nnes
 estimators/tdccp
 estimators/mce_irl

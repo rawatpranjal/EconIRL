@@ -32,7 +32,6 @@ Ordered by the source of complexity each one answers.
 | --- | --- | --- |
 | [MPEC](mpec.md) | You want a constrained-optimization check on the DDC likelihood. | Secondary structural check; useful, but overlaps with NFXP/CCP and has higher solver complexity. |
 | [UFXP](ufxp.md) | You want maximum-likelihood-grade structural estimates without nesting any fixed point in the search. | Secondary structural speed/FOC variant. |
-| [SEES](sees.md) | You want a sieve-basis value approximation for structural estimation. | Secondary sieve-value structural variant. |
 | [Neural MCE-IRL](deep_mce_irl.md) | You need nonlinear reward-map recovery under the MCE objective. | Neural extension of MCE-IRL. |
 | [f-IRL](f_irl.md) | The study question is state-marginal matching under an f-divergence. | Narrower state-marginal method. |
 | [IQ-Learn](iq_learn.md) | Inverse soft-Q learning or imitation diagnostics are the estimator of interest. | Preview diagnostic. |

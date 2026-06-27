@@ -34,8 +34,8 @@ exact nested solve cheap. Encoded, high-dimensional, or smooth states make the i
 fixed point infeasible. This motivates [CCP](ccp.md) (invert observed choice
 probabilities, no nested solve), [MPEC](mpec.md) (one constrained optimization
 instead of repeated inner solves), [UFXP](ufxp.md) (fold the fixed point into the
-optimization), [SEES](sees.md) (a sieve-basis value approximation), and
-[NNES](nnes.md) (a neural continuation value with finite reward parameters).
+optimization), and [NNES](nnes.md) (a neural continuation value with finite reward
+parameters).
 
 **The transition density gets hard to model.** NFXP needs an exogenous, estimable
 transition kernel. When that first stage is the bottleneck, [TD-CCP](tdccp.md)
@@ -60,7 +60,7 @@ scales to route-choice and graph problems.
 
 | Source of complexity | Estimators it motivates |
 | --- | --- |
-| Large or continuous state space | CCP, MPEC, UFXP, SEES, NNES |
+| Large or continuous state space | CCP, MPEC, UFXP, NNES |
 | Hard-to-model transition density | TD-CCP |
 | Unknown reward form (IRL) | MCE-IRL, Neural MCE-IRL, AIRL, GLADIUS |
 | Latent heterogeneity | AIRL-Het |
