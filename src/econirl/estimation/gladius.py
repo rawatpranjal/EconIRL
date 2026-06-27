@@ -123,6 +123,20 @@ class GLADIUSConfig:
     # in per-period utility units. With beta=0.9999, Q-values are order
     # 10000; scaling lets the MLP work in [-10, 10] and multiplies the
     # output by value_scale. Set to 1.0 to disable rescaling.
+    network_mode: Literal["separate", "shared_trunk"] = "separate"
+    """Network architecture. ``separate`` (default) trains two independent
+    MLPs (Q_eta and V_zeta). ``shared_trunk`` follows Enoch Kang's reference:
+    one shared trunk feeds a Q-head and a zeta-head, both over actions, with
+    the output-bias init (see ``output_bias_init``) setting the value level."""
+    output_bias_init: float | None = None
+    """Constant bias initializer for the output head(s). When set (used by the
+    Enoch-faithful ``shared_trunk`` recipe), both heads start at this level so
+    the network need not climb to the cardinal Q-level from ~0. None keeps the
+    default zero-bias init."""
+    gradient_clip_mode: Literal["global_norm", "value"] = "global_norm"
+    """Gradient clipping style. ``global_norm`` (default) clips the global
+    gradient norm. ``value`` clips each element to [-gradient_clip,
+    gradient_clip], matching Enoch's ``clip_grad_value_``."""
     compute_se: bool = True
     n_bootstrap: int = 100
     verbose: bool = False
@@ -265,6 +279,83 @@ class _EVNetwork(eqx.Module):
         """
         x = jnp.concatenate([state_features, action_onehot], axis=-1)
         return jax.vmap(self)(x)
+
+
+class _SharedTrunkNetwork(eqx.Module):
+    """Enoch-faithful multi-headed network: a shared MLP trunk feeding a
+    Q-head and a zeta-head, each over actions.
+
+    Follows the reference implementation (Kang, github.com/Enoch-H-Kang/
+    Gladius, ``multiHeadedMLPModule.py`` / ``mlp.py``): the trunk maps state
+    features to a hidden representation; two linear heads produce Q(s, .) and
+    zeta(s, .) over actions. A constant output-bias init places both heads at
+    the cardinal value level so the network need not climb from ~0 (the
+    reference uses a -55 bias for the Zurcher problem). No output
+    nonlinearity. Outputs are multiplied by value_scale (kept at 1.0 in the
+    faithful recipe so the bias carries the level).
+    """
+
+    trunk: eqx.nn.MLP
+    q_head: eqx.nn.Linear
+    zeta_head: eqx.nn.Linear
+    n_actions: int = eqx.field(static=True)
+    value_scale: float = eqx.field(static=True)
+
+    def __init__(
+        self,
+        state_dim: int,
+        n_actions: int,
+        hidden_dim: int,
+        num_layers: int,
+        *,
+        key: jax.Array,
+        value_scale: float = 1.0,
+        output_bias_init: float | None = None,
+    ):
+        self.n_actions = n_actions
+        self.value_scale = value_scale
+        trunk_key, q_key, zeta_key = jax.random.split(key, 3)
+        # Trunk: num_layers hidden layers (state_dim -> hidden), ReLU on every
+        # layer including the last so the heads see an activated representation
+        # (matches the reference trunk; no nonlinearity on the heads).
+        self.trunk = eqx.nn.MLP(
+            in_size=state_dim,
+            out_size=hidden_dim,
+            width_size=hidden_dim,
+            depth=max(num_layers - 1, 0),
+            activation=jax.nn.relu,
+            final_activation=jax.nn.relu,
+            key=trunk_key,
+        )
+        self.q_head = eqx.nn.Linear(hidden_dim, n_actions, key=q_key)
+        self.zeta_head = eqx.nn.Linear(hidden_dim, n_actions, key=zeta_key)
+        if output_bias_init is not None:
+            bias = jnp.full((n_actions,), float(output_bias_init))
+            self.q_head = eqx.tree_at(lambda m: m.bias, self.q_head, bias)
+            self.zeta_head = eqx.tree_at(lambda m: m.bias, self.zeta_head, bias)
+
+    def _heads(self, state_features: jax.Array) -> tuple[jax.Array, jax.Array]:
+        h = jax.vmap(self.trunk)(state_features)
+        q = jax.vmap(self.q_head)(h) * self.value_scale
+        zeta = jax.vmap(self.zeta_head)(h) * self.value_scale
+        return q, zeta
+
+    def forward_all_actions(self, state_features: jax.Array) -> jax.Array:
+        """Q(s, a) for all actions, shape (batch, n_actions)."""
+        q, _ = self._heads(state_features)
+        return q
+
+    def zeta_all_actions(self, state_features: jax.Array) -> jax.Array:
+        """zeta(s, a) for all actions, shape (batch, n_actions)."""
+        _, zeta = self._heads(state_features)
+        return zeta
+
+    def forward(
+        self, state_features: jax.Array, action_onehot: jax.Array
+    ) -> jax.Array:
+        """Q(s, a) for the chosen action, shape (batch,)."""
+        q, _ = self._heads(state_features)
+        return jnp.sum(q * action_onehot, axis=-1)
 
 
 class GLADIUSEstimator(BaseEstimator):
@@ -518,24 +609,48 @@ class GLADIUSEstimator(BaseEstimator):
         # Cap at 10000 to avoid extreme scales
         vs = min(vs, 10000.0)
 
-        q_net = _QNetwork(
-            state_dim, n_actions, self.config.q_hidden_dim,
-            self.config.q_num_layers, key=q_key, value_scale=vs,
-        )
-        # Zeta network approximates E[V(s')|s,a]. Same architecture as
-        # the EV network but trained with the corrected alternating scheme
-        # from Algorithm 1 in the paper. Kept as a separate network
-        # (rather than a shared-body multi-headed MLP) for cleaner
-        # gradient separation in the alternating update.
-        zeta_net = _EVNetwork(
-            state_dim, n_actions, self.config.v_hidden_dim,
-            self.config.v_num_layers, key=zeta_key, value_scale=vs,
-        )
+        if self.config.network_mode == "shared_trunk":
+            # Enoch-faithful: the output-bias init carries the value level, so
+            # default to no rescaling unless value_scale was set explicitly.
+            if (
+                self.config.value_scale is None
+                and self.config.output_bias_init is not None
+            ):
+                vs = 1.0
+            shared_net = _SharedTrunkNetwork(
+                state_dim, n_actions, self.config.q_hidden_dim,
+                self.config.q_num_layers, key=key, value_scale=vs,
+                output_bias_init=self.config.output_bias_init,
+            )
+            # q_net and zeta_net are the same shared object; the shared-trunk
+            # training path below updates it through both heads.
+            q_net = shared_net
+            zeta_net = shared_net
+        else:
+            q_net = _QNetwork(
+                state_dim, n_actions, self.config.q_hidden_dim,
+                self.config.q_num_layers, key=q_key, value_scale=vs,
+            )
+            # Zeta network approximates E[V(s')|s,a]. Same architecture as
+            # the EV network but trained with the corrected alternating scheme
+            # from Algorithm 1 in the paper. Kept as a separate network
+            # (rather than a shared-body multi-headed MLP) for cleaner
+            # gradient separation in the alternating update.
+            zeta_net = _EVNetwork(
+                state_dim, n_actions, self.config.v_hidden_dim,
+                self.config.v_num_layers, key=zeta_key, value_scale=vs,
+            )
 
         # Build optimizers with gradient clipping, weight decay, and
         # learning rate decay following Kang et al. (2025).
         # LR decays as lr_0 / (1 + decay_rate * step).
         decay = self.config.lr_decay_rate
+
+        clip_transform = (
+            optax.clip(self.config.gradient_clip)
+            if self.config.gradient_clip_mode == "value"
+            else optax.clip_by_global_norm(self.config.gradient_clip)
+        )
 
         def _make_optimizer(base_lr: float):
             """Build an optax optimizer chain with LR decay."""
@@ -543,7 +658,7 @@ class GLADIUSEstimator(BaseEstimator):
                 return base_lr / (1.0 + decay * step)
 
             return optax.chain(
-                optax.clip_by_global_norm(self.config.gradient_clip),
+                clip_transform,
                 optax.scale_by_adam(),
                 optax.add_decayed_weights(self.config.weight_decay),
                 optax.scale_by_schedule(lr_schedule),
@@ -744,6 +859,81 @@ class GLADIUSEstimator(BaseEstimator):
             zeta_net = eqx.apply_updates(zeta_net, zeta_updates)
             return q_net, zeta_net, new_q_opt, new_zeta_opt, loss, aux
 
+        # Enoch-faithful shared-trunk steps: one network, one optimizer,
+        # alternating zeta (V every 2 batches) and Q (every 2 batches)
+        # updates, both flowing gradients into the shared trunk. Reuses the
+        # same loss expressions as the separate-net path above.
+        @eqx.filter_jit
+        def shared_zeta_step(net, opt_state, s_feat, a_batch, sp_feat):
+            def loss_fn(net_inner):
+                a_onehot = jax.nn.one_hot(a_batch, n_actions)
+                zeta_sa = jnp.sum(
+                    net_inner.zeta_all_actions(s_feat) * a_onehot, axis=1
+                )
+                q_sp_all = jax.lax.stop_gradient(
+                    net_inner.forward_all_actions(sp_feat)
+                )
+                v_sp = sigma * jax.scipy.special.logsumexp(
+                    q_sp_all / sigma, axis=1
+                )
+                return jnp.mean((zeta_sa - v_sp) ** 2)
+
+            loss, grads = eqx.filter_value_and_grad(loss_fn)(net)
+            updates, new_opt = q_optimizer.update(
+                grads, opt_state, eqx.filter(net, eqx.is_array)
+            )
+            net = eqx.apply_updates(net, updates)
+            return net, new_opt, loss
+
+        @eqx.filter_jit
+        def shared_q_step(net, opt_state, s_feat, a_batch, sp_feat,
+                          anchor_r_batch, ce_weight):
+            def loss_fn(net_inner):
+                a_onehot = jax.nn.one_hot(a_batch, n_actions)
+                q_all = net_inner.forward_all_actions(s_feat)
+                log_probs = q_all / sigma - jax.scipy.special.logsumexp(
+                    q_all / sigma, axis=1, keepdims=True
+                )
+                nll = -log_probs[jnp.arange(len(a_batch)), a_batch].mean()
+
+                zeta_sa = jax.lax.stop_gradient(
+                    jnp.sum(net_inner.zeta_all_actions(s_feat) * a_onehot, axis=1)
+                )
+                q_sp_all = net_inner.forward_all_actions(sp_feat)
+                v_sp = sigma * jax.scipy.special.logsumexp(
+                    q_sp_all / sigma, axis=1
+                )
+
+                if use_anchor_bellman:
+                    q_sa = jnp.sum(q_all * a_onehot, axis=1)
+                    mask = (a_batch == anchor_action).astype(jnp.float32)
+                    if anchor_bellman_mode == "paper_minimax":
+                        anchor_td = anchor_r_batch + beta * v_sp - q_sa
+                        zeta_residual = v_sp - zeta_sa
+                        bellman_terms = jnp.abs(
+                            anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
+                        )
+                    else:
+                        anchor_td = anchor_r_batch + beta * zeta_sa - q_sa
+                        bellman_terms = anchor_td ** 2
+                    bellman_loss = jnp.sum(mask * bellman_terms) / jnp.maximum(
+                        mask.sum(), 1.0
+                    )
+                    total_loss = ce_weight * nll + bellman_weight * bellman_loss
+                else:
+                    total_loss = ce_weight * nll
+                    bellman_loss = jnp.float32(0.0)
+                return total_loss, (nll, bellman_loss)
+
+            (loss, aux), grads = eqx.filter_value_and_grad(
+                loss_fn, has_aux=True
+            )(net)
+            updates, new_opt = q_optimizer.update(
+                grads, opt_state, eqx.filter(net, eqx.is_array)
+            )
+            net = eqx.apply_updates(net, updates)
+            return net, new_opt, loss, aux
+
         # --- Step 3: Training loop ---
         best_loss = float("inf")
         epochs_no_improve = 0
@@ -817,7 +1007,22 @@ class GLADIUSEstimator(BaseEstimator):
                 s_feat = self._build_state_features(s_batch, problem)
                 sp_feat = self._build_state_features(sp_batch, problem)
 
-                if q_only_mode:
+                if self.config.network_mode == "shared_trunk":
+                    if batch_idx % 2 == 0:
+                        # Even batch: zeta head (V) update on the shared net.
+                        q_net, q_opt_state, loss = shared_zeta_step(
+                            q_net, q_opt_state, s_feat, a_batch, sp_feat,
+                        )
+                        epoch_bell = float(loss)
+                    else:
+                        # Odd batch: Q head update on the shared net.
+                        q_net, q_opt_state, loss, _aux = shared_q_step(
+                            q_net, q_opt_state, s_feat, a_batch, sp_feat,
+                            anchor_r_batch, ce_weight,
+                        )
+                        epoch_nll = float(_aux[0])
+                    zeta_net = q_net  # same shared object
+                elif q_only_mode:
                     q_net, q_opt_state, loss, nll = q_only_step(
                         q_net, q_opt_state, s_feat, a_batch, ce_weight,
                     )
@@ -895,12 +1100,15 @@ class GLADIUSEstimator(BaseEstimator):
         q_table = q_net.forward_all_actions(all_state_feat)
 
         # Compute zeta(s, a) for all (s, a)
-        eye = jnp.eye(n_actions)
-        ev_columns = []
-        for a in range(n_actions):
-            a_oh = jnp.broadcast_to(eye[a], (n_states, n_actions))
-            ev_columns.append(zeta_net.forward(all_state_feat, a_oh))
-        ev_table = jnp.stack(ev_columns, axis=1)
+        if self.config.network_mode == "shared_trunk":
+            ev_table = q_net.zeta_all_actions(all_state_feat)
+        else:
+            eye = jnp.eye(n_actions)
+            ev_columns = []
+            for a in range(n_actions):
+                a_oh = jnp.broadcast_to(eye[a], (n_states, n_actions))
+                ev_columns.append(zeta_net.forward(all_state_feat, a_oh))
+            ev_table = jnp.stack(ev_columns, axis=1)
 
         # Implied reward: r(s, a) = Q(s, a) - beta * zeta(s, a)
         reward_table = q_table - beta * ev_table
@@ -952,6 +1160,9 @@ class GLADIUSEstimator(BaseEstimator):
                 "anchor_action": self.config.anchor_action,
                 "anchor_bellman_loss": bool(use_anchor_bellman),
                 "anchor_bellman_mode": anchor_bellman_mode,
+                "network_mode": self.config.network_mode,
+                "output_bias_init": self.config.output_bias_init,
+                "gradient_clip_mode": self.config.gradient_clip_mode,
                 "anchor_rewards": (
                     np.asarray(anchor_rewards).tolist()
                     if anchor_rewards is not None else None
