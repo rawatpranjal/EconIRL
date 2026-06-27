@@ -1,17 +1,28 @@
 # Core Estimators
 
-EconIRL is a research build. It centers on one reference estimator, the nested
-fixed point (NFXP), the exact maximum-likelihood estimator for tabular structural
-dynamic discrete choice. NFXP is the one estimator with a verified paper-exact
-replication, matched to Rust (1987) Table IX.
+EconIRL is a research build. These are the core estimators, the ones the project
+focuses on. NFXP is the reference: the exact maximum-likelihood estimator for
+tabular structural dynamic discrete choice, and the one with a verified paper-exact
+replication, matched to Rust (1987) Table IX. The rest of the core spans the
+structural and inverse-reinforcement-learning methods that carry the main
+identification stories and method lineages.
 
-For the reasoning behind the split between this core and the other estimators, see
-[Choosing an Estimator](landscape.md). For a side-by-side table, see
-[Comparing Estimators](comparison.md).
+For how to choose among them, see [Choosing an Estimator](landscape.md). For a
+side-by-side table, see [Comparing Estimators](comparison.md).
 
-| Estimator | Best for | Scope |
+| Estimator | Family | Best for |
 | --- | --- | --- |
-| [NFXP](nfxp.md) | Exact tabular dynamic discrete choice, replicated to Rust (1987) Table IX. | Synthetic tabular simulation and the Rust bus replication. |
+| [NFXP](nfxp.md) | Structural | Exact tabular DDC, replicated to Rust (1987) Table IX. |
+| [CCP](ccp.md) | Structural | Hotz-Miller and NPL tabular DDC without a nested solve. |
+| [TD-CCP](tdccp.md) | Structural | Reward parameters without modeling the transition density. |
+| [MCE-IRL](mce_irl.md) | IRL | Maximum causal entropy reward-feature matching. |
+| [Neural MCE-IRL](deep_mce_irl.md) | IRL | Unrestricted neural reward map under the MCE objective. |
+| [AIRL](airl.md) | IRL | AIRL-1: adversarial transferable state-only reward. |
+| [AIRL-Het](airl_het.md) | IRL | AIRL-2: segment-specific rewards under an anchor. |
+| [GLADIUS](gladius.md) | IRL | Neural Q and continuation reward recovery at scale. |
+
+GLADIUS is the package's neural estimator. The `GLADIUS` class is the
+`NeuralGLADIUS` implementation, so the two names refer to the same estimator.
 
 ```{toctree}
 :maxdepth: 1
@@ -19,4 +30,11 @@ For the reasoning behind the split between this core and the other estimators, s
 landscape
 comparison
 nfxp
+ccp
+tdccp
+mce_irl
+deep_mce_irl
+airl
+airl_het
+gladius
 ```

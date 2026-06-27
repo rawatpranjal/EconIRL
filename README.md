@@ -40,21 +40,17 @@ Example output:
 
 ## Public Estimator Guides
 
-The public docs center on one reference estimator, the nested fixed point (NFXP),
-the exact estimator we replicate to Rust (1987) Table IX. Every other estimator
-answers a specific complication that breaks NFXP's canonical case. See
-[Choosing an Estimator](https://econirl.readthedocs.io/en/latest/estimators/landscape.html)
-for the full map.
+The public docs split the estimators into a core roster and the rest. NFXP is the
+reference within the core, the exact estimator we replicate to Rust (1987) Table IX.
+See [Choosing an Estimator](https://econirl.readthedocs.io/en/latest/estimators/landscape.html)
+for how the methods relate.
 
-| Estimator | Best for | Public evidence scope |
-| --- | --- | --- |
-| [NFXP](https://econirl.readthedocs.io/en/latest/estimators/nfxp.html) | Exact tabular dynamic discrete choice, replicated to Rust (1987) Table IX. | Synthetic tabular validation and the Rust bus replication. |
+Core: NFXP, CCP, TD-CCP, MCE-IRL, Neural MCE-IRL, AIRL (AIRL-1), AIRL-Het (AIRL-2),
+and GLADIUS. GLADIUS is the package's neural estimator, the `GLADIUS` class is the
+`NeuralGLADIUS` implementation.
 
-The other estimators are grouped by the source of complexity they answer: large or
-continuous state spaces (CCP, MPEC, UFXP, NNES), hard-to-model transitions
-(TD-CCP), unknown reward form (MCE-IRL, Neural MCE-IRL, AIRL, GLADIUS), latent
-heterogeneity (AIRL-Het), and finite-horizon planning (RHIP), with f-IRL, IQ-Learn,
-and the contrib baselines alongside.
+Other: NNES, MPEC, UFXP, RHIP, f-IRL, IQ-Learn, and the contrib baselines. These are
+available for advanced users and method development.
 
 ## Package Surface
 

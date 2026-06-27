@@ -177,30 +177,34 @@ def test_estimator_navigation_is_owned_by_section_pages() -> None:
     other = (DOCS / "estimators" / "other.md").read_text(encoding="utf-8")
     config = runpy.run_path(str(DOCS / "conf.py"))
 
-    # NFXP is the sole Core estimator; every other estimator lives under Other.
-    assert "\nnfxp\n" in core
-    expected_other = [
+    # The core roster lives in core.md; every other estimator lives under Other.
+    expected_core = [
+        "nfxp",
         "ccp",
-        "mpec",
-        "ufxp",
-        "nnes",
         "tdccp",
         "mce_irl",
         "deep_mce_irl",
         "airl",
-        "gladius",
         "airl_het",
+        "gladius",
+    ]
+    expected_other = [
+        "nnes",
+        "mpec",
+        "ufxp",
         "rhip",
         "f_irl",
         "iq_learn",
     ]
-    missing = [entry for entry in expected_other if f"\n{entry}\n" not in other]
-    assert missing == []
+    missing_core = [entry for entry in expected_core if f"\n{entry}\n" not in core]
+    missing_other = [entry for entry in expected_other if f"\n{entry}\n" not in other]
+    assert missing_core == []
+    assert missing_other == []
 
     # Estimator pages are not hardcoded directly in the root toctree.
     root_entries = [
         entry
-        for entry in (["nfxp"] + expected_other)
+        for entry in (expected_core + expected_other)
         if f"   estimators/{entry}\n" in index
     ]
     assert root_entries == []
