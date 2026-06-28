@@ -235,6 +235,44 @@ Reproduce:
 PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 250 --lr-reps 50
 ```
 
+## RHIP (Barnes et al., 2024)
+
+RHIP, Receding Horizon Inverse Planning, generalizes classic IRL through a
+planning horizon H. The policy plans with a stochastic soft-Bellman rule for H
+steps, then follows a cheap deterministic planner. The paper's Figure 5 finding on
+real Google Maps routing is that an interior horizon (H = 10) gives the best route
+accuracy, beating both the myopic endpoint and the full MaxEnt endpoint (H
+infinite). The paper reads this as better behavioral specification: people plan
+over a finite horizon and approximate beyond it.
+
+The package reproduces the mechanism on a controlled graph. Demonstrations come
+from a finite-lookahead planner with a known lookahead h. The reward and the shock
+scale are held fixed, and only the planning horizon differs from the estimator.
+RHIP is then fit across a sweep of horizons H, and the fit is the policy distance
+to the demonstrations.
+
+### Recovering the demonstrator's lookahead (25-node graph, 300 trajectories, 3 seeds)
+
+| Demonstrator lookahead h | H = 0 (myopic) | H = h (interior) | H infinite (MaxEnt) | Best H |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 0.035 | 0.011 | 0.060 | 1 |
+| 2 | 0.057 | 0.016 | 0.042 | 2 |
+| 3 | 0.068 | 0.012 | 0.031 | 3 |
+
+The numbers are policy distance to the demonstrations, lower is better. For every
+demonstrator, the best-fitting horizon is interior and lands on the demonstrator's
+lookahead. Both endpoints fit worse. As the demonstrator's lookahead changes, the
+recovery-optimal horizon shifts with it, so the horizon is an identifiable
+behavioral parameter. This reproduces the Figure 5 mechanism. It is a controlled
+recovery reproduction, not a match of the paper's real-world routing numbers, which
+need proprietary data.
+
+Reproduce:
+
+```bash
+python scripts/study_rhip_lookahead.py
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -244,6 +282,5 @@ both the estimates and the standard errors.
 | Estimator | Paper | Status |
 | --- | --- | --- |
 | NNES | Nguyen (2025) | Not yet evaluated. |
-| RHIP | Barnes et al. (2024) | Not yet evaluated. |
 | AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
