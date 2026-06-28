@@ -1,0 +1,104 @@
+{
+  "claim": "NNES attains the NFXP (oracle MLE) efficiency bound: NNES sd = NFXP sd.",
+  "dgp": {
+    "beta": 0.9,
+    "delta": 0.5,
+    "exp_rate": 0.2,
+    "grid_nodes": 201,
+    "mmax": 100.0,
+    "n_buses": 50,
+    "n_periods": 20,
+    "n_reps": 100,
+    "note": "transition kernel discretized to the grid; absolute sd differs from the paper's continuous-mileage design, the NNES=NFXP equality reproduces."
+  },
+  "estimator": "NNES",
+  "paper": "Nguyen (2025), Table 1 (two-module bus-engine renewal), efficiency claim",
+  "paper_table1": {
+    "module_1": {
+      "c": [
+        0.0509,
+        0.0103,
+        0.0515,
+        0.0103
+      ],
+      "crep": [
+        1.9454,
+        0.1746,
+        1.9443,
+        0.1754
+      ],
+      "true_c": 0.05,
+      "true_crep": 2.0
+    },
+    "module_2": {
+      "c": [
+        0.0843,
+        0.0134,
+        0.0872,
+        0.0141
+      ],
+      "crep": [
+        2.5135,
+        0.1812,
+        2.5823,
+        0.1903
+      ],
+      "true_c": 0.08,
+      "true_crep": 2.5
+    }
+  },
+  "results": {
+    "module_1": {
+      "nfxp": {
+        "c": {
+          "mean": 0.049867067006335246,
+          "sd": 0.0057603798777066196,
+          "true": 0.05
+        },
+        "crep": {
+          "mean": 1.9996483472034468,
+          "sd": 0.1503067168270304,
+          "true": 2.0
+        }
+      },
+      "nnes": {
+        "c": {
+          "mean": 0.04972590241581201,
+          "sd": 0.005717061910237934,
+          "true": 0.05
+        },
+        "crep": {
+          "mean": 1.998024982213974,
+          "sd": 0.14978660640708213,
+          "true": 2.0
+        }
+      }
+    },
+    "module_2": {
+      "nfxp": {
+        "c": {
+          "mean": 0.07920444085678731,
+          "sd": 0.00774671910633783,
+          "true": 0.08
+        },
+        "crep": {
+          "mean": 2.4834350663574187,
+          "sd": 0.1842391548030948,
+          "true": 2.5
+        }
+      },
+      "nnes": {
+        "c": {
+          "mean": 0.07876688484102487,
+          "sd": 0.007657207718471373,
+          "true": 0.08
+        },
+        "crep": {
+          "mean": 2.479023377895355,
+          "sd": 0.18311403160034861,
+          "true": 2.5
+        }
+      }
+    }
+  }
+}

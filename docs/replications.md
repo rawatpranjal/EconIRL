@@ -230,6 +230,46 @@ Reproduce:
 PYTHONPATH=src python validation/estimators/tdccp/bus_engine_nfxp.py --n-reps 300
 ```
 
+## NNES (Nguyen, 2025)
+
+Nguyen proposes the neural-network efficient estimator (NNES) for structural
+dynamic discrete choice. A neural network approximates the value function inside
+the nested pseudo-likelihood, and a Neyman-orthogonality property makes the
+structural score insensitive to first-order value-approximation error. The
+central result is that NNES attains the semiparametric efficiency bound, it
+matches the oracle nested fixed point in both mean and standard deviation (their
+Theorem 4.3 and Table 1).
+
+The test is the paper's two-module bus-engine renewal model. Each module has
+mileage that grows by an exponential increment when the engine is kept and resets
+on replacement, with Type-1 extreme-value shocks at discount 0.9. The keep cost is
+c times mileage and the replacement cost is crep. The true values are crep = 2.0
+and c = 0.05 for module one, crep = 2.5 and c = 0.08 for module two. Each
+replication draws 50 buses over 20 periods. The package runs its NNES and the
+nested fixed point on the same panels, across 100 draws.
+
+### Two-module renewal, 50 buses, T = 20, 100 draws
+
+| Module | Parameter | Package NFXP | Package NNES | Paper NFXP | Paper NNES |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 | crep | 1.9996 (0.1503) | 1.9980 (0.1498) | 1.9454 (0.1746) | 1.9443 (0.1754) |
+| 1 | c | 0.0499 (0.0058) | 0.0497 (0.0057) | 0.0509 (0.0103) | 0.0515 (0.0103) |
+| 2 | crep | 2.4834 (0.1842) | 2.4790 (0.1831) | 2.5135 (0.1812) | 2.5823 (0.1903) |
+| 2 | c | 0.0792 (0.0077) | 0.0788 (0.0077) | 0.0843 (0.0134) | 0.0872 (0.0141) |
+
+Standard deviations are in parentheses. The package's NNES tracks the nested fixed
+point to the third figure on every parameter, the same mean and the same standard
+deviation. NNES attains the efficiency bound, which is the paper's result. The
+absolute dispersion differs from the paper because this run discretizes the
+continuous mileage to a grid, while the paper samples mileage continuously. The
+reproduced quantity is the equality between NNES and the nested fixed point.
+
+Reproduce:
+
+```bash
+PYTHONPATH=src python validation/estimators/nnes/bus_renewal_efficiency.py --n-reps 100
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -238,7 +278,6 @@ both the estimates and the standard errors.
 
 | Estimator | Paper | Status |
 | --- | --- | --- |
-| NNES | Nguyen (2025) | Not yet evaluated. |
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |
 | AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
