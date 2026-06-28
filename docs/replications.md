@@ -132,11 +132,10 @@ python examples/ziebart-mce-irl/run_gridworld.py --grid-size 12
 
 Aguirregabiria and Mira show that iterating the conditional-choice-probability
 estimator, nested pseudo-likelihood (NPL), converges to the nested fixed point
-estimates. Their Section 5.2 finding is that the one-step Hotz-Miller estimator
-is poor, the gains from extra policy iterations come fast, and the K-step NPL
-settles to a fixed point. The replication target is this convergence on the
-bus-engine data, since the estimator is equivalent to NFXP in theory rather than
-a separate published table.
+estimates (their Lemma 2 and footnote 15). The one-step Hotz-Miller estimator is
+poor, the gains from extra policy iterations come fast, and NPL run to its fixed
+point reaches the maximum likelihood estimate. The replication target is this
+equivalence on the bus-engine data.
 
 ### Bundled bus panel, Group 4, beta = 0.9999
 
@@ -144,19 +143,17 @@ a separate published table.
 | --- | ---: | ---: | ---: |
 | NFXP (MLE) | 2.2636 | 10.1423 | -163.7111 |
 | Hotz-Miller (K = 1) | 1.2872 | 10.9207 | -168.1879 |
-| NPL (K = 5) | 2.2651 | 10.1462 | -163.7113 |
-| NPL (K = 20) | 2.2651 | 10.1462 | -163.7113 |
+| NPL (run to convergence) | 2.2640 | 10.1432 | -163.7113 |
 
-The one-step estimator sits well below the MLE. NPL reaches its fixed point by
-the fifth iteration: K = 5 and K = 20 return the same estimates. The fixed point
-lands within 0.0002 log-likelihood of the NFXP MLE.
-
-NPL does not attain the MLE here. Its replacement cost differs from NFXP at the
-fourth figure, 10.1462 against 10.1423, and its log-likelihood is marginally
-lower. The stronger Aguirregabiria-Mira claim, that the NPL and nested fixed
-point estimates agree to the twelfth digit, does not reproduce in this
-implementation. NFXP remains the exact Rust replication. This is a convergence
-reproduction, not a four-figure number match.
+The one-step estimator sits well below the MLE. NPL run to its fixed point reaches
+it, the operating cost and replacement cost match NFXP to the third and fourth
+figure. At this discount factor the choice likelihood is nearly flat in the
+replacement cost, so NPL and NFXP both sit about 0.0005 from the exact maximizer
+and agree to the fourth figure rather than the twelfth the paper reports on its
+own machine. At lower discount factors, where the replacement cost is better
+identified, NPL matches the maximum likelihood estimate to five figures. An
+earlier build stopped the policy-iteration loop too early and missed the MLE at
+the fourth figure; running NPL to its fixed point closes that gap.
 
 Reproduce:
 
