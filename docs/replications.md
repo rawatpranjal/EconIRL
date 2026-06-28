@@ -40,6 +40,47 @@ The transition probabilities and their log-likelihood are estimated separately
 from the cost parameters, so they are the same across both rows. The replication
 runs through `make rust-table-ix`, which fetches the official NFXP data.
 
+## MPEC (Su and Judd, 2012)
+
+Su and Judd prove that their constrained-optimization estimator and the nested
+fixed point solve the same maximum-likelihood problem and return the same
+estimates (their Proposition 1). The paper's own evidence is a Monte Carlo on the
+simulated bus model, with no real-data estimate table. The replication target is
+the equivalence: on the bus-engine data, MPEC recovers the NFXP estimates, and so
+the published Rust Table IX numbers.
+
+### STORDAT Group-4 panel, beta = 0.9999
+
+| Quantity | MPEC | NFXP | Paper |
+| --- | ---: | ---: | ---: |
+| theta_1 (maintenance) | 2.2931 | 2.2931 | 2.2930 |
+| theta_1 standard error | 0.6383 | 0.6388 | 0.639 |
+| RC (replacement) | 10.0750 | 10.0750 | 10.0750 |
+| RC standard error | 1.5815 | 1.5816 | 1.582 |
+| choice log-likelihood | -163.5843 | -163.5843 | -163.584 |
+
+The point estimates agree to four or more figures, and the standard errors match
+to the precision Rust reports.
+
+### Bundled bus panel, a second discretization
+
+The packaged bus panel bins the same GMC records differently (4329 rows,
+transition split 0.3938 / 0.5933 against the STORDAT 0.3919 / 0.5953), which moves
+the cost level away from the published table. MPEC still tracks NFXP, which is the
+content of Proposition 1.
+
+| beta | Quantity | MPEC | NFXP |
+| --- | --- | ---: | ---: |
+| 0.9999 | theta_1 | 2.2638 | 2.2636 |
+| 0.9999 | RC | 10.1430 | 10.1423 |
+| 0.9999 | choice log-likelihood | -163.7111 | -163.7111 |
+| 0.975 | theta_1 | 3.7768 | 3.7764 |
+| 0.975 | RC | 9.0533 | 9.0529 |
+| 0.975 | choice log-likelihood | -164.0198 | -164.0198 |
+
+The cost level differs from the published table because this panel uses a
+different binning. The agreement between MPEC and NFXP does not.
+
 ## MCE-IRL (Ziebart et al., 2008 and 2010)
 
 The paper reports a route-choice table that needs the original taxi trajectories,
