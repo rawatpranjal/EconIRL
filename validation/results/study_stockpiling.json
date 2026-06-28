@@ -1,8 +1,8 @@
 {
   "meta": {
     "title": "Simulation study: consumer stockpiling of a storable good",
-    "date": "2026-06-16",
-    "package_version": "0.0.6",
+    "date": "2026-06-28",
+    "package_version": "0.0.8",
     "cells": [
       {
         "cell_id": "stockpiling",
@@ -14,11 +14,13 @@
         "n_individuals": 200,
         "n_periods": 35,
         "seed": 42,
-        "n_replications": 2,
+        "n_replications": 30,
         "param_block": true,
         "show_params": true,
         "show_regret": true,
+        "scaling_only": false,
         "figure": "stockpiling_dgp.png",
+        "results_figure": "stockpiling_results.png",
         "parameter_names": [
           "spend",
           "holding",
@@ -40,27 +42,20 @@
           {
             "name": "NFXP",
             "family": "structural",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": true
           },
           {
             "name": "CCP",
             "family": "structural",
-            "max_reps": null
-          },
-          {
-            "name": "MPEC",
-            "family": "structural",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": true
           },
           {
             "name": "MCE-IRL",
             "family": "behavioral",
-            "max_reps": null
-          },
-          {
-            "name": "NeuralGLADIUS",
-            "family": "behavioral",
-            "max_reps": null
+            "max_reps": null,
+            "uses_transitions": true
           }
         ]
       }
@@ -68,6 +63,10 @@
     "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
     "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
     "excluded": [
+      {
+        "name": "MPEC",
+        "reason": "an Other-tier constrained-optimization form of the same MLE; NFXP and CCP carry the structural recovery here"
+      },
       {
         "name": "IQ-Learn, f-IRL",
         "reason": "not separately identified from choices on this problem; reward is only partially identified from behavior"
@@ -79,22 +78,23 @@
       {
         "name": "MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL",
         "reason": "trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here"
+      },
+      {
+        "name": "NeuralGLADIUS",
+        "reason": "a model-free neural policy learner; on a 20-state tabular problem it reduces to behavioral cloning on the choice likelihood with no structural edge, and it trailed every method shown. Its arena is scalability and predictive likelihood on large state spaces where full-solution methods become intractable, a regime outside these policy-recovery studies"
       }
     ],
     "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).",
     "snippets": {
       "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(\n        inner_solver=\"hybrid\", inner_tol=1e-10,\n        inner_max_iter=100_000, compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    # solver=\"sqp\" is the real constrained MLE; \"slsqp\" is a legacy alias for\n    # the augmented-Lagrangian penalty solver and does not check optimality.\n    est = MPECEstimator(\n        config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),\n        compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(\n        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,\n        compute_se=False, verbose=False,\n    ))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
-      "NeuralGLADIUS": "def _run_neural_gladius(env, panel):\n    from types import SimpleNamespace\n\n    from econirl.estimators import NeuralGLADIUS\n\n    ps = env.problem_spec\n    m = NeuralGLADIUS(\n        n_actions=int(env.num_actions),\n        discount=float(ps.discount_factor),\n        max_epochs=200,\n        verbose=False,\n    )\n    m.fit(\n        panel,\n        features=np.asarray(env.feature_matrix),\n        transitions=np.asarray(env.transition_matrices),\n    )\n    return SimpleNamespace(\n        parameters=None,\n        standard_errors=None,\n        policy=m.policy_,\n        value_function=getattr(m, \"value_\", None),\n        converged=bool(getattr(m, \"converged_\", True)),\n    )\n"
+      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=5, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(\n        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,\n        compute_se=False, verbose=False,\n    ))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n"
     },
     "diagnoses": {
       "NFXP": "Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum; all three parameters are identified from the action-dependent stockout feature and the price-varying spending feature.",
       "CCP": "CCP uses a first-step nonparametric policy estimate to avoid the inner Bellman loop. One policy-iteration step corrects the bias from the nonparametric first stage.",
       "MPEC": "Mathematical programming with equilibrium constraints. MPEC is not in the CAPABILITIES registry (so run_form does not surface it automatically) but runs correctly via the direct .estimate() path. Uses solver='sqp' for real constrained MLE; the legacy 'slsqp' alias checks only Bellman feasibility.",
-      "MCE-IRL": "Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate.",
-      "NeuralGLADIUS": "Model-free neural policy learner. Uses only the feature matrix and the observed panel; it does not use transition matrices. Capped at 200 epochs here for short compute."
+      "MCE-IRL": "Its convergence indicator mirrors the inner optimizer's success status. The optimizer can stop short while the recovered policy is already accurate, so it can read False on an accurate fit."
     },
     "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
   },
@@ -105,25 +105,25 @@
       "cell": "stockpiling",
       "rep": 0,
       "params": [
-        0.9740477624618314,
-        0.19378463767434256,
-        2.8336450682066934
+        0.9740458648858361,
+        0.19378429428929356,
+        2.8336396954945333
       ],
       "standard_errors": [
-        0.03593349829316139,
-        0.008326388895511627,
-        0.09537998586893082
+        0.03528828413699847,
+        0.00827912278392554,
+        0.09332499054137415
       ],
-      "policy_tv": 0.004195145270746504,
-      "value_rmse": 1.1356034940277553,
+      "policy_tv": 0.004195247795101746,
+      "value_rmse": 1.1356700550410177,
       "regret": {
-        "baseline": 0.010690711568439482,
-        "type_a": 0.010925111440480388,
-        "type_b": 0.0016626762291019027,
-        "type_c": 0.0018203293964216796,
+        "baseline": 0.01069095299549121,
+        "type_a": 0.010925354359502416,
+        "type_b": 0.0016628903201968814,
+        "type_c": 0.0018204001029058906,
         "transferred": true
       },
-      "runtime": 3.3815879821777344,
+      "runtime": 2.3319990634918213,
       "converged": true,
       "error": null
     },
@@ -133,53 +133,25 @@
       "cell": "stockpiling",
       "rep": 0,
       "params": [
-        0.9741427898406982,
-        0.19316083192825317,
-        2.833470106124878
+        0.9740469455718994,
+        0.1937849074602127,
+        2.8336410522460938
       ],
       "standard_errors": [
-        0.02077917240082967,
-        0.00760855416423135,
-        0.05456538657108474
+        0.008750636960201669,
+        0.007928613207678258,
+        0.04158431998544014
       ],
-      "policy_tv": 0.0041352316848865195,
-      "value_rmse": 1.1562579156597674,
+      "policy_tv": 0.00419501534150202,
+      "value_rmse": 1.1356397519404207,
       "regret": {
-        "baseline": 0.010537041389588189,
-        "type_a": 0.010762810963862534,
-        "type_b": 0.0016564473474771852,
-        "type_c": 0.0018107691759546762,
+        "baseline": 0.010691339590284796,
+        "type_a": 0.010925755998100474,
+        "type_b": 0.0016627808490199255,
+        "type_c": 0.0018204140996625645,
         "transferred": true
       },
-      "runtime": 3.047111988067627,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "stockpiling",
-      "rep": 0,
-      "params": [
-        0.9740479588508606,
-        0.19378474354743958,
-        2.8336453437805176
-      ],
-      "standard_errors": [
-        0.03593344986438751,
-        0.008326388895511627,
-        0.09537987411022186
-      ],
-      "policy_tv": 0.004195144917576243,
-      "value_rmse": 1.13559523453681,
-      "regret": {
-        "baseline": 0.010690789954592087,
-        "type_a": 0.010925192705339905,
-        "type_b": 0.0016626613561516984,
-        "type_c": 0.0018203335187462674,
-        "transferred": true
-      },
-      "runtime": 0.42612719535827637,
+      "runtime": 3.1236801147460938,
       "converged": true,
       "error": null
     },
@@ -191,44 +163,24 @@
       "params": [
         0.9740477800369263,
         0.19378463923931122,
-        2.8336453437805176
+        2.8336451053619385
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.004195137852076786,
-      "value_rmse": 1.1356013453530358,
+      "policy_tv": 0.004195145697899606,
+      "value_rmse": 1.13560179945468,
       "regret": {
-        "baseline": 0.010690663939068635,
-        "type_a": 0.010925062770365142,
-        "type_b": 0.00166267410576552,
-        "type_c": 0.0018203234888524023,
+        "baseline": 0.010690715362725135,
+        "type_a": 0.010925115492982067,
+        "type_b": 0.00166267555800174,
+        "type_c": 0.0018203293970018373,
         "transferred": true
       },
-      "runtime": 8.272402048110962,
+      "runtime": 6.221447944641113,
       "converged": false,
-      "error": null
-    },
-    {
-      "estimator": "NeuralGLADIUS",
-      "family": "behavioral",
-      "cell": "stockpiling",
-      "rep": 0,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.06392891224228925,
-      "value_rmse": 29.95217965032125,
-      "regret": {
-        "baseline": 2.446958559361854,
-        "type_a": 2.563849986439288,
-        "type_b": 5.739521418898057,
-        "type_c": 39.07170860805578,
-        "transferred": false
-      },
-      "runtime": 9.540535926818848,
-      "converged": true,
       "error": null
     },
     {
@@ -237,25 +189,25 @@
       "cell": "stockpiling",
       "rep": 1,
       "params": [
-        1.0125830549369486,
-        0.19930524394184088,
-        3.0267460704842994
+        1.012605585038192,
+        0.19931172737722264,
+        3.0268195488399834
       ],
       "standard_errors": [
-        0.036605868488550186,
-        0.008494922891259193,
-        0.09868251532316208
+        0.036181246457780675,
+        0.008338246410787413,
+        0.09695886399725925
       ],
-      "policy_tv": 0.001102316715583629,
-      "value_rmse": 0.3176447995177077,
+      "policy_tv": 0.0011022314705003964,
+      "value_rmse": 0.3185306017674528,
       "regret": {
-        "baseline": 0.00022626057598033934,
-        "type_a": 0.00022247057471446114,
-        "type_b": 0.0003023378015607805,
-        "type_c": 2.5455791461827906e-05,
+        "baseline": 0.00022651317622456127,
+        "type_a": 0.00022272649397916887,
+        "type_b": 0.00030328244969964676,
+        "type_c": 2.561052563911775e-05,
         "transferred": true
       },
-      "runtime": 1.444173812866211,
+      "runtime": 0.5814621448516846,
       "converged": true,
       "error": null
     },
@@ -265,53 +217,25 @@
       "cell": "stockpiling",
       "rep": 1,
       "params": [
-        1.0129046440124512,
-        0.19858379662036896,
-        3.026446580886841
+        1.0125834941864014,
+        0.19930557906627655,
+        3.0267462730407715
       ],
       "standard_errors": [
-        0.005350954335778951,
-        0.00587012639331088,
-        0.04077015789454382
+        NaN,
+        NaN,
+        NaN
       ],
-      "policy_tv": 0.0010765984268912142,
-      "value_rmse": 0.2993755159457723,
+      "policy_tv": 0.001102368265139458,
+      "value_rmse": 0.31767695433974824,
       "regret": {
-        "baseline": 0.0003051801488590951,
-        "type_a": 0.00029882324240359815,
-        "type_b": 0.0003305446610230859,
-        "type_c": 2.597271907389668e-05,
+        "baseline": 0.00022624640107763187,
+        "type_a": 0.00022245692539649283,
+        "type_b": 0.00030235306570837624,
+        "type_c": 2.545375082320606e-05,
         "transferred": true
       },
-      "runtime": 1.399728775024414,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "stockpiling",
-      "rep": 1,
-      "params": [
-        1.0125833749771118,
-        0.19930541515350342,
-        3.0267465114593506
-      ],
-      "standard_errors": [
-        0.03660596162080765,
-        0.008494957350194454,
-        0.0986829325556755
-      ],
-      "policy_tv": 0.0011023000544921522,
-      "value_rmse": 0.3176598307972816,
-      "regret": {
-        "baseline": 0.0002262581358088603,
-        "type_a": 0.00022246833152781353,
-        "type_b": 0.00030235101527394565,
-        "type_c": 2.5454892394682653e-05,
-        "transferred": true
-      },
-      "runtime": 0.24884486198425293,
+      "runtime": 2.7458059787750244,
       "converged": true,
       "error": null
     },
@@ -321,46 +245,2378 @@
       "cell": "stockpiling",
       "rep": 1,
       "params": [
-        1.0125831365585327,
+        1.0125830173492432,
         0.19930525124073029,
-        3.0267462730407715
+        3.0267460346221924
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.0011023218680985844,
-      "value_rmse": 0.31764653472791954,
+      "policy_tv": 0.00110231253359526,
+      "value_rmse": 0.3176443374089184,
       "regret": {
-        "baseline": 0.00022626320399622788,
-        "type_a": 0.0002224731681672413,
-        "type_b": 0.0003023433125193078,
-        "type_c": 2.545665990422552e-05,
+        "baseline": 0.00022626052818426037,
+        "type_a": 0.00022247061932997308,
+        "type_b": 0.00030233696640375785,
+        "type_c": 2.545579080883913e-05,
         "transferred": true
       },
-      "runtime": 6.586438894271851,
+      "runtime": 4.411114931106567,
       "converged": false,
       "error": null
     },
     {
-      "estimator": "NeuralGLADIUS",
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 2,
+      "params": [
+        0.9860680758159894,
+        0.1969452596739031,
+        2.979475810552352
+      ],
+      "standard_errors": [
+        0.0355136021365029,
+        0.008152253482880123,
+        0.09581043927336143
+      ],
+      "policy_tv": 0.0014147668252421097,
+      "value_rmse": 0.47436070243138795,
+      "regret": {
+        "baseline": 0.000693154784365475,
+        "type_a": 0.0006716216623196138,
+        "type_b": 0.00036165001786796967,
+        "type_c": 3.2929751430960813e-06,
+        "transferred": true
+      },
+      "runtime": 0.6734099388122559,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 2,
+      "params": [
+        0.9860573410987854,
+        0.19694285094738007,
+        2.979440212249756
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.001415435890116885,
+      "value_rmse": 0.4747546263877433,
+      "regret": {
+        "baseline": 0.0006934711269917979,
+        "type_a": 0.0006718997244007656,
+        "type_b": 0.0003622137576843606,
+        "type_c": 3.30261438944095e-06,
+        "transferred": true
+      },
+      "runtime": 2.700345039367676,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
       "family": "behavioral",
       "cell": "stockpiling",
-      "rep": 1,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.06539335701936014,
-      "value_rmse": 29.64014679377642,
+      "rep": 2,
+      "params": [
+        0.9860568046569824,
+        0.19694264233112335,
+        2.979437828063965
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.001415497742145987,
+      "value_rmse": 0.47478698008396,
       "regret": {
-        "baseline": 2.373998053648718,
-        "type_a": 2.4794138821177802,
-        "type_b": 5.449919620312562,
-        "type_c": 38.74065413529611,
-        "transferred": false
+        "baseline": 0.000693481000350609,
+        "type_a": 0.0006719075570115312,
+        "type_b": 0.00036224142427565776,
+        "type_c": 3.3032873530025284e-06,
+        "transferred": true
       },
-      "runtime": 5.393345832824707,
+      "runtime": 3.1712820529937744,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 3,
+      "params": [
+        1.0034418159035028,
+        0.21101182078502825,
+        3.1039371221347682
+      ],
+      "standard_errors": [
+        0.03621973065847746,
+        0.008532986801795308,
+        0.09769248745315103
+      ],
+      "policy_tv": 0.00447253408985761,
+      "value_rmse": 0.6631230504746526,
+      "regret": {
+        "baseline": 0.006870293730276166,
+        "type_a": 0.0069008103518390365,
+        "type_b": 0.0004642205875406349,
+        "type_c": 0.0012572535345384617,
+        "transferred": true
+      },
+      "runtime": 0.6857750415802002,
       "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 3,
+      "params": [
+        1.0034263134002686,
+        0.21101117134094238,
+        3.103890895843506
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004472569038018924,
+      "value_rmse": 0.6626656401960509,
+      "regret": {
+        "baseline": 0.006869159491400874,
+        "type_a": 0.006899642026020899,
+        "type_b": 0.00046411402453058504,
+        "type_c": 0.0012564031218351222,
+        "transferred": true
+      },
+      "runtime": 2.465446949005127,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 3,
+      "params": [
+        1.0034266710281372,
+        0.2110106498003006,
+        3.103891134262085
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00447247390011842,
+      "value_rmse": 0.6626552038975579,
+      "regret": {
+        "baseline": 0.0068690161332866885,
+        "type_a": 0.006899512528628201,
+        "type_b": 0.0004640886595623922,
+        "type_c": 0.001256416216171244,
+        "transferred": true
+      },
+      "runtime": 3.2117812633514404,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 4,
+      "params": [
+        0.9694427960031401,
+        0.20232595447564378,
+        2.9038316614312443
+      ],
+      "standard_errors": [
+        0.03537201618468178,
+        0.008472954878323575,
+        0.09432416881906926
+      ],
+      "policy_tv": 0.0036571970382403367,
+      "value_rmse": 0.8069875002712699,
+      "regret": {
+        "baseline": 0.0027806395884123615,
+        "type_a": 0.0027740767347547678,
+        "type_b": 0.0020999483316734725,
+        "type_c": 0.0004951533288754588,
+        "transferred": true
+      },
+      "runtime": 0.6981539726257324,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 4,
+      "params": [
+        0.9694442749023438,
+        0.2023254930973053,
+        2.903839349746704
+      ],
+      "standard_errors": [
+        0.010771536121762848,
+        0.014257214617125417,
+        0.044441961257850646
+      ],
+      "policy_tv": 0.0036570012384418552,
+      "value_rmse": 0.806971850808842,
+      "regret": {
+        "baseline": 0.0027799975335799755,
+        "type_a": 0.002773434631880455,
+        "type_b": 0.0020997071252931393,
+        "type_c": 0.0004950565965537301,
+        "transferred": true
+      },
+      "runtime": 2.715219259262085,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 4,
+      "params": [
+        0.9694409370422363,
+        0.20232556760311127,
+        2.9038262367248535
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003657241006000559,
+      "value_rmse": 0.8070542243881506,
+      "regret": {
+        "baseline": 0.0027807392120495866,
+        "type_a": 0.002774179737980564,
+        "type_b": 0.002100182358259695,
+        "type_c": 0.0004951944429279678,
+        "transferred": true
+      },
+      "runtime": 3.0725350379943848,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 5,
+      "params": [
+        1.0047515458012712,
+        0.2015708211415244,
+        2.955251238746123
+      ],
+      "standard_errors": [
+        0.035754936559109815,
+        0.008416858090726396,
+        0.09539189462853977
+      ],
+      "policy_tv": 0.0027521634476503866,
+      "value_rmse": 0.08808896304192301,
+      "regret": {
+        "baseline": 0.003937765267142036,
+        "type_a": 0.003989516421544595,
+        "type_b": 0.00011078904560595835,
+        "type_c": 0.0003383165055627382,
+        "transferred": true
+      },
+      "runtime": 0.6199939250946045,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 5,
+      "params": [
+        1.0047563314437866,
+        0.20157046616077423,
+        2.955258846282959
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0027519805200050657,
+      "value_rmse": 0.08820137267216434,
+      "regret": {
+        "baseline": 0.0039380335264887715,
+        "type_a": 0.003989790559692687,
+        "type_b": 0.00011086331461800623,
+        "type_c": 0.0003382854242739764,
+        "transferred": true
+      },
+      "runtime": 2.91046404838562,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 5,
+      "params": [
+        1.0047576427459717,
+        0.20157039165496826,
+        2.95526123046875
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0027518873765393806,
+      "value_rmse": 0.08822752483452437,
+      "regret": {
+        "baseline": 0.003938074276379419,
+        "type_a": 0.0039898322142026595,
+        "type_b": 0.00011088284741758645,
+        "type_c": 0.00033827413530866765,
+        "transferred": true
+      },
+      "runtime": 3.7598142623901367,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 6,
+      "params": [
+        1.0246033305293754,
+        0.20359057729869784,
+        3.0853983540366325
+      ],
+      "standard_errors": [
+        0.03684712845578945,
+        0.008397113070131424,
+        0.09898638397240492
+      ],
+      "policy_tv": 0.0019590567301618926,
+      "value_rmse": 0.8555119174553933,
+      "regret": {
+        "baseline": 0.0011544848814870098,
+        "type_a": 0.0011499553989552157,
+        "type_b": 0.0010597287224404872,
+        "type_c": 0.00043333442462922383,
+        "transferred": true
+      },
+      "runtime": 0.6961448192596436,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 6,
+      "params": [
+        1.0245976448059082,
+        0.2035900503396988,
+        3.085383892059326
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.001958899307030139,
+      "value_rmse": 0.8553424795958755,
+      "regret": {
+        "baseline": 0.0011541603026600422,
+        "type_a": 0.0011496376616816299,
+        "type_b": 0.0010592639470587528,
+        "type_c": 0.00043320627251972174,
+        "transferred": true
+      },
+      "runtime": 2.7033591270446777,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 6,
+      "params": [
+        1.0246001482009888,
+        0.20359042286872864,
+        3.085388660430908
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0019588380721088914,
+      "value_rmse": 0.8554155520772397,
+      "regret": {
+        "baseline": 0.0011542309775293645,
+        "type_a": 0.0011497012613727142,
+        "type_b": 0.0010594633848420593,
+        "type_c": 0.0004332304697623366,
+        "transferred": true
+      },
+      "runtime": 3.4766268730163574,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 7,
+      "params": [
+        1.0469318937145269,
+        0.21171621371227714,
+        3.0590592577316906
+      ],
+      "standard_errors": [
+        0.03733022048334375,
+        0.008937443124135133,
+        0.098806437644605
+      ],
+      "policy_tv": 0.005344382598341579,
+      "value_rmse": 1.6199458123148673,
+      "regret": {
+        "baseline": 0.010204778235462945,
+        "type_a": 0.00994683091455049,
+        "type_b": 0.003479143868371224,
+        "type_c": 4.176720062035718e-05,
+        "transferred": true
+      },
+      "runtime": 0.6153910160064697,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 7,
+      "params": [
+        1.0469272136688232,
+        0.21171529591083527,
+        3.059049606323242
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005344191360795407,
+      "value_rmse": 1.6197969541076815,
+      "regret": {
+        "baseline": 0.010203578754545042,
+        "type_a": 0.009945671107297,
+        "type_b": 0.0034785014414113464,
+        "type_c": 4.176747311918474e-05,
+        "transferred": true
+      },
+      "runtime": 2.752147912979126,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 7,
+      "params": [
+        1.046926736831665,
+        0.2117156833410263,
+        3.0590479373931885
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005344277946187594,
+      "value_rmse": 1.619786946914396,
+      "regret": {
+        "baseline": 0.010203973501705356,
+        "type_a": 0.009946055790075303,
+        "type_b": 0.003478433699089429,
+        "type_c": 4.17702763666385e-05,
+        "transferred": true
+      },
+      "runtime": 3.359422206878662,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 8,
+      "params": [
+        1.0085619482683643,
+        0.20271838738283637,
+        3.057091162997781
+      ],
+      "standard_errors": [
+        0.03642709912229426,
+        0.008351755784513578,
+        0.09799519228395155
+      ],
+      "policy_tv": 0.0013981175977098319,
+      "value_rmse": 0.3983202533526748,
+      "regret": {
+        "baseline": 0.0011209332826836687,
+        "type_a": 0.0011428400509960516,
+        "type_b": 0.00016899817085100358,
+        "type_c": 0.0002921276298965554,
+        "transferred": true
+      },
+      "runtime": 0.624730110168457,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 8,
+      "params": [
+        1.0085524320602417,
+        0.2027149796485901,
+        3.0570645332336426
+      ],
+      "standard_errors": [
+        0.01771078402841325,
+        0.0077602442112977635,
+        0.05961787845019797
+      ],
+      "policy_tv": 0.001397400414956768,
+      "value_rmse": 0.39792863792932925,
+      "regret": {
+        "baseline": 0.0011207309517290165,
+        "type_a": 0.0011426546474859866,
+        "type_b": 0.00016869687204851388,
+        "type_c": 0.00029196046890892175,
+        "transferred": true
+      },
+      "runtime": 2.8873770236968994,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 8,
+      "params": [
+        1.0085527896881104,
+        0.20271556079387665,
+        3.0570669174194336
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0013975703597274328,
+      "value_rmse": 0.39796051591604326,
+      "regret": {
+        "baseline": 0.0011207892400361555,
+        "type_a": 0.0011427111855934699,
+        "type_b": 0.00016871213980877538,
+        "type_c": 0.00029198016791963816,
+        "transferred": true
+      },
+      "runtime": 3.2519659996032715,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 9,
+      "params": [
+        0.9333917848436883,
+        0.18866438740036756,
+        2.875361302527027
+      ],
+      "standard_errors": [
+        0.034313611001560294,
+        0.007826162373343845,
+        0.0928566489660098
+      ],
+      "policy_tv": 0.00531013314513825,
+      "value_rmse": 2.2009237531415287,
+      "regret": {
+        "baseline": 0.009576658022914282,
+        "type_a": 0.009201090674099962,
+        "type_b": 0.009566057579966104,
+        "type_c": 0.00021692694596445086,
+        "transferred": true
+      },
+      "runtime": 0.7371881008148193,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 9,
+      "params": [
+        0.9333914518356323,
+        0.18866510689258575,
+        2.8753597736358643
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005310003826682071,
+      "value_rmse": 2.200901141794669,
+      "regret": {
+        "baseline": 0.009576097982766518,
+        "type_a": 0.009200564288217673,
+        "type_b": 0.009566162756782926,
+        "type_c": 0.0002169440332978539,
+        "transferred": true
+      },
+      "runtime": 2.3934199810028076,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 9,
+      "params": [
+        0.9333912134170532,
+        0.18866491317749023,
+        2.875361919403076
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00531006802665986,
+      "value_rmse": 2.2009159051028564,
+      "regret": {
+        "baseline": 0.009576587060264312,
+        "type_a": 0.009201040082559005,
+        "type_b": 0.00956622541164294,
+        "type_c": 0.00021692309479612033,
+        "transferred": true
+      },
+      "runtime": 3.4715921878814697,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 10,
+      "params": [
+        1.0093168793075598,
+        0.1939956342760005,
+        3.0630421416173346
+      ],
+      "standard_errors": [
+        0.03594788547030243,
+        0.00802299559206647,
+        0.09735667104397777
+      ],
+      "policy_tv": 0.0047776980658612595,
+      "value_rmse": 0.13668856313700234,
+      "regret": {
+        "baseline": 0.004661843682179662,
+        "type_a": 0.004624023976250633,
+        "type_b": 0.0003783087095350507,
+        "type_c": 0.0005290209645521838,
+        "transferred": true
+      },
+      "runtime": 0.7235467433929443,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 10,
+      "params": [
+        1.009299397468567,
+        0.1939973384141922,
+        3.0629823207855225
+      ],
+      "standard_errors": [
+        0.018908902614018026,
+        0.0061170031197376115,
+        0.06181067548670701
+      ],
+      "policy_tv": 0.004775535361136833,
+      "value_rmse": 0.13632235732926692,
+      "regret": {
+        "baseline": 0.0046575887944802575,
+        "type_a": 0.0046197766045016925,
+        "type_b": 0.0003774691440739997,
+        "type_c": 0.000528237283354783,
+        "transferred": true
+      },
+      "runtime": 2.9612133502960205,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 10,
+      "params": [
+        1.0093002319335938,
+        0.1939973384141922,
+        3.0629844665527344
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004775490647228642,
+      "value_rmse": 0.1363287428955711,
+      "regret": {
+        "baseline": 0.004657661308005945,
+        "type_a": 0.0046198491609146745,
+        "type_b": 0.00037750249916607435,
+        "type_c": 0.0005282571346220201,
+        "transferred": true
+      },
+      "runtime": 4.119765043258667,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 11,
+      "params": [
+        1.008656950274497,
+        0.21398782312197076,
+        3.0374619464745063
+      ],
+      "standard_errors": [
+        0.03644338001933721,
+        0.008740037097389313,
+        0.09750019106966727
+      ],
+      "policy_tv": 0.00519106629259895,
+      "value_rmse": 0.7836231557980947,
+      "regret": {
+        "baseline": 0.004443272102946181,
+        "type_a": 0.004153439168073221,
+        "type_b": 0.0004861091763254409,
+        "type_c": 2.5055000761001223e-05,
+        "transferred": true
+      },
+      "runtime": 0.7428247928619385,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 11,
+      "params": [
+        1.0086575746536255,
+        0.21398457884788513,
+        3.0374410152435303
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005190396666743795,
+      "value_rmse": 0.7834829498264009,
+      "regret": {
+        "baseline": 0.004441951559281226,
+        "type_a": 0.004152221342558272,
+        "type_b": 0.0004859235335599123,
+        "type_c": 2.499160373873502e-05,
+        "transferred": true
+      },
+      "runtime": 3.030468225479126,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 11,
+      "params": [
+        1.0086572170257568,
+        0.21398453414440155,
+        3.037442922592163
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005190317508675992,
+      "value_rmse": 0.7834743992144068,
+      "regret": {
+        "baseline": 0.0044418214272980054,
+        "type_a": 0.004152096953877506,
+        "type_b": 0.0004859173503182569,
+        "type_c": 2.4999601881446866e-05,
+        "transferred": true
+      },
+      "runtime": 4.192748069763184,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 12,
+      "params": [
+        0.9868753288326891,
+        0.20566558651807737,
+        2.9860211074449734
+      ],
+      "standard_errors": [
+        0.03627928571275986,
+        0.008417046952391207,
+        0.09721629103463117
+      ],
+      "policy_tv": 0.0027557518023739154,
+      "value_rmse": 0.1513647319058454,
+      "regret": {
+        "baseline": 0.0011714227609449178,
+        "type_a": 0.001123150902476362,
+        "type_b": 0.0005137165157573635,
+        "type_c": 5.98350239114832e-06,
+        "transferred": true
+      },
+      "runtime": 0.7438280582427979,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 12,
+      "params": [
+        0.9868630766868591,
+        0.20566299557685852,
+        2.985987424850464
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002755305248367879,
+      "value_rmse": 0.1517250105907741,
+      "regret": {
+        "baseline": 0.0011712508134025933,
+        "type_a": 0.001123012868930066,
+        "type_b": 0.0005143279264471362,
+        "type_c": 6.009325056073095e-06,
+        "transferred": true
+      },
+      "runtime": 2.2711172103881836,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 12,
+      "params": [
+        0.986863374710083,
+        0.20566321909427643,
+        2.98598575592041
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002755372864985321,
+      "value_rmse": 0.15172346296852796,
+      "regret": {
+        "baseline": 0.0011713014103056597,
+        "type_a": 0.0011230578158038036,
+        "type_b": 0.0005143219855446998,
+        "type_c": 6.011937616235818e-06,
+        "transferred": true
+      },
+      "runtime": 4.331313848495483,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 13,
+      "params": [
+        1.0157189475591966,
+        0.2083891449320595,
+        3.064401982044657
+      ],
+      "standard_errors": [
+        0.03640266902498192,
+        0.008543362356920568,
+        0.09776898005190669
+      ],
+      "policy_tv": 0.002866257170435191,
+      "value_rmse": 0.7867296050374816,
+      "regret": {
+        "baseline": 0.0015051823748888978,
+        "type_a": 0.001417145871752867,
+        "type_b": 0.0005010402810791888,
+        "type_c": 0.000206649931569745,
+        "transferred": true
+      },
+      "runtime": 0.5936329364776611,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 13,
+      "params": [
+        1.015707015991211,
+        0.20838409662246704,
+        3.0643699169158936
+      ],
+      "standard_errors": [
+        0.003326037194350842,
+        0.004306718859489116,
+        0.031697915735147845
+      ],
+      "policy_tv": 0.00286464918402337,
+      "value_rmse": 0.7862045142672556,
+      "regret": {
+        "baseline": 0.0015035502206714449,
+        "type_a": 0.0014156372619125183,
+        "type_b": 0.0005003571855372261,
+        "type_c": 0.00020650054471831698,
+        "transferred": true
+      },
+      "runtime": 4.17038893699646,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 13,
+      "params": [
+        1.015706181526184,
+        0.20838382840156555,
+        3.064365863800049
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002864615084072798,
+      "value_rmse": 0.7861754730793608,
+      "regret": {
+        "baseline": 0.0015034295213606098,
+        "type_a": 0.001415520288539342,
+        "type_b": 0.0005003084383984403,
+        "type_c": 0.00020646752245805384,
+        "transferred": true
+      },
+      "runtime": 4.3197922706604,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 14,
+      "params": [
+        1.0073848460904204,
+        0.202703611849024,
+        3.0542923548619125
+      ],
+      "standard_errors": [
+        0.03625142517476038,
+        0.008452458454408467,
+        0.09714195070131823
+      ],
+      "policy_tv": 0.0013657649992059517,
+      "value_rmse": 0.3653781659324911,
+      "regret": {
+        "baseline": 0.0010991831990090205,
+        "type_a": 0.0011209763175211598,
+        "type_b": 0.00013610380827490593,
+        "type_c": 0.0002728487046426067,
+        "transferred": true
+      },
+      "runtime": 0.7629680633544922,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 14,
+      "params": [
+        1.0073851346969604,
+        0.20270338654518127,
+        3.0542917251586914
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.001365554875614156,
+      "value_rmse": 0.3653771131808073,
+      "regret": {
+        "baseline": 0.0010991177871079716,
+        "type_a": 0.0011209102405922463,
+        "type_b": 0.00013610876794756358,
+        "type_c": 0.00027283559192367834,
+        "transferred": true
+      },
+      "runtime": 4.621998310089111,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 14,
+      "params": [
+        1.0073823928833008,
+        0.2027033418416977,
+        3.0542855262756348
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0013656523046385997,
+      "value_rmse": 0.3652986546015983,
+      "regret": {
+        "baseline": 0.0010990933328593805,
+        "type_a": 0.0011208861532087768,
+        "type_b": 0.0001360381559031878,
+        "type_c": 0.00027279731104170983,
+        "transferred": true
+      },
+      "runtime": 4.00230073928833,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 15,
+      "params": [
+        1.0245886305215206,
+        0.20100764430059992,
+        3.0536372742138997
+      ],
+      "standard_errors": [
+        0.03620508745440146,
+        0.008337387962937096,
+        0.09714176257878226
+      ],
+      "policy_tv": 0.0015803442912700634,
+      "value_rmse": 0.7069393020073583,
+      "regret": {
+        "baseline": 0.0006645145286777985,
+        "type_a": 0.0006508801202533441,
+        "type_b": 0.0010581751378641547,
+        "type_c": 9.12108529947845e-05,
+        "transferred": true
+      },
+      "runtime": 0.7914869785308838,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 15,
+      "params": [
+        1.0245682001113892,
+        0.20100300014019012,
+        3.0535857677459717
+      ],
+      "standard_errors": [
+        0.05261973029393959,
+        0.008392299312310048,
+        0.107980704719941
+      ],
+      "policy_tv": 0.0015795395562217562,
+      "value_rmse": 0.7062000534382588,
+      "regret": {
+        "baseline": 0.0006635173751451388,
+        "type_a": 0.0006499178276639587,
+        "type_b": 0.0010565489369359412,
+        "type_c": 9.103550659130585e-05,
+        "transferred": true
+      },
+      "runtime": 2.7481207847595215,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 15,
+      "params": [
+        1.024569034576416,
+        0.20100334286689758,
+        3.053588390350342
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.001579685288305389,
+      "value_rmse": 0.7062400670564795,
+      "regret": {
+        "baseline": 0.0006635542836969263,
+        "type_a": 0.0006499528681294103,
+        "type_b": 0.0010566109561853576,
+        "type_c": 9.104597580771133e-05,
+        "transferred": true
+      },
+      "runtime": 4.864220857620239,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 16,
+      "params": [
+        0.965572229519376,
+        0.1894480316260756,
+        2.869222121499723
+      ],
+      "standard_errors": [
+        0.03475183100269467,
+        0.008064203382076206,
+        0.09276747780222315
+      ],
+      "policy_tv": 0.003997345871743935,
+      "value_rmse": 1.4236781580899436,
+      "regret": {
+        "baseline": 0.0036591494312398077,
+        "type_a": 0.003532552159158788,
+        "type_b": 0.002507147321127646,
+        "type_c": 0.0007572754700200458,
+        "transferred": true
+      },
+      "runtime": 0.8955128192901611,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 16,
+      "params": [
+        0.965575098991394,
+        0.1894480139017105,
+        2.869227647781372
+      ],
+      "standard_errors": [
+        0.005097091300407266,
+        0.007367492855501163,
+        0.03245698743172698
+      ],
+      "policy_tv": 0.003997282754496024,
+      "value_rmse": 1.4236082925564508,
+      "regret": {
+        "baseline": 0.0036590475016593776,
+        "type_a": 0.0035324561384106256,
+        "type_b": 0.002506744630594855,
+        "type_c": 0.0007572361083311506,
+        "transferred": true
+      },
+      "runtime": 3.140209913253784,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 16,
+      "params": [
+        0.9655708074569702,
+        0.18944764137268066,
+        2.8692166805267334
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003997502469586296,
+      "value_rmse": 1.4237363173385915,
+      "regret": {
+        "baseline": 0.0036594660521382942,
+        "type_a": 0.0035328596075980805,
+        "type_b": 0.0025073622553782268,
+        "type_c": 0.0007573378922114147,
+        "transferred": true
+      },
+      "runtime": 3.9549267292022705,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 17,
+      "params": [
+        1.0141212796133088,
+        0.19889952504807548,
+        2.979719631456495
+      ],
+      "standard_errors": [
+        0.03595747301915555,
+        0.008423353815573076,
+        0.09606336990630197
+      ],
+      "policy_tv": 0.0017483508651501718,
+      "value_rmse": 0.2545111170577867,
+      "regret": {
+        "baseline": 0.0028556095964747093,
+        "type_a": 0.0029023553587033055,
+        "type_b": 0.0004245702692799177,
+        "type_c": 0.0001658264821171211,
+        "transferred": true
+      },
+      "runtime": 0.8667600154876709,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 17,
+      "params": [
+        1.0141205787658691,
+        0.19889862835407257,
+        2.9797139167785645
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0017484519890023046,
+      "value_rmse": 0.254451935840751,
+      "regret": {
+        "baseline": 0.0028558469264881124,
+        "type_a": 0.0029026011020670288,
+        "type_b": 0.000424559375596289,
+        "type_c": 0.00016586139482361199,
+        "transferred": true
+      },
+      "runtime": 3.2550060749053955,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 17,
+      "params": [
+        1.0141197443008423,
+        0.19889894127845764,
+        2.9797136783599854
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0017484340908259827,
+      "value_rmse": 0.2544454873454916,
+      "regret": {
+        "baseline": 0.002855706021753864,
+        "type_a": 0.0029024579864410103,
+        "type_b": 0.00042450833595830055,
+        "type_c": 0.00016585777654348248,
+        "transferred": true
+      },
+      "runtime": 4.654658794403076,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 18,
+      "params": [
+        0.9585289006880331,
+        0.20367946251077654,
+        2.9069057656905635
+      ],
+      "standard_errors": [
+        0.03543158061825824,
+        0.008452417527978383,
+        0.09450615827418342
+      ],
+      "policy_tv": 0.0039710349954291315,
+      "value_rmse": 1.0105482470940252,
+      "regret": {
+        "baseline": 0.002990384738456635,
+        "type_a": 0.002935840689957588,
+        "type_b": 0.003920577870565616,
+        "type_c": 0.0003171525160600696,
+        "transferred": true
+      },
+      "runtime": 0.7734520435333252,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 18,
+      "params": [
+        0.9585252404212952,
+        0.2036733478307724,
+        2.906883955001831
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003969634142829866,
+      "value_rmse": 1.010888232256861,
+      "regret": {
+        "baseline": 0.0029889106524080933,
+        "type_a": 0.002934434591452588,
+        "type_b": 0.003920826732195565,
+        "type_c": 0.0003172822551245184,
+        "transferred": true
+      },
+      "runtime": 3.459028959274292,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 18,
+      "params": [
+        0.9585258960723877,
+        0.2036731094121933,
+        2.9068825244903564
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003969756527526154,
+      "value_rmse": 1.0108797712537696,
+      "regret": {
+        "baseline": 0.0029888350782840078,
+        "type_a": 0.0029343630371878515,
+        "type_b": 0.003920682623712536,
+        "type_c": 0.0003173017374619745,
+        "transferred": true
+      },
+      "runtime": 3.800182819366455,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 19,
+      "params": [
+        1.0301712494895388,
+        0.20480499135147986,
+        3.0466822781758434
+      ],
+      "standard_errors": [
+        0.03675242060904998,
+        0.008479605511975134,
+        0.09816025696652317
+      ],
+      "policy_tv": 0.0023349969509472808,
+      "value_rmse": 0.9613247340206462,
+      "regret": {
+        "baseline": 0.0023098564584573466,
+        "type_a": 0.0022525756226627427,
+        "type_b": 0.0015081350690054297,
+        "type_c": 1.943102393901917e-05,
+        "transferred": true
+      },
+      "runtime": 0.697504997253418,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 19,
+      "params": [
+        1.0301659107208252,
+        0.20480455458164215,
+        3.046668529510498
+      ],
+      "standard_errors": [
+        0.04159920792958139,
+        0.011905108739029,
+        0.07989606577356687
+      ],
+      "policy_tv": 0.0023347845033895353,
+      "value_rmse": 0.9611607152224402,
+      "regret": {
+        "baseline": 0.0023095745455840974,
+        "type_a": 0.00225230850311379,
+        "type_b": 0.001507620489147121,
+        "type_c": 1.9413730071090227e-05,
+        "transferred": true
+      },
+      "runtime": 3.172488212585449,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 19,
+      "params": [
+        1.0301686525344849,
+        0.20480488240718842,
+        3.0466744899749756
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0023349144529176726,
+      "value_rmse": 0.9612474176500322,
+      "regret": {
+        "baseline": 0.002309826218861713,
+        "type_a": 0.002252550783503021,
+        "type_b": 0.0015078887666371225,
+        "type_c": 1.9420798940418872e-05,
+        "transferred": true
+      },
+      "runtime": 3.676910877227783,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 20,
+      "params": [
+        0.9928870646025725,
+        0.182931795561016,
+        2.929590456679779
+      ],
+      "standard_errors": [
+        0.034846542328409995,
+        0.007967837832130798,
+        0.09361772214649414
+      ],
+      "policy_tv": 0.007031067792772977,
+      "value_rmse": 0.9316242436071064,
+      "regret": {
+        "baseline": 0.007006186516100058,
+        "type_a": 0.006565401600245441,
+        "type_b": 0.0008306217772927133,
+        "type_c": 0.00024609679599835757,
+        "transferred": true
+      },
+      "runtime": 0.7823810577392578,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 20,
+      "params": [
+        0.9928841590881348,
+        0.18292994797229767,
+        2.9295756816864014
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.007031892604452218,
+      "value_rmse": 0.9317918962322113,
+      "regret": {
+        "baseline": 0.007007714262782313,
+        "type_a": 0.00656683516821631,
+        "type_b": 0.0008308469131368827,
+        "type_c": 0.000246201739107281,
+        "transferred": true
+      },
+      "runtime": 3.0842862129211426,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 20,
+      "params": [
+        0.9928805828094482,
+        0.18292930722236633,
+        2.9295668601989746
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.007031990510634955,
+      "value_rmse": 0.9319077998004758,
+      "regret": {
+        "baseline": 0.007008105092823494,
+        "type_a": 0.006567186450109033,
+        "type_b": 0.000830958109735803,
+        "type_c": 0.00024624322847450824,
+        "transferred": true
+      },
+      "runtime": 4.1579179763793945,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 21,
+      "params": [
+        1.0396265741385453,
+        0.20183691718473418,
+        3.144173730544648
+      ],
+      "standard_errors": [
+        0.037058004838960414,
+        0.008258034175423022,
+        0.09999664035109943
+      ],
+      "policy_tv": 0.0037861616465977646,
+      "value_rmse": 1.244832910870446,
+      "regret": {
+        "baseline": 0.004215457819415432,
+        "type_a": 0.0042615942909240865,
+        "type_b": 0.0027590081590312962,
+        "type_c": 0.0015446244617515407,
+        "transferred": true
+      },
+      "runtime": 0.6905360221862793,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 21,
+      "params": [
+        1.0396292209625244,
+        0.20183737576007843,
+        3.1441826820373535
+      ],
+      "standard_errors": [
+        0.008973190581782607,
+        0.005206452145089489,
+        0.043700944135789524
+      ],
+      "policy_tv": 0.003786306524097646,
+      "value_rmse": 1.2449133617931412,
+      "regret": {
+        "baseline": 0.004215850229868527,
+        "type_a": 0.004261989923436116,
+        "type_b": 0.0027593417836812434,
+        "type_c": 0.0015448218322871986,
+        "transferred": true
+      },
+      "runtime": 3.0341198444366455,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 21,
+      "params": [
+        1.0396289825439453,
+        0.20183737576007843,
+        3.1441807746887207
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0037862482300617243,
+      "value_rmse": 1.2449178429429963,
+      "regret": {
+        "baseline": 0.004215696327688298,
+        "type_a": 0.0042618327993939505,
+        "type_b": 0.002759310248919127,
+        "type_c": 0.001544756196324844,
+        "transferred": true
+      },
+      "runtime": 4.405813932418823,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 22,
+      "params": [
+        0.980618513988451,
+        0.2020555599698712,
+        2.9021876663904864
+      ],
+      "standard_errors": [
+        0.03557988670548143,
+        0.008431039649789997,
+        0.0948688248073654
+      ],
+      "policy_tv": 0.00393505856840967,
+      "value_rmse": 0.5589752719697593,
+      "regret": {
+        "baseline": 0.004695897044121259,
+        "type_a": 0.004746712852641211,
+        "type_b": 0.0009367073298451353,
+        "type_c": 0.0007176129684310228,
+        "transferred": true
+      },
+      "runtime": 0.7730028629302979,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 22,
+      "params": [
+        0.9805895090103149,
+        0.2020532786846161,
+        2.902116298675537
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003935581704047723,
+      "value_rmse": 0.5598784287098779,
+      "regret": {
+        "baseline": 0.0046972129152144815,
+        "type_a": 0.00474806180786414,
+        "type_b": 0.0009391154985381286,
+        "type_c": 0.0007182216455584008,
+        "transferred": true
+      },
+      "runtime": 2.6658668518066406,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 22,
+      "params": [
+        0.9805870652198792,
+        0.2020527422428131,
+        2.9021122455596924
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003935633436700567,
+      "value_rmse": 0.5599434812190975,
+      "regret": {
+        "baseline": 0.004696877871761215,
+        "type_a": 0.004747728125485171,
+        "type_b": 0.0009392956657605343,
+        "type_c": 0.0007182375151522766,
+        "transferred": true
+      },
+      "runtime": 3.8420000076293945,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 23,
+      "params": [
+        1.0062141703993086,
+        0.21065951477656444,
+        3.0660549823323326
+      ],
+      "standard_errors": [
+        0.03639227623891551,
+        0.008529607534598308,
+        0.09808414093512932
+      ],
+      "policy_tv": 0.004071497810651415,
+      "value_rmse": 0.652848033743404,
+      "regret": {
+        "baseline": 0.002926223936997809,
+        "type_a": 0.0028234861446112414,
+        "type_b": 0.00032970344905170444,
+        "type_c": 0.0003380613189066819,
+        "transferred": true
+      },
+      "runtime": 0.757932186126709,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 23,
+      "params": [
+        1.0062190294265747,
+        0.21065999567508698,
+        3.0660669803619385
+      ],
+      "standard_errors": [
+        0.014220031120598527,
+        0.007125661219665613,
+        0.05296243095896568
+      ],
+      "policy_tv": 0.004071501147093591,
+      "value_rmse": 0.6530034710113441,
+      "regret": {
+        "baseline": 0.0029263280516561682,
+        "type_a": 0.002823578062166712,
+        "type_b": 0.0003297820104230843,
+        "type_c": 0.00033814415640833097,
+        "transferred": true
+      },
+      "runtime": 2.764664888381958,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 23,
+      "params": [
+        1.0062166452407837,
+        0.21065932512283325,
+        3.0660600662231445
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004071358855917159,
+      "value_rmse": 0.6529071830307003,
+      "regret": {
+        "baseline": 0.0029260809513975616,
+        "type_a": 0.0028233475083291196,
+        "type_b": 0.0003297219995392605,
+        "type_c": 0.00033809753233379,
+        "transferred": true
+      },
+      "runtime": 4.297321796417236,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 24,
+      "params": [
+        1.038339372698118,
+        0.20341887581586426,
+        3.125429310333231
+      ],
+      "standard_errors": [
+        0.03704239844035623,
+        0.008515658021016361,
+        0.0992058302536541
+      ],
+      "policy_tv": 0.002958389559483371,
+      "value_rmse": 1.2403958467689435,
+      "regret": {
+        "baseline": 0.002487395641816524,
+        "type_a": 0.002488338204515894,
+        "type_b": 0.002503842602685953,
+        "type_c": 0.0009684340355623059,
+        "transferred": true
+      },
+      "runtime": 0.6086750030517578,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 24,
+      "params": [
+        1.0383355617523193,
+        0.2034197449684143,
+        3.125422954559326
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002958090219286116,
+      "value_rmse": 1.2403535344295449,
+      "regret": {
+        "baseline": 0.00248711786217345,
+        "type_a": 0.002488060202400465,
+        "type_b": 0.0025033566705756224,
+        "type_c": 0.0009683511542343803,
+        "transferred": true
+      },
+      "runtime": 2.312624931335449,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 24,
+      "params": [
+        1.0383367538452148,
+        0.20341993868350983,
+        3.1254231929779053
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002958092109485162,
+      "value_rmse": 1.240362336362287,
+      "regret": {
+        "baseline": 0.0024870344040034747,
+        "type_a": 0.0024879687963574337,
+        "type_b": 0.002503491269609726,
+        "type_c": 0.0009683183518206615,
+        "transferred": true
+      },
+      "runtime": 4.855074167251587,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 25,
+      "params": [
+        1.073404130511675,
+        0.20212549219968948,
+        3.161085655621363
+      ],
+      "standard_errors": [
+        0.03753872343871007,
+        0.008424736270268813,
+        0.10065494818961263
+      ],
+      "policy_tv": 0.004791448357074554,
+      "value_rmse": 2.0765847108190996,
+      "regret": {
+        "baseline": 0.005778664778057334,
+        "type_a": 0.005672595607691876,
+        "type_b": 0.008360653373363811,
+        "type_c": 0.0009439180060872551,
+        "transferred": true
+      },
+      "runtime": 0.6931450366973877,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 25,
+      "params": [
+        1.073405385017395,
+        0.20212487876415253,
+        3.1610918045043945
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004791513550018281,
+      "value_rmse": 2.0766056837895714,
+      "regret": {
+        "baseline": 0.005778871793309451,
+        "type_a": 0.005672806204712526,
+        "type_b": 0.008360953522437438,
+        "type_c": 0.0009440536290925926,
+        "transferred": true
+      },
+      "runtime": 3.163922071456909,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 25,
+      "params": [
+        1.073405146598816,
+        0.2021251618862152,
+        3.161088705062866
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004791585332061694,
+      "value_rmse": 2.076600841512527,
+      "regret": {
+        "baseline": 0.005778845968105757,
+        "type_a": 0.005672777274328496,
+        "type_b": 0.008360889967388332,
+        "type_c": 0.0009439733587875707,
+        "transferred": true
+      },
+      "runtime": 5.036109924316406,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 26,
+      "params": [
+        0.9480419250156751,
+        0.2006345233137595,
+        2.89583110276809
+      ],
+      "standard_errors": [
+        0.0347826194905379,
+        0.00829425441158316,
+        0.09335332721460755
+      ],
+      "policy_tv": 0.0040742359246044805,
+      "value_rmse": 1.3840224662783756,
+      "regret": {
+        "baseline": 0.0034765089014455867,
+        "type_a": 0.0034194977941238965,
+        "type_b": 0.005955845221646871,
+        "type_c": 0.0002803431889906865,
+        "transferred": true
+      },
+      "runtime": 0.8647358417510986,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 26,
+      "params": [
+        0.9480407238006592,
+        0.20063389837741852,
+        2.8958253860473633
+      ],
+      "standard_errors": [
+        0.005826450072806687,
+        0.012887818809200513,
+        0.03322287467855757
+      ],
+      "policy_tv": 0.0040742402117647635,
+      "value_rmse": 1.3840774626768577,
+      "regret": {
+        "baseline": 0.0034765151359929585,
+        "type_a": 0.0034195012472781543,
+        "type_b": 0.005956104582547939,
+        "type_c": 0.00028038342870720113,
+        "transferred": true
+      },
+      "runtime": 2.2908947467803955,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 26,
+      "params": [
+        0.9480413198471069,
+        0.20063449442386627,
+        2.895829200744629
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004074275113314494,
+      "value_rmse": 1.3840421930080349,
+      "regret": {
+        "baseline": 0.003476553614484859,
+        "type_a": 0.0034195414207164846,
+        "type_b": 0.005956002679794053,
+        "type_c": 0.0002803560927834022,
+        "transferred": true
+      },
+      "runtime": 3.6911840438842773,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 27,
+      "params": [
+        0.9506195708960476,
+        0.2011245976787426,
+        2.9022416714734183
+      ],
+      "standard_errors": [
+        0.03497143076666822,
+        0.008237859176722727,
+        0.09393879644663812
+      ],
+      "policy_tv": 0.003998703799227849,
+      "value_rmse": 1.2946094236236465,
+      "regret": {
+        "baseline": 0.003230150007253417,
+        "type_a": 0.00317825270922259,
+        "type_b": 0.0053775411706540495,
+        "type_c": 0.00024756604322983557,
+        "transferred": true
+      },
+      "runtime": 0.6107001304626465,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 27,
+      "params": [
+        0.9505986571311951,
+        0.20112203061580658,
+        2.90218448638916
+      ],
+      "standard_errors": [
+        0.003404442422377998,
+        0.022235791131788245,
+        0.057823733756576554
+      ],
+      "policy_tv": 0.003999598455982696,
+      "value_rmse": 1.2952952478407869,
+      "regret": {
+        "baseline": 0.0032321788627846736,
+        "type_a": 0.003180240855887805,
+        "type_b": 0.005382203547210809,
+        "type_c": 0.00024788856175000245,
+        "transferred": true
+      },
+      "runtime": 3.158463954925537,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 27,
+      "params": [
+        0.9506009817123413,
+        0.20112240314483643,
+        2.902190923690796
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003999548694342216,
+      "value_rmse": 1.295215853090592,
+      "regret": {
+        "baseline": 0.0032319675012400986,
+        "type_a": 0.0031800336802741843,
+        "type_b": 0.00538169097354925,
+        "type_c": 0.00024785218743292396,
+        "transferred": true
+      },
+      "runtime": 5.536465883255005,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 28,
+      "params": [
+        1.0389377248954894,
+        0.2049089094583449,
+        3.073745144591525
+      ],
+      "standard_errors": [
+        0.03709164475168962,
+        0.008566538725526315,
+        0.09904431394615244
+      ],
+      "policy_tv": 0.002564842812297027,
+      "value_rmse": 1.2179016331180548,
+      "regret": {
+        "baseline": 0.0024077890609248667,
+        "type_a": 0.002335309971006438,
+        "type_b": 0.002471441447953998,
+        "type_c": 0.0001001228162012265,
+        "transferred": true
+      },
+      "runtime": 0.9343438148498535,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 28,
+      "params": [
+        1.038944125175476,
+        0.2049100548028946,
+        3.0737664699554443
+      ],
+      "standard_errors": [
+        0.012227847583364395,
+        0.007134254809777501,
+        0.04634193035892103
+      ],
+      "policy_tv": 0.002565224156776828,
+      "value_rmse": 1.2181306580163849,
+      "regret": {
+        "baseline": 0.002408151480261435,
+        "type_a": 0.0023356440259339837,
+        "type_b": 0.002472207104003356,
+        "type_c": 0.00010021533195766198,
+        "transferred": true
+      },
+      "runtime": 4.206915855407715,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 28,
+      "params": [
+        1.0389418601989746,
+        0.2049093395471573,
+        3.073756694793701
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0025650356251284453,
+      "value_rmse": 1.2180340123921873,
+      "regret": {
+        "baseline": 0.0024080729893254478,
+        "type_a": 0.0023355807301562435,
+        "type_b": 0.0024719374444816,
+        "type_c": 0.00010016984637688173,
+        "transferred": true
+      },
+      "runtime": 4.706009149551392,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 29,
+      "params": [
+        0.9493497727913275,
+        0.196028255596371,
+        2.8414057076873744
+      ],
+      "standard_errors": [
+        0.03484371162848632,
+        0.008237304599833722,
+        0.09305075392028624
+      ],
+      "policy_tv": 0.003961445775667805,
+      "value_rmse": 1.6141532978459519,
+      "regret": {
+        "baseline": 0.004241061194183969,
+        "type_a": 0.004231261335057099,
+        "type_b": 0.005542643803230822,
+        "type_c": 0.0010676268765893284,
+        "transferred": true
+      },
+      "runtime": 1.007746934890747,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "stockpiling",
+      "rep": 29,
+      "params": [
+        0.949349582195282,
+        0.196028470993042,
+        2.841404914855957
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0039614480715358304,
+      "value_rmse": 1.6141421454369334,
+      "regret": {
+        "baseline": 0.0042411402982265095,
+        "type_a": 0.004231343610090089,
+        "type_b": 0.0055427003992521585,
+        "type_c": 0.0010676417822971518,
+        "transferred": true
+      },
+      "runtime": 2.6605520248413086,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "stockpiling",
+      "rep": 29,
+      "params": [
+        0.9493508338928223,
+        0.1960286647081375,
+        2.841409206390381
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003961389144104481,
+      "value_rmse": 1.6141071444438508,
+      "regret": {
+        "baseline": 0.004240912430135337,
+        "type_a": 0.0042311165512158005,
+        "type_b": 0.005542419982205504,
+        "type_c": 0.0010675922088232645,
+        "transferred": true
+      },
+      "runtime": 5.488239049911499,
+      "converged": false,
       "error": null
     }
   ]
