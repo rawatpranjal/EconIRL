@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # High-dimensional route choice on a synthetic road network
 
 A traveller moves through a road network one step at a time. Each period, the agent chooses among the nearest neighbours of the current node. The utility depends on the edge: how long it is, how attractive the destination is, and how close the destination sits to a fixed goal node. This is the same route-choice problem as the small study, run on a much larger graph.

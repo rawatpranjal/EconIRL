@@ -4,8 +4,8 @@ AIRL-Het extends adversarial inverse reinforcement learning to populations with
 latent segments. Each segment has its own reward and policy, recovered jointly
 through an expectation-maximization loop that alternates between assigning
 trajectories to segments and updating each segment's adversarial reward and
-policy. Two anchor normalizations — one on the exit action and one on the
-absorbing state — pin the action-dependent reward uniquely, so the recovered
+policy. Two anchor normalizations, one on the exit action and one on the
+absorbing state, pin the action-dependent reward uniquely, so the recovered
 reward equals the structural reward rather than a potential-based perturbation
 of it. The result is a segment-level reward object that supports structural
 counterfactual analysis on heterogeneous populations.
@@ -142,8 +142,8 @@ $$
 where $\ell(x) = 1/(1+e^{-x})$ is the logistic function. Substituting
 $D_k = \ell(f_k - \log \pi_k)$ gives
 $\log(1 - D_k) = -\log(1 + \exp(f_k - \log \pi_k))$, so the policy term
-is $\mathbb{E}_{\pi_k}[\log(1 - D_k)] = -\mathbb{E}_{\pi_k}[\operatorname{logaddexp}(0,\, f_k - \log \pi_k)]$,
-matching the implementation (`airl_het.py`, line 730). The E-step posterior is:
+is $\mathbb{E}_{\pi_k}[\log(1 - D_k)] = -\mathbb{E}_{\pi_k}[\operatorname{logaddexp}(0,\, f_k - \log \pi_k)]$.
+The E-step posterior is:
 
 $$
 q_{ik} \propto \lambda_k \prod_t \pi_k(a_{it} \mid s_{it}),
@@ -286,10 +286,9 @@ fitted attributes, the initialization options, and the reward-type settings.
 
 ## Evidence
 
-AIRL-Het is evaluated on the synthetic `airl_het_paper_identification` cell: a
-serialized-content heterogeneous environment with two latent segments, 61
-states, 3 actions (read, wait, exit), 20 reward features, and known
-segment-level rewards, policies, values, Q functions, and counterfactual
+AIRL-Het is evaluated on a synthetic serialized-content environment with two
+latent segments, 61 states, 3 actions (read, wait, exit), 20 reward features, and
+known segment-level rewards, policies, values, Q functions, and counterfactual
 oracle objects. 58 of 61 states are observed; three states outside the
 simulation support are expected given the content dynamics and do not
 indicate a data problem, but they bound what segment heterogeneity claims
@@ -306,17 +305,16 @@ Behavioral fit and segment recovery on that cell, from
 
 Counterfactual regret per intervention family (maximum across segments):
 
-| Counterfactual | Max regret | Status |
-| --- | ---: | --- |
-| Type A (reward shift) | 0.0145 | pass |
-| Type B (transition change) | 0.1189 | pass |
-| Type C (action removal) | 0.00687 | pass |
+| Counterfactual | Max regret |
+| --- | ---: |
+| Type A (reward shift) | 0.0145 |
+| Type B (transition change) | 0.1189 |
+| Type C (action removal) | 0.00687 |
 
-Type B regret is close to the gate threshold. The transition-change
-counterfactual is more demanding for adversarial estimators than reward
-shifts or action removals: the recovered reward must transfer across a
-dynamically different world without a likelihood-based correction.
-The result passes.
+Type B regret is the highest of the three. The transition-change counterfactual
+is more demanding for adversarial estimators than reward shifts or action
+removals. The recovered reward must transfer across a dynamically different world
+without a likelihood-based correction.
 
 AIRL-Het is not included in the current cross-estimator simulation studies,
 which target homogeneous populations. For the full study roster, see the

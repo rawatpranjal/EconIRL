@@ -15,6 +15,5 @@ The estimators are organized into two sections:
 - [Other Estimators](estimators/other.md) - every other estimator, grouped by the
   source of complexity it answers.
 
-For the reasoning behind the split, see
-[Choosing an Estimator](estimators/landscape.md). For a side-by-side decision
-table, see [Comparing Estimators](estimators/comparison.md).
+For the reasoning behind the split and a side-by-side decision table, see
+[Choosing an Estimator](estimators/landscape.md).

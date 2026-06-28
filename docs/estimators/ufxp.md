@@ -31,10 +31,8 @@ CCP-weighted transition is
 $F_{\hat{P}} = \sum_a \operatorname{diag}(\hat{P}_a) F_a$, and $V_{\hat{P}}(s)$
 is the value of following the empirical policy. The CCP-weighted feature matrix is
 $\Phi_{\hat{P}} = \sum_a \operatorname{diag}(\hat{P}_a) \Phi_a$, where $\Phi_a$ is
-the $(S, K)$ slice of $\phi(s, a)$ at action $a$ (source: `ufxp.py` line 136,
-`phi_P = einsum('sa,sak->sk', P, phi)`). The policy-entropy correction is
-$\operatorname{ent}(s) = -\sigma \sum_a \hat{P}_a(s) \log \hat{P}_a(s)$
-(source: `ufxp.py` line 134, `ent = -sigma * (P * log_p).sum(axis=1)`). The dual
+the $(S, K)$ slice of $\phi(s, a)$ at action $a$. The policy-entropy correction is
+$\operatorname{ent}(s) = -\sigma \sum_a \hat{P}_a(s) \log \hat{P}_a(s)$. The dual
 vector $\lambda$ satisfies $\lambda = w + \beta F_{\hat{P}}^\top \lambda$ for a
 given functional weight $w$.
 The integrated value function is $V_\theta(s)$, the choice-specific value is
@@ -187,8 +185,7 @@ $\sum_a \hat{P}_a \circ \phi(\cdot,a)^\top\theta = \Phi_{\hat{P}}\,\theta$, so i
 $\theta$-derivative is $\Phi_{\hat{P}}$ exactly. This is the shared
 implicit-differentiation step: the matrix $(I - \beta F_{\hat{P}})$ is
 $\theta$-free, so no chain rule through the inverse is needed. The result makes
-$dV$ constant in $\theta$, which is what enables the closed-form solve (source:
-`ufxp.py` lines 242--246; internal\_docs `§OUFXP upgrade`).
+$dV$ constant in $\theta$, which is what enables the closed-form solve.
 
 Separating the $\theta$-dependent part of $V_{\hat{P}}$ using
 $\partial V_{\hat{P}}/\partial\theta = dV$ and the constant entropy-correction value
@@ -197,8 +194,7 @@ $V_{\hat{P}} = dV\,\theta + v_{\text{ent}}$. Substituting into the first-order
 condition gives
 $\sigma \log(\hat{P}_a/\hat{P}_A) = \Delta\phi(s)^\top\theta + \beta\,\Delta F(s)(dV\,\theta + v_{\text{ent}})$,
 which rearranges to $y(s) = G(s)\,\theta + \varepsilon(s)$ with $G$ and $y$ as
-defined above (source: `ufxp.py` lines 247--249; internal\_docs
-`§Derivation as implemented`).
+defined above.
 
 Both $v_{\text{ent}}$ and $dV$ are independent of
 $\theta$ and are precomputed from a single factorization of $(I - \beta
@@ -215,7 +211,7 @@ is the multinomial covariance of the empirical CCPs, $\Gamma(s)$ is the Jacobian
 of the inverse-CCP map with
 $\Gamma_{a,b}(s) = \sigma\,\delta_{a,b}/\hat{P}_a(s) - \sigma\,\delta_{b,A}/\hat{P}_A(s)$
 (where $\delta$ is the Kronecker delta, $a$ indexes the $A-1$ non-reference actions,
-and $b$ indexes all $A$ actions; source: `ufxp.py` lines 261--263),
+and $b$ indexes all $A$ actions),
 and $\eta(s) = N(s)/N$ is the state's sample share. Setting the weighted moments to
 zero gives $\sum_s z(s)^\top G(s)\,\theta = \sum_s z(s)^\top y(s)$, so the
 closed-form solution is:
@@ -269,7 +265,7 @@ Output  theta_hat, standard errors, policy pi, value V
 
 The default variant is `weights="optimal"` (the OUFXP form of Oguz and Bray 2026):
 the single factorization in step 2 removes the value function from the estimation
-problem, and the per-state optimal weights in steps 6--13 deliver maximum-likelihood
+problem, and the per-state optimal weights in steps 6-13 deliver maximum-likelihood
 efficiency. An alternative variant is `weights="random"` (plain UFXP): $m$ random
 projection matrices $Z_i$ replace the optimal weights; $m$ dual vectors $\lambda_i$
 are pre-computed from the same single factorization via Proposition 2, and the
@@ -333,9 +329,9 @@ attributes, weighting modes, and the lower-level `UFXPEstimator` interface.
 
 ## Evidence
 
-Parameter recovery is measured on the `canonical_low_action` synthetic cell, which
-has known rewards, transitions, policies, values, Q functions, and Type A, Type B,
-and Type C counterfactual oracles. The figure below is a Monte-Carlo study over 100
+Parameter recovery is measured on a synthetic benchmark with known rewards,
+transitions, policies, values, Q functions, and Type A, Type B, and Type C
+counterfactual oracles. The figure below is a Monte-Carlo study over 100
 replications: the panel is resimulated and refit on a fresh seed each time, and each
 parameter is plotted as its recovered mean and 95% interval against the true value.
 

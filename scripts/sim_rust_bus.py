@@ -222,17 +222,9 @@ def _run_max_margin(env, panel):
 ROSTER = (
     RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
     RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
-    RosterEntry("NNES", "structural", _run_nnes, uses_transitions=True),
-    RosterEntry("SEES", "structural", _run_sees, uses_transitions=True),
     RosterEntry("TD-CCP", "structural", _run_tdccp, uses_transitions=True),
-    RosterEntry("UFXP", "structural", _run_ufxp, uses_transitions=True),
     RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
-    RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl, uses_transitions=True),
-    RosterEntry("IQ-Learn", "behavioral", _run_iq_learn, uses_transitions=True),
     RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
-    RosterEntry("AIRL", "behavioral", _run_airl, uses_transitions=True),
-    RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl, uses_transitions=True),
 )
 
 # Trimmed roster for the scaling sweep: five representative lines, a strict
@@ -241,7 +233,6 @@ ROSTER = (
 SCALING_ROSTER = (
     RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
     RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
     RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
     RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
 )
@@ -262,6 +253,13 @@ DIAGNOSES = {
 }
 
 EXCLUDED = [
+    {"name": "MPEC, NNES, SEES, UFXP", "reason": "Other-tier structural "
+     "estimators; this study shows the core structural family (NFXP, CCP, "
+     "TD-CCP). They ran and their records remain in the results file"},
+    {"name": "AIRL, Deep-MCE-IRL", "reason": "core IRL methods shown on the "
+     "gridworld study, whose deterministic state-only reward suits them"},
+    {"name": "MaxEnt-IRL, IQ-Learn", "reason": "trajectory MaxEnt and inverse "
+     "soft-Q; not part of the core roster"},
     {"name": "AIRL-Het / AAIRL", "reason": "designed for latent-type "
      "heterogeneity; this panel has one agent type"},
     {"name": "MMP, GAIL", "reason": "too slow for this page's per-fit budget"},

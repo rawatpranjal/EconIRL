@@ -44,6 +44,35 @@ means what you want it to mean.
 The estimator pages spell these out per method. The [NFXP identification
 section](../estimators/nfxp.md) is the worked example.
 
+### Four questions that point to an estimator
+
+The assumptions above let any of these estimators run. Four further questions narrow the
+field to the one that fits your problem.
+
+- **Is the reward state-only or action-dependent?** A state-only reward depends on where
+  you are, not on what you do. It suits [AIRL](../estimators/airl.md) and
+  [MCE-IRL](../estimators/mce_irl.md). When the payoff differs by action, a state-only
+  reward cannot represent the action contrast, and the policy collapses toward uniform.
+  Action-dependent rewards need a structural estimator ([NFXP](../estimators/nfxp.md),
+  [CCP](../estimators/ccp.md)) or an anchored method
+  ([AIRL-Het](../estimators/airl_het.md)). The
+  [AIRL identification boundary](../estimators/airl/identification.md) works this through.
+- **Are transitions deterministic or stochastic?** Structural estimators handle stochastic
+  transitions directly. AIRL's reward-recovery guarantee holds under deterministic
+  dynamics. Under stochastic dynamics AIRL still matches behavior, but the reward is no
+  longer pinned. MCE-IRL's feature matching holds either way. The
+  [AIRL page](../estimators/airl.md) states the condition.
+- **Is the state low-dimensional or high-dimensional?** A handful of known features
+  supports a linear reward: NFXP, CCP, MCE-IRL. A high-dimensional state, or a reward
+  whose form you do not know, calls for a neural reward:
+  [Neural MCE-IRL](../estimators/deep_mce_irl.md) or
+  [GLADIUS](../estimators/gladius.md). Structural estimators stay linear by design.
+- **Can you anchor a reward value?** A reward is recovered relative to a baseline. If you
+  can pin one value, such as a known zero-payoff exit action R(s, exit) = 0, you fix the
+  level. An anchor also lets you identify an action-dependent reward where a plain method
+  cannot. AIRL-Het uses two anchors, one on the exit action and one on the absorbing
+  state.
+
 ## Run the diagnostics
 
 Three checks tell you whether the data can support a fit. Each one says what it
@@ -138,19 +167,31 @@ are moderate.
 (choosing-your-estimator)=
 ## Choosing your estimator
 
-Two families fit the same kind of panel but recover different objects. Pick by
-what you need from the answer.
+The four questions above point to a family. Two families fit the same kind of panel but
+recover different objects. Pick by what you need from the answer.
+
+The key decisions, in short:
+
+- **Need parameters with units and counterfactuals?** Use a structural estimator.
+- **Reward state-only and dynamics deterministic?** AIRL or MCE-IRL recover it.
+- **State high-dimensional or reward form unknown?** Use a neural reward.
+- **Have a credible anchor action?** It pins the level and widens what you can identify.
 
 | Family | Estimators | Recovers | Counterfactuals | Assumptions |
 | --- | --- | --- | --- | --- |
 | Structural | NFXP, CCP, MPEC | Finite reward parameters with a fixed meaning. | Supported: re-solve the model under a changed primitive. | Stronger: a parametric reward and the anchor above. |
 | IRL / behavioral | MCE-IRL, AIRL | A reward only up to behavior-preserving transformations. | Not always: some methods recover behavior without a re-solvable primitive. | Weaker: less structure on the reward. |
 
-Structural estimators are the choice when you need parameters with units and
-want to ask what happens under a new policy. IRL estimators trade that for
-weaker assumptions, and recover a reward that matches behavior but is not pinned
-to a single scale. See the [estimator map](../estimators.md) for the full set and
-the [comparison page](../estimators/comparison.md) for a side-by-side table.
+Structural estimators are the choice when you need parameters with units and want to ask
+what happens under a new policy. IRL estimators trade that for weaker assumptions. They
+recover a reward that matches behavior but is identified only up to transformations that
+leave behavior unchanged.
+
+When the reward is state-only and the dynamics are deterministic, MCE-IRL and AIRL recover
+the reward up to an additive constant, with linear features or a neural reward. An anchor
+that pins one reward value fixes the constant too, so the recovered reward equals the true
+reward. See the [estimator map](../estimators.md) for the full set and
+[Choosing an Estimator](../estimators/landscape.md) for the side-by-side comparison.
 
 ## A full run, start to finish
 

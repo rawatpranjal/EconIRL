@@ -26,7 +26,6 @@ Synthetic route choice on a random geometric graph. ``road_network(num_nodes=25,
 |---|---|---|---|---|
 | NFXP | structural | yes | yes | yes |
 | CCP | structural | yes | yes | no |
-| MPEC | structural | yes | yes | yes |
 | MCE-IRL | behavioral | yes | yes | no |
 | NeuralGLADIUS | behavioral | no | no | no |
 
@@ -38,7 +37,6 @@ Uses transitions is whether the estimator reads the transition kernel; model-fre
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 2/2 | 2/2 | [1.182, 0.508, 0.999] | 0.1052 | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 3.0 |
 | CCP | structural | 2/2 | 2/2 | [1.167, 0.488, 0.953] | 0.1025 | 0.0126 | 0.0058 | 0.0042 | 0.0086 | 0.0088 | 2.2 |
-| MPEC | structural | 2/2 | 2/2 | [1.182, 0.508, 0.999] | 0.1052 | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 0.3 |
 | MCE-IRL | behavioral | 2/2 | 0/2 | [1.182, 0.508, 0.999] | - | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 5.0 |
 | NeuralGLADIUS | behavioral | 2/2 | 2/2 | - | - | 0.2658 | 4.2640 | 4.2552 | 3.3720 | 44.4197 | 6.1 |
 
@@ -56,9 +54,6 @@ Param RMSE covers the structural family only, which shares the parameterization 
 | CCP | edge_cost | 1.000 | 1.167 | +0.167 | 0.085 | 0.178 | - | 0% (2 reps) |
 | CCP | amenity | 0.500 | 0.488 | -0.012 | 0.020 | 0.018 | - | 0% (2 reps) |
 | CCP | goal | 1.000 | 0.953 | -0.047 | 0.018 | 0.049 | - | 0% (2 reps) |
-| MPEC | edge_cost | 1.000 | 1.182 | +0.182 | 0.083 | 0.191 | 1.00 +/- 0.00 | 100% (2 reps) |
-| MPEC | amenity | 0.500 | 0.508 | +0.008 | 0.016 | 0.014 | 1.00 +/- 0.00 | 100% (2 reps) |
-| MPEC | goal | 1.000 | 0.999 | -0.001 | 0.008 | 0.006 | 1.00 +/- 0.00 | 100% (2 reps) |
 
 Coverage is the share of replications whose 95% interval contains the truth, shown with its Monte Carlo standard error. It is computed only where every replication produced a finite standard error. SE avail is the share of replications with finite standard errors.
 
@@ -86,8 +81,6 @@ The recovered reward sits beside the true reward as state-by-action heatmaps, sh
 
 **CCP.** CCP uses a first-step nonparametric policy estimate to avoid the inner Bellman loop. One policy-iteration step corrects the bias from the nonparametric first stage.
 
-**MPEC.** Mathematical programming with equilibrium constraints. MPEC is not in the CAPABILITIES registry (so run_form does not surface it automatically) but runs correctly via the direct .estimate() path. Uses solver='sqp' for real constrained MLE; the legacy 'slsqp' alias checks only Bellman feasibility.
-
 **MCE-IRL.** Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate.
 
 **NeuralGLADIUS.** Model-free neural policy learner. Uses only the feature matrix and the observed panel; it does not use transition matrices. Capped at 200 epochs here for short compute.
@@ -102,4 +95,4 @@ python scripts/study_route_choice.py --verify        # re-derive the table from 
 
 Raw facts: `validation/results/study_route_choice.json`.
 
-Not shown on this page: IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NNES, SEES, TD-CCP, UFXP (correct structural estimators but slower on a 25-node graph; NFXP and CCP already cover the structural family); MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL (trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here).
+Not shown on this page: MPEC (an Other-tier constrained-optimization form of the same MLE; NFXP and CCP carry the structural recovery here); IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NNES, SEES, TD-CCP, UFXP (correct structural estimators but slower on a 25-node graph; NFXP and CCP already cover the structural family); MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL (trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here).

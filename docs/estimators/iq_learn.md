@@ -323,9 +323,9 @@ attributes and the `IQLearnEstimator` interface.
 
 ## Evidence
 
-Behavioral recovery and counterfactual regret on the primary synthetic cell
-(`canonical_low_action`, 21 states, 3 actions, 2000 individuals, 80 periods,
-`q_type="tabular"`, `divergence="chi2"`, `alpha=1.0`):
+Behavioral recovery and counterfactual regret on the primary synthetic benchmark
+(21 states, 3 actions, 2000 individuals, 80 periods, `q_type="tabular"`,
+`divergence="chi2"`, `alpha=1.0`):
 
 | Metric | Value |
 | --- | ---: |

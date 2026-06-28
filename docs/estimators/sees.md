@@ -75,7 +75,7 @@ $$
 
 where $Q_\theta(s, a; V) = \phi(s,a)^\top\theta + \beta\sum_{s'} P_a(s,s') V(s')$
 takes $V$ as its direct argument (no alpha subscript). The fixed point satisfies
-$V = T_\theta(V)$ at the true value function. (Source: `bellman.py` lines 9 and 94–95.)
+$V = T_\theta(V)$ at the true value function.
 
 The canonical instance is the Rust bus-engine replacement model. A bus
 operator decides each period whether to keep a deteriorating engine or pay a
@@ -123,14 +123,12 @@ $$
 
 where $\ell(\theta,\alpha) = \sum_{i,t} \log \pi_{\theta,\alpha}(a_{it} \mid
 s_{it})$ is the conditional log likelihood and the second term penalizes the
-state-average squared Bellman equilibrium residual. (Implementation:
-`penalized_criterion_mean` in `sees.py` lines 760–766 uses
-`jnp.mean(residual**2)`, so $\omega$ is on the mean-squared scale; using a
-sum norm instead would rescale $\omega$ by $|S|$.) The unpenalized log
+state-average squared Bellman equilibrium residual. The penalty uses the mean
+squared residual, so $\omega$ is on the mean-squared scale. A sum norm instead
+would rescale $\omega$ by $|S|$. The unpenalized log
 likelihood is reported at the final point; the Bellman violation, defined as
 the maximum absolute pointwise residual $\|V_\alpha - T_\theta(V_\alpha)\|_\infty
 = \max_s |V_\alpha(s) - T_\theta(V_\alpha)(s)|$, is reported separately.
-(Source: `sees.py` line 876, `jnp.max(jnp.abs(bellman_residual))`.)
 
 **Score of the penalized objective.** The log-likelihood score with respect
 to $\theta$ follows from differentiating $\log \pi_{\theta,\alpha}(a \mid s)$:
@@ -155,10 +153,8 @@ expected feature vector under the current policy. The implementation computes
 the full gradient of the penalized objective over $(\theta, \alpha)$ jointly
 via JAX autodiff (`jax.jit` over the negated penalized criterion); both
 gradient contributions are taken together in a single autodiff pass.
-L-BFGS-B descends the negated sum. (Derivation: differentiates
-the logit CCP and the log-sum-exp operator on the page; implementation:
-`_neg_penalized_ll = jax.jit(lambda x: -penalized_criterion_mean(x))`,
-`sees.py` line 774; see also Luo and Sang (2024) Appendix.)
+L-BFGS-B descends the negated sum. The derivation differentiates the logit CCP
+and the log-sum-exp operator on the page. See also Luo and Sang (2024) Appendix.
 
 Standard errors for $\theta$ are obtained by marginalizing out the sieve
 coefficients as a nuisance block via the Schur complement of the joint Hessian.
@@ -296,9 +292,9 @@ attributes and the lower-level `SEESEstimator` interface.
 
 ## Evidence
 
-Parameter recovery is measured on the `canonical_high_action` synthetic cell,
-which has known rewards, transitions, policies, values, Q functions, and Type A,
-Type B, and Type C counterfactual oracles. The cell has 81 states, 3 actions,
+Parameter recovery is measured on a high-action synthetic benchmark with known
+rewards, transitions, policies, values, Q functions, and Type A, Type B, and Type
+C counterfactual oracles. It has 81 states, 3 actions,
 and 32 reward parameters. The figure below is a Monte-Carlo parameter-recovery
 study over 50 replications: the panel is resimulated and refit on a fresh seed
 each time, and each parameter is plotted as its recovered mean and 95% interval

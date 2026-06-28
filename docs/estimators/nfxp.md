@@ -196,13 +196,15 @@ Output  theta_hat, standard errors, policy pi, value V
 
 The inner solve in step 4 defaults to `inner_solver="polyalgorithm"`: safe
 successive approximation while far from the fixed point, then Newton-Kantorovich
-steps near the solution, following Iskhakov et al. (2016). Two pure variants are
+steps near the solution, following Iskhakov et al. (2016). With this
+polyalgorithm the nested fixed point is computationally competitive with the
+constrained-optimization alternative, narrowing the speed gap that earlier
+comparisons reported. Two pure variants are
 also available. `sa` (successive approximation) is a contraction iteration that
 converges linearly and is robust from any start. `nk` (Newton-Kantorovich)
 converges quadratically near the solution but needs a good starting point. The
 outer optimizer is BHHH, which builds a positive semi-definite Hessian
-approximation from the outer products of the per-observation scores. The
-implementation lives in `econirl.estimation.nfxp`.
+approximation from the outer products of the per-observation scores.
 
 The standard errors come from maximum-likelihood asymptotics. The `se_method`
 argument selects the covariance estimator. `asymptotic` inverts the
@@ -268,9 +270,9 @@ attributes and the lower-level `NFXPEstimator` interface.
 
 ## Evidence
 
-Parameter recovery is measured on the `canonical_low_action` synthetic cell,
-which has known rewards, transitions, policies, values, Q functions, and Type A,
-Type B, and Type C counterfactual oracles. The figure below is a Monte-Carlo
+Parameter recovery is measured on a synthetic benchmark with known rewards,
+transitions, policies, values, Q functions, and Type A, Type B, and Type C
+counterfactual oracles. The figure below is a Monte-Carlo
 study over 200 replications: the panel is resimulated and refit on a fresh seed
 each time, and each parameter is plotted as its recovered mean and 95% interval
 against the true value.

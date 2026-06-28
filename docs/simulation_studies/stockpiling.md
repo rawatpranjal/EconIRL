@@ -28,7 +28,6 @@ Consumer stockpiling of a storable good. A household holds inventory $i \in \{0,
 |---|---|---|---|---|
 | NFXP | structural | yes | yes | yes |
 | CCP | structural | yes | yes | yes |
-| MPEC | structural | yes | yes | yes |
 | MCE-IRL | behavioral | yes | yes | no |
 | NeuralGLADIUS | behavioral | no | no | no |
 
@@ -40,7 +39,6 @@ Uses transitions is whether the estimator reads the transition kernel; model-fre
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 2/2 | 2/2 | [0.993, 0.197, 2.930] | 0.0572 | 0.0026 | 0.0055 | 0.0056 | 0.0010 | 0.0009 | 2.4 |
 | CCP | structural | 2/2 | 2/2 | [0.994, 0.196, 2.930] | 0.0572 | 0.0026 | 0.0054 | 0.0055 | 0.0010 | 0.0009 | 2.2 |
-| MPEC | structural | 2/2 | 2/2 | [0.993, 0.197, 2.930] | 0.0572 | 0.0026 | 0.0055 | 0.0056 | 0.0010 | 0.0009 | 0.3 |
 | MCE-IRL | behavioral | 2/2 | 0/2 | [0.993, 0.197, 2.930] | - | 0.0026 | 0.0055 | 0.0056 | 0.0010 | 0.0009 | 7.4 |
 | NeuralGLADIUS | behavioral | 2/2 | 2/2 | - | - | 0.0647 | 2.4105 | 2.5216 | 5.5947 | 38.9062 | 7.5 |
 
@@ -58,9 +56,6 @@ Param RMSE covers the structural family only, which shares the parameterization 
 | CCP | spend | 1.000 | 0.994 | -0.006 | 0.027 | 0.020 | 0.50 +/- 0.35 | 100% (2 reps) |
 | CCP | holding | 0.200 | 0.196 | -0.004 | 0.004 | 0.005 | 1.00 +/- 0.00 | 100% (2 reps) |
 | CCP | stockout | 3.000 | 2.930 | -0.070 | 0.136 | 0.119 | 0.50 +/- 0.35 | 100% (2 reps) |
-| MPEC | spend | 1.000 | 0.993 | -0.007 | 0.027 | 0.020 | 1.00 +/- 0.00 | 100% (2 reps) |
-| MPEC | holding | 0.200 | 0.197 | -0.003 | 0.004 | 0.004 | 1.00 +/- 0.00 | 100% (2 reps) |
-| MPEC | stockout | 3.000 | 2.930 | -0.070 | 0.137 | 0.119 | 1.00 +/- 0.00 | 100% (2 reps) |
 
 Coverage is the share of replications whose 95% interval contains the truth, shown with its Monte Carlo standard error. It is computed only where every replication produced a finite standard error. SE avail is the share of replications with finite standard errors.
 
@@ -82,8 +77,6 @@ The same reward as a state-by-action heatmap puts the true and recovered rewards
 
 **CCP.** CCP uses a first-step nonparametric policy estimate to avoid the inner Bellman loop. One policy-iteration step corrects the bias from the nonparametric first stage.
 
-**MPEC.** Mathematical programming with equilibrium constraints. MPEC is not in the CAPABILITIES registry (so run_form does not surface it automatically) but runs correctly via the direct .estimate() path. Uses solver='sqp' for real constrained MLE; the legacy 'slsqp' alias checks only Bellman feasibility.
-
 **MCE-IRL.** Its convergence indicator mirrors the inner optimizer's success status. The optimizer can stop short while the recovered policy is already accurate, so it can read False on an accurate fit.
 
 **NeuralGLADIUS.** Model-free neural policy learner. Uses only the feature matrix and the observed panel; it does not use transition matrices. Capped at 200 epochs here for short compute.
@@ -98,4 +91,4 @@ python scripts/study_stockpiling.py --verify        # re-derive the table from J
 
 Raw facts: `validation/results/study_stockpiling.json`.
 
-Not shown on this page: IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NNES, SEES, TD-CCP, UFXP (correct structural estimators but slower here; NFXP and CCP already cover the structural family); MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL (trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here).
+Not shown on this page: MPEC (an Other-tier constrained-optimization form of the same MLE; NFXP and CCP carry the structural recovery here); IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NNES, SEES, TD-CCP, UFXP (correct structural estimators but slower here; NFXP and CCP already cover the structural family); MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL (trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here).
