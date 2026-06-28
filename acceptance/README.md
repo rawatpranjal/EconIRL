@@ -7,8 +7,28 @@ and a dataset, and tries to recover a real medium-scale messy problem. He never
 sees this repo, the author, or the true answer. The orchestrator holds the answer
 key and grades him. What he finds drives the final cleanup.
 
-Full design and the chunk list (J0..J16) live in `project/roadmap.md` under the
+The default roster is now the focused core set from `project/estimator_roster.md`:
+NFXP, CCP, NNES, TD-CCP, MCE-IRL, RHIP, AIRL-1/AIRL, AIRL-2/AIRL-Het, and
+GLADIUS. Other estimators remain available, but they are not default Joe chunks
+unless the user explicitly promotes or names them.
+
+Full design and the chunk list (J0..J12) live in `project/roadmap.md` under the
 "Joe from Uber" stream.
+
+## Exact paper replication profiles
+
+Use these when the task is "match the paper number exactly, no cheating." These
+profiles may use tighter tolerances or original-paper preprocessing that should
+not automatically become package-wide defaults.
+
+```bash
+make rust-table-ix
+```
+
+This downloads Rust's official NFXP archive into `downloads/`, mirrors
+`STORDAT.GPR` for the 1975 GMC A5308 group, runs the strict NFXP/BHHH Table IX
+profile, writes machine receipts to `acceptance/loop/nfxp/table_ix/`, and writes
+the private markdown receipt to `project/replications/nfxp_rust1987_table_ix.md`.
 
 ## Layout
 

@@ -1,6 +1,9 @@
-# Ziebart MCE IRL Replication
+# Ziebart MCE IRL Controlled Gridworld Study
 
-Replication of experiments from Ziebart et al. (2008, 2010) using the `econirl` package.
+Reproducible gridworld evidence for Ziebart-style maximum causal entropy IRL.
+This is not an exact replication of Ziebart's taxi-route paper table; that
+table requires the original route data or an independently reproducible
+benchmark.
 
 ## Papers
 
@@ -9,19 +12,20 @@ Replication of experiments from Ziebart et al. (2008, 2010) using the `econirl` 
 
 ## Scripts
 
-- `run_gridworld.py` - Main replication script. Runs MCE IRL and MaxEnt IRL on a gridworld, compares recovered rewards and policies.
+- `run_gridworld.py` - Main controlled gridworld study. Runs MCE IRL and MaxEnt IRL on three synthetic gridworld reward cases.
+- `ziebart_mce_irl_replication.py` - Smaller legacy gridworld diagnostic.
 
 ## Usage
 
 ```bash
-# Default: 5x5 grid, 100 trajectories
+# Default: 5x5 grid, 2000 trajectories
 python run_gridworld.py
 
-# Larger grid with more data
-python run_gridworld.py --grid-size 8 --n-traj 200
+# Reference run used in the replication record
+python run_gridworld.py --grid-size 5 --n-traj 500 --n-periods 30
 
-# Save results to JSON
-python run_gridworld.py --save-results --output-dir results
+# Larger grid with less data
+python run_gridworld.py --grid-size 8 --n-traj 200
 ```
 
 ## Key Results

@@ -1,10 +1,10 @@
 """
-Replication of Ziebart et al. (2008/2010) Maximum Causal Entropy IRL
-=====================================================================
+Controlled gridworld study for Ziebart-style Maximum Causal Entropy IRL
+=======================================================================
 
-Replicates the gridworld experiment from Ziebart's MCE IRL paper using
-the econirl package. Demonstrates reward recovery, feature matching,
-and policy comparison between MCE IRL and MaxEnt IRL.
+Runs a small synthetic gridworld through the econirl MCE-IRL implementation.
+This checks the Ziebart soft-Bellman and feature-matching mechanics, but it is
+not an exact paper-number replication.
 """
 
 import jax.numpy as jnp
@@ -20,7 +20,7 @@ from econirl.core.solvers import hybrid_iteration
 
 def run_replication():
     print("=" * 70)
-    print("  Ziebart MCE IRL Replication: Gridworld Experiment")
+    print("  Ziebart-style MCE IRL Controlled Gridworld Study")
     print("=" * 70)
 
     # --- Setup ---
@@ -186,20 +186,19 @@ def run_replication():
     print("  Summary")
     print(f"{'='*70}")
     print(f"""
-  MCE IRL (Ziebart 2010) successfully recovers reward parameters from
-  expert demonstrations in a {grid_size}x{grid_size} gridworld:
+  MCE IRL was fit to expert demonstrations in a {grid_size}x{grid_size}
+  synthetic gridworld:
 
-  - Feature matching converges (||diff|| = {diff if diff is not None else 'N/A'})
-  - Reward direction recovery: cosine similarity = {cos_sim:.4f}
+  - Feature residual norm: {diff if diff is not None else 'N/A'}
+  - Reward direction statistic: cosine similarity = {cos_sim:.4f}
   - Policy accuracy: {mce_acc:.1f}% of states match optimal action
   - KL divergence from true policy: {kl_mce:.6f}
   - Log-likelihood: {mce_result.log_likelihood:.2f}
 
-  Note: IRL rewards are identified only up to an additive constant
-  and multiplicative scale (Kim et al. 2021, Cao & Cohen 2021), so
-  the *direction* of the recovered reward vector matters more than
-  exact parameter values. The high cosine similarity confirms the
-  algorithm correctly identifies the reward structure.
+  This is a controlled simulation, not a Ziebart paper-number replication. Policy
+  agreement can be strong even when reward direction or feature residuals
+  are not exact, so inspect all metrics before treating the gridworld as a
+  reward-recovery success.
 """)
 
 
