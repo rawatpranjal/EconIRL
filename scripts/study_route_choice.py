@@ -166,8 +166,9 @@ EXCLUDED = [
             "a model-free neural policy learner; on a 25-node tabular state "
             "space it reduces to behavioral cloning on the choice likelihood "
             "with no structural edge, and it trailed every method shown. Its "
-            "decisive setting is scale, where the full-solution methods time "
-            "out; see the fleet-maintenance scale study"
+            "arena is scalability and predictive likelihood on large state "
+            "spaces where full-solution methods become intractable, a regime "
+            "outside these policy-recovery studies"
         ),
     },
 ]
