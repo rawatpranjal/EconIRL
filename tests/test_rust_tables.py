@@ -310,6 +310,69 @@ class TestTableIXProfile:
         assert "Rust (1987), Table IX" in receipt
 
 
+class TestMPECStordatProfile:
+    """MPEC reproduces the exact Rust Table IX estimates (Su-Judd 2012, Prop 1).
+
+    Su and Judd publish no real-data table (Monte Carlo only). Their
+    Proposition 1 is that MPEC and NFXP solve the same MLE, so the matchable
+    target is Rust's published Table IX, group 4, beta=0.9999. This locks the
+    MPEC replication recorded in project/replications/mpec_rust1987.md.
+    """
+
+    @pytest.mark.slow
+    def test_mpec_stordat_matches_table_ix(self):
+        if not OFFICIAL_GROUP4_RAW.exists():
+            pytest.skip("official NFXP archive not downloaded")
+
+        import jax
+
+        jax.config.update("jax_enable_x64", True)
+        from econirl.environments.rust_bus import RustBusEnvironment
+        from econirl.estimation.mpec import MPECConfig, MPECEstimator
+        from econirl.preferences.linear import LinearUtility
+        from econirl.replication.rust1987.table_ix import PAPER_TABLE_IX_GROUP4
+        from econirl.replication.rust1987.tables import _df_to_panel
+
+        df, metadata = load_stordat_group4_panel(OFFICIAL_GROUP4_RAW)
+        panel = _df_to_panel(df)
+        probs = tuple(float(metadata["transition_probabilities"][k]) for k in range(3))
+
+        env = RustBusEnvironment(
+            operating_cost=0.001,
+            replacement_cost=3.0,
+            num_mileage_bins=int(metadata["n_states"]),
+            mileage_transition_probs=probs,
+            discount_factor=0.9999,
+        )
+        utility = LinearUtility.from_environment(env)
+        estimator = MPECEstimator(
+            config=MPECConfig(solver="sqp"),
+            se_method="asymptotic",
+            compute_hessian=True,
+        )
+        result = estimator.estimate(
+            panel, utility, env.problem_spec, env.transition_matrices
+        )
+
+        paper = PAPER_TABLE_IX_GROUP4[0.9999]
+        se = np.asarray(result.standard_errors, dtype=np.float64)
+
+        assert bool(result.converged)
+        # Estimates match the published Table IX to four significant figures.
+        assert float(result.parameters[0]) * 1000.0 == pytest.approx(
+            paper["theta_1_paper_units"], abs=5e-4
+        )
+        assert float(result.parameters[1]) == pytest.approx(paper["RC"], abs=5e-4)
+        assert float(result.log_likelihood) == pytest.approx(
+            paper["choice_log_likelihood"], abs=5e-3
+        )
+        # Standard errors match Table IX to its reported (three-figure) precision.
+        assert float(se[0]) * 1000.0 == pytest.approx(
+            paper["theta_1_se_paper_units"], abs=1e-3
+        )
+        assert float(se[1]) == pytest.approx(paper["RC_se"], abs=1e-3)
+
+
 class TestExport:
     """Tests for LaTeX export."""
 
