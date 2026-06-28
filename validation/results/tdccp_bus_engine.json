@@ -1,0 +1,112 @@
+{
+  "arxiv": "1912.09509",
+  "dgp": {
+    "beta": 0.9,
+    "model": "bus-engine replacement, deterministic mileage, permanent type",
+    "n_buses": 1000,
+    "n_periods": 30,
+    "n_reps": 500,
+    "n_types": 2,
+    "param_names": [
+      "theta0_intercept",
+      "theta1_mileage",
+      "theta2_type"
+    ],
+    "reps_by_column": {
+      "locally_robust": 100,
+      "not_locally_robust": 500
+    },
+    "theta_true": [
+      2.0,
+      -0.15,
+      1.0
+    ],
+    "x_max": 40
+  },
+  "estimator": "TD-CCP",
+  "estimator_config": {
+    "basis_dim": 3,
+    "basis_type": "encoded",
+    "ccp_method": "logit",
+    "ccp_poly_degree": 3,
+    "method": "semigradient"
+  },
+  "paper": "Adusumilli and Eckardt (2025), Table B.1 (bus-engine replacement)",
+  "paper_table_b1": {
+    "theta0_intercept": {
+      "mean_lr": 1.9778,
+      "mean_nlr": 1.9788,
+      "mse_lr": 0.0081,
+      "mse_nlr": 0.008,
+      "sd_lr": 0.087,
+      "sd_nlr": 0.0868,
+      "true": 2.0
+    },
+    "theta1_mileage": {
+      "mean_lr": -0.1489,
+      "mean_nlr": -0.1492,
+      "mse_lr": 1.3e-05,
+      "mse_nlr": 1.2e-05,
+      "sd_lr": 0.0034,
+      "sd_nlr": 0.0033,
+      "true": -0.15
+    },
+    "theta2_type": {
+      "mean_lr": 1.0032,
+      "mean_nlr": 1.0044,
+      "mse_lr": 0.0034,
+      "mse_nlr": 0.0034,
+      "sd_lr": 0.0584,
+      "sd_nlr": 0.0583,
+      "true": 1.0
+    }
+  },
+  "results": {
+    "locally_robust": {
+      "theta0_intercept": {
+        "bias": 0.08377095746240798,
+        "mean": 2.0837709574624084,
+        "mse": 0.010548157752325453,
+        "sd": 0.059718061817419815,
+        "true": 2.0
+      },
+      "theta1_mileage": {
+        "bias": -0.009983806489069777,
+        "mean": -0.1599838064890698,
+        "mse": 0.00015504324071591617,
+        "sd": 0.007478376147450187,
+        "true": -0.15
+      },
+      "theta2_type": {
+        "bias": -0.04144021439263383,
+        "mean": 0.9585597856073662,
+        "mse": 0.007978896886436042,
+        "sd": 0.07952895106883834,
+        "true": 1.0
+      }
+    },
+    "not_locally_robust": {
+      "theta0_intercept": {
+        "bias": 0.042069170710692314,
+        "mean": 2.0420691707106924,
+        "mse": 0.005212751009366121,
+        "sd": 0.058735300767027106,
+        "true": 2.0
+      },
+      "theta1_mileage": {
+        "bias": -0.006108604811139003,
+        "mean": -0.156108604811139,
+        "mse": 0.0001006683836067788,
+        "sd": 0.007967452004939235,
+        "true": -0.15
+      },
+      "theta2_type": {
+        "bias": -0.034381547983101245,
+        "mean": 0.9656184520168987,
+        "mse": 0.0068513663051232515,
+        "sd": 0.0753699989178899,
+        "true": 1.0
+      }
+    }
+  }
+}

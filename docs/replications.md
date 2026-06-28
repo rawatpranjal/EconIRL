@@ -197,6 +197,44 @@ Reproduce:
 python validation/estimators/airl/run.py    # state-only recovers, state-action does not
 ```
 
+## TD-CCP (Adusumilli and Eckardt, 2025)
+
+Adusumilli and Eckardt estimate dynamic discrete choice models with
+temporal-difference learning built on the conditional-choice-probability
+approach. Their linear semi-gradient estimator approximates the recursive value
+terms with basis functions and needs no transition densities. Their bus-engine
+Monte Carlo (Online Appendix, Table B.1) is a Rust-style replacement problem with
+one mileage state and a permanent bus type. The manager keeps or replaces each
+period under Type-1 extreme-value shocks. The replacement payoff is set to zero,
+and the keep payoff is theta0 + theta1 times mileage + theta2 times type. The true
+values are theta0 = 2, theta1 = -0.15, theta2 = 1, with discount 0.9.
+
+The package runs the same linear semi-gradient estimator, with a third-order
+polynomial basis and logit conditional choice probabilities, on 1000 buses
+observed for 30 periods, repeated across Monte Carlo draws. Each parameter's mean
+estimate and mean-squared error sit next to the paper.
+
+### Bus-engine recovery, 1000 buses, T = 30, 250 draws
+
+| Parameter | True | Package mean | Paper mean | Package MSE | Paper MSE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| theta0 (intercept) | 2.0 | 2.043 | 1.979 | 0.0048 | 0.0080 |
+| theta1 (mileage) | -0.15 | -0.156 | -0.149 | 0.00009 | 0.00001 |
+| theta2 (type) | 1.0 | 0.964 | 1.004 | 0.0067 | 0.0034 |
+
+The estimator recovers all three parameters with small bias, near the paper's
+means. The locally robust correction returns nearly the same estimates as the
+plain version, which matches the paper's reading that the correction adds little
+in this setting. The mileage coefficient is recovered less precisely than the
+paper's own code. This is a Monte Carlo recovery reproduction, not a four-figure
+number match.
+
+Reproduce:
+
+```bash
+PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 250 --lr-reps 50
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -206,7 +244,6 @@ both the estimates and the standard errors.
 | Estimator | Paper | Status |
 | --- | --- | --- |
 | NNES | Nguyen (2025) | Not yet evaluated. |
-| TD-CCP | Adusumilli-Eckardt (2025) | Not yet evaluated. |
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |
 | AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
