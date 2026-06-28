@@ -319,12 +319,23 @@ def hybrid_iteration(
     max_iter: int = 1000,
     switch_tol: float = 1e-3,
     max_nk_iter: int = 20,
+    min_sa_iter: int = 5,
+    max_sa_iter: int = 2000,
+    switch_rtol: float = 0.02,
 ) -> SolverResult:
     """Solve for the fixed point using hybrid contraction + Newton-Kantorovich.
 
     This implements the hybrid algorithm from Rust (1987, 2000):
-    1. Run contraction iterations until error < switch_tol
-    2. Switch to Newton-Kantorovich iterations for quadratic convergence
+    1. Run contraction iterations until the value-function shape is recovered,
+       detected when the successive-error ratio approaches beta (Rust 2000 p.28),
+       or the error already falls below switch_tol. Bounded by [min_sa_iter,
+       max_sa_iter].
+    2. Switch to Newton-Kantorovich iterations for quadratic convergence.
+
+    The shape-recovery switch keeps the warm-up cost insensitive to beta. Keying
+    the switch on error < switch_tol alone forces tens of thousands of contraction
+    steps at high beta, since the remaining constant offset decays only at rate
+    beta while NK removes it in one step.
 
     Args:
         operator: SoftBellmanOperator instance
@@ -332,8 +343,11 @@ def hybrid_iteration(
         V_init: Initial value function guess. If None, starts at zeros.
         tol: Final convergence tolerance (sup norm)
         max_iter: Maximum total iterations (contraction + NK)
-        switch_tol: Switch from contraction to NK when error < this
+        switch_tol: Early switch to NK when contraction error < this
         max_nk_iter: Maximum NK iterations after switch
+        min_sa_iter: Minimum contraction steps before the ratio test can switch
+        max_sa_iter: Hard cap on contraction steps (safety; ratio test usually fires first)
+        switch_rtol: Switch when |error_ratio - beta| < this (shape-recovery test)
 
     Returns:
         SolverResult with converged value function and policy
@@ -352,26 +366,50 @@ def hybrid_iteration(
     else:
         V = jnp.array(V_init)
 
-    # Phase 1: Contraction iterations via while_loop
+    # Phase 1: contraction warm-up. Switch to NK once the value-function SHAPE is
+    # recovered, detected when the ratio of successive sup-norm errors approaches
+    # beta (Rust 2000 p.28): a near-fixed-point iterate differs from the solution
+    # by a constant offset that decays at rate beta, and NK strips that offset in
+    # one step. Keying the switch on error < switch_tol instead would force tens of
+    # thousands of contraction steps at high beta (the offset decays slowly),
+    # which was the cause of hybrid's beta-sensitive cost. Bounded by
+    # [min_sa_iter, max_sa_iter] for safety; the early exit error <= switch_tol is
+    # kept so low-beta problems that converge fast skip the ratio test.
     def sa_body(carry):
-        V, error, k = carry
+        V, error, prev_error, k = carry
         V_new = bellman_operator_fn(V, (utility, transitions, beta, sigma))
-        error = jnp.max(jnp.abs(V_new - V))
-        return V_new, error, k + 1
+        new_error = jnp.max(jnp.abs(V_new - V))
+        return V_new, new_error, error, k + 1
 
     def sa_cond(carry):
-        _, error, k = carry
-        return jnp.logical_and(error > switch_tol, k < max_iter)
+        _, error, prev_error, k = carry
+        ratio = error / jnp.maximum(prev_error, 1e-300)
+        shape_recovered = jnp.abs(ratio - beta) < switch_rtol
+        ready = jnp.logical_and(
+            k >= min_sa_iter,
+            jnp.logical_or(error <= switch_tol, shape_recovered),
+        )
+        keep = jnp.logical_and(
+            error > tol,
+            jnp.logical_and(
+                jnp.logical_not(ready),
+                jnp.logical_and(k < max_sa_iter, k < max_iter),
+            ),
+        )
+        return keep
 
-    init_state = (V, jnp.float64(switch_tol + 1.0), jnp.int32(0))
-    V, sa_error, sa_iters = jax.lax.while_loop(sa_cond, sa_body, init_state)
+    big = jnp.float64(switch_tol + 1.0)
+    init_state = (V, big, big * 2.0, jnp.int32(0))
+    V, sa_error, _, sa_iters = jax.lax.while_loop(sa_cond, sa_body, init_state)
 
     converged = bool(sa_error <= tol)
     final_error = float(sa_error)
     total_iters = int(sa_iters)
 
-    # Phase 2: Newton-Kantorovich iterations
-    if not converged and float(sa_error) <= switch_tol:
+    # Phase 2: Newton-Kantorovich iterations. Enter whenever phase 1 handed off
+    # without converging (it now switches on the shape-recovery test, so sa_error
+    # may still be well above switch_tol at hand-off).
+    if not converged:
         for nk_iter in range(max_nk_iter):
             V, error = _newton_kantorovich_step(V, utility, operator)
             total_iters += 1

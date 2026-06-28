@@ -203,21 +203,19 @@ class TestNFXPSolverScalingILRSS2016:
     4, inner iterations per fixed-point solve:
 
         beta:        0.975   0.99   0.995   0.999   0.9999
-        nk  :            8      9       9       9        9
-        sa  :          844   2104    4202  (slow)  (impractical)
+        nk    :          8      9       9       9        9
+        hybrid:         12     13      13      13       13
+        sa    :        844   2104    4202  (slow)  (impractical)
 
-    The "nk" (policy iteration / Newton-Kantorovich) solve stays flat ~9 across all
-    beta; NFXP-SA grows sharply with beta. All solvers recover the same MLE.
+    The "nk" (policy iteration / Newton-Kantorovich) and "hybrid" solves stay flat
+    across all beta; NFXP-SA grows sharply. All solvers recover the same MLE.
 
-    On the "hybrid" solver: its TOTAL inner-iteration count also grows with beta
-    (~211 -> ~48k over this range), but that growth is the phase-1 SA warm-up, not
-    the NK phase. hybrid_iteration switches to NK only once the contraction error
-    drops below switch_tol=1e-3, and reaching 1e-3 by contraction is itself slow at
-    high beta (the contraction modulus is beta); the NK phase is capped at
-    max_nk_iter=20 and stays flat (verified: at beta=0.9999 the NK phase is 1 step).
-    So hybrid's NK is fine - the high-beta cost is a late, error-thresholded switch.
-    For high beta use "nk", or switch SA->NK on a bounded step count (Rust 2000),
-    not an error threshold.
+    The "hybrid" solver switches SA -> NK on a shape-recovery ratio test (the
+    successive-error ratio approaching beta, Rust 2000 p.28), which keeps its
+    warm-up beta-flat. Before that switch criterion was added it grew ~211 ->
+    ~48,513 over this range, dominated by the phase-1 SA warm-up needed to reach
+    error < switch_tol=1e-3 (slow at high beta because the constant offset decays
+    only at rate beta, while NK strips it in one step).
     """
 
     @staticmethod
@@ -241,6 +239,14 @@ class TestNFXPSolverScalingILRSS2016:
         assert nk_hi < 30
         # NFXP-SA: inner iterations grow sharply with beta (Su-Judd's slow NFXP).
         assert sa_hi > 3 * sa_lo
+
+    def test_hybrid_switch_stays_beta_flat(self):
+        # The hybrid SA->NK switch (shape-recovery ratio test, Rust 2000) keeps the
+        # warm-up beta-flat. Before the fix this grew ~211 -> ~48,513 over the range.
+        h_lo, _ = self._final_inner(0.975, "hybrid")
+        h_hi, _ = self._final_inner(0.9999, "hybrid")
+        assert h_lo < 30
+        assert h_hi < 30
 
     def test_sa_and_nk_recover_the_same_estimate(self):
         _, rc_sa = self._final_inner(0.995, "sa")
