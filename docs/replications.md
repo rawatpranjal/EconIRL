@@ -164,6 +164,39 @@ Reproduce:
 pytest tests/test_rust_tables.py::TestNPLConvergenceAM2002
 ```
 
+## AIRL (Fu, Luo, and Levine, 2018)
+
+AIRL learns a reward through an adversarial discriminator. Fu, Luo, and Levine
+prove (their Theorems 5.1 and 5.2) that the reward is identified and portable to
+new dynamics only when it is a function of state, R(s). A state-action reward
+recovers a shaped advantage that re-optimizes correctly in the training dynamics
+but not under a changed transition model. Their Section 7.1 task is a 16-state,
+4-action MDP with a reward at a single state.
+
+The package reproduces the identification structure:
+
+| Form | Reward | Transitions | Recovers the reward |
+| --- | --- | --- | --- |
+| AIRL-1 | R(s) | deterministic | yes |
+| AIRL-2 (default) | R(s,a) | any | no, a shaped advantage |
+| AIRL-2 anchored | R(s,a) with an action anchor | any | yes (see AIRL-Het) |
+
+State-only AIRL recovers the reward on the deterministic 16-state task: normalized
+reward error 0.10, policy distance 0.006, counterfactual regret near 0.004. The
+action-dependent reward with no anchor does not recover, normalized reward error
+1.16 and large counterfactual regret. On the Section 7.1 transfer test, the
+state-only reward re-optimizes to optimal behavior under a fresh transition
+matrix, while the state-action reward barely beats a random policy.
+
+This is simulation evidence of the paper's identification claims. Section 7.1
+reports reward maps and a transfer curve, not a numerical table.
+
+Reproduce:
+
+```bash
+python validation/estimators/airl/run.py    # state-only recovers, state-action does not
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -175,6 +208,5 @@ both the estimates and the standard errors.
 | NNES | Nguyen (2025) | Not yet evaluated. |
 | TD-CCP | Adusumilli-Eckardt (2025) | Not yet evaluated. |
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |
-| AIRL | Fu-Luo-Levine (2018) | Not yet evaluated. |
 | AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
