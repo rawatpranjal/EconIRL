@@ -9,7 +9,7 @@ replacement problem:
   keep  (a=0): payoff theta0 + theta1 * x + theta2 * s, mileage x -> x + 1
   replace (a=1): payoff normalized to 0,             mileage x -> 0
 
-x is mileage (deterministic, +1 on keep, reset on replace), s in {0,1} is a
+x is mileage (deterministic, +1 on keep, reset on replace), s in {1,2} is a
 permanent bus type known to the econometrician, shocks are Type-1 EV, beta=0.9.
 True parameters: theta0 = 2, theta1 = -0.15, theta2 = 1.
 
@@ -90,8 +90,12 @@ def build_dgp() -> dict[str, Any]:
     for x in range(X_MAX + 1):
         for s in range(N_TYPES):
             xn = x / MILEAGE_SCALE
-            s_val = float(s)  # bus type s in {0, 1}
-            xs[state_index(x, s)] = [xn, s_val, xn * s_val]
+            # Basis/CCP encode the binary type as a {0,1} indicator: same function
+            # space as {1,2} but s^k = s collapses, so the third-order polynomial
+            # stays the paper's 16 terms and well-conditioned. The structural
+            # payoff below uses the paper's actual type value s in {1,2}.
+            s_ind = float(s)
+            xs[state_index(x, s)] = [xn, s_ind, xn * s_ind]
     xs_j = jnp.asarray(xs)
 
     def state_encoder(states: jnp.ndarray) -> jnp.ndarray:
@@ -110,7 +114,7 @@ def build_dgp() -> dict[str, Any]:
     feat = np.zeros((num_states, num_actions, 3), dtype=np.float64)
     for x in range(X_MAX + 1):
         for s in range(N_TYPES):
-            feat[state_index(x, s), 0, :] = [1.0, float(x), float(s)]
+            feat[state_index(x, s), 0, :] = [1.0, float(x), float(s + 1)]  # s in {1, 2}
     utility = ActionDependentReward(jnp.asarray(feat), list(PARAM_NAMES))
 
     # Deterministic transitions (A, S, S).

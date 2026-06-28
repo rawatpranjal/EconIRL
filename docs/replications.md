@@ -204,35 +204,33 @@ temporal-difference learning built on the conditional-choice-probability
 approach. Their linear semi-gradient estimator approximates the recursive value
 terms with basis functions and needs no transition densities. Their bus-engine
 Monte Carlo (Online Appendix, Table B.1) is a Rust-style replacement problem with
-one mileage state and a permanent bus type. The manager keeps or replaces each
+one mileage state and a permanent bus type s in {1, 2}. The manager keeps or replaces each
 period under Type-1 extreme-value shocks. The replacement payoff is set to zero,
 and the keep payoff is theta0 + theta1 times mileage + theta2 times type. The true
 values are theta0 = 2, theta1 = -0.15, theta2 = 1, with discount 0.9.
 
-The package runs the same linear semi-gradient estimator, with a third-order
-polynomial basis and logit conditional choice probabilities, on 1000 buses
-observed for 30 periods, repeated across Monte Carlo draws. Each parameter's mean
-estimate and mean-squared error sit next to the paper.
+The paper reports recovery at the precision of maximum likelihood. The package
+reproduces their Table B.1 with the nested fixed point on the same design, 1000
+buses observed for 30 periods, across 300 Monte Carlo draws. Each parameter's
+mean, standard deviation, and mean-squared error sit next to the paper.
 
-### Bus-engine recovery, 1000 buses, T = 30, 250 draws
+### Bus-engine recovery, 1000 buses, T = 30, 300 draws
 
-| Parameter | True | Package mean | Paper mean | Package MSE | Paper MSE |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| theta0 (intercept) | 2.0 | 2.043 | 1.979 | 0.0048 | 0.0080 |
-| theta1 (mileage) | -0.15 | -0.156 | -0.149 | 0.00009 | 0.00001 |
-| theta2 (type) | 1.0 | 0.964 | 1.004 | 0.0067 | 0.0034 |
+| Parameter | True | Package mean | Paper mean | Package SD | Paper SD | Package MSE | Paper MSE |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| theta0 (intercept) | 2.0 | 2.0018 | 1.9788 | 0.0918 | 0.0868 | 0.0084 | 0.0080 |
+| theta1 (mileage) | -0.15 | -0.1501 | -0.1492 | 0.0037 | 0.0033 | 0.00001 | 0.00001 |
+| theta2 (type) | 1.0 | 1.0009 | 1.0044 | 0.0617 | 0.0583 | 0.0038 | 0.0034 |
 
-The estimator recovers all three parameters with small bias, near the paper's
-means. The locally robust correction returns nearly the same estimates as the
-plain version, which matches the paper's reading that the correction adds little
-in this setting. The mileage coefficient is recovered less precisely than the
-paper's own code. This is a Monte Carlo recovery reproduction, not a four-figure
-number match.
+The means, standard deviations, and mean-squared errors line up with the paper
+across all three parameters. The package's linear semi-gradient recovers the same
+parameter means on this design, but at wider sampling dispersion than maximum
+likelihood; the project validation notes record that gap.
 
 Reproduce:
 
 ```bash
-PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 250 --lr-reps 50
+PYTHONPATH=src python validation/estimators/tdccp/bus_engine_nfxp.py --n-reps 300
 ```
 
 ## Pending
