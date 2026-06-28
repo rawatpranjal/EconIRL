@@ -209,9 +209,15 @@ class TestNFXPSolverScalingILRSS2016:
     The "nk" (policy iteration / Newton-Kantorovich) solve stays flat ~9 across all
     beta; NFXP-SA grows sharply with beta. All solvers recover the same MLE.
 
-    Secondary finding (flagged, not a correctness bug): the package "hybrid" solver
-    does NOT achieve this flatness (~211 -> ~48,513 iters/solve over 0.975 ->
-    0.9999) despite its "best for high beta" docstring. Use "nk" for high beta.
+    On the "hybrid" solver: its TOTAL inner-iteration count also grows with beta
+    (~211 -> ~48k over this range), but that growth is the phase-1 SA warm-up, not
+    the NK phase. hybrid_iteration switches to NK only once the contraction error
+    drops below switch_tol=1e-3, and reaching 1e-3 by contraction is itself slow at
+    high beta (the contraction modulus is beta); the NK phase is capped at
+    max_nk_iter=20 and stays flat (verified: at beta=0.9999 the NK phase is 1 step).
+    So hybrid's NK is fine - the high-beta cost is a late, error-thresholded switch.
+    For high beta use "nk", or switch SA->NK on a bounded step count (Rust 2000),
+    not an error threshold.
     """
 
     @staticmethod
