@@ -178,6 +178,14 @@ class TDCCPConfig:
     ccp_method: Literal["frequency", "logit"] = "frequency"
     ccp_smoothing: float = 0.01
     ccp_poly_degree: int = 3
+    ccp_use_encoder: bool = False
+    """For ``ccp_method="logit"``: build the polynomial CCP design from
+    ``problem.state_encoder`` features (elementwise powers up to
+    ``ccp_poly_degree``) instead of the scalar state index. This makes the
+    first-stage logit a function of the encoded state variables, which is the
+    right path when the scalar index conflates distinct state dimensions (e.g.
+    a mileage coordinate and a permanent type). Default ``False`` preserves the
+    historical scalar-index behavior."""
 
     # --- Inference ---
     cross_fitting: bool = True
@@ -327,6 +335,7 @@ class TDCCPEstimator(BaseEstimator):
         panel: Panel,
         num_states: int,
         num_actions: int,
+        problem: DDCProblem | None = None,
     ) -> jnp.ndarray:
         """Estimate conditional choice probabilities P(a|x).
 
@@ -339,7 +348,7 @@ class TDCCPEstimator(BaseEstimator):
             CCP matrix of shape (num_states, num_actions).
         """
         if self._config.ccp_method == "logit":
-            return self._estimate_ccps_logit(panel, num_states, num_actions)
+            return self._estimate_ccps_logit(panel, num_states, num_actions, problem)
         else:
             return self._estimate_ccps_frequency(panel, num_states, num_actions)
 
@@ -366,7 +375,8 @@ class TDCCPEstimator(BaseEstimator):
         return ccps
 
     def _estimate_ccps_logit(
-        self, panel: Panel, num_states: int, num_actions: int
+        self, panel: Panel, num_states: int, num_actions: int,
+        problem: DDCProblem | None = None,
     ) -> jnp.ndarray:
         """Logit CCP estimator with polynomial features.
 
@@ -374,16 +384,38 @@ class TDCCPEstimator(BaseEstimator):
         where X_poly includes polynomial terms up to ccp_poly_degree in
         the normalized state variable. This gives smooth CCP estimates
         even at states with few observations, as recommended by the paper.
+
+        With ``ccp_use_encoder=True`` and a ``problem.state_encoder``, the design
+        is built from the encoded state features (elementwise powers up to
+        ``ccp_poly_degree``) rather than the scalar state index, so the logit is
+        a function of the underlying state variables.
         """
         all_states = np.array(panel.get_all_states())
         all_actions = np.array(panel.get_all_actions())
 
-        # Normalize states to [0, 1] for numerical stability
-        x_norm = all_states / max(num_states - 1, 1)
-
-        # Build polynomial features: [1, x, x^2, ..., x^d]
         degree = self._config.ccp_poly_degree
-        X_poly = np.column_stack([x_norm ** p for p in range(degree + 1)])
+        use_encoder = (
+            self._config.ccp_use_encoder
+            and problem is not None
+            and problem.state_encoder is not None
+        )
+
+        def poly_design(state_idx: np.ndarray) -> np.ndarray:
+            if use_encoder:
+                feats = np.asarray(
+                    problem.state_encoder(jnp.asarray(state_idx, dtype=jnp.int32)),
+                    dtype=np.float64,
+                )
+                if feats.ndim == 1:
+                    feats = feats[:, None]
+                blocks = [np.ones((feats.shape[0], 1), dtype=np.float64)]
+                for p in range(1, degree + 1):
+                    blocks.append(np.power(feats, p))
+                return np.concatenate(blocks, axis=1)
+            x_norm = np.asarray(state_idx, dtype=np.float64) / max(num_states - 1, 1)
+            return np.column_stack([x_norm ** p for p in range(degree + 1)])
+
+        X_poly = poly_design(all_states)
 
         # Fit logistic regression via iterative reweighted least squares.
         # For binary actions, this is standard logistic regression.
@@ -403,8 +435,7 @@ class TDCCPEstimator(BaseEstimator):
             beta = np.asarray(result.x)
 
             # Predict P(a=1|s) for all states
-            x_all = np.arange(num_states) / max(num_states - 1, 1)
-            X_all = np.column_stack([x_all ** p for p in range(degree + 1)])
+            X_all = poly_design(np.arange(num_states))
             logits_all = X_all @ beta
             p1 = 1.0 / (1.0 + np.exp(-logits_all))
             ccps = np.column_stack([1.0 - p1, p1])
@@ -428,8 +459,7 @@ class TDCCPEstimator(BaseEstimator):
             result = minimize_lbfgsb(neg_ll_multi, jnp.zeros(n_params, dtype=jnp.float64), maxiter=200, tol=1e-6)
             beta = np.asarray(result.x).reshape(num_actions - 1, X_poly.shape[1])
 
-            x_all = np.arange(num_states) / max(num_states - 1, 1)
-            X_all = np.column_stack([x_all ** p for p in range(degree + 1)])
+            X_all = poly_design(np.arange(num_states))
             logits = X_all @ beta.T  # (S, A-1)
             logits_full = np.column_stack([np.zeros(num_states), logits])
             exp_logits = np.exp(logits_full - logits_full.max(axis=1, keepdims=True))
@@ -1914,7 +1944,7 @@ class TDCCPEstimator(BaseEstimator):
         # Step 1: Estimate CCPs from data
         # -----------------------------------------------------------------
         self._log("Step 1: Estimating CCPs from data")
-        ccps = self._estimate_ccps(panel, num_states, num_actions)
+        ccps = self._estimate_ccps(panel, num_states, num_actions, problem)
 
         # -----------------------------------------------------------------
         # Step 2: Extract observed transition tuples (a, x, a', x')
@@ -2207,8 +2237,8 @@ class TDCCPEstimator(BaseEstimator):
         if not np.any(fold1_trans_mask) or not np.any(fold2_trans_mask):
             raise ValueError("TD-CCP cross-fitting produced an empty fold")
 
-        ccps1 = self._estimate_ccps(fold1_panel, problem.num_states, problem.num_actions)
-        ccps2 = self._estimate_ccps(fold2_panel, problem.num_states, problem.num_actions)
+        ccps1 = self._estimate_ccps(fold1_panel, problem.num_states, problem.num_actions, problem)
+        ccps2 = self._estimate_ccps(fold2_panel, problem.num_states, problem.num_actions, problem)
 
         key, k1 = jax.random.split(key)
         h1, g1, losses1 = self._estimate_h_g(
