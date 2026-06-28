@@ -281,3 +281,4 @@ both the estimates and the standard errors.
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |
 | AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
+| UFXP | Oguz and Bray (2026) | Not yet evaluated. |
