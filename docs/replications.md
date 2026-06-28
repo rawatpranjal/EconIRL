@@ -273,6 +273,44 @@ Reproduce:
 python scripts/study_rhip_lookahead.py
 ```
 
+## AIRL-Het (Lee, Sudhir, and Wang, 2026)
+
+Lee, Sudhir, and Wang extend AIRL to consumers who differ in unobserved ways and
+to action-dependent utilities. Their setting is sequential content: a reader of
+serialized fiction decides each period whether to continue, paying an access cost,
+or to exit. The paper proves (its Theorems 1 to 3) that fixing the exit-action
+reward to zero and assuming an absorbing state makes the adversarial discriminator
+recover the true reward and value, even under stochastic transitions. An
+expectation-maximization layer then infers latent segments and segment-specific
+rewards. The empirical study uses proprietary readership data, so this is an
+identification reproduction on a controlled problem, not a match of the published
+estimates.
+
+The package reproduces the identification on a 61-state, two-segment problem with
+an exit-action anchor and an absorbing state, a reward over 20 content features,
+and discount 0.92.
+
+### Anchored segment recovery (two segments, priors 0.48 / 0.52)
+
+| Quantity | Value |
+| --- | ---: |
+| Segment assignment accuracy | 0.895 |
+| Segment prior error (L1) | 0.043 |
+| Segment policy distance | 0.059 |
+| Segment reward error (normalized RMSE) | 0.24, 0.27 |
+
+The estimator recovers which segment each user belongs to with about 90 percent
+accuracy, the segment sizes to an L1 of 0.04, and each segment's policy to a
+distance of 0.06. The exit anchor and the absorbing state pin the action-dependent
+utilities and the latent segments, which is the paper's identification claim. The
+published consumption estimates use proprietary data and are not reproduced here.
+
+Reproduce:
+
+```bash
+python validation/estimators/aairl/run.py
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -282,5 +320,4 @@ both the estimates and the standard errors.
 | Estimator | Paper | Status |
 | --- | --- | --- |
 | NNES | Nguyen (2025) | Not yet evaluated. |
-| AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
