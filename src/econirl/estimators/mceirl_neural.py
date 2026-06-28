@@ -214,6 +214,15 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         Hidden dimension for the reward MLP.
     reward_num_layers : int, default=2
         Number of hidden layers in the reward MLP.
+    reward_network : callable, optional
+        Factory for a custom reward architecture, overriding the default MLP.
+        Called as ``reward_network(state_dim, n_actions, key)`` and must return
+        an Equinox module that maps the full state-feature matrix of shape
+        ``(n_states, state_dim)`` to the reward: shape ``(n_states,)`` for a
+        state reward or ``(n_states, n_actions)`` for a state-action reward. Set
+        ``reward_type`` to match the module's output. Use this to plug in deeper
+        MLPs, residual or Fourier-feature nets, or convolutional reward fields
+        (e.g. a CoordConv over the grid). When ``None`` the default MLP is used.
     max_epochs : int, default=200
         Maximum number of training epochs.
     lr : float, default=1e-3
@@ -283,6 +292,21 @@ class MCEIRLNeural(NeuralEstimatorMixin):
     >>> model = MCEIRLNeural(n_states=25, n_actions=4, reward_type="state")
     >>> model.fit(...)
     >>> print(model.reward_.shape)  # (25,)
+    >>>
+    >>> # Custom architecture: any net mapping (S, state_dim) -> (S,) or (S, A)
+    >>> import equinox as eqx, jax
+    >>> class DeeperMLP(eqx.Module):
+    ...     layers: list
+    ...     def __init__(self, state_dim, n_actions, key):
+    ...         k1, k2 = jax.random.split(key)
+    ...         self.layers = [eqx.nn.Linear(state_dim, 64, key=k1),
+    ...                        eqx.nn.Linear(64, 1, key=k2)]
+    ...     def __call__(self, X):  # (S, state_dim) -> (S,)
+    ...         f = lambda x: self.layers[1](jax.nn.tanh(self.layers[0](x))).squeeze(-1)
+    ...         return jax.vmap(f)(X)
+    >>> model = MCEIRLNeural(n_states=25, n_actions=4, reward_type="state",
+    ...                      reward_network=lambda sd, na, key: DeeperMLP(sd, na, key))
+    >>> model.fit(...)  # CoordConv / CNN reward fields plug in the same way
     """
 
     def __init__(
@@ -295,6 +319,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         # Network
         reward_hidden_dim: int = 64,
         reward_num_layers: int = 2,
+        reward_network: Callable | None = None,
         # Training
         max_epochs: int = 200,
         lr: float = 1e-3,
@@ -323,6 +348,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         self.reward_type = reward_type
         self.reward_hidden_dim = reward_hidden_dim
         self.reward_num_layers = reward_num_layers
+        self.reward_network = reward_network
         self.max_epochs = max_epochs
         self.lr = lr
         self.inner_solver = inner_solver
@@ -438,7 +464,9 @@ class MCEIRLNeural(NeuralEstimatorMixin):
 
         # --- Step 4: Build reward network ---
         key = jax.random.PRNGKey(self.seed)
-        if self.reward_type == "state_action":
+        if self.reward_network is not None:
+            self._reward_net = self.reward_network(self._state_dim, n_actions, key)
+        elif self.reward_type == "state_action":
             self._reward_net = _StateActionRewardNetwork(
                 self._state_dim,
                 n_actions,
@@ -590,6 +618,33 @@ class MCEIRLNeural(NeuralEstimatorMixin):
     # Training
     # ------------------------------------------------------------------
 
+    def _net_reward_matrix(
+        self,
+        reward_net,
+        state_feat: jax.Array,
+        n_states: int,
+        n_actions: int,
+    ) -> jax.Array:
+        """Raw R(s,a) from the reward net, before absorbing/anchor masking.
+
+        Default per-state nets are vmapped over states (state reward) or queried
+        for all actions (state-action reward). A custom ``reward_network`` is
+        called once on the full ``(S, state_dim)`` feature matrix and must return
+        ``(S,)`` (state reward) or ``(S, A)`` (state-action reward).
+        """
+        if self.reward_network is not None:
+            # Feed the custom net canonical-dtype features (x64-aware) so strict
+            # ops like conv (which do not auto-promote) match their weights.
+            sf = state_feat.astype(jnp.result_type(float))
+            out = jnp.asarray(reward_net(sf))
+            if out.ndim == 1:
+                return jnp.broadcast_to(out[:, None], (n_states, n_actions))
+            return out
+        if self.reward_type == "state_action":
+            return reward_net.all_actions(state_feat)
+        rewards_s = jax.vmap(reward_net)(state_feat)
+        return jnp.broadcast_to(rewards_s[:, None], (n_states, n_actions))
+
     def _compute_reward_matrix(
         self,
         reward_net,
@@ -598,13 +653,9 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         n_actions: int,
     ) -> jax.Array:
         """Compute R(s,a) for all states and actions."""
-        if self.reward_type == "state_action":
-            rewards = reward_net.all_actions(state_feat)
-        else:
-            rewards_s = jax.vmap(reward_net)(state_feat)
-            rewards = jnp.broadcast_to(
-                rewards_s[:, None], (n_states, n_actions)
-            )
+        rewards = self._net_reward_matrix(
+            reward_net, state_feat, n_states, n_actions
+        )
         if self.absorbing_state is not None:
             rewards = rewards.at[int(self.absorbing_state), :].set(0.0)
         if self.anchor_action is not None:
@@ -823,8 +874,10 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         if self.reward_type == "state_action":
             self.reward_ = np.asarray(reward_matrix)
         else:
-            rewards_s = jax.vmap(self._reward_net)(state_feat)
-            self.reward_ = np.asarray(rewards_s)
+            raw = self._net_reward_matrix(
+                self._reward_net, state_feat, n_states, n_actions
+            )
+            self.reward_ = np.asarray(raw[:, 0])
         if self._empirical_sa is not None:
             policy_sa = self._forward_pass(
                 result.policy,

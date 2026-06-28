@@ -1,0 +1,427 @@
+{
+  "meta": {
+    "grid_size": 8,
+    "n_traj": 2000,
+    "n_periods": 50,
+    "discount": 0.95,
+    "max_epochs": 400,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "reward_num_layers": 4,
+    "reward_hidden_dim": 128,
+    "neural_lr": 0.01
+  },
+  "records": [
+    {
+      "case": "state_action",
+      "seed": 0,
+      "true_theta": [
+        -0.5,
+        2.0,
+        0.1,
+        0.1
+      ],
+      "names": [
+        "move_cost",
+        "goal_approach",
+        "northward",
+        "eastward"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.9999497317874356,
+          "reward_rmse": 0.013249522750500752,
+          "reward_sign_match": 1.0,
+          "policy_kl": 4.4461959651990414e-05,
+          "policy_tv": 0.003714202586627565,
+          "policy_accuracy": 89.0625,
+          "evd": 27.50062985573351,
+          "ll_per_obs_in": -1.444476648300762,
+          "ll_per_obs_out": -1.445661720066226,
+          "transfer_accuracy": 98.4375,
+          "projection_r2": null,
+          "runtime": 13.289626121520996,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.012491991578544047,
+          "reward_rmse": 1.1398493585851865,
+          "reward_sign_match": 0.75,
+          "policy_kl": 0.02083123580383378,
+          "policy_tv": 0.07727656962312823,
+          "policy_accuracy": 85.9375,
+          "evd": 28.801030416448143,
+          "ll_per_obs_in": -1.4626543139204553,
+          "ll_per_obs_out": -1.46489740413007,
+          "transfer_accuracy": 75.0,
+          "projection_r2": 0.8012995427464176,
+          "runtime": 11.086562871932983,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "state_action",
+      "seed": 1,
+      "true_theta": [
+        -0.5,
+        2.0,
+        0.1,
+        0.1
+      ],
+      "names": [
+        "move_cost",
+        "goal_approach",
+        "northward",
+        "eastward"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.9999651334608928,
+          "reward_rmse": 0.013134476002246149,
+          "reward_sign_match": 1.0,
+          "policy_kl": 3.7984896677275624e-05,
+          "policy_tv": 0.0035030127855927274,
+          "policy_accuracy": 95.3125,
+          "evd": 27.631996515925184,
+          "ll_per_obs_in": -1.448484141828979,
+          "ll_per_obs_out": -1.4481402802217216,
+          "transfer_accuracy": 93.75,
+          "projection_r2": null,
+          "runtime": 4.301314830780029,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.18445966782022866,
+          "reward_rmse": 1.1013669166114732,
+          "reward_sign_match": 1.0,
+          "policy_kl": 0.01985269906207869,
+          "policy_tv": 0.07143729000841358,
+          "policy_accuracy": 90.625,
+          "evd": 28.531562927515278,
+          "ll_per_obs_in": -1.4634955465725419,
+          "ll_per_obs_out": -1.4626357853001282,
+          "transfer_accuracy": 84.375,
+          "projection_r2": 0.8668960182931558,
+          "runtime": 8.968581199645996,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "state_action",
+      "seed": 2,
+      "true_theta": [
+        -0.5,
+        2.0,
+        0.1,
+        0.1
+      ],
+      "names": [
+        "move_cost",
+        "goal_approach",
+        "northward",
+        "eastward"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.9997428685219932,
+          "reward_rmse": 0.045783374989843605,
+          "reward_sign_match": 1.0,
+          "policy_kl": 0.0001006989033759547,
+          "policy_tv": 0.005402661984301002,
+          "policy_accuracy": 95.3125,
+          "evd": 27.663790856316343,
+          "ll_per_obs_in": -1.4496804887077825,
+          "ll_per_obs_out": -1.4473102762191925,
+          "transfer_accuracy": 98.4375,
+          "projection_r2": null,
+          "runtime": 4.813114881515503,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.2190759705331816,
+          "reward_rmse": 1.1382418040908715,
+          "reward_sign_match": 1.0,
+          "policy_kl": 0.028360866105828997,
+          "policy_tv": 0.08310566876154815,
+          "policy_accuracy": 82.8125,
+          "evd": 28.360620278500225,
+          "ll_per_obs_in": -1.4660271425209084,
+          "ll_per_obs_out": -1.4639733373415391,
+          "transfer_accuracy": 82.8125,
+          "projection_r2": 0.8862397656480065,
+          "runtime": 9.82551908493042,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "rust_style",
+      "seed": 0,
+      "true_theta": [
+        2.0,
+        0.3
+      ],
+      "names": [
+        "operating_cost",
+        "move_cost"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.999998571135517,
+          "reward_rmse": 0.02563568192329853,
+          "reward_sign_match": 1.0,
+          "policy_kl": 1.2080257479440736e-05,
+          "policy_tv": 0.0015499624400692109,
+          "policy_accuracy": 100.0,
+          "evd": 30.953971357719624,
+          "ll_per_obs_in": -1.5571049834524424,
+          "ll_per_obs_out": -1.5563738574348096,
+          "transfer_accuracy": 100.0,
+          "projection_r2": null,
+          "runtime": 3.5905861854553223,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.9797268545526545,
+          "reward_rmse": 0.37651979267181107,
+          "reward_sign_match": 0.5,
+          "policy_kl": 0.00834410852851349,
+          "policy_tv": 0.05222620977868336,
+          "policy_accuracy": 48.4375,
+          "evd": 30.82869741859444,
+          "ll_per_obs_in": -1.5643440934878639,
+          "ll_per_obs_out": -1.563537075484025,
+          "transfer_accuracy": 95.3125,
+          "projection_r2": 0.8919634189461622,
+          "runtime": 8.94169282913208,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "rust_style",
+      "seed": 1,
+      "true_theta": [
+        2.0,
+        0.3
+      ],
+      "names": [
+        "operating_cost",
+        "move_cost"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.9999986536404177,
+          "reward_rmse": 0.004694726438501632,
+          "reward_sign_match": 1.0,
+          "policy_kl": 6.510469339600435e-07,
+          "policy_tv": 0.0004647871888169286,
+          "policy_accuracy": 96.875,
+          "evd": 30.98439864575598,
+          "ll_per_obs_in": -1.5582659977102067,
+          "ll_per_obs_out": -1.55852482830193,
+          "transfer_accuracy": 100.0,
+          "projection_r2": null,
+          "runtime": 2.654736280441284,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.9566946907469185,
+          "reward_rmse": 0.4286878275159482,
+          "reward_sign_match": 0.5,
+          "policy_kl": 0.014809342631135768,
+          "policy_tv": 0.058919733625880585,
+          "policy_accuracy": 42.1875,
+          "evd": 30.52412501133521,
+          "ll_per_obs_in": -1.5729386592286532,
+          "ll_per_obs_out": -1.5706962364392452,
+          "transfer_accuracy": 95.3125,
+          "projection_r2": 0.8979515525190355,
+          "runtime": 8.293111085891724,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "rust_style",
+      "seed": 2,
+      "true_theta": [
+        2.0,
+        0.3
+      ],
+      "names": [
+        "operating_cost",
+        "move_cost"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.9999972100579528,
+          "reward_rmse": 0.02591258162762826,
+          "reward_sign_match": 1.0,
+          "policy_kl": 1.3877023928887429e-05,
+          "policy_tv": 0.00164313106392687,
+          "policy_accuracy": 100.0,
+          "evd": 31.018544800534404,
+          "ll_per_obs_in": -1.5598479896452457,
+          "ll_per_obs_out": -1.5588700295123645,
+          "transfer_accuracy": 100.0,
+          "projection_r2": null,
+          "runtime": 2.678162097930908,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.9499253842864656,
+          "reward_rmse": 0.997240222602774,
+          "reward_sign_match": 0.5,
+          "policy_kl": 0.011040380163130626,
+          "policy_tv": 0.0580732235905001,
+          "policy_accuracy": 56.25,
+          "evd": 31.93178812505009,
+          "ll_per_obs_in": -1.5710396030720821,
+          "ll_per_obs_out": -1.5700610528564438,
+          "transfer_accuracy": 87.5,
+          "projection_r2": 0.9034024631904526,
+          "runtime": 7.894121170043945,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "state_only",
+      "seed": 0,
+      "true_theta": [
+        3.0,
+        0.5
+      ],
+      "names": [
+        "goal_dist",
+        "center_dist"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.9999994688186598,
+          "reward_rmse": 0.027714166621350737,
+          "reward_sign_match": 1.0,
+          "policy_kl": 2.6400253883830193e-05,
+          "policy_tv": 0.002672170521495843,
+          "policy_accuracy": 93.75,
+          "evd": 25.931914207523093,
+          "ll_per_obs_in": -1.3966236149263196,
+          "ll_per_obs_out": -1.3946018467786838,
+          "transfer_accuracy": 98.4375,
+          "projection_r2": null,
+          "runtime": 3.051279067993164,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.9965510296891992,
+          "reward_rmse": 1.6650806912206877,
+          "reward_sign_match": 1.0,
+          "policy_kl": 0.03608100656484822,
+          "policy_tv": 0.0852113885292067,
+          "policy_accuracy": 93.75,
+          "evd": 26.927661786217115,
+          "ll_per_obs_in": -1.4103264888009954,
+          "ll_per_obs_out": -1.4101549836378686,
+          "transfer_accuracy": 90.625,
+          "projection_r2": 0.016083162930172534,
+          "runtime": 10.06168794631958,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "state_only",
+      "seed": 1,
+      "true_theta": [
+        3.0,
+        0.5
+      ],
+      "names": [
+        "goal_dist",
+        "center_dist"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 1.0000000380557954,
+          "reward_rmse": 0.015025741171925865,
+          "reward_sign_match": 1.0,
+          "policy_kl": 7.924464318667628e-06,
+          "policy_tv": 0.001435086866401287,
+          "policy_accuracy": 95.3125,
+          "evd": 25.84796854875882,
+          "ll_per_obs_in": -1.393990344385249,
+          "ll_per_obs_out": -1.3971094213210475,
+          "transfer_accuracy": 100.0,
+          "projection_r2": null,
+          "runtime": 3.4818949699401855,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.9991729618547344,
+          "reward_rmse": 1.4473161315278664,
+          "reward_sign_match": 1.0,
+          "policy_kl": 0.02296460564762779,
+          "policy_tv": 0.06842707470303969,
+          "policy_accuracy": 93.75,
+          "evd": 26.632901011707936,
+          "ll_per_obs_in": -1.4074951012067787,
+          "ll_per_obs_out": -1.411910606776934,
+          "transfer_accuracy": 90.625,
+          "projection_r2": 0.04612901149852522,
+          "runtime": 9.553966283798218,
+          "converged": true
+        }
+      }
+    },
+    {
+      "case": "state_only",
+      "seed": 2,
+      "true_theta": [
+        3.0,
+        0.5
+      ],
+      "names": [
+        "goal_dist",
+        "center_dist"
+      ],
+      "estimators": {
+        "MCE-IRL": {
+          "reward_cosine": 0.9999968387798217,
+          "reward_rmse": 0.02199311784036813,
+          "reward_sign_match": 1.0,
+          "policy_kl": 1.5703232508197573e-05,
+          "policy_tv": 0.002107929386567493,
+          "policy_accuracy": 92.1875,
+          "evd": 25.91630494190828,
+          "ll_per_obs_in": -1.39613359564289,
+          "ll_per_obs_out": -1.3962132634953173,
+          "transfer_accuracy": 100.0,
+          "projection_r2": null,
+          "runtime": 3.1557910442352295,
+          "converged": false
+        },
+        "Neural MCE-IRL": {
+          "reward_cosine": 0.997378242405801,
+          "reward_rmse": 1.6212708092466983,
+          "reward_sign_match": 1.0,
+          "policy_kl": 0.03599861573102689,
+          "policy_tv": 0.07870290616438183,
+          "policy_accuracy": 92.1875,
+          "evd": 26.25980737848167,
+          "ll_per_obs_in": -1.4109998456038988,
+          "ll_per_obs_out": -1.4112182004432068,
+          "transfer_accuracy": 93.75,
+          "projection_r2": 0.014528197434849788,
+          "runtime": 10.115926027297974,
+          "converged": true
+        }
+      }
+    }
+  ]
+}

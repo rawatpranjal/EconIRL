@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import jax
 import jax.numpy as jnp
+import equinox as eqx
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.estimators.mceirl_neural import MCEIRLNeural
@@ -515,3 +517,142 @@ class TestStateActionRewardType:
         assert result is model
         # Without features, reward_ should still be (S, A)
         assert result.reward_.shape == (_N_STATES, _N_ACTIONS)
+
+
+# ---------------------------------------------------------------------------
+# Custom reward architectures via the reward_network hook
+# ---------------------------------------------------------------------------
+
+
+class _CustomTanhMLP(eqx.Module):
+    """Custom state-reward net, full (S, state_dim) -> (S,) contract."""
+
+    layers: list
+
+    def __init__(self, state_dim, n_actions, key, width=16):
+        k1, k2 = jax.random.split(key)
+        self.layers = [
+            eqx.nn.Linear(state_dim, width, key=k1),
+            eqx.nn.Linear(width, 1, key=k2),
+        ]
+
+    def __call__(self, X):
+        def one(x):
+            return self.layers[1](jax.nn.tanh(self.layers[0](x))).squeeze(-1)
+
+        return jax.vmap(one)(X)
+
+
+class _CustomStateActionNet(eqx.Module):
+    """Custom net returning the full (S, A) reward matrix."""
+
+    lin: eqx.nn.Linear
+
+    def __init__(self, state_dim, n_actions, key):
+        self.lin = eqx.nn.Linear(state_dim, n_actions, key=key)
+
+    def __call__(self, X):
+        return jax.vmap(self.lin)(X)
+
+
+class _CustomConvReward(eqx.Module):
+    """CoordConv-style reward field over a square grid.
+
+    Exercises the canonical-dtype cast: Conv2d requires matching dtypes and does
+    not auto-promote, unlike the Linear matmul path.
+    """
+
+    convs: list
+    g: int = eqx.field(static=True)
+
+    def __init__(self, state_dim, n_actions, key, g):
+        k1, k2 = jax.random.split(key)
+        self.convs = [
+            eqx.nn.Conv2d(state_dim, 4, 3, padding=1, key=k1),
+            eqx.nn.Conv2d(4, 1, 3, padding=1, key=k2),
+        ]
+        self.g = g
+
+    def __call__(self, X):
+        img = X.T.reshape(X.shape[1], self.g, self.g)
+        img = jax.nn.relu(self.convs[0](img))
+        return self.convs[1](img).reshape(-1)
+
+
+class TestCustomArchitecture:
+    """The reward_network hook accepts custom reward architectures."""
+
+    def test_custom_mlp_state_reward(self, gridworld_df, transitions):
+        model = MCEIRLNeural(
+            n_states=_N_STATES,
+            n_actions=_N_ACTIONS,
+            discount=_DISCOUNT,
+            reward_type="state",
+            reward_network=lambda sd, na, key: _CustomTanhMLP(sd, na, key),
+            max_epochs=60,
+            lr=1e-2,
+            verbose=False,
+        )
+        model.fit(
+            gridworld_df,
+            state="state",
+            action="action",
+            id="agent_id",
+            transitions=transitions,
+            features=_make_features(),
+        )
+        assert model.reward_.shape == (_N_STATES,)
+        assert model.policy_.shape == (_N_STATES, _N_ACTIONS)
+        assert np.all(np.isfinite(model.reward_))
+        assert model.coef_.shape == (2,)
+        assert isinstance(model.projection_r2_, float)
+
+    def test_custom_state_action_matrix(self, gridworld_df, transitions):
+        model = MCEIRLNeural(
+            n_states=_N_STATES,
+            n_actions=_N_ACTIONS,
+            discount=_DISCOUNT,
+            reward_type="state_action",
+            reward_network=lambda sd, na, key: _CustomStateActionNet(sd, na, key),
+            max_epochs=60,
+            lr=1e-2,
+            verbose=False,
+        )
+        model.fit(
+            gridworld_df,
+            state="state",
+            action="action",
+            id="agent_id",
+            transitions=transitions,
+        )
+        assert model.reward_.shape == (_N_STATES, _N_ACTIONS)
+        assert np.all(np.isfinite(model.reward_))
+
+    def test_custom_conv_net_runs(self):
+        n, g = 9, 3
+        df = _make_gridworld_data(
+            n_states=n, n_actions=_N_ACTIONS, n_individuals=15, n_periods=20
+        )
+        T = _make_gridworld_transitions(n, _N_ACTIONS)
+        enc = lambda s: jnp.stack(  # noqa: E731
+            [
+                (jnp.asarray(s) // g).astype(jnp.float32) / g,
+                (jnp.asarray(s) % g).astype(jnp.float32) / g,
+            ],
+            axis=-1,
+        )
+        model = MCEIRLNeural(
+            n_states=n,
+            n_actions=_N_ACTIONS,
+            discount=_DISCOUNT,
+            reward_type="state",
+            reward_network=lambda sd, na, key: _CustomConvReward(sd, na, key, g=g),
+            max_epochs=30,
+            lr=5e-3,
+            state_encoder=enc,
+            state_dim=2,
+            verbose=False,
+        )
+        model.fit(df, state="state", action="action", id="agent_id", transitions=T)
+        assert model.reward_.shape == (n,)
+        assert np.all(np.isfinite(model.reward_))

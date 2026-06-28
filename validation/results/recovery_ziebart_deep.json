@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "task": "ziebart R(s) recovery",
+    "grid_size": 12,
+    "case": "state_only",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "reward_num_layers": 4,
+    "reward_hidden_dim": 128,
+    "neural_lr": 0.01,
+    "metric": "affine R^2 of recovered reward vs true reward across states; policy KL(true||est)"
+  },
+  "summary": {
+    "MCE-IRL": {
+      "reward_affine_r2": 0.9999881316111198,
+      "policy_kl": 1.2774098494387237e-05
+    },
+    "Neural MCE-IRL": {
+      "reward_affine_r2": 0.9875867358987142,
+      "policy_kl": 0.014316326920118616
+    }
+  },
+  "records": [
+    {
+      "seed": 0,
+      "MCE-IRL": {
+        "reward_affine_r2": 0.9999756749688622,
+        "policy_kl": 1.2640608216052693e-05
+      },
+      "Neural MCE-IRL": {
+        "reward_affine_r2": 0.9941709751488533,
+        "policy_kl": 0.017385908050527327
+      }
+    },
+    {
+      "seed": 1,
+      "MCE-IRL": {
+        "reward_affine_r2": 0.9999993853481446,
+        "policy_kl": 5.142389550701271e-07
+      },
+      "Neural MCE-IRL": {
+        "reward_affine_r2": 0.9830975283726703,
+        "policy_kl": 0.013745281123514079
+      }
+    },
+    {
+      "seed": 2,
+      "MCE-IRL": {
+        "reward_affine_r2": 0.9999893345163525,
+        "policy_kl": 2.516744831203889e-05
+      },
+      "Neural MCE-IRL": {
+        "reward_affine_r2": 0.9854917041746186,
+        "policy_kl": 0.011817791586314443
+      }
+    }
+  ]
+}

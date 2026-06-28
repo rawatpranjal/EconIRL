@@ -83,17 +83,59 @@ different binning. The agreement between MPEC and NFXP does not.
 
 ## MCE-IRL (Ziebart et al., 2008 and 2010)
 
-The paper reports a route-choice table that needs the original taxi trajectories,
-which are not public, and no published gridworld table. The package evidence is a
-controlled 5x5 gridworld recovery, not a paper-number match.
+Ziebart's reward is a function of state, R(s) linear in state features, on a
+deterministic MDP. The paper models Pittsburgh as a deterministic road network
+and scores road segments by their features. The published route-choice table
+needs the original taxi trajectories, which are not public, so this is a
+controlled gridworld recovery, not a paper-number match.
 
-| Setting | Reward cosine | Reward RMSE |
+The test is a deterministic 12x12 gridworld. An agent walks from a corner to an
+absorbing goal under a state reward over two features, distance to the goal and
+distance to the center. Two estimators recover that reward from demonstrations:
+maximum causal entropy (MCE-IRL) and its neural-reward form (Neural MCE-IRL, a
+multi-layer network over state coordinates).
+
+| Estimator | Reward recovery R² | Policy KL |
 | --- | ---: | ---: |
-| Gridworld run 1 | 0.9997 | 0.0310 |
-| Gridworld run 2 | 0.9998 | 0.0639 |
-| Gridworld run 3 | 0.9998 | 0.0514 |
+| MCE-IRL (linear) | 1.000 | 0.000 |
+| Neural MCE-IRL | 0.988 | 0.014 |
 
-This is simulation evidence, not a replication of a published number.
+Mean over three seeds. Reward recovery is the R² of the recovered reward against
+the true reward across states, where 1.0 is exact. Only the shape of the reward
+across states is identified, not its level. Both estimators recover the reward,
+the linear one exactly and the neural one nearly so. The neural reward map does
+not cost identification on Ziebart's state-reward problem. This is simulation
+evidence, not a replication of a published number.
+
+## CCP / NPL (Hotz-Miller, 1993 and Aguirregabiria-Mira, 2002)
+
+Aguirregabiria and Mira show that iterating the conditional-choice-probability
+estimator, nested pseudo-likelihood (NPL), converges to the nested fixed point
+estimates. Their Section 5.2 finding is that the one-step Hotz-Miller estimator
+is poor, the gains from extra policy iterations come fast, and the K-step NPL
+settles to a fixed point. The replication target is this convergence on the
+bus-engine data, since the estimator is equivalent to NFXP in theory rather than
+a separate published table.
+
+### Bundled bus panel, Group 4, beta = 0.9999
+
+| Estimator | theta_1 | RC | choice log-likelihood |
+| --- | ---: | ---: | ---: |
+| NFXP (MLE) | 2.2636 | 10.1423 | -163.7111 |
+| Hotz-Miller (K = 1) | 1.2872 | 10.9207 | -168.1879 |
+| NPL (K = 5) | 2.2651 | 10.1462 | -163.7113 |
+| NPL (K = 20) | 2.2651 | 10.1462 | -163.7113 |
+
+The one-step estimator sits well below the MLE. NPL reaches its fixed point by
+the fifth iteration: K = 5 and K = 20 return the same estimates. The fixed point
+lands within 0.0002 log-likelihood of the NFXP MLE.
+
+NPL does not attain the MLE here. Its replacement cost differs from NFXP at the
+fourth figure, 10.1462 against 10.1423, and its log-likelihood is marginally
+lower. The stronger Aguirregabiria-Mira claim, that the NPL and nested fixed
+point estimates agree to the twelfth digit, does not reproduce in this
+implementation. NFXP remains the exact Rust replication. This is a convergence
+reproduction, not a four-figure number match.
 
 ## Pending
 
@@ -103,7 +145,6 @@ both the estimates and the standard errors.
 
 | Estimator | Paper | Status |
 | --- | --- | --- |
-| CCP | Hotz-Miller (1993), Aguirregabiria-Mira (2002) | Not yet evaluated. |
 | NNES | Nguyen (2025) | Not yet evaluated. |
 | TD-CCP | Adusumilli-Eckardt (2025) | Not yet evaluated. |
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |

@@ -63,18 +63,27 @@ class NeuralEstimatorMixin:
 
         N, K = features_np.shape
 
-        theta, _, _, _ = np.linalg.lstsq(features_np, rewards_np, rcond=None)
+        # Fit slopes WITH an intercept. The IRL reward level is not identified,
+        # only the direction is. A through-origin fit would smear the reward's
+        # constant offset (the network's bias plus the reward-level gauge) into
+        # the slopes and can flip their sign. The intercept absorbs that
+        # non-identified level; theta is the identified reward direction.
+        design = np.column_stack(
+            [features_np, np.ones(N, dtype=features_np.dtype)]
+        )
+        coef, _, _, _ = np.linalg.lstsq(design, rewards_np, rcond=None)
+        theta = coef[:K]
 
-        predicted = features_np @ theta
+        predicted = design @ coef
         residuals = rewards_np - predicted
         ss_res = float((residuals**2).sum())
         ss_tot = float(((rewards_np - rewards_np.mean()) ** 2).sum())
         r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
 
-        sigma2 = ss_res / max(N - K, 1)
+        sigma2 = ss_res / max(N - (K + 1), 1)
         try:
-            cov = sigma2 * np.linalg.inv(features_np.T @ features_np)
-            se = np.sqrt(np.clip(np.diag(cov), a_min=0.0, a_max=None))
+            cov = sigma2 * np.linalg.inv(design.T @ design)
+            se = np.sqrt(np.clip(np.diag(cov)[:K], a_min=0.0, a_max=None))
         except Exception:
             se = np.full(K, float("nan"), dtype=np.float32)
 
