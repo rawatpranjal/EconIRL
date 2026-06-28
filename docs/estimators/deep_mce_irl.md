@@ -179,7 +179,7 @@ $$
 Minimizing $L_\text{surrogate}$ over $\eta$ is equivalent to maximizing the
 MCE log-likelihood; the sign convention here is for gradient descent (model
 minus data), matching Wulfmeier (2015) eq. 11 up to sign. The chain-rule
-decomposition (Wulfmeier 2015, eqs. 10–11) shows that
+decomposition (Wulfmeier 2015, eqs. 10-11) shows that
 
 $$
 \nabla_\eta L_\text{surrogate}
@@ -244,9 +244,7 @@ tolerance, then Newton-Kantorovich steps near the fixed point. The alternative
 `inner_solver="value"` uses plain value iteration throughout, which is
 robust from any start but converges more slowly near the solution. The outer
 optimizer is AdamW with a global gradient-norm clip of 1.0, implemented via
-Equinox and Optax. The implementation lives in
-`econirl.estimators.mceirl_neural`; the lower-level MCE solver is in
-`econirl.estimation.mce_irl`.
+Equinox and Optax.
 
 ## Applicability
 
@@ -254,7 +252,7 @@ Equinox and Optax. The implementation lives in
 | --- | --- |
 | Transitions are known or supplied. | Transitions must be estimated jointly. |
 | The reward is nonlinear in the available state encodings. | A linear reward table is adequate (use MCE-IRL). |
-| Behavioral recovery --- policy, value, and Q --- matters more than a structural parameter vector. | Identified structural parameters are required (use the structural family). |
+| Behavioral recovery (policy, value, and Q) matters more than a structural parameter vector. | Identified structural parameters are required (use the structural family). |
 | A normalization anchor can be fixed before estimation. | The reward normalization cannot be fixed in advance. |
 | Counterfactual re-solving under the learned reward is the goal. | Policy-only imitation is sufficient (use BC). |
 
@@ -314,10 +312,9 @@ feature projection interface.
 
 ## Evidence
 
-Behavioral recovery is measured on the `deep_mce_neural_reward` synthetic
-cell, which has 32 states, 3 actions, 160,000 observations, a nonlinear
-neural reward, stochastic transitions, and an anchor action that normalizes
-the reward map. The oracle reward matrix, policy, value function, Q function,
+Behavioral recovery is measured on a synthetic benchmark with 32 states, 3
+actions, 160,000 observations, a nonlinear neural reward, stochastic transitions,
+and an anchor action that normalizes the reward map. The oracle reward matrix, policy, value function, Q function,
 and counterfactual objects are all known for this cell, so every figure below
 is compared against the oracle.
 

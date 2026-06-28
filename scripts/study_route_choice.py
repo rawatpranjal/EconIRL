@@ -126,8 +126,6 @@ def _run_neural_gladius(env, panel):
 ROSTER = (
     RosterEntry("NFXP",         "structural", _run_nfxp, uses_transitions=True),
     RosterEntry("CCP",          "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MPEC",         "structural", _run_mpec, timeout=120,
-                uses_transitions=True),
     RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl, uses_transitions=True),
     RosterEntry("NeuralGLADIUS","behavioral", _run_neural_gladius,
                 uses_transitions=False),
@@ -168,6 +166,13 @@ DIAGNOSES = {
 }
 
 EXCLUDED = [
+    {
+        "name": "MPEC",
+        "reason": (
+            "an Other-tier constrained-optimization form of the same MLE; "
+            "NFXP and CCP carry the structural recovery here"
+        ),
+    },
     {
         "name": "IQ-Learn, f-IRL",
         "reason": (

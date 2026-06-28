@@ -306,9 +306,9 @@ attributes and lower-level interface options.
 
 ## Evidence
 
-Parameter recovery is measured on the `canonical_low_action` synthetic cell,
-which has known rewards, transitions, policies, values, Q functions, and Type A,
-Type B, and Type C counterfactual oracles. The figure below is a Monte-Carlo
+Parameter recovery is measured on a synthetic benchmark with known rewards,
+transitions, policies, values, Q functions, and Type A, Type B, and Type C
+counterfactual oracles. The figure below is a Monte-Carlo
 study: the panel is resimulated and refit on a fresh seed each time, and each
 parameter is plotted as its recovered mean and 95% interval against the true
 value.

@@ -139,7 +139,7 @@ problem (Eq. 12) uniquely identifies $Q^*$ and establishes that the optimal
 inner maximiser is $\zeta^*(s,a) = \mathbb{E}[V_{Q^*}(s') \mid s, a]$.
 
 **Convergence result (Kang et al. 2025, Section 6).** Under a
-Polyak–Łojasiewicz (PL) condition on the objective landscape,
+Polyak-Łojasiewicz (PL) condition on the objective landscape,
 gradient-based optimisation converges to the global minimiser. The empirical
 objective gap decreases at $O(T^{-1})$ in the number of gradient iterations
 $T$ (Kang et al. 2025, Thm. 12), and the $L^2(d^*)$ estimation error in $Q^*$
@@ -162,8 +162,7 @@ $$
 
 with $\log \pi_\eta(a \mid s)
 = Q_\eta(s, a)/\sigma - \log \sum_b \exp(Q_\eta(s, b)/\sigma)$
-(the softmax log-probability; this expansion is equivalent to lines 11–13
-of the Algorithm below). The anchor Bellman term pins the Q-level at the
+(the softmax log-probability, expanded in the Algorithm below). The anchor Bellman term pins the Q-level at the
 anchor action. The paper's primary form of this term (Eq. 12 of Kang et al. 2025)
 is the minimax objective
 
@@ -219,7 +218,7 @@ $Q - r_{\text{anch}} - \beta\zeta$ as a direct residual
 
 In the paper, $\zeta(s, a) = \mathbb{E}[V_Q(s') \mid s, a]$ is the
 closed-form conditional expectation that solves the inner maximisation in
-Theorem 5 — it is an analytic object, not a separate network. The package
+Theorem 5. It is an analytic object, not a separate network. The package
 approximates this conditional expectation with a neural network $\zeta_\xi$
 trained by MSE regression (the bi-conjugate EV representation of the internal
 docs):
@@ -249,8 +248,8 @@ where $\Delta\hat{r}(s, a) = \hat{r}(s, a) - \hat{r}(s, 0)$ and
 $\Delta\phi(s, a) = \phi(s, a) - \phi(s, 0)$ are stacked over all states
 and all non-reference actions. The projection is solved in closed form.
 
-The action-difference is taken because $Q(s, a)$ — and therefore
-$\hat{r}(s, a)$ — contains a state-dependent additive constant $c(s)$
+The action-difference is taken because $Q(s, a)$, and therefore
+$\hat{r}(s, a)$, contains a state-dependent additive constant $c(s)$
 that is unidentified without the anchor (Kim et al. 2021; Cao et al. 2021):
 subtracting the reference action $a = 0$ eliminates $c(s)$ from both
 $\Delta\hat{r}$ and $\Delta\phi$, leaving $\Delta r(s,a) = \Delta\phi(s,a)^\top\theta$
@@ -309,8 +308,8 @@ continuation-moment residual above. Two alternative modes are available.
 with $\sigma \log \sum_b \exp(Q_\eta(s', b) / \sigma)$; the anchor Bellman
 loss is not available in this mode and $Q_\eta$ is trained on $L_{\text{NLL}}$
 alone. `anchor_bellman_mode="paper_minimax"` uses the literal bi-conjugate
-minimax term from the paper rather than the continuation-moment anchor; it is
-retained for diagnostics and is not recommended for standard estimation.
+minimax term from the paper rather than the continuation-moment anchor. It is
+available for comparison and is not the default.
 Setting `alternating_updates=False` updates both networks jointly in each
 step, which is the legacy behavior.
 
@@ -324,15 +323,17 @@ step, which is the legacy behavior.
 | A fast neural approximation suffices for model exploration. | Structural standard errors or formal inference are required. |
 
 GLADIUS sits in the behavioral family alongside MCE-IRL, AIRL, and IQ-Learn.
-It does not solve a dynamic program at each candidate parameter, so it scales
-to state representations that make the structural family expensive. Against
+It learns its Q and continuation-value networks offline, from the fixed panel,
+without policy rollouts or a dynamic-program solve at each candidate parameter.
+That is what lets it scale to state representations that make the structural
+family expensive. Against
 simpler behavioral methods, GLADIUS adds explicit Bellman structure through
 the Q and zeta architecture and the anchor Bellman loss, which provides a
 path toward structural parameter recovery that policy-gradient or
 behavioral-cloning methods do not have. The current evaluation cells show
-strong policy imitation and projected-reward recovery, but raw Bellman reward
-and value recovery do not pass their gates, so GLADIUS is not
-counterfactual-valid on those cells.
+strong policy imitation and projected-reward recovery. Raw Bellman reward and
+value recovery are weaker, so GLADIUS is best read as a policy-imitation and
+action-contrast method on those cells, not a source of counterfactual rewards.
 
 ## Usage
 
@@ -383,37 +384,34 @@ table and the lower-level `GLADIUSEstimator` interface.
 
 GLADIUS is evaluated on two synthetic high-dimensional-state cells with
 known rewards, transitions, policies, and counterfactual oracle objects.
-The primary cell, `gladius_paper_high_state`, has 21 discrete states encoded
-into 64-dimensional feature vectors, a 4-parameter linear reward, and an
-anchor action with known rewards. Policy imitation and projected reward
-recovery are within acceptable bounds; raw Bellman reward and value recovery
-fail their gates.
+The primary cell has 21 discrete states encoded into 64-dimensional feature
+vectors, a 4-parameter linear reward, and an anchor action with known rewards.
+Policy imitation and projected reward recovery are within acceptable bounds. Raw
+Bellman reward and value recovery are less accurate.
 
-Behavioral recovery and counterfactual regret on the primary cell
-(`gladius_paper_high_state`, 21 states, 3 actions, 1,000 individuals,
-100 periods; results from
-[`gladius.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json)):
+Behavioral recovery and counterfactual regret on the primary cell (21 states, 3
+actions, 1,000 individuals, 100 periods):
 
 | Metric | Value |
 | --- | ---: |
 | Policy total variation | 0.0369 |
 | Q NRMSE | 0.235 |
 | Projected reward NRMSE | 0.198 |
-| Raw Bellman reward NRMSE | 0.571 (gate fail) |
-| Value NRMSE | 0.420 (gate fail) |
+| Raw Bellman reward NRMSE | 0.571 |
+| Value NRMSE | 0.420 |
 | Type A regret (reward shift) | 0.00854 |
 | Type B regret (transition change) | 0.0529 |
 | Type C regret (action removed) | 0.00852 |
 
 The imitation policy is close to the data-generating policy (TV 0.0369). The
 projected parameters show high directional alignment with the truth (parameter
-cosine 0.975), though this figure should be read with care: reward is only
-partially identified in general, and the projection aligns with the ground
-truth only when the anchor availability condition holds in the study cell. The raw Bellman reward and value do not pass their gates, so GLADIUS
-is reported as diagnostically useful for policy imitation and action-contrast
-structural recovery, not as counterfactual-valid on these cells. The regret
-figures are small but insufficient for structural validity when the upstream
-reward gates fail.
+cosine 0.975). That alignment should be read with care. Reward is only partially
+identified in general, and the projection matches the ground truth only when the
+anchor availability condition holds in the study cell. The raw Bellman reward and
+value are recovered less accurately, with NRMSE 0.571 and 0.420. On these cells
+GLADIUS recovers the imitation policy and the action-contrast reward well, but not
+the absolute reward and value that counterfactual re-solving needs. The small
+regret figures alone do not establish structural counterfactual validity.
 
 For cross-estimator behavioral comparisons, including NeuralGLADIUS alongside
 the structural and IRL rosters, see the

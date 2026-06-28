@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # RHIP recovers the demonstrator's planning horizon
 
 A traveller moves through a road network one step at a time, choosing among the

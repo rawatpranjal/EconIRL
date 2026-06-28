@@ -218,12 +218,11 @@ $$
 
 which the inner L-BFGS-B step solves numerically.
 
-The score $\psi_i$ above is used only by the inner L-BFGS-B step to maximize the
-pseudo-LL; it is NOT the score used to form the sandwich estimator. Standard errors
-use the Hessian of the full structural log-likelihood (re-solving Bellman at each
-perturbation), which matches the NFXP Hessian convention and avoids the
-rank-deficiency of the pseudo-LL Hessian. This keeps the fitted summary compatible
-with the shared inference interface used by NFXP.
+The score $\psi_i$ above drives the inner L-BFGS-B step that maximizes the
+pseudo-likelihood. It is not the score used for standard errors. Those come from the
+Hessian of the full structural log-likelihood, re-solving the Bellman equation at each
+perturbation. That matches the NFXP convention and avoids the rank deficiency of the
+pseudo-likelihood Hessian.
 
 ## Algorithm
 
@@ -252,12 +251,15 @@ Output  theta_hat, standard errors, policy pi^K, value V
 The outer optimizer in step 8 is L-BFGS-B, applied to the augmented-feature logit;
 the gradient is the closed-form score $\psi_i$ from the Estimator section. The
 default in the public `CCP` wrapper is `num_policy_iterations=1`: the loop runs
-once, giving the one-step Hotz-Miller estimator. Hotz and Miller (1993) show the
-one-step estimator is root-$N$ consistent; Aguirregabiria and Mira (2002,
-Proposition 1) show NPL iteration recovers full MLE efficiency as $K$ grows.
-Setting `num_policy_iterations=K` for $K > 1$ runs the NPL iteration for $K$
-steps; setting $K = -1$ continues until parameter convergence. The implementation
-lives in `econirl.estimation.ccp`.
+once, giving the one-step Hotz-Miller estimator. Hotz and Miller (1993) show the one-step
+estimator is root-$N$ consistent but imprecise in finite samples. Aguirregabiria
+and Mira (2002, Proposition 1) show the NPL iteration recovers full
+maximum-likelihood efficiency as $K$ grows. Their Monte-Carlo finding is sharper:
+most of the finite-sample precision is regained by the second policy iteration,
+and the further gain from iterating all the way to the MLE is small. A handful of
+NPL steps is usually enough. Setting `num_policy_iterations=K` for $K > 1$ runs
+the NPL iteration for $K$ steps. Setting $K = -1$ continues until parameter
+convergence.
 
 ## Applicability
 
@@ -318,9 +320,9 @@ attributes and the lower-level `CCPEstimator` interface.
 
 ## Evidence
 
-Parameter recovery is measured on the `canonical_low_action` synthetic cell, which
-has known rewards, transitions, policies, values, Q functions, and Type A, Type B,
-and Type C counterfactual oracles. The figure below is a Monte-Carlo study over 40
+Parameter recovery is measured on a synthetic benchmark with known rewards,
+transitions, policies, values, Q functions, and Type A, Type B, and Type C
+counterfactual oracles. The figure below is a Monte-Carlo study over 40
 replications: the panel is resimulated and refit on a fresh seed each time, and each
 parameter is plotted as its recovered mean and 95% interval against the true value.
 

@@ -123,7 +123,7 @@ and approaches it as the NPL iterates converge. Because the right-hand side is
 affine in $\theta$, the solution splits as $W_\theta = W_z\theta + W_e$ via a
 single matrix solve.
 
-The primary package evidence uses the `canonical_high_action` synthetic cell:
+The primary package evidence uses a high-action synthetic benchmark with
 81 states (80 regular, 1 absorbing), a 16-dimensional encoded state
 representation, 3 actions, and 32 reward parameters. This cell tests whether
 the NPL-profiled neural value path recovers a finite-dimensional structural
@@ -166,7 +166,7 @@ assumptions.
   $$
 
   where $\delta$ represents a first-order perturbation to $V_\psi$
-  (Nguyen 2025, Propositions 3–4). This zero-Jacobian / Neyman-orthogonality
+  (Nguyen 2025, Propositions 3-4). This zero-Jacobian / Neyman-orthogonality
   property means the pseudo-likelihood Hessian is the correct semiparametrically
   efficient variance estimator without an explicit debiasing correction.
 - **Value-approximation regularity.** The value-network approximation error must
@@ -361,10 +361,10 @@ attributes and the lower-level `NNESEstimator` interface.
 
 ## Evidence
 
-Parameter recovery is measured on the `canonical_high_action` synthetic cell,
-which has 81 states, a 16-dimensional encoded state representation, 3 actions,
-and 32 reward parameters, with known oracle reward, policy, value, Q, and
-counterfactual objects. The figure below is a Monte-Carlo study over 25
+Parameter recovery is measured on a high-action synthetic benchmark with 81
+states, a 16-dimensional encoded state representation, 3 actions, and 32 reward
+parameters, with known oracle reward, policy, value, Q, and counterfactual
+objects. The figure below is a Monte-Carlo study over 25
 replications: the panel is resimulated and refit on a fresh seed each time, and
 each parameter is plotted as its recovered mean and 95% interval against the true
 value.

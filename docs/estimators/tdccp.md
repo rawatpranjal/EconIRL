@@ -199,8 +199,8 @@ $$
                   + \beta\,\lambda(a, x),
 $$
 
-reversing the time direction relative to the forward recursion for $h$ and $g$
-(source: `_compute_backward_value`). **Sign convention note.** This page
+reversing the time direction relative to the forward recursion for $h$ and $g$.
+**Sign convention note.** This page
 writes the correction moment as $\zeta_i = m_i + \lambda \cdot \delta_i$ and the
 backward recursion with $-m$. Adusumilli and Eckardt (2025) may use the opposite
 sign on $m$ together with a compensating sign on $\zeta$; the two conventions are
@@ -258,7 +258,6 @@ approximate value iteration, which trains neural networks for $h$ and $g$
 iteratively; it
 is more flexible for high-dimensional state spaces and does not use
 cross-fitting or locally robust standard errors in the current implementation.
-The implementation lives in `econirl.estimation.td_ccp`.
 
 ## Applicability
 
@@ -321,18 +320,17 @@ attributes and the lower-level `TDCCPEstimator` interface.
 
 ## Evidence
 
-Parameter recovery is measured on the `shapeshifter_encoded_state_locally_robust`
-synthetic cell, which has known rewards, transitions, policies, values, Q
-functions, and Type A, Type B, and Type C counterfactual oracles. The figure
-below is a Monte-Carlo study: the panel is resimulated on a fresh seed each
-replication, and each parameter is plotted as its recovered mean and 95%
-interval against the true value.
+Parameter recovery is measured on a deliberately hard synthetic benchmark with
+encoded-state features and locally robust inference. It has known rewards,
+transitions, policies, values, Q functions, and Type A, Type B, and Type C
+counterfactual oracles. The figure below is a Monte-Carlo study: the panel is
+resimulated on a fresh seed each replication, and each parameter is plotted as its
+recovered mean and 95% interval against the true value.
 
 ![tdccp parameter recovery, Monte Carlo](../_static/estimators/tdccp_recovery.png)
 
-Parameter recovery on the `shapeshifter_encoded_state_locally_robust` cell
-across 40 replications. Each replication resimulates the panel on a fresh seed
-and refits the estimator.
+Parameter recovery on the encoded-state benchmark across 40 replications. Each
+replication resimulates the panel on a fresh seed and refits the estimator.
 
 | Parameter | True | Recovered (mean) | 95% interval |
 | --- | ---: | ---: | --- |
@@ -343,7 +341,7 @@ and refits the estimator.
 | `action_2_x0` | 0.065 | 0.076 | [-1.174, 1.320] |
 | `action_2_x1` | -0.063 | -0.068 | [-1.693, 1.198] |
 
-The mean estimate recovers each parameter, but the deliberately hard shapeshifter case has high per-replication variance, so the 95% intervals are wide. The width reflects finite-sample difficulty, not bias.
+The mean estimate recovers each parameter, but the deliberately hard case has high per-replication variance, so the 95% intervals are wide. The width reflects finite-sample difficulty, not bias.
 
 Behavioral fit and counterfactual regret on the same cell, against the known
 oracle objects:

@@ -29,18 +29,12 @@ and every trajectory starts at the top-left corner (state 0). The figure shows t
 
 | Estimator | Family | Uses transitions $P(s'\mid s,a)$ | Transferable reward | Standard errors |
 |---|---|---|---|---|
-| MaxEnt-IRL | behavioral | yes | yes | no |
 | MCE-IRL | behavioral | yes | yes | no |
 | Deep-MCE-IRL | behavioral | yes | yes | no |
 | AIRL | behavioral | yes | yes | no |
-| IQ-Learn | behavioral | yes | yes | no |
-| f-IRL | behavioral | yes | no | no |
 | GLADIUS | behavioral | yes | yes | no |
-| BC | behavioral | yes | no | no |
 | NFXP | structural | yes | yes | yes |
 | CCP | structural | yes | yes | yes |
-| MPEC | structural | yes | yes | yes |
-| UFXP | structural | yes | yes | yes |
 
 Uses transitions is whether the estimator reads the transition kernel; model-free learners do not. Transferable reward is whether it recovers a reward that re-solves under a counterfactual. Standard errors is whether it returns inference. The last two are read from the run.
 
@@ -48,18 +42,12 @@ Uses transitions is whether the estimator reads the transition kernel; model-fre
 
 | Estimator | Family | Ran | Conv | Policy TV | Time (s) |
 |---|---|---|---|---|---|
-| MaxEnt-IRL | behavioral | 3/3 | 0/3 | 0.2567 | 22.5 |
 | MCE-IRL | behavioral | 3/3 | 0/3 | 0.3632 | 251.1 |
 | Deep-MCE-IRL | behavioral | 3/3 | 3/3 | 0.3986 | 11.1 |
 | AIRL | behavioral | 3/3 | 0/3 | 0.6152 | 113.7 |
-| IQ-Learn | behavioral | 3/3 | 3/3 | 0.6165 | 2.1 |
-| f-IRL | behavioral | 3/3 | 3/3 | 0.0509 | 28.4 |
 | GLADIUS | behavioral | 3/3 | 3/3 | 0.2208 | 25.6 |
-| BC | behavioral | 3/3 | 3/3 | 0.1298 | 0.2 |
 | NFXP | structural | 3/3 | 3/3 | 0.0004 | 12.0 |
 | CCP | structural | 3/3 | 3/3 | 0.0081 | 3.1 |
-| MPEC | structural | 3/3 | 3/3 | 0.0004 | 0.9 |
-| UFXP | structural | 3/3 | 0/3 | 0.0388 | 0.1 |
 
 Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate.
 
@@ -83,8 +71,6 @@ The reward and the optimal value lie on the actual grid. The left panel is the b
 
 **MCE-IRL.** Two of its three reward directions, the state-only step and distance features, are unidentified here. Its gradient ascent can drift along them, and in one replication of three the policy collapsed. Read the per-rep records, not just the mean.
 
-**f-IRL.** The strongest behavioral score on this page. It recovers a tabular reward, one value per state-action pair, which does not depend on the deficient feature basis at all.
-
 ## Reproduce
 
 ```bash
@@ -95,4 +81,4 @@ python scripts/sim_taxi_gridworld.py --verify        # re-derive the table from 
 
 Raw facts: `validation/results/sim_taxi_gridworld.json`.
 
-Not shown on this page: SEES (its spline value basis is built for an ordered 1-D state index. A 2-D grid breaks that geometry, so running it here would be misspecification by construction); NNES, TD-CCP (the structural contrast is carried by NFXP/CCP/MPEC/UFXP here. The full structural roster runs on the bus engine and abstract MDP pages); MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code or too slow; not benchmarked in this study).
+Not shown on this page: SEES (its spline value basis is built for an ordered 1-D state index. A 2-D grid breaks that geometry, so running it here would be misspecification by construction); MPEC, UFXP, NNES (Other-tier structural estimators; NFXP and CCP carry the structural contrast here, and the full structural roster runs on the bus engine and fleet pages); TD-CCP (core, but shown on the bus engine study; the deterministic grid does not exercise its transition-free estimation); MaxEnt-IRL, IQ-Learn, f-IRL, BC (trajectory MaxEnt, inverse soft-Q, state-marginal, and behavioral-cloning baselines; not part of the core roster); MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code or too slow; not benchmarked in this study).

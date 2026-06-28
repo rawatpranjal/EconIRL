@@ -68,9 +68,10 @@ $$
 
 normalized to sum to one over $s$. Here $\mu_0$ is treated as a row vector
 and $\mu_0^\top P_\pi^t$ denotes right-multiplication, matching the
-implementation's `mu @ P_pi` convention. The canonical instance is the paper-faithful
-synthetic cell: eight states, three actions, a state-only reward, and
-deterministic transitions that fully specify the data-generating process.
+implementation's `mu @ P_pi` convention. The canonical instance is a
+paper-faithful synthetic benchmark with eight states, three actions, a state-only
+reward, and deterministic transitions that fully specify the data-generating
+process.
 
 ## Identification
 
@@ -313,10 +314,10 @@ attributes and divergence options.
 
 ## Evidence
 
-Behavioral recovery is measured on the paper-faithful synthetic cell
-(`f_irl_paper_state_marginal`): eight states, three actions, a state-only
-reward, deterministic transitions, and fully specified oracle objects for
-policy, value, and three counterfactual families. All results use the forward
+Behavioral recovery is measured on a paper-faithful synthetic benchmark with
+eight states, three actions, a state-only reward, deterministic transitions, and
+fully specified oracle objects for policy, value, and three counterfactual
+families. All results use the forward
 KL divergence with `marginal_space="state"` and `reward_scope="state"`.
 
 | Metric | Value |

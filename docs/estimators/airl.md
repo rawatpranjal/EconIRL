@@ -103,8 +103,8 @@ AIRL recovers $g_\theta$ under the following assumptions.
   separates into a reward term and a continuation-value term, enabling
   $h_\phi$ to absorb the dynamics-dependent component. Formally (Fu et al.
   2018, Def. B.1), the dynamics satisfy decomposability if all states are
-  linked — every pair of states can be reached from a common predecessor in
-  one step (transitively). Under this condition, Lemma B.1 guarantees that
+  linked, meaning every pair of states can be reached from a common predecessor
+  in one step (transitively). Under this condition, Lemma B.1 guarantees that
   any identity $a(s) + b(s') = c(s) + d(s')$ for all $s, s'$ implies
   $a(s) = c(s) + \text{const}$ and $b(s') = d(s') + \text{const}$, enabling
   the $f^* = g^* + \beta h^*(s') - h^*(s)$ decomposition.
@@ -133,9 +133,9 @@ $g^*_\theta(s) = r(s) + \text{const}$ and $h^*_\phi(s) = V^*(s) +
 
 These hold inside a finite discrete state space, a stationary environment, and
 a known fixed discount $\beta$. Given them, $g_\theta$ is identified up to a
-constant. The potential-based shaping ambiguity — any
+constant. The potential-based shaping ambiguity (any
 $r'(s,a,s') = r(s,a,s') + \beta h(s') - h(s)$ is behaviorally equivalent
-under the original dynamics — is absorbed by $h_\phi$ under the state-only
+under the original dynamics) is absorbed by $h_\phi$ under the state-only
 condition. Identification fails under two modes: (i) a state-only $g_\theta(s)$ cannot
 represent the action contrast when the DGP has action-dependent payoffs; (ii)
 expanding to $g_\theta(s,a)$ breaks the decomposability of $f^*$ and
@@ -222,13 +222,16 @@ loses the disentanglement property.
 | An adversarial IRL comparison is the research objective. | Counterfactual analysis requires a reward in the same parameterization as the DGP. |
 | Transitions are available for policy update and evaluation. | Thin state coverage makes adversarial training unstable. |
 
-AIRL is the tabular reference in the adversarial IRL family. MCE-IRL uses a
-maximum causal entropy objective and does not require an adversarial game,
-making it more stable in small tabular environments. AIRL-Het extends the
-design to anchored action-dependent rewards in heterogeneous dynamic discrete
-choice settings; that extension is documented separately. GAIL is a simpler
-adversarial baseline without the shaping structure and does not carry the
-disentanglement property.
+AIRL's distinctive aim is a reward that transfers. Fu et al. (2018) show that a
+disentangled reward, one that re-optimizes to the right behavior under changed
+dynamics, must be a function of state alone. That is the state-only restriction
+above, and it is what separates AIRL from its neighbors. GAIL recovers only a
+policy: its discriminator converges to one-half everywhere, so it carries no
+reward to re-optimize and cannot transfer to new dynamics. MCE-IRL recovers a
+reward without an adversarial game, which is more stable in small tabular
+environments, but it is not built for the transfer guarantee. AIRL-Het extends
+the design to anchored action-dependent rewards for heterogeneous populations,
+documented separately.
 
 ## Usage
 
@@ -268,8 +271,7 @@ policy     = summary.policy            # shape (n_states, n_actions)
 value      = summary.value_function    # shape (n_states,)
 disc_loss  = summary.metadata["final_disc_loss"]   # inspect before interpreting reward metrics
 
-# Type A, B, and C counterfactual regrets are reported
-# in validation/results/airl.json under the primary cell.
+# Type A, B, and C counterfactual regrets appear in the Evidence section below.
 ```
 
 The [Quick Start](airl/quick_start.md) page documents the full set of fitted
@@ -277,14 +279,13 @@ attributes and the lower-level interface.
 
 ## Evidence
 
-AIRL is evaluated on the `airl_paper_identification` cell, a state-only reward
-DGP with 16 states and 4 actions that matches the identification conditions of
-Fu et al. (2018). A second diagnostic cell (`airl_anchor_action_dependent`) is
-also run and fails all checks; it documents the action-dependent identification
-boundary, not a validated use case.
+AIRL is evaluated on a synthetic state-only reward DGP with 16 states and 4
+actions that matches the identification conditions of Fu et al. (2018). The
+action-dependent boundary, where a state-only reward cannot represent the action
+contrast, is covered on the [Identification Boundary](airl/identification.md) page.
 
-All metrics below are from `validation/results/airl.json`, primary cell
-`airl_paper_identification` (24,000 observations, 150 training rounds).
+The metrics below come from a run with 24,000 observations and 150 training
+rounds.
 
 Behavioral recovery against the known oracle:
 

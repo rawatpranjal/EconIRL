@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Direct optimization approaches
 
 Most structural estimators of dynamic discrete choice nest a Bellman fixed-point

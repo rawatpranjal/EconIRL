@@ -13,11 +13,15 @@ fitted MDP primitives.
 The estimator follows {ref}`Ziebart et al. (2008) <ziebart-2008>`, which
 introduces maximum-entropy inverse reinforcement learning through feature-count
 matching, and {ref}`Ziebart (2010) <ziebart-2010>`, which formulates the
-maximum causal entropy objective. The causal entropy formulation conditions
-each action only on the current state and continuation values, not on future
-realized states. That is the critical distinction from trajectory
-maximum-entropy IRL and is why MCE-IRL is the reference entropy IRL route for
-dynamic discrete choice comparisons in this package.
+maximum causal entropy objective. The causal entropy conditions each action only
+on information available when the choice is made, the current state and
+continuation values, not on the states the action later reaches. Trajectory
+maximum-entropy IRL instead scores the whole trajectory, which ties the entropy
+to the transition dynamics and biases the recovered policy toward actions with
+uncertain outcomes. The two coincide under deterministic dynamics and separate
+under stochastic ones. The causal form matches the logit dynamic-discrete-choice
+structure, which is why MCE-IRL is the reference entropy IRL route for these
+comparisons.
 
 ## Notation
 
@@ -198,9 +202,7 @@ $$
 or in matrix form $D_\theta = \rho_0 + \beta P_\pi^\top D_\theta$, solved by
 fixed-point iteration. The state-action occupancy is then
 $D_\theta(s, a) = D_\theta(s)\,\pi_\theta(a \mid s)$, from which
-$\mu_\theta = \sum_{s,a} D_\theta(s, a)\,\phi(s, a)$. This forward pass
-corresponds to `_compute_state_visitation` in the source
-(lines 272–283 of `mce_irl.py`).
+$\mu_\theta = \sum_{s,a} D_\theta(s, a)\,\phi(s, a)$.
 
 The final gradient of the log-likelihood with respect to $\theta_k$ is
 
@@ -214,10 +216,9 @@ $$
 $$
 
 where $dQ_k(s, a) = \phi_k(s, a) + \beta (P_a\, dV_k)(s)$ and $dV_k$ solves
-the implicit-differentiation system above. This formula appears directly in
-the source at lines 667–676 of `mce_irl.py` and is the step that connects
-implicit differentiation to the gradient used in L-BFGS-B. The resulting
-gradient has the same logit form as the structural conditional likelihood score.
+the implicit-differentiation system above. This step connects the implicit
+differentiation to the gradient used in L-BFGS-B. The resulting gradient has the
+same logit form as the structural conditional likelihood score.
 
 ## Algorithm
 
@@ -252,10 +253,9 @@ solution but requires a good starting point.
 
 An alternative outer path, used in the package's own simulation study, is
 `optimizer="root"`: a direct root-finding solver (HYBR method) that solves
-$\mu_E - \mu_\theta = 0$ without maximizing the log likelihood. The root path
-converged in 25 iterations on the primary validation cell. A gradient-descent
+$\mu_E - \mu_\theta = 0$ without maximizing the log likelihood. A gradient-descent
 path (`optimizer="gradient"`) is also available, using Adam or plain SGD as
-the outer update. The implementation lives in `econirl.estimation.mce_irl`.
+the outer update.
 
 ## Applicability
 
@@ -367,12 +367,12 @@ attributes and the lower-level `MCEIRLEstimator` interface.
 
 ## Evidence
 
-Behavioral recovery is measured on the `mce_low_high_reward` synthetic cell,
-which has 25 states, 3 actions, and 8 action-dependent reward features. The
-reward, transitions, policy, value, Q functions, and counterfactual oracles are
-fully specified before any data are generated. The estimator sees only the
-300,000 generated observations, the transition tensor, and the feature matrix.
-The root feature-matching path reaches a solution in 25 iterations.
+Behavioral recovery is measured on a synthetic benchmark with 25 states, 3
+actions, and 8 action-dependent reward features. The reward, transitions, policy,
+value, Q functions, and counterfactual oracles are fully specified before any data
+are generated. The estimator sees only the 300,000 generated observations, the
+transition tensor, and the feature matrix. The root feature-matching path reaches a
+solution in 25 iterations.
 
 Behavioral fit against the known oracle policy:
 
@@ -392,9 +392,9 @@ Counterfactual recovery under three perturbation families:
 | Type B (transition change) | 0.006284 | 0.000523 | 0.000410 |
 | Type C (action removed) | 0.004211 | 0.000145 | 9.44e-05 |
 
-All ten release checks pass. These results are local to the known simulation
-environment and depend on the same transition law, support, reward
-representation, and policy-response assumptions used in fitting. For the
+These results are local to the known simulation environment. They depend on the
+same transition law, support, reward representation, and policy-response
+assumptions used in fitting. For the
 cross-estimator comparison on multiple dynamic choice problems, see the
 [bus engine simulation study](../simulation_studies/rust_bus.md).
 

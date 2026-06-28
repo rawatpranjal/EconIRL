@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Optimal replacement: vehicle scrappage (RDW)
 
 A vehicle owner decides each year whether to keep running a car or scrap it and buy a new one. The decision depends on the car's age and how well it passed the mandatory Dutch APK roadworthiness inspection. The model is an optimal stopping problem in the spirit of Rust (1987), applied to vehicle scrappage.

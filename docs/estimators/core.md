@@ -7,8 +7,8 @@ replication, matched to Rust (1987) Table IX. The rest of the core spans the
 structural and inverse-reinforcement-learning methods that carry the main
 identification stories and method lineages.
 
-For how to choose among them, see [Choosing an Estimator](landscape.md). For a
-side-by-side table, see [Comparing Estimators](comparison.md).
+For how to choose among them, including the side-by-side table, see
+[Choosing an Estimator](landscape.md).
 
 | Estimator | Family | Best for |
 | --- | --- | --- |
@@ -28,7 +28,6 @@ GLADIUS is the package's neural estimator. The `GLADIUS` class is the
 :maxdepth: 1
 
 landscape
-comparison
 nfxp
 ccp
 tdccp

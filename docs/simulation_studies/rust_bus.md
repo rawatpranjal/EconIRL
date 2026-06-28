@@ -37,17 +37,9 @@ Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-re
 |---|---|---|---|---|
 | NFXP | structural | yes | yes | yes |
 | CCP | structural | yes | yes | yes |
-| MPEC | structural | yes | yes | yes |
-| NNES | structural | yes | yes | no |
-| SEES | structural | yes | yes | no |
 | TD-CCP | structural | yes | yes | no |
-| UFXP | structural | yes | yes | yes |
 | MCE-IRL | behavioral | yes | yes | no |
-| MaxEnt-IRL | behavioral | yes | yes | no |
-| IQ-Learn | behavioral | yes | yes | no |
 | GLADIUS | behavioral | yes | yes | no |
-| AIRL | behavioral | yes | yes | no |
-| Deep-MCE-IRL | behavioral | yes | yes | no |
 
 Uses transitions is whether the estimator reads the transition kernel; model-free learners do not. Transferable reward is whether it recovers a reward that re-solves under a counterfactual. Standard errors is whether it returns inference. The last two are read from the run.
 
@@ -57,17 +49,9 @@ Uses transitions is whether the estimator reads the transition kernel; model-fre
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | NFXP | structural | 3/3 | 3/3 | [0.012, 2.011] | 0.0130 | 0.0075 | 0.0007 | 0.0008 | 0.0005 | 0.0000 | 4.2 |
 | CCP | structural | 3/3 | 3/3 | [0.011, 2.008] | 0.0125 | 0.0078 | 0.0005 | 0.0006 | 0.0004 | 0.0000 | 3.2 |
-| MPEC | structural | 3/3 | 3/3 | [0.012, 2.011] | 0.0130 | 0.0075 | 0.0007 | 0.0008 | 0.0005 | 0.0000 | 0.8 |
-| NNES | structural | 3/3 | 3/3 | [0.012, 2.011] | 0.0130 | 0.0075 | 0.0007 | 0.0008 | 0.0005 | 0.0000 | 22.6 |
-| SEES | structural | 3/3 | 0/3 | [0.011, 2.010] | 0.0128 | 0.0074 | 0.0007 | 0.0007 | 0.0004 | 0.0000 | 2.9 |
 | TD-CCP | structural | 3/3 | 3/3 | [0.012, 2.013] | 0.0118 | 0.0090 | 0.0010 | 0.0011 | 0.0007 | 0.0000 | 3.9 |
-| UFXP | structural | 3/3 | 3/3 | [0.011, 2.009] | 0.0122 | 0.0067 | 0.0006 | 0.0006 | 0.0004 | 0.0000 | 0.2 |
 | MCE-IRL | behavioral | 3/3 | 0/3 | [0.012, 2.011] | - | 0.0075 | 0.0007 | 0.0008 | 0.0005 | 0.0000 | 8.6 |
-| MaxEnt-IRL | behavioral | 3/3 | 3/3 | [-0.006, 1.685] | - | 0.0649 | 0.0987 | 0.1075 | 0.0702 | 0.0003 | 9.4 |
-| IQ-Learn | behavioral | 3/3 | 3/3 | [-0.016, 1.519] | - | 0.0420 | 0.4733 | 0.5252 | 0.1696 | 0.0004 | 1.9 |
 | GLADIUS | behavioral | 3/3 | 3/3 | [0.029, 2.031] | - | 0.0095 | 0.0773 | 0.0795 | 0.0631 | 0.0542 | 32.7 |
-| AIRL | behavioral | 3/3 | 0/3 | [0.020, 2.034] | - | 0.0528 | 0.0251 | 0.0261 | 0.0140 | 0.0025 | 132.5 |
-| Deep-MCE-IRL | behavioral | 3/3 | 3/3 | [-0.082, 0.568] | - | 0.0092 | 3.3450 | 3.2419 | 1.6305 | 0.0005 | 14.0 |
 
 Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
@@ -93,13 +77,7 @@ The same reward as a state-by-action heatmap puts the true and recovered rewards
 
 ## Notes per estimator
 
-**UFXP.** Unnested fixed point (Bray; Oguz and Bray 2026) with the paper's optimal weighting. The value function is eliminated before any parameter search, so the linear case is closed form and as efficient as maximum likelihood.
-
 **MCE-IRL.** Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus first, so it can read False while the policy is essentially exact.
-
-**MaxEnt-IRL.** It trails MCE-IRL because trajectory-entropy matching is not the causal choice model that generated the data.
-
-**IQ-Learn.** Uses the linear feature structure. A tabular Q-table would not propagate to unvisited states.
 
 ## Reproduce
 
@@ -111,4 +89,4 @@ python scripts/sim_rust_bus.py --verify        # re-derive the table from JSON
 
 Raw facts: `validation/results/sim_rust_bus.json`.
 
-Not shown on this page: AIRL-Het / AAIRL (designed for latent-type heterogeneity; this panel has one agent type); MMP, GAIL (too slow for this page's per-fit budget); GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code, not benchmarked); MaxMargin-IRL (its unit-norm reward direction has no link to the choice model's noise scale, so it is not a like-for-like baseline on this problem; it ran 3/3 and its raw records remain in the results file); f-IRL, BC (they recover a tabular reward and a choice-probability table, objects in a different parameterization; their raw records remain in the results file).
+Not shown on this page: MPEC, NNES, SEES, UFXP (Other-tier structural estimators; this study shows the core structural family (NFXP, CCP, TD-CCP). They ran and their records remain in the results file); AIRL, Deep-MCE-IRL (core IRL methods shown on the gridworld study, whose deterministic state-only reward suits them); MaxEnt-IRL, IQ-Learn (trajectory MaxEnt and inverse soft-Q; not part of the core roster); AIRL-Het / AAIRL (designed for latent-type heterogeneity; this panel has one agent type); MMP, GAIL (too slow for this page's per-fit budget); GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code, not benchmarked); MaxMargin-IRL (its unit-norm reward direction has no link to the choice model's noise scale, so it is not a like-for-like baseline on this problem; it ran 3/3 and its raw records remain in the results file); f-IRL, BC (they recover a tabular reward and a choice-probability table, objects in a different parameterization; their raw records remain in the results file).

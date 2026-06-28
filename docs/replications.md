@@ -3,7 +3,8 @@
 This page reports numerical replication evidence. A study counts as a paper
 replication only when the published design, sample, and estimand are available and
 the reported quantities are directly comparable. Each section sets the package
-value against the paper's published value, side by side.
+value against the paper's published value, side by side, and ends with a command
+to reproduce the run.
 
 ## Rust (1987), Table IX, Group 4 (NFXP)
 
@@ -37,8 +38,14 @@ the point estimates and the standard errors.
 | full log-likelihood | -3306.0291 | -3306.028 |
 
 The transition probabilities and their log-likelihood are estimated separately
-from the cost parameters, so they are the same across both rows. The replication
-runs through `make rust-table-ix`, which fetches the official NFXP data.
+from the cost parameters, so they are the same across both rows.
+
+Reproduce, on the official NFXP data:
+
+```bash
+make rust-table-ix                            # fetch the official data, print Table IX
+pytest tests/test_rust_tables.py -k TableIX   # lock the published numbers
+```
 
 ## MPEC (Su and Judd, 2012)
 
@@ -81,6 +88,14 @@ content of Proposition 1.
 The cost level differs from the published table because this panel uses a
 different binning. The agreement between MPEC and NFXP does not.
 
+Reproduce:
+
+```bash
+pytest tests/test_mpec.py::TestMPECvsNFXP      # MPEC matches NFXP (Proposition 1)
+# exact Table IX match, after make rust-table-ix has downloaded the data:
+pytest tests/test_rust_tables.py::TestMPECStordatProfile
+```
+
 ## MCE-IRL (Ziebart et al., 2008 and 2010)
 
 Ziebart's reward is a function of state, R(s) linear in state features, on a
@@ -106,6 +121,12 @@ across states is identified, not its level. Both estimators recover the reward,
 the linear one exactly and the neural one nearly so. The neural reward map does
 not cost identification on Ziebart's state-reward problem. This is simulation
 evidence, not a replication of a published number.
+
+Reproduce:
+
+```bash
+python examples/ziebart-mce-irl/run_gridworld.py --grid-size 12
+```
 
 ## CCP / NPL (Hotz-Miller, 1993 and Aguirregabiria-Mira, 2002)
 
@@ -136,6 +157,12 @@ lower. The stronger Aguirregabiria-Mira claim, that the NPL and nested fixed
 point estimates agree to the twelfth digit, does not reproduce in this
 implementation. NFXP remains the exact Rust replication. This is a convergence
 reproduction, not a four-figure number match.
+
+Reproduce:
+
+```bash
+pytest tests/test_rust_tables.py::TestNPLConvergenceAM2002
+```
 
 ## Pending
 

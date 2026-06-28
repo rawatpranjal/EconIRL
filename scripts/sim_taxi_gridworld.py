@@ -169,18 +169,12 @@ def _run_ufxp(env, panel):
 
 
 ROSTER = (
-    RosterEntry("MaxEnt-IRL", "behavioral", _run_maxent_irl, uses_transitions=True),
     RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
     RosterEntry("Deep-MCE-IRL", "behavioral", _run_deep_mce_irl, uses_transitions=True),
     RosterEntry("AIRL", "behavioral", _run_airl, uses_transitions=True),
-    RosterEntry("IQ-Learn", "behavioral", _run_iq_learn, uses_transitions=True),
-    RosterEntry("f-IRL", "behavioral", _run_firl, uses_transitions=True),
     RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
-    RosterEntry("BC", "behavioral", _run_bc, uses_transitions=True),
     RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
     RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
-    RosterEntry("UFXP", "structural", _run_ufxp, uses_transitions=True),
 )
 
 # A trimmed, representative subset of ROSTER for the scaling sweep: five lines
@@ -189,7 +183,6 @@ ROSTER = (
 SCALING_ROSTER = (
     RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
     RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MPEC", "structural", _run_mpec, uses_transitions=True),
     RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
     RosterEntry("GLADIUS", "behavioral", _run_gladius, uses_transitions=True),
 )
@@ -210,9 +203,14 @@ EXCLUDED = [
     {"name": "SEES", "reason": "its spline value basis is built for an ordered "
      "1-D state index. A 2-D grid breaks that geometry, so running it here "
      "would be misspecification by construction"},
-    {"name": "NNES, TD-CCP", "reason": "the structural contrast is carried by "
-     "NFXP/CCP/MPEC/UFXP here. The full structural roster runs on the bus "
-     "engine and abstract MDP pages"},
+    {"name": "MPEC, UFXP, NNES", "reason": "Other-tier structural estimators; "
+     "NFXP and CCP carry the structural contrast here, and the full structural "
+     "roster runs on the bus engine and fleet pages"},
+    {"name": "TD-CCP", "reason": "core, but shown on the bus engine study; the "
+     "deterministic grid does not exercise its transition-free estimation"},
+    {"name": "MaxEnt-IRL, IQ-Learn, f-IRL, BC", "reason": "trajectory MaxEnt, "
+     "inverse soft-Q, state-marginal, and behavioral-cloning baselines; not "
+     "part of the core roster"},
     {"name": "MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "research "
      "code or too slow; not benchmarked in this study"},
 ]
