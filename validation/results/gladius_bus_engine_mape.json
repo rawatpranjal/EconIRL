@@ -1,0 +1,49 @@
+{
+  "arxiv": "2502.14131",
+  "dgp": {
+    "anchor": true,
+    "beta": 0.95,
+    "max_mileage": 20,
+    "model": "bus-engine replacement",
+    "n_periods": 100,
+    "seed": 7,
+    "theta0": 1.0,
+    "theta1": 5.0
+  },
+  "estimator": "GLADIUS",
+  "metric": "data-visited reward MAPE (%)",
+  "paper": "Kang, Yoganarasimhan, Jain (2025), Table 2",
+  "paper_table2_gladius": {
+    "1000": 0.52,
+    "250": 0.84,
+    "2500": 0.13,
+    "50": 3.44,
+    "500": 0.55,
+    "5000": 0.12
+  },
+  "paper_table2_rust_oracle": {
+    "1000": 0.71,
+    "250": 1.37,
+    "2500": 0.68,
+    "50": 3.62,
+    "500": 0.9,
+    "5000": 0.4
+  },
+  "results": {
+    "250": {
+      "mape_mean": 3.886658033262578,
+      "mape_min": 2.266920556535613,
+      "mape_std": 1.5761556145828675,
+      "mapes": [
+        2.266920556535613,
+        2.907349139908768,
+        5.022709982716156,
+        6.417870059253837,
+        2.8184404278985147
+      ],
+      "paper_gladius": 0.84,
+      "paper_rust_oracle": 1.37,
+      "reps": 5
+    }
+  }
+}
