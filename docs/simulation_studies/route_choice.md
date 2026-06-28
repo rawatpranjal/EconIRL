@@ -16,7 +16,7 @@ where $d_{ss'}$ is the Euclidean edge length, $\mathrm{am}(s')$ is a node-level 
 
 Agents discount future payoffs at $\beta$ and face i.i.d. logit taste shocks (scale $\sigma = 1$). Their behaviour solves the soft Bellman equation. All three parameters are identified from observed route choices because the features vary across edges, not just states. The panel simulates $N$ agents for $T$ periods from the true optimal policy. The figure shows simulated paths and the optimal value function (lower at nodes far from the goal).
 
-Synthetic route choice on a random geometric graph. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, seed=0)``. 200 x 35 observations, 2 replications, seed 42. True theta `[1.0, 0.5, 1.0]`. Design rank 3/3, condition number 1.34e+01, action-contrast rank 3/3 (the rank that identification from choices actually uses). Generated 2026-06-23 with econirl 0.0.7.
+Synthetic route choice on a random geometric graph. ``road_network(num_nodes=25, num_actions=4, discount_factor=0.95, seed=0)``. 200 x 35 observations, 30 replications, seed 42. True theta `[1.0, 0.5, 1.0]`. Design rank 3/3, condition number 1.34e+01, action-contrast rank 3/3 (the rank that identification from choices actually uses). Generated 2026-06-28 with econirl 0.0.8.
 
 ![Simulated trajectories and the optimal value function for Route choice (25 nodes, 4 actions)](../_static/simulation_studies/route_choice_dgp.png)
 
@@ -25,9 +25,8 @@ Synthetic route choice on a random geometric graph. ``road_network(num_nodes=25,
 | Estimator | Family | Uses transitions $P(s'\mid s,a)$ | Transferable reward | Standard errors |
 |---|---|---|---|---|
 | NFXP | structural | yes | yes | yes |
-| CCP | structural | yes | yes | no |
+| CCP | structural | yes | yes | yes |
 | MCE-IRL | behavioral | yes | yes | no |
-| NeuralGLADIUS | behavioral | no | no | no |
 
 Uses transitions is whether the estimator reads the transition kernel; model-free learners do not. Transferable reward is whether it recovers a reward that re-solves under a counterfactual. Standard errors is whether it returns inference. The last two are read from the run.
 
@@ -35,10 +34,9 @@ Uses transitions is whether the estimator reads the transition kernel; model-fre
 
 | Estimator | Family | Ran | Conv | Recovered params | Param RMSE | Policy TV | Regret base | Regret A | Regret B | Regret C | Time (s) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| NFXP | structural | 2/2 | 2/2 | [1.182, 0.508, 0.999] | 0.1052 | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 3.0 |
-| CCP | structural | 2/2 | 2/2 | [1.167, 0.488, 0.953] | 0.1025 | 0.0126 | 0.0058 | 0.0042 | 0.0086 | 0.0088 | 2.2 |
-| MCE-IRL | behavioral | 2/2 | 0/2 | [1.182, 0.508, 0.999] | - | 0.0067 | 0.0044 | 0.0031 | 0.0044 | 0.0025 | 5.0 |
-| NeuralGLADIUS | behavioral | 2/2 | 2/2 | - | - | 0.2658 | 4.2640 | 4.2552 | 3.3720 | 44.4197 | 6.1 |
+| NFXP | structural | 30/30 | 30/30 | [1.024, 0.495, 0.990] | 0.0733 | 0.0081 | 0.0034 | 0.0028 | 0.0068 | 0.0050 | 0.9 |
+| CCP | structural | 30/30 | 1/30 | [1.024, 0.495, 0.990] | 0.0733 | 0.0081 | 0.0034 | 0.0028 | 0.0068 | 0.0050 | 3.5 |
+| MCE-IRL | behavioral | 30/30 | 2/30 | [1.024, 0.495, 0.990] | - | 0.0081 | 0.0034 | 0.0028 | 0.0068 | 0.0050 | 3.5 |
 
 Param RMSE covers the structural family only, which shares the parameterization of the true model. Policy TV is the distance between estimated and true choice probabilities, lower is better. Conv is the estimator's own convergence indicator. A cautious estimator can report False while the recovered policy is accurate. Regret base is welfare lost in the observed environment. Types A, B, and C are welfare lost after a change. Type A shifts a payoff, Type B changes the transitions, Type C penalizes an action. Estimators with a recovered reward re-solve it and adapt. Those without one keep their old policy.
 
@@ -48,20 +46,20 @@ Param RMSE covers the structural family only, which shares the parameterization 
 
 | Estimator | Parameter | True | Mean est | Bias | Emp. SE | RMSE | 95% coverage | SE avail |
 |---|---|---|---|---|---|---|---|---|
-| NFXP | edge_cost | 1.000 | 1.182 | +0.182 | 0.083 | 0.191 | 1.00 +/- 0.00 | 100% (2 reps) |
-| NFXP | amenity | 0.500 | 0.508 | +0.008 | 0.016 | 0.014 | 1.00 +/- 0.00 | 100% (2 reps) |
-| NFXP | goal | 1.000 | 0.999 | -0.001 | 0.008 | 0.006 | 1.00 +/- 0.00 | 100% (2 reps) |
-| CCP | edge_cost | 1.000 | 1.167 | +0.167 | 0.085 | 0.178 | - | 0% (2 reps) |
-| CCP | amenity | 0.500 | 0.488 | -0.012 | 0.020 | 0.018 | - | 0% (2 reps) |
-| CCP | goal | 1.000 | 0.953 | -0.047 | 0.018 | 0.049 | - | 0% (2 reps) |
+| NFXP | edge_cost | 1.000 | 1.024 | +0.024 | 0.139 | 0.139 | 1.00 +/- 0.00 | 100% (30 reps) |
+| NFXP | amenity | 0.500 | 0.495 | -0.005 | 0.021 | 0.021 | 1.00 +/- 0.00 | 100% (30 reps) |
+| NFXP | goal | 1.000 | 0.990 | -0.010 | 0.042 | 0.043 | 1.00 +/- 0.00 | 100% (30 reps) |
+| CCP | edge_cost | 1.000 | 1.024 | +0.024 | 0.139 | 0.139 | - | 17% (30 reps) |
+| CCP | amenity | 0.500 | 0.495 | -0.005 | 0.021 | 0.021 | - | 17% (30 reps) |
+| CCP | goal | 1.000 | 0.990 | -0.010 | 0.042 | 0.043 | - | 17% (30 reps) |
 
 Coverage is the share of replications whose 95% interval contains the truth, shown with its Monte Carlo standard error. It is computed only where every replication produced a finite standard error. SE avail is the share of replications with finite standard errors.
 
-The structural family (NFXP, CCP, MPEC) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL here uses the same linear features and recovers the same values, but its weights stay out of the recovery table because an IRL reward is only partially identified in general. NeuralGLADIUS learns a model-free policy with no reward weights to compare. Policy TV and regret are the right scorecards for the behavioral family.
+The structural family (NFXP, CCP) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. MCE-IRL here uses the same linear features and recovers the same values, but its weights stay out of the recovery table because an IRL reward is only partially identified in general. Policy TV and regret are the behavioral scorecards.
 
 ## Scaling
 
-The same study at three problem sizes (15, 25, 40 states). Each line is one estimator: fit time on the left, policy total variation on the right. The structural methods stay accurate across sizes, with MPEC the fastest. NeuralGLADIUS is the least accurate at every size. The fits run from sub-second to a few seconds, so the compute lines reflect fixed overhead more than asymptotics at this scale.
+The same study at three problem sizes (15, 25, 40 states). Each line is one estimator: fit time on the left, policy total variation on the right. The structural methods stay accurate across sizes. The fits run from sub-second to a few seconds, so the compute lines reflect fixed overhead more than asymptotics at this scale.
 
 ![Fit time and policy total variation against the number of states](../_static/simulation_studies/route_choice_scaling.png)
 
@@ -83,8 +81,6 @@ The recovered reward sits beside the true reward as state-by-action heatmaps, sh
 
 **MCE-IRL.** Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate.
 
-**NeuralGLADIUS.** Model-free neural policy learner. Uses only the feature matrix and the observed panel; it does not use transition matrices. Capped at 200 epochs here for short compute.
-
 ## Reproduce
 
 ```bash
@@ -95,4 +91,4 @@ python scripts/study_route_choice.py --verify        # re-derive the table from 
 
 Raw facts: `validation/results/study_route_choice.json`.
 
-Not shown on this page: MPEC (an Other-tier constrained-optimization form of the same MLE; NFXP and CCP carry the structural recovery here); IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NNES, SEES, TD-CCP, UFXP (correct structural estimators but slower on a 25-node graph; NFXP and CCP already cover the structural family); MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL (trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here).
+Not shown on this page: MPEC (an Other-tier constrained-optimization form of the same MLE; NFXP and CCP carry the structural recovery here); IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NNES, SEES, TD-CCP, UFXP (correct structural estimators but slower on a 25-node graph; NFXP and CCP already cover the structural family); MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL (trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here); NeuralGLADIUS (a model-free neural policy learner; on a 25-node tabular state space it reduces to behavioral cloning on the choice likelihood with no structural edge, and it trailed every method shown. Its arena is scalability and predictive likelihood on large state spaces where full-solution methods become intractable, a regime outside these policy-recovery studies).
