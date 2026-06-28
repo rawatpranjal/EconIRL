@@ -26,6 +26,38 @@ Fitted attributes follow the same convention as CCP and UFXP:
 | `log_likelihood_` | Maximized conditional choice log likelihood. |
 | `converged_` | Whether the outer optimizer reported convergence. |
 
+## Custom Reward Features
+
+The `utility="linear_cost"` default builds the Rust bus features for you. To use
+your own features, pass a `RewardSpec` to `fit`. The feature array has shape
+`(n_states, n_actions, n_features)`, and `reward=` overrides the constructor
+default.
+
+```python
+import numpy as np
+from econirl import NFXP, RewardSpec
+from econirl.datasets import load_rust_bus
+
+df = load_rust_bus()
+n_states, n_actions = 90, 2
+mileage = np.arange(n_states) / n_states
+
+features = np.zeros((n_states, n_actions, 2))
+features[:, 0, 0] = -mileage   # operating cost on "keep", rising with mileage
+features[:, 1, 1] = -1.0       # flat replacement cost on "replace"
+
+spec = RewardSpec(features, names=["operating_cost", "replacement_cost"])
+
+model = NFXP(n_states=n_states, discount=0.9999)
+model.fit(df, state="mileage_bin", action="replaced", id="bus_id", reward=spec)
+
+print(model.params_)   # {"operating_cost": ..., "replacement_cost": ...}
+```
+
+A `RewardSpec` whose state or action dimension does not match `n_states` /
+`n_actions` raises a clear `ValueError` at `fit` time, not a broadcasting error
+later.
+
 ## Counterfactual Example
 
 ```python
