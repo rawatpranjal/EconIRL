@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "task": "AIRL Fu-Luo-Levine 2018 section 7.1 (deterministic tabular)",
+    "n_states": 16,
+    "n_actions": 4,
+    "reward": "1.0 at state 0",
+    "discount": 0.9,
+    "seeds": [
+      0
+    ],
+    "metric": "affine R^2 of recovered reward vs true; transfer = fraction of hard-optimal return under new T'"
+  },
+  "summary": {
+    "AIRL-1 (state-only)": {
+      "reward_affine_r2": 0.9773678154367048,
+      "transfer_frac_optimal": 0.9999999999997472
+    },
+    "AIRL-2 (state-action)": {
+      "reward_affine_r2": 0.24383767955506475,
+      "transfer_frac_optimal": -0.19712116513525796
+    }
+  },
+  "records": [
+    {
+      "seed": 0,
+      "AIRL-1 (state-only)": {
+        "reward_affine_r2": 0.9773678154367048,
+        "transfer_frac_optimal": 0.9999999999997472
+      },
+      "AIRL-2 (state-action)": {
+        "reward_affine_r2": 0.24383767955506475,
+        "transfer_frac_optimal": -0.19712116513525796
+      }
+    }
+  ]
+}

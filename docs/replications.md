@@ -3,7 +3,8 @@
 This page reports numerical replication evidence. A study counts as a paper
 replication only when the published design, sample, and estimand are available and
 the reported quantities are directly comparable. Each section sets the package
-value against the paper's published value, side by side.
+value against the paper's published value, side by side, and ends with a command
+to reproduce the run.
 
 ## Rust (1987), Table IX, Group 4 (NFXP)
 
@@ -37,8 +38,14 @@ the point estimates and the standard errors.
 | full log-likelihood | -3306.0291 | -3306.028 |
 
 The transition probabilities and their log-likelihood are estimated separately
-from the cost parameters, so they are the same across both rows. The replication
-runs through `make rust-table-ix`, which fetches the official NFXP data.
+from the cost parameters, so they are the same across both rows.
+
+Reproduce, on the official NFXP data:
+
+```bash
+make rust-table-ix                            # fetch the official data, print Table IX
+pytest tests/test_rust_tables.py -k TableIX   # lock the published numbers
+```
 
 ## MPEC (Su and Judd, 2012)
 
@@ -81,6 +88,14 @@ content of Proposition 1.
 The cost level differs from the published table because this panel uses a
 different binning. The agreement between MPEC and NFXP does not.
 
+Reproduce:
+
+```bash
+pytest tests/test_mpec.py::TestMPECvsNFXP      # MPEC matches NFXP (Proposition 1)
+# exact Table IX match, after make rust-table-ix has downloaded the data:
+pytest tests/test_rust_tables.py::TestMPECStordatProfile
+```
+
 ## MCE-IRL (Ziebart et al., 2008 and 2010)
 
 Ziebart's reward is a function of state, R(s) linear in state features, on a
@@ -106,6 +121,12 @@ across states is identified, not its level. Both estimators recover the reward,
 the linear one exactly and the neural one nearly so. The neural reward map does
 not cost identification on Ziebart's state-reward problem. This is simulation
 evidence, not a replication of a published number.
+
+Reproduce:
+
+```bash
+python examples/ziebart-mce-irl/run_gridworld.py --grid-size 12
+```
 
 ## CCP / NPL (Hotz-Miller, 1993 and Aguirregabiria-Mira, 2002)
 
@@ -137,6 +158,45 @@ point estimates agree to the twelfth digit, does not reproduce in this
 implementation. NFXP remains the exact Rust replication. This is a convergence
 reproduction, not a four-figure number match.
 
+Reproduce:
+
+```bash
+pytest tests/test_rust_tables.py::TestNPLConvergenceAM2002
+```
+
+## AIRL (Fu, Luo, and Levine, 2018)
+
+AIRL learns a reward through an adversarial discriminator. Fu, Luo, and Levine
+prove (their Theorems 5.1 and 5.2) that the reward is identified and portable to
+new dynamics only when it is a function of state, R(s). A state-action reward
+recovers a shaped advantage that re-optimizes correctly in the training dynamics
+but not under a changed transition model. Their Section 7.1 task is a 16-state,
+4-action MDP with a reward at a single state.
+
+The package reproduces the identification structure:
+
+| Form | Reward | Transitions | Recovers the reward |
+| --- | --- | --- | --- |
+| AIRL-1 | R(s) | deterministic | yes |
+| AIRL-2 (default) | R(s,a) | any | no, a shaped advantage |
+| AIRL-2 anchored | R(s,a) with an action anchor | any | yes (see AIRL-Het) |
+
+State-only AIRL recovers the reward on the deterministic 16-state task: normalized
+reward error 0.10, policy distance 0.006, counterfactual regret near 0.004. The
+action-dependent reward with no anchor does not recover, normalized reward error
+1.16 and large counterfactual regret. On the Section 7.1 transfer test, the
+state-only reward re-optimizes to optimal behavior under a fresh transition
+matrix, while the state-action reward barely beats a random policy.
+
+This is simulation evidence of the paper's identification claims. Section 7.1
+reports reward maps and a transfer curve, not a numerical table.
+
+Reproduce:
+
+```bash
+python validation/estimators/airl/run.py    # state-only recovers, state-action does not
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -148,6 +208,5 @@ both the estimates and the standard errors.
 | NNES | Nguyen (2025) | Not yet evaluated. |
 | TD-CCP | Adusumilli-Eckardt (2025) | Not yet evaluated. |
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |
-| AIRL | Fu-Luo-Levine (2018) | Not yet evaluated. |
 | AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
