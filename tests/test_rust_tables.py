@@ -118,8 +118,8 @@ class TestTableV:
         assert table['converged'].all()
 
 
-def _fit_group4(estimator):
-    """Fit one estimator on Rust Group-4 data and return (theta_c, RC, loglik)."""
+def _group4_inputs(beta=0.9999):
+    """Build (panel, utility, problem, transitions) for Rust Group-4 at a discount beta."""
     from econirl.datasets import load_rust_bus
     from econirl.estimation.transitions import estimate_transition_probs_by_group
     from econirl.environments.rust_bus import RustBusEnvironment
@@ -133,9 +133,15 @@ def _fit_group4(estimator):
         operating_cost=0.001,
         replacement_cost=3.0,
         mileage_transition_probs=tuple(probs[4]),
-        discount_factor=0.9999,
+        discount_factor=beta,
     )
-    res = estimator.estimate(panel, LinearUtility.from_environment(env), env.problem_spec, env.transition_matrices)
+    return panel, LinearUtility.from_environment(env), env.problem_spec, env.transition_matrices
+
+
+def _fit_group4(estimator):
+    """Fit one estimator on Rust Group-4 data (beta=0.9999) and return (theta_c, RC, loglik)."""
+    panel, utility, problem, transitions = _group4_inputs()
+    res = estimator.estimate(panel, utility, problem, transitions)
     return res.parameters[0].item(), res.parameters[1].item(), float(res.log_likelihood)
 
 
@@ -185,6 +191,56 @@ class TestNPLConvergenceAM2002:
         # the RC point estimate differs at the 4th significant figure.
         assert ll_nfxp >= ll5 - 1e-9
         assert abs(rc5 - rc_nfxp) > 1e-4
+
+
+@pytest.mark.slow
+class TestNFXPSolverScalingILRSS2016:
+    """Reproduce Iskhakov-Lee-Rust-Schjerning-Seo (2016) on the Rust bus data.
+
+    ILRSS show that Su-Judd's "MPEC is much faster than NFXP" is an artifact of
+    NFXP-SA (successive approximations): with the efficient NFXP-NK the inner-loop
+    iteration count is insensitive to the discount factor. Measured here on Group
+    4, inner iterations per fixed-point solve:
+
+        beta:        0.975   0.99   0.995   0.999   0.9999
+        nk  :            8      9       9       9        9
+        sa  :          844   2104    4202  (slow)  (impractical)
+
+    The "nk" (policy iteration / Newton-Kantorovich) solve stays flat ~9 across all
+    beta; NFXP-SA grows sharply with beta. All solvers recover the same MLE.
+
+    Secondary finding (flagged, not a correctness bug): the package "hybrid" solver
+    does NOT achieve this flatness (~211 -> ~48,513 iters/solve over 0.975 ->
+    0.9999) despite its "best for high beta" docstring. Use "nk" for high beta.
+    """
+
+    @staticmethod
+    def _final_inner(beta, solver):
+        from econirl.estimation.nfxp import NFXPEstimator
+
+        panel, utility, problem, transitions = _group4_inputs(beta)
+        s = NFXPEstimator(
+            inner_solver=solver, inner_tol=1e-10, inner_max_iter=2_000_000,
+            outer_max_iter=200, verbose=False,
+        ).estimate(panel, utility, problem, transitions)
+        return s.metadata["final_inner_iterations"], s.parameters[1].item()
+
+    def test_nk_inner_iterations_beta_insensitive_unlike_sa(self):
+        sa_lo, _ = self._final_inner(0.975, "sa")
+        sa_hi, _ = self._final_inner(0.995, "sa")
+        nk_lo, _ = self._final_inner(0.975, "nk")
+        nk_hi, _ = self._final_inner(0.9999, "nk")
+        # NFXP-NK: inner iterations per solve stay flat across beta (ILRSS).
+        assert nk_lo < 30
+        assert nk_hi < 30
+        # NFXP-SA: inner iterations grow sharply with beta (Su-Judd's slow NFXP).
+        assert sa_hi > 3 * sa_lo
+
+    def test_sa_and_nk_recover_the_same_estimate(self):
+        _, rc_sa = self._final_inner(0.995, "sa")
+        _, rc_nk = self._final_inner(0.995, "nk")
+        # The inner solver is a numerical choice; the MLE is the same.
+        assert rc_sa == pytest.approx(rc_nk, abs=1e-3)
 
 
 class TestTableIXProfile:
