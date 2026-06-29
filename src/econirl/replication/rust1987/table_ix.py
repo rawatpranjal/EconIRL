@@ -25,7 +25,7 @@ from econirl.replication.rust1987.tables import _df_to_panel
 NFXP_ARCHIVE_URL = "https://editorialexpress.com/jrust/nfxp.zip"
 DEFAULT_GROUP4_RAW_PATH = Path("downloads/nfxp_unzip/nfxp/dat/a530875.asc")
 DEFAULT_OUTPUT_DIR = Path("acceptance/loop/nfxp/table_ix")
-DEFAULT_PRIVATE_RECEIPT_PATH = Path("project/replications/nfxp_rust1987_table_ix.md")
+DEFAULT_PRIVATE_RECEIPT_PATH = Path("docs/research/replications/nfxp_rust1987_table_ix.md")
 
 PAPER_TABLE_IX_GROUP4: dict[float, dict[str, float]] = {
     0.9999: {
@@ -567,7 +567,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--replication-note",
         type=Path,
         default=DEFAULT_PRIVATE_RECEIPT_PATH,
-        help="Private markdown receipt path. Defaults under project/replications/.",
+        help="Private markdown receipt path. Defaults under docs/research/replications/.",
     )
     parser.add_argument(
         "--no-replication-note",

@@ -307,7 +307,7 @@ class TestMPECStordatProfile:
     Su and Judd publish no real-data table (Monte Carlo only). Their
     Proposition 1 is that MPEC and NFXP solve the same MLE, so the matchable
     target is Rust's published Table IX, group 4, beta=0.9999. This locks the
-    MPEC replication recorded in project/replications/mpec_rust1987.md.
+    MPEC replication recorded in docs/research/replications/mpec_rust1987.md.
     """
 
     @pytest.mark.slow
