@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the validated state-marginal matching path. The main diagnostic
+is whether the model state marginal follows the expert marginal, not whether a
+structural reward parameter has been recovered.
+
 ```python
 from econirl.estimation import FIRLEstimator
 

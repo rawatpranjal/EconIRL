@@ -1,5 +1,9 @@
 # Fleet maintenance (multi-component bus engine replacement)
 
+Read this page as the factored high-dimensional version of the bus benchmark.
+The study asks what breaks when a familiar replacement problem grows from one
+state component to several.
+
 A fleet operator maintains a bus with $K$ independent engine components. Each period, the operator chooses to keep all components running or replace them all at once. Replacing is costly upfront but avoids the growing operating cost that accumulates as mileage rises. The problem is a multi-component extension of Rust (1987).
 
 ## The data-generating process

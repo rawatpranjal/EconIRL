@@ -10,6 +10,10 @@ yields a Bellman-implied reward as a diagnostic object. It does not enforce a
 structural Bellman fixed point and does not produce a point-identified reward parameter
 vector.
 
+Read this page as an imitation and diagnostic route. The fitted Q object can
+suggest a Bellman-implied reward, but that reward is not the same kind of
+structural parameter estimated by NFXP, CCP, or TD-CCP.
+
 ## Source Papers
 
 The estimator follows {ref}`Garg et al. (2021) <garg-2021>`, which introduces inverse
@@ -60,6 +64,9 @@ recover the underlying reward. In practice $Q$ is fitted on expert support only 
 $r_{\mathrm{IB}}$ is a diagnostic object rather than a structural estimate.
 
 ## Identification
+
+This is the section that says what IQ-Learn can support before any structural
+counterfactual interpretation is attempted.
 
 IQ-Learn yields an imitation policy and a Bellman-implied reward under the following
 conditions.

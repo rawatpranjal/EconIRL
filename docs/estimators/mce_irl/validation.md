@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for feature-matching IRL. The
+simulation can score reward and counterfactual recovery because the transition
+law and reward-feature basis are fixed before the panel is generated.
+
 MCE-IRL runs on two synthetic cells. The primary cell is
 `mce_low_high_reward`, a compact state-space problem with eight
 action-dependent reward features. The sanity cell is `canonical_low_action`.

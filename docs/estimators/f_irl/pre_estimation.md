@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting f-IRL. The primary question is whether the expert
+state marginal is well covered enough for behavioral matching to be meaningful.
+
 f-IRL estimates a tabular reward by gradient ascent on a divergence objective,
 so its failure modes differ from structural estimators. Check these before fitting:
 

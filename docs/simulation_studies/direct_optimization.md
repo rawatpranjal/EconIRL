@@ -4,6 +4,10 @@ orphan: true
 
 # Direct optimization approaches
 
+Read this page as a comparison of numerical routes, not a new estimand. The
+methods differ in how they impose or approximate the Bellman condition while
+trying to recover the same anchored reward object.
+
 Most structural estimators of dynamic discrete choice nest a Bellman fixed-point
 solve inside every optimization step: NFXP and Deep MCE-IRL re-solve for the value
 function each time the reward parameters change. Direct optimization avoids the

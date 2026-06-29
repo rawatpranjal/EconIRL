@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the public CCP wrapper. The snippet checks that the estimator
+runs and returns the structural objects; support and first-stage CCP quality are
+checked on the pre-estimation page.
+
 The public API follows the same sklearn convention as NFXP. Create an
 estimator, call `fit`, and read fitted attributes.
 

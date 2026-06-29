@@ -1,5 +1,9 @@
 # RHIP recovers the demonstrator's planning horizon
 
+Read this page as the horizon-identification experiment. The reward is held
+fixed so the test can isolate whether RHIP chooses the planning depth that
+generated the demonstrations.
+
 A traveller moves through a road network one step at a time, choosing among the
 nearest neighbours of the current node. The utility of an edge depends on its
 length, the amenity of the destination, and the destination's distance to a fixed

@@ -5,6 +5,10 @@ They sit outside the core focus, either because they overlap a core method, carr
 caveated public status, or are narrower in scope. The grouping follows the sources
 of complexity in [Choosing and Comparing Estimators](../comparing_estimators.md).
 
+Read this page after the core menu. These methods are useful for specific
+computational, behavioral, or diagnostic needs, but each carries a narrower
+public evidence or interpretation boundary.
+
 | Estimator | Source of complexity it answers | Use |
 | --- | --- | --- |
 | [NNES](nnes.md) | Large state space | Neural continuation value with finite reward parameters. |

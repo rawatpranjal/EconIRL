@@ -1,5 +1,8 @@
 # Counterfactuals
 
+Read this page as structural re-solving. NFXP estimates reward parameters in a
+model that can be solved again after a primitive changes.
+
 NFXP recovers the utility parameters in the same parameterization as the
 data-generating process, so counterfactual analysis is straightforward:
 change a parameter, re-solve the dynamic program once, and read off the new

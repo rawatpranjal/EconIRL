@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an imitation and diagnostic validation page. Passing regret
+checks is not enough here; reward, value, Q, and coverage gates decide whether
+the objects can be read structurally.
+
 IQ-Learn runs on three synthetic cells covering low-dimensional tabular,
 high-dimensional neural, and state-only reward settings. Each cell has known
 transitions, policy, value, Q function, and counterfactual oracle objects, so

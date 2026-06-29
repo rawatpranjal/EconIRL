@@ -8,6 +8,10 @@ probabilities. For linear utility with optimal weighting the estimator reduces t
 single closed-form solve that attains the same asymptotic efficiency as maximum
 likelihood.
 
+Read this page as an unnested route to the same finite structural reward target.
+The method replaces repeated Bellman solves with estimating equations built from
+empirical choice probabilities.
+
 ## Source Papers
 
 The estimator follows {ref}`Bray <bray-2019>`, which introduces the unnested
@@ -95,6 +99,9 @@ replace it. The dynamic program links today's choices to tomorrow's states, so
 observed choices carry information about the structural costs.
 
 ## Identification
+
+This is the section that says when those empirical choice-probability equations
+identify the structural reward parameters.
 
 UFXP point-identifies the reward parameters $\theta$ under the following
 assumptions.

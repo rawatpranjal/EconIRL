@@ -7,6 +7,10 @@ evaluation. The inner loop solves the Bellman fixed point for a candidate
 reward parameter. The outer loop maximizes the conditional choice log
 likelihood over that parameter.
 
+Read this page as the benchmark case. Later structural estimators either keep
+this target and change the numerical route, or relax one bottleneck at a cost
+stated on their own pages.
+
 ## Source Papers
 
 The estimator follows {ref}`Rust (1987) <rust-1987>`, which introduces the
@@ -68,6 +72,9 @@ replace it. The dynamic program links today's choices to tomorrow's states, so
 observed choices carry information about the structural costs.
 
 ## Identification
+
+This is the section that says when the estimated parameters can be read as the
+primitive reward parameters, not just as a good in-sample choice fit.
 
 NFXP point-identifies the reward parameters $\theta$ under the following
 assumptions.

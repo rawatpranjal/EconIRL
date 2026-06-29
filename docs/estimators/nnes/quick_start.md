@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the wrapper path for NNES. The network shown here approximates
+the continuation value; the reported reward parameters remain finite structural
+parameters.
+
 The public wrapper accepts dataframe-style panel data. This quick start is the
 package smoke path: create a model, call `fit`, and read the fitted
 sklearn-style attributes. The full NNES simulation study lives in the

@@ -10,6 +10,10 @@ reward equals the structural reward rather than a potential-based perturbation
 of it. The result is a segment-level reward object that supports structural
 counterfactual analysis on heterogeneous populations.
 
+Read this page when one pooled reward is not credible. The anchors and the
+latent-segment separation are the main reasons the recovered rewards can be
+interpreted segment by segment.
+
 ## Source Papers
 
 The estimator builds on {ref}`Fu, Luo, and Levine (2018) <fu-2018>`, which
@@ -82,6 +86,9 @@ Two latent segments differ in their dynamic preferences, and the exit action
 absorbs each individual into a terminal state.
 
 ## Identification
+
+This is the section that says when the segment rewards are structurally pinned,
+not just clustered policies with different labels.
 
 AIRL-Het recovers segment-level structural rewards under the following
 assumptions. Absent the anchor normalizations, the discriminator score

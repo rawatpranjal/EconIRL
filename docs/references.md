@@ -4,6 +4,10 @@ This page lists the papers that the public estimator pages draw from. The
 estimator pages link here so the methodological source is visible before the
 usage examples.
 
+Use this page to trace a method back to its source paper. It is a bibliography,
+not a claim that every source paper has a full numerical replication in the
+package.
+
 ## Dynamic Discrete Choice
 
 (rust-1987)=

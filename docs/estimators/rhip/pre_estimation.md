@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting RHIP. The checks tell you whether feature matching
+can support reward recovery for the planning horizon you intend to use.
+
 Most RHIP failures are visible before optimization starts. Check feature
 variation, support, transition validity, and normalization before treating a
 fit as reward recovery.

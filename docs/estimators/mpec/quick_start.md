@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the constrained-program API. Read the returned constraint
+violation together with the estimates, because MPEC's structural interpretation
+requires the Bellman constraint to be satisfied.
+
 The public MPEC surface is the full estimator API. Create an estimator,
 call `estimate`, and read the returned summary object.
 

@@ -8,6 +8,10 @@ explicit optimization variable and enforces the Bellman fixed point as an
 equality constraint. The reward parameters and the value vector are estimated
 jointly in a single constrained program.
 
+Read this page as a numerical alternative to NFXP, not a different economic
+model. The target is the same likelihood; the risk is whether the constrained
+program is well conditioned enough to reach it.
+
 ## Source Papers
 
 The constrained formulation follows {ref}`Su and Judd (2012) <su-judd-2012>`.
@@ -74,6 +78,9 @@ replace it. The dynamic program links today's choices to tomorrow's states, so
 observed choices carry information about the structural costs.
 
 ## Identification
+
+This is the section that says when the constrained program has the same
+structural interpretation as NFXP rather than just a feasible optimizer output.
 
 MPEC point-identifies the reward parameters $\theta$ under the following
 assumptions, which are the same structural requirements as NFXP plus one

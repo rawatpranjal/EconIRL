@@ -10,6 +10,10 @@ place of the transition integral. Cross-fitted, locally robust standard errors
 correct for first-stage estimation error in those objects and deliver valid
 inference at parametric rates.
 
+Read this page when the transition density is the obstacle. TD-CCP still targets
+finite structural reward parameters; it changes how recursive continuation terms
+are estimated.
+
 ## Source Papers
 
 The estimator follows {ref}`Adusumilli and Eckardt (2025)
@@ -103,6 +107,9 @@ of two encoded state coordinates; action 0 serves as the reward-normalized
 baseline.
 
 ## Identification
+
+This is the section that says when successor tuples and CCPs are enough to
+recover the reward parameters without modeling the transition density.
 
 TD-CCP point-identifies the reward parameters $\theta$ under the following
 assumptions.

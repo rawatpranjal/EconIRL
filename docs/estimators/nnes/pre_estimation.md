@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting NNES. These checks separate problems with the
+finite reward target from problems with the neural continuation-value
+approximation.
+
 NNES can fail for reasons that are visible before the neural value path starts.
 Run these checks before treating a NNES result as structural evidence.
 

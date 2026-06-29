@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting Neural MCE-IRL. The main risks are anchor
+normalization, state encoding, and thin occupancy support for the neural reward
+map.
+
 Deep MCE-IRL inherits all MCE-IRL data requirements and adds the neural
 reward normalization problem. Check these before fitting:
 

@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the anchored projected-reward
+route. Small regret is reported, but the reward checks determine whether the
+learned objects support structural interpretation.
+
 GLADIUS is evaluated on two related high-dimensional-state synthetic cells.
 Each cell has 21 discrete states paired with a high-dimensional encoded
 state-feature vector, a low-dimensional action-dependent reward basis, and an

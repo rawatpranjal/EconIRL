@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting MCE-IRL. The checks tell you whether the supplied
+features, transitions, and normalization can support reward recovery from
+demonstrations.
+
 Most MCE-IRL failures are visible before optimization starts. Check feature
 variation, support, transition validity, and normalization before treating a
 fit as reward recovery.

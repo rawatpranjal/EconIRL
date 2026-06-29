@@ -1,5 +1,8 @@
 # Quick Start
 
+This page shows how to fit the neural reward-map estimator. Inspect the anchored
+reward matrix and induced policy, not the raw network weights.
+
 ```python
 from econirl.estimators import MCEIRLNeural
 import numpy as np

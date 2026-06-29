@@ -1,5 +1,8 @@
 # Bus Engine Example
 
+Read this page as a runnable UFXP smoke test on bundled data. The structural
+evidence is the simulation study; this page is for seeing the wrapper shape.
+
 The bundled bus engine replacement dataset gives a quick end-to-end smoke
 test: load the panel, fit, inspect, and run a counterfactual.
 

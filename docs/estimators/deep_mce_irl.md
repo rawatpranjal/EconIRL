@@ -9,6 +9,9 @@ network rather than a dot product with fixed features. The validated object is
 the anchored reward matrix and the behavior it induces; raw network weights are
 not a structural estimand.
 
+Read this page as the neural-reward version of MCE-IRL. The reward matrix under
+the chosen anchor is the object to inspect; the raw network weights are not.
+
 ## Source Papers
 
 The estimator draws on {ref}`Ziebart (2010) <ziebart-2010>`, which establishes
@@ -74,6 +77,9 @@ The soft value function uses log-sum-exp without an Euler-gamma constant,
 following the package convention throughout.
 
 ## Identification
+
+This is the section that says when an anchored neural reward map is interpretable,
+and when it is only a behavior-fitting object.
 
 Deep MCE-IRL identifies the anchored reward map $r_\eta$ under the following
 conditions.

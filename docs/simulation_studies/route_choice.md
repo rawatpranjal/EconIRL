@@ -1,5 +1,9 @@
 # Route choice on a synthetic road network
 
+Read this page as the small graph benchmark. It tests whether estimators recover
+edge-level reward tradeoffs and counterfactual behavior on a controlled route
+choice problem.
+
 A traveller moves through a road network one step at a time. Each period, the agent chooses among the nearest neighbours of the current node. The utility depends on the edge: how long it is, how attractive the destination is, and how close the destination sits to a fixed goal node.
 
 ## The data-generating process

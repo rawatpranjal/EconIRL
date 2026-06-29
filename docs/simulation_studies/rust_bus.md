@@ -1,5 +1,9 @@
 # Bus engine replacement
 
+Read this page as the canonical small structural benchmark. It is useful because
+the true costs, policy, value, and counterfactual oracles are known before the
+estimators see the simulated panel.
+
 The canonical structural benchmark (Rust 1987). A single agent decides each period whether to keep paying a mileage-dependent operating cost or pay a fixed replacement cost to reset the bus engine. The data-generating process is fully known, so the table reports the exact recovered cost parameters, the distance between each estimator's policy and the true one, and the welfare lost when the recovered model is carried into three counterfactual worlds.
 
 ## The data-generating process

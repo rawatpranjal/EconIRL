@@ -6,6 +6,10 @@ the reported quantities are directly comparable. Each section sets the package
 value against the paper's published value, side by side, and ends with a command
 to reproduce the run.
 
+Read this page as the paper-number ledger. If a method has simulation evidence
+but no directly comparable published table, that distinction is stated rather
+than hidden.
+
 ## Rust (1987), Table IX, Group 4 (NFXP)
 
 The nested fixed point recovers the bus-engine maintenance and replacement costs

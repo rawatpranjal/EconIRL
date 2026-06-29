@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the constrained-program route. The
+simulation checks whether MPEC reaches the same structural target as NFXP on a
+fully specified DGP.
+
 MPEC runs on the `canonical_low_action` synthetic cell, the same
 low-dimensional action-dependent structural benchmark used for NFXP and CCP.
 The cell has 21 states, 3 actions, known linear reward, known transitions, and

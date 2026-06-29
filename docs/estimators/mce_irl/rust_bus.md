@@ -1,5 +1,9 @@
 # Rust Bus Engine Example
 
+Read this page as a feature-specified smoke test. MCE-IRL depends on the reward
+features supplied by the user, so this is an example of wiring, not a canonical
+paper replication.
+
 The Rust bus-engine replacement problem is a useful smoke example for MCE-IRL,
 but it is not the simulation study. The wrapper needs an explicit reward
 feature matrix for multi-action recovery.

@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as structural re-solving for UFXP. The estimator uses a
+different estimating route, but the counterfactual object is the same kind of
+linear reward model used by NFXP.
+
 UFXP recovers the utility parameters in the same parameterization as the
 data-generating process. Counterfactual analysis therefore works exactly as
 it does for NFXP. Change a parameter, re-solve the dynamic program once, and

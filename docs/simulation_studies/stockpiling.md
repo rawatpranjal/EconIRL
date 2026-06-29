@@ -1,5 +1,9 @@
 # Consumer stockpiling of a storable good
 
+Read this page as a dynamic inventory benchmark. The important question is
+whether the recovered model captures forward-looking buying before future high
+prices, not just current purchase shares.
+
 A household buys a storable good over time. It consumes one unit each period. The shelf price swings between a low sale price and a high regular price. The household can buy a pack now to avoid paying the high price later. The cost of doing so is the holding cost on the inventory it carries.
 
 ## The data-generating process

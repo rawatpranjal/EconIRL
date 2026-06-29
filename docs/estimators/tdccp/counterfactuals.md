@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as the boundary between estimation and policy evaluation. TD-CCP
+avoids transition-density modeling for reward estimation, but counterfactual
+evaluation still needs an environment.
+
 TD-CCP estimates reward parameters without fitting a transition-density model
 for the original data-generating process. Counterfactual analysis is a separate
 step. Once `theta` is estimated, policy and value evaluation still need a

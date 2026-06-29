@@ -1,5 +1,9 @@
 # Content consumption with latent viewer types
 
+Read this page as the heterogeneous-agent test. A good method has to recover
+more than one average policy: it must separate latent viewer types and recover a
+usable reward for each type.
+
 A viewer opens a feed and chooses what to watch each period, until they leave. Two kinds of viewer share the same feed. A binge type keeps watching the same category. A sampler type tires of a category fast and switches, then leaves sooner. The two types are not labelled in the data. An estimator sees only the choices.
 
 A homogeneous method fits one reward to the whole crowd. With one reward it cannot serve two types, so it settles on one and leaves the other behind. This study asks whether AIRL-Het can pull the two types apart: recover a reward and a policy for each type, and sort each viewer into the right type.

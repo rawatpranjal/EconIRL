@@ -10,6 +10,10 @@ known rewards pins the absolute level of the learned Q-function; without
 the anchor, the network identifies the policy but not the reward in the
 full Bellman sense.
 
+Read this page as the high-dimensional offline route. The safest structural
+object is the anchored action contrast; raw neural Q levels need the anchor
+before they carry reward meaning.
+
 ## Source Papers
 
 The estimator follows {ref}`Kang, Yoganarasimhan, and Jain (2025) <kang-2025>`,
@@ -79,6 +83,10 @@ allowing implied rewards and projected parameters to be compared against
 the data-generating truth.
 
 ## Identification
+
+This is the section that separates policy identification from reward
+interpretation. The anchor and action-difference rank are what let the learned
+Q objects support projected reward recovery.
 
 GLADIUS identifies the imitation policy and projected structural reward
 contrasts under the following assumptions.

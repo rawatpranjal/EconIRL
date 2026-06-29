@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as behavioral counterfactual evidence. The reported regret is
+about the policy induced by the learned reward, not a structural parameter
+being re-solved under new primitives.
+
 f-IRL recovers a tabular state reward rather than structural utility parameters,
 so counterfactual analysis works differently from structural estimators. The
 recovered reward is not in the same parameterization as the data-generating

@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting IQ-Learn. Coverage gates matter because the method
+learns Q values from expert support and extrapolates outside it.
+
 IQ-Learn has the same general data-quality checks as other estimators plus
 coverage checks that are specific to its Q-based reward recovery.
 

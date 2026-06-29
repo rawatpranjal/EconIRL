@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the transition-density-free
+estimation step. The transition model is withheld from `theta` estimation but
+used afterward to score policies, values, Q functions, and counterfactuals.
+
 The TD-CCP simulation study uses the `shapeshifter_encoded_state_locally_robust`
 synthetic cell: encoded state features, a finite linear reward, and known oracle
 objects for every comparison. The simulation asks whether the cross-fitted,

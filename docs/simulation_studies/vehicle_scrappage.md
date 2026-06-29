@@ -4,6 +4,10 @@ orphan: true
 
 # Optimal replacement: vehicle scrappage (RDW)
 
+Read this page as an optimal-stopping benchmark in the Rust family. The point is
+to test recovery when replacement depends on both age and inspection condition,
+not just one mileage state.
+
 A vehicle owner decides each year whether to keep running a car or scrap it and buy a new one. The decision depends on the car's age and how well it passed the mandatory Dutch APK roadworthiness inspection. The model is an optimal stopping problem in the spirit of Rust (1987), applied to vehicle scrappage.
 
 ## The data-generating process

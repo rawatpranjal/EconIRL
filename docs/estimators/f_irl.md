@@ -8,6 +8,10 @@ than structural utility parameters. The primary validated scope is
 state-marginal matching with a state-only reward; action-dependent structural
 DDC recovery remains a diagnostic exercise under current evidence.
 
+Read this page as a behavioral state-marginal method. It is useful for matching
+where the expert goes, but that is weaker than identifying structural utility
+parameters.
+
 ## Source Papers
 
 The estimator follows {ref}`Ni et al. (2020) <ni-2020>`, which introduces
@@ -74,6 +78,9 @@ state-only reward, and deterministic transitions that fully specify the
 data-generating process.
 
 ## Identification
+
+This is the section that says why the primary validated claim is behavioral
+state-marginal recovery, not structural counterfactual recovery.
 
 f-IRL identifies a behavioral reward under the following assumptions.
 

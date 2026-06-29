@@ -9,6 +9,10 @@ the Bellman equation. The Aguirregabiria-Mira nested pseudo-likelihood extension
 iterates the inversion and the pseudo-likelihood to refine the structural estimate
 toward full maximum likelihood efficiency.
 
+Read this page as the speed route for the same finite structural target as NFXP.
+The key tradeoff is that CCP avoids repeated solves only when first-stage choice
+probabilities have enough support to carry the inversion.
+
 ## Source Papers
 
 The estimator follows {ref}`Hotz and Miller (1993) <hotz-miller-1993>`, which
@@ -145,6 +149,9 @@ of $\hat\pi$ on $\theta$ only enters when the outer loop updates the policy.
 See Aguirregabiria and Mira (2002) eqs. (4)-(5).
 
 ## Identification
+
+This is the section that says when the CCP shortcut still recovers the same
+reward object as the full nested likelihood.
 
 CCP point-identifies the reward parameters $\theta$ under the following assumptions
 and support requirements.

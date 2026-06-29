@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as anchored reward-map transfer. The counterfactual is meaningful
+only when the perturbed environment uses the same state-action space and reward
+normalization.
+
 Deep MCE-IRL recovers an anchored reward matrix rather than a structural
 parameter vector, so counterfactual analysis works differently from the
 structural family. The reward matrix is re-solved under the perturbed

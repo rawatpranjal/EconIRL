@@ -1,5 +1,9 @@
 # Gridworld navigation
 
+Read this page as the thin-support IRL stress test. The goal is not just to see
+who fits the visited path, but who behaves sensibly where demonstrations are
+sparse or absent.
+
 Gridworld navigation is the home turf of the maximum-entropy IRL tradition of Ziebart's MaxEnt and its descendants, so this page weights the roster toward IRL methods. NFXP, CCP, MPEC, and UFXP run as the structural contrast. The environment also supplies a stress the bus engine does not. Every trajectory starts at the same corner and walks toward the goal, so states off that path are visited rarely or never. Methods that invert state-by-state choice frequencies feel that thinness. Methods that share strength through features or networks do not.
 
 ## The data-generating process

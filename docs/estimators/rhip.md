@@ -9,6 +9,10 @@ spans a family of classic methods: at $H = \infty$ it is maximum causal entropy
 IRL, at $H = 0$ it is the Max-Margin-Planning end, and intermediate values
 interpolate.
 
+Read this page when the demonstrator may not be an infinite-horizon planner.
+The horizon changes the behavioral model being matched; it is not a new source
+of reward identification by itself.
+
 ## Source Papers
 
 The estimator follows {ref}`Barnes et al. (2024) <barnes-2024>`, which
@@ -76,6 +80,9 @@ one edge at a time, and the planning horizon sets how far ahead the route is
 planned stochastically.
 
 ## Identification
+
+This is the section that says what must hold before the horizon-specific moment
+match can be read as reward recovery.
 
 RHIP recovers a reward representation under the maximum causal entropy dynamic
 discrete choice assumptions. These are inherited unchanged from MCE-IRL; the

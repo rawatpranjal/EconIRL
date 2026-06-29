@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting TD-CCP. The goal is to catch weak feature support,
+weak successor-tuple support, and unstable continuation bases before the
+transition-density-free shortcut is interpreted structurally.
+
 TD-CCP is most reliable when the reward features, observed choices, and panel
 transitions support the structural parameter target. These checks are meant to
 catch problems before a result is treated as recovery.

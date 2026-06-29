@@ -1,5 +1,8 @@
 # Quick Start
 
+This page shows the RHIP wrapper and the horizon knob. Treat `horizon` as part
+of the behavioral model: it changes the planning depth being matched.
+
 The wrapper follows the sklearn-style pattern: build an estimator, call `fit`,
 then read fitted attributes. RHIP requires a pre-built `Panel`, an
 action-dependent feature array, and a transition tensor.

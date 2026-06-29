@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation. The simulation can test reward,
+policy, value, Q, and counterfactual recovery because the data-generating
+objects are known before estimation.
+
 NFXP runs on the `canonical_low_action` synthetic cell. The cell has known
 rewards, transitions, policies, values, Q functions, and Type A, Type B, and
 Type C counterfactual oracles, so every recovery claim is checked against the

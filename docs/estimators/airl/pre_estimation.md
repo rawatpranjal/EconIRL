@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting AIRL. The most important check is whether the
+reward object you want is actually state-only, because that is where the
+original recovery guarantee applies.
+
 Adversarial training is sensitive to a small number of setup choices. Run these
 checks before fitting.
 

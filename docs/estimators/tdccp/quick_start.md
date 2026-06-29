@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the public TD-CCP wrapper. The snippet is about using the API;
+the reason to choose TD-CCP is the transition-density-free estimation route
+described on the parent page.
+
 The public API follows the same convention as the other structural estimators:
 create an estimator, call `fit`, and inspect fitted attributes.
 

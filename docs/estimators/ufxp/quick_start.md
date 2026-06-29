@@ -1,5 +1,9 @@
 # Quick Start
 
+This is the smallest UFXP path: fit the unnested structural estimator and read
+the same kind of reward, policy, and value objects as NFXP or CCP. The shortcut
+depends on empirical choice-probability support.
+
 ```python
 from econirl.datasets import load_rust_bus
 from econirl import UFXP

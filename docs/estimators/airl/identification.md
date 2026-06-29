@@ -1,5 +1,9 @@
 # Identification Boundary
 
+Read this page before using AIRL outside the state-only setting. It explains
+why matching behavior with a discriminator is weaker than recovering an
+action-dependent structural reward.
+
 ## Potential-Based Shaping
 
 Any reward function of the form

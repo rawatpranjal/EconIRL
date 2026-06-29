@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for a finite reward target with a
+neural continuation-value approximation. It is not a literal replication of the
+Nguyen Monte Carlo.
+
 NNES runs on the `canonical_high_action` synthetic cell. The low-dimensional
 `canonical_low_action` cell remains in the results file as a sanity check.
 The simulation asks whether the NPL-profiled neural value path can recover a

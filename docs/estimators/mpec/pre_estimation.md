@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting MPEC. The same structural checks as NFXP matter,
+plus the constrained optimizer must be able to enforce the Bellman equations.
+
 MPEC can show estimation risk for reasons that are visible before optimization
 starts. Run these checks before treating a result as structural evidence.
 

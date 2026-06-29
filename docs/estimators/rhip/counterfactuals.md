@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as horizon-specific reward transfer. The same recovered reward is
+re-solved under interventions, but the behavioral interpretation still depends
+on the planning horizon.
+
 The public `RHIP` wrapper exposes the recovered policy, reward matrix, and
 value function. It does not yet provide a one-call `counterfactual` method like
 the structural likelihood wrappers.

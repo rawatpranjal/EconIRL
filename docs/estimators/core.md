@@ -7,6 +7,10 @@ replication, matched to Rust (1987) Table IX. The rest of the core spans the
 structural and inverse-reinforcement-learning methods that carry the main
 identification stories and method lineages.
 
+Read this page as the short menu for the main methods. If a method name is
+unfamiliar, open the combined chooser first, then return here for the specific
+method page.
+
 For how to choose among them, including the side-by-side table, see
 [Choosing and Comparing Estimators](../comparing_estimators.md).
 

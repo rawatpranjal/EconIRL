@@ -1,5 +1,8 @@
 # Counterfactuals
 
+Read this page as policy-regret evidence, not structural re-solving. AIRL's
+state-only recovered reward is not used here like an NFXP-style parameter vector.
+
 AIRL does not recover a reward in the same parameterization as the
 data-generating process. The recovered reward component
 $g_\theta$ is identified only up to potential-based shaping, so raw parameter

@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as anchored segment-level re-solving. Counterfactuals are
+interpretable only when the exit-action and absorbing-state normalizations are
+kept fixed under the intervention.
+
 AIRL-Het recovers a segment-level reward with the same parameterization as the
 structural truth, provided the anchor normalization is correctly specified. Counterfactual
 analysis reruns each segment's dynamic program under a controlled change and

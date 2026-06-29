@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the public GLADIUS wrapper. Use the projected parameters and
+projection diagnostics for structural reading; the neural Q objects alone are
+not enough to claim reward recovery.
+
 ## Sklearn-Style API
 
 `GLADIUS` accepts a pandas DataFrame directly.

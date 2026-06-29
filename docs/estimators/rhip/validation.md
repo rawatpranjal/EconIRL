@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the planning-horizon behavior.
+The study asks whether the chosen horizon matches the demonstrator's planning
+depth when the reward and transitions are known.
+
 RHIP runs on two synthetic studies. The primary study is the
 high-dimensional route-choice problem on a 150-node random geometric road
 network. The second study fixes a known demonstrator lookahead and sweeps

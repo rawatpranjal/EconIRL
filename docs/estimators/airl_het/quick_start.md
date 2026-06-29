@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the anchored heterogeneous AIRL path. The exit action and
+absorbing state are not optional bookkeeping; they are the normalizations that
+make the segment rewards interpretable.
+
 AIRL-Het is accessed through `AIRLHetConfig` and `AIRLHetEstimator`. Both the
 exit action index and the absorbing state index must be supplied; the estimator
 raises an error if either is missing.

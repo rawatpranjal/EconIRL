@@ -8,6 +8,10 @@ implied feature moments, and updates the parameters until the model moments
 equal the expert moments. Counterfactuals are meaningful only through the
 fitted MDP primitives.
 
+Read this page when demonstrations, not a structural likelihood, define the
+problem. The estimated object is a reward inside the supplied feature basis and
+normalization.
+
 ## Source Papers
 
 The estimator follows {ref}`Ziebart et al. (2008) <ziebart-2008>`, which
@@ -79,6 +83,9 @@ MCE-IRL estimates the reward through feature moments rather than through a
 conditional likelihood alone.
 
 ## Identification
+
+This is the section that says when matching feature moments is enough to recover
+the intended reward representation, rather than only reproducing behavior.
 
 MCE-IRL identifies a reward representation under the following assumptions.
 

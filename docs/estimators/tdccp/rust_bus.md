@@ -1,5 +1,8 @@
 # Rust Bus Engine Example
 
+Read this page as a runnable TD-CCP smoke test. It shows usage on bundled data;
+the transition-density-free recovery claim is evaluated on the simulation page.
+
 The Rust bus-engine replacement problem is the standard dynamic discrete
 choice example. A bus operator observes mileage and chooses whether to keep the
 current engine or replace it.

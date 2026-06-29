@@ -1,5 +1,9 @@
 # Simulation Studies
 
+Read these pages as controlled simulation experiments. They are designed to show what
+each estimator recovers or fails to recover when the data-generating process is
+fully controlled.
+
 Every page below is one experiment. We simulate data from a known model, run
 the estimators on it, and report what they recover. Because the truth is
 known, both recovery and failure are measurable.

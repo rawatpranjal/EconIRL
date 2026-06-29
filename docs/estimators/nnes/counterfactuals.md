@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as counterfactual evidence for finite structural reward
+parameters with a neural continuation-value approximation. The network is not
+the reward being intervened on.
+
 NNES estimates structural reward parameters and a neural value approximation.
 The counterfactual evidence comes from the simulation harness,
 which re-solves oracle counterfactuals and compares them with policies implied

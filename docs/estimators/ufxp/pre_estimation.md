@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting UFXP. The method is fast because it uses empirical
+choice probabilities directly, so thin or degenerate support is the main thing
+to rule out first.
+
 UFXP inverts empirical choice probabilities state by state, so its
 pre-estimation risks are CCP's plus the usual linear-utility ones. Check these
 before fitting:

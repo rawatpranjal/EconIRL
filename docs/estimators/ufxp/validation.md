@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the unnested estimating-equation
+route. The reported metrics compare recovered objects against oracle objects
+from the synthetic DGP.
+
 UFXP runs on the same low-dimensional action-dependent synthetic cell as the
 other structural estimators. The cell has 21 states, 3 actions, known linear
 reward, known transitions, and exact policy, value, Q, and Type A, Type B, and

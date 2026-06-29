@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as simulation-harness counterfactual evidence for the MPEC
+structural target. The estimator target supports re-solving, even though the
+public wrapper does not expose the same shortcut method as NFXP.
+
 MPEC estimates structural reward parameters and a value function, but it does
 not currently expose the same one-call dataframe wrapper `counterfactual`
 method as NFXP and CCP. Counterfactual evidence therefore comes from the

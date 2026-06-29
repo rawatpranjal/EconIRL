@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the feature-based MCE-IRL workflow. The reward that comes out is
+only as interpretable as the supplied feature matrix, transition tensor, and
+normalization.
+
 The wrapper follows the sklearn-style pattern: build an estimator, call `fit`,
 then read fitted attributes. For multi-action MCE-IRL, provide reward features
 explicitly.

@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting AIRL-Het. The anchors and segment separation are
+not secondary diagnostics; they are what make heterogeneous reward recovery
+interpretable.
+
 AIRL-Het has a richer failure surface than single-segment estimators because
 segment identification depends on both the anchor design and the behavioral
 signal that separates segments. Check these before fitting:

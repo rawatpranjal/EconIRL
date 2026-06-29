@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows IQ-Learn as an imitation and diagnostic estimator. Coverage
+metadata matter because off-support Q values are extrapolated, not learned from
+expert choices.
+
 ```python
 from econirl.estimation import IQLearnConfig, IQLearnEstimator
 

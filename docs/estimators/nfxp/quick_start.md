@@ -1,5 +1,9 @@
 # Quick Start
 
+This is the smallest NFXP path: fit the reference structural estimator, then
+inspect parameters, standard errors, policy, and value objects. It is a usage
+example, not a substitute for the pre-estimation checks.
+
 ```python
 from econirl.datasets import load_rust_bus
 from econirl import NFXP

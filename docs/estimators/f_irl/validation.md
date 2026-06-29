@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as a behavioral-validation page. The primary cell is the
+state-marginal matching setting; the action-dependent cell is a negative
+control, not structural evidence.
+
 f-IRL is reported on two synthetic cells. The primary cell is the source-paper
 state-marginal configuration: a fully specified data-generating process with
 known reward, transitions, policy, value, Q function, and Type A, B, and C

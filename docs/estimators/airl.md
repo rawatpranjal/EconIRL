@@ -10,6 +10,10 @@ to a constant. This package implements the tabular variant; the validated cell
 satisfies the state-only reward condition required by the original
 disentanglement theorem.
 
+Read this page with the state-only condition in mind. AIRL's clean reward
+recovery claim is narrow; action-dependent rewards are handled separately on the
+identification-boundary page.
+
 ## Source Papers
 
 The estimator follows {ref}`Fu, Luo, and Levine (2018) <fu-2018>`, which
@@ -92,6 +96,9 @@ constructed before generating the demonstration panel. The estimator sees only
 the demonstrations, the transitions, and the reward feature basis.
 
 ## Identification
+
+This is the section that states the original AIRL guarantee and the conditions
+under which the discriminator reward can be read as a true state reward.
 
 AIRL recovers $g_\theta$ under the following assumptions.
 

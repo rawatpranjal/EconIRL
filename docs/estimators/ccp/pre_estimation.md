@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting CCP. These checks focus on support and
+conditioning because the estimator leans on first-stage choice probabilities.
+
 CCP can show estimation risk for reasons that are visible before optimization
 starts. Run these checks before treating a result as structural evidence.
 

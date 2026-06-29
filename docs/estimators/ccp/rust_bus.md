@@ -1,5 +1,9 @@
 # Rust Bus Engine Example
 
+Read this page as a runnable CCP smoke test, not as the main evidence page. It
+shows the wrapper on a familiar problem after the estimator assumptions have
+already been checked elsewhere.
+
 The Rust bus-engine replacement problem is the canonical dynamic discrete
 choice example. A bus operator observes mileage and chooses whether to keep the
 current engine or replace it.

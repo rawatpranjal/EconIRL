@@ -1,5 +1,8 @@
 # Counterfactuals
 
+Read this page as a diagnostic boundary page. IQ-Learn can produce low regret
+while still failing reward, value, or Q recovery checks.
+
 IQ-Learn recovers a Bellman-implied reward as a diagnostic alongside the
 imitation policy. Using that reward for counterfactual analysis requires
 understanding what is and is not grounded by the current evidence.
