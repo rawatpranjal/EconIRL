@@ -50,7 +50,7 @@ estimator = FIRLEstimator(f_divergence="tv")    # total variation
 ```
 
 Forward KL is the primary validated choice. The others are available for
-comparison but are not separately validated on the paper-faithful cell.
+comparison but are not separately validated on the source-paper benchmark.
 
 ## Checking for Flat-Reward Failure
 
@@ -63,7 +63,7 @@ if summary.metadata["reward_range"] < 0.001:
     print("Flat-reward failure: check learning rate, divergence, or marginal scope.")
 ```
 
-## Lower-Level Control
+## Full Estimator API
 
 `FIRLEstimator` takes an explicit `Panel`, utility specification, `DDCProblem`,
 and transition tensor, matching the other low-level estimators:

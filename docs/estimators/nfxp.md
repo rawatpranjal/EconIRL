@@ -296,7 +296,7 @@ print(model.predict_proba([0, 10, 50, 89]))
 ```
 
 The [Quick Start](nfxp/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `NFXPEstimator` interface.
+attributes and the full `NFXPEstimator` API.
 
 ## Evidence
 

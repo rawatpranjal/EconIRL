@@ -46,8 +46,8 @@ The `horizon` parameter spans a family of behavioral models:
 | `0` | Max-Margin-Planning-like (deterministic, cheapest) |
 | `1`, `3`, ... | Receding-horizon interpolation between the two ends |
 
-The `H = inf` endpoint delegates to `MCEIRLEstimator` so the result is
-identical to MCE-IRL by construction. Finite horizons run `H` soft-Bellman
+The `H = inf` endpoint is MCE-IRL, so the result is identical to MCE-IRL by
+construction. Finite horizons run `H` soft-Bellman
 backups on top of a deterministic continuation value.
 
 ```python
@@ -60,7 +60,7 @@ det_end = RHIP(horizon=0)                     # the deterministic end
 det_end.fit(panel, features=features, transitions=transitions)
 ```
 
-## Lower-Level Interface
+## Advanced Estimator API
 
 Use `econirl.estimators.rhip.RHIPEstimator` when you need direct control over
 `Panel` objects, `DDCProblem`, `RHIPConfig`, or transition tensors as JAX

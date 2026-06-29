@@ -14,7 +14,7 @@ so its failure modes differ from structural estimators. Check these before fitti
 
 ## Canonical Simulation Checks
 
-Values from the paper-faithful primary cell (see [Simulation Study](validation.md)):
+Values from the primary source-paper benchmark (see [Simulation Study](validation.md)):
 
 | Check | Value | Status |
 | --- | --- | --- |

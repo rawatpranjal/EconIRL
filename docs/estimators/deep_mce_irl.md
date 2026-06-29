@@ -382,7 +382,7 @@ Source papers:
 Implementation and reproduction:
 
 - Estimator source: [`econirl.estimators.mceirl_neural`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/mceirl_neural.py).
-- Lower-level MCE solver: [`econirl.estimation.mce_irl`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/mce_irl.py).
+- MCE solver: [`econirl.estimation.mce_irl`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/mce_irl.py).
 - Validation runner: [`validation/estimators/deep_mce_irl/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/deep_mce_irl/run.py).
 - Results file: [`deep_mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json).
 

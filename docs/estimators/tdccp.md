@@ -345,7 +345,7 @@ tensor. See the [Counterfactuals](tdccp/counterfactuals.md) subpage for the
 counterfactual taxonomy and reported regret values.
 
 The [Quick Start](tdccp/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `TDCCPEstimator` interface.
+attributes and the full `TDCCPEstimator` API.
 
 ## Evidence
 

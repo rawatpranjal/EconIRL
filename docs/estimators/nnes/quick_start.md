@@ -55,7 +55,7 @@ and the trained value-network predictions over states.
 Use `bellman="npl"` for the reported NNES path. The wrapper also accepts
 `bellman="nfxp"` as a neural soft-Bellman diagnostic variant.
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.nnes.NNESEstimator` when the model already has
 package-native objects or when the simulation study needs exact control over
@@ -80,10 +80,10 @@ print(summary.parameters)
 print(summary.metadata["v_loss_per_outer"][-1])
 ```
 
-No fixed output is shown for the lower-level snippet because `panel`,
+No fixed output is shown for the estimator-API snippet because `panel`,
 `utility`, `problem`, and `transitions` are caller-supplied objects.
 
-The synthetic data simulation uses the lower-level API because it supplies the
+The synthetic data simulation uses the full estimator API because it supplies the
 true DDC problem, transition tensor, and reward specification directly. That is
 also the route to use when reproducing paper-style designs with custom state
 encodings or supplied transition laws.

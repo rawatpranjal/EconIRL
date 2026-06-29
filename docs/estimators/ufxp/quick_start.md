@@ -37,7 +37,7 @@ model = UFXP(n_states=90, weights="random",    # plain random projections
 The default optimal weighting is the one to use; the random-projection mode is
 the paper's baseline construction and is kept for comparison.
 
-## Lower-Level Control
+## Full Estimator API
 
 The underlying `UFXPEstimator` accepts a `Panel` and an explicit utility
 specification, problem definition, and transition tensor, mirroring the other

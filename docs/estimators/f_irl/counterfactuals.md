@@ -29,7 +29,7 @@ objects for three intervention families:
 | Type B | 0.0151 | 0.01236 | 0.01237 |
 | Type C | 0.00770 | 0.00273 | 0.00277 |
 
-These results hold in the paper-faithful primary cell (state marginal matching,
+These results hold in the primary source-paper cell (state marginal matching,
 state-only reward). They reflect the quality of the recovered policy rather than
 the ability to re-solve a structural reward under each intervention.
 

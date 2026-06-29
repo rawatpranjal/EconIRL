@@ -348,7 +348,7 @@ print(model.predict_proba([0, 10, 50, 89]))
 ```
 
 The [Quick Start](ccp/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `CCPEstimator` interface.
+attributes and the full `CCPEstimator` API.
 
 ## Evidence
 

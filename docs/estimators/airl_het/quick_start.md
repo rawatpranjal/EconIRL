@@ -1,8 +1,8 @@
 # Quick Start
 
-AIRL-Het is accessed through the lower-level `AIRLHetConfig` and
-`AIRLHetEstimator` classes. Both the exit action index and the absorbing state
-index must be supplied; the estimator raises an error if either is missing.
+AIRL-Het is accessed through `AIRLHetConfig` and `AIRLHetEstimator`. Both the
+exit action index and the absorbing state index must be supplied; the estimator
+raises an error if either is missing.
 
 ```python
 from econirl.estimation.adversarial.airl_het import AIRLHetConfig, AIRLHetEstimator

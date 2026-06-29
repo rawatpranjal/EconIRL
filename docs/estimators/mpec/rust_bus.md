@@ -48,7 +48,7 @@ print(summary.policy[states, 1])
 
 ## Counterfactual Replacement Cost
 
-MPEC's lower-level estimator does not currently provide the one-call
+MPEC's estimator API does not currently provide the one-call
 dataframe-wrapper `counterfactual` method used by NFXP and CCP. For simulation
 evidence, counterfactual replacement-cost and transition interventions are
 tested through the simulation harness and reported on the

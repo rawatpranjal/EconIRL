@@ -52,6 +52,5 @@ choice.
 
 For package users, the stable public objects are the fitted reward, policy, and
 value arrays (`model.reward_matrix_`, `model.policy_`, `model.value_`). For
-controlled payoff, transition, or action-set interventions, use the lower-level
-simulation and evaluation utilities with an explicit problem and transition
-environment.
+controlled payoff, transition, or action-set interventions, use the simulation
+and evaluation utilities with an explicit problem and transition environment.

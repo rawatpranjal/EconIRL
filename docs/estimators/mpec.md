@@ -264,7 +264,7 @@ large for either repeated nested Bellman solves or the constrained program.
 
 ## Usage
 
-The public MPEC surface is the lower-level estimator API. Create an estimator,
+The public MPEC surface is the full estimator API. Create an estimator,
 call `estimate`, and inspect the returned summary:
 
 ```python
@@ -302,7 +302,7 @@ print(summary.policy[[0, 5, 10, 19], :])
 ```
 
 The [Quick Start](mpec/quick_start.md) page documents the full set of fitted
-attributes and lower-level interface options.
+attributes and advanced API options.
 
 ## Evidence
 

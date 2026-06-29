@@ -306,7 +306,7 @@ theta_proj = summary.metadata["reward_params"]
 ```
 
 These are diagnostic objects; they should not be treated as structurally recovered
-parameters unless coverage and Bellman-object gates pass. To use the projected
+parameters unless coverage and Bellman-object checks are satisfied. To use the projected
 parameters as a starting point for a structural estimator:
 
 ```python

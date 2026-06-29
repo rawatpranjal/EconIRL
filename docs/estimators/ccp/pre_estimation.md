@@ -12,7 +12,7 @@ starts. Run these checks before treating a result as structural evidence.
 | State-action coverage | One-action states make counterfactual action values weakly supported. |
 | Minimum positive CCP | Very small probabilities make the log correction unstable. |
 | Reward normalization | Reward level and scale need a valid anchor. |
-| Transition orientation | CCP expects action, state, next-state transition tensors internally. |
+| Transition orientation | CCP expects transition tensors in action, state, next-state order. |
 
 ## Canonical Simulation Checks
 

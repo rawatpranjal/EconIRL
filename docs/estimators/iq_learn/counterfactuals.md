@@ -33,7 +33,7 @@ stored in `summary.metadata["projected_reward_matrix"]` and
 These are diagnostic objects. They may be useful for qualitative comparison
 or for initializing a structural estimator, but they should not be reported as
 structurally recovered parameters without first verifying that the structural
-gates pass.
+checks are satisfied.
 
 ## Structural Counterfactual Use
 

@@ -59,5 +59,5 @@ propagates to unvisited state-action pairs.
 Do not pair `q_type="tabular"` with `divergence="simple"`. The simple
 objective has no upper bound on a free Q table and the optimizer drives Q to
 numerical overflow (value RMSE can exceed 1e21). The chi-squared objective
-with `alpha >= 1` keeps the problem bounded. See the internal notes for a
-detailed account of this failure mode.
+with `alpha >= 1` keeps the problem bounded, so it is the documented setting
+for tabular IQ-Learn.

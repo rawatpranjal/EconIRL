@@ -15,7 +15,7 @@ print(result.value)    # value function under the new world
 
 ## Counterfactual Families
 
-The validation cell checks recovered counterfactual behavior against exact
+The simulation study checks recovered counterfactual behavior against exact
 oracle objects for three intervention families:
 
 | Family | Intervention | Checked against |

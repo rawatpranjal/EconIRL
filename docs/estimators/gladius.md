@@ -305,8 +305,8 @@ continuation-moment residual above. Two alternative modes are available.
 `mode="q_only"` drops the zeta network and replaces $\mathbb{E}[V(s') \mid s, a]$
 with $\sigma \log \sum_b \exp(Q_\eta(s', b) / \sigma)$; the anchor Bellman
 loss is not available in this mode and $Q_\eta$ is trained on $L_{\text{NLL}}$
-alone. `anchor_bellman_mode="paper_minimax"` uses the literal bi-conjugate
-minimax term from the paper rather than the continuation-moment anchor. It is
+alone. `anchor_bellman_mode="paper_minimax"` uses the paper's bi-conjugate
+minimax objective rather than the continuation-moment anchor. It is
 available for comparison and is not the default.
 Setting `alternating_updates=False` updates both networks jointly in each
 step, which is the legacy behavior.
@@ -406,7 +406,7 @@ and value can then be compared against the original. The
 [Counterfactuals](gladius/counterfactuals.md) page describes the regret
 evaluation protocol and the current scope of counterfactual results. The
 [Quick Start](gladius/quick_start.md) page documents the full fitted-attribute
-table and the lower-level `GLADIUSEstimator` interface.
+table and the full `GLADIUSEstimator` API.
 
 ## Evidence
 

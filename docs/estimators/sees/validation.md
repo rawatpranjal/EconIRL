@@ -53,7 +53,7 @@ not make the sample MLE exactly equal to the DGP parameters.
 pytest tests/benchmarks/test_parameter_recovery.py::test_sees_rust_bus_solution_variants
 ```
 
-Generated results file:
+Results file:
 [`sees_rust_random_start.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/sees_rust_random_start.json).
 
 ## Evidence

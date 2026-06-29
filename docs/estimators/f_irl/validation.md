@@ -1,6 +1,6 @@
 # Simulation Study
 
-f-IRL is reported on two synthetic cells. The primary cell is the paper-faithful
+f-IRL is reported on two synthetic cells. The primary cell is the source-paper
 state-marginal configuration: a fully specified data-generating process with
 known reward, transitions, policy, value, Q function, and Type A, B, and C
 counterfactual oracle objects. The action-dependent cell is a diagnostic

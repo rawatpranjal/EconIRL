@@ -39,7 +39,7 @@ for k, rw in enumerate(seg_rewards):
 ## Reported Results
 
 On the primary synthetic cell, welfare regret is reported per segment and the
-maximum across segments is used for the gate. Results from
+maximum across segments is the conservative summary. Results from
 [aairl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/aairl.json):
 
 | Counterfactual | Max regret across segments | Threshold | Status |

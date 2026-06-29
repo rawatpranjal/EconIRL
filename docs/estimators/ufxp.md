@@ -325,7 +325,7 @@ print(model.predict_proba([0, 10, 50, 89]))
 ```
 
 The [Quick Start](ufxp/quick_start.md) page documents the full set of fitted
-attributes, weighting modes, and the lower-level `UFXPEstimator` interface.
+attributes, weighting modes, and the full `UFXPEstimator` API.
 
 ## Evidence
 

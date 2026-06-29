@@ -161,8 +161,8 @@ Output  theta_hat, policy pi_H, value V_H
 ```
 
 The infinite-horizon endpoint takes a separate path. When `horizon=float("inf")`
-(or `None`), the estimator delegates to `econirl.estimation.mce_irl`, so
-$H = \infty$ reproduces maximum causal entropy IRL exactly with the same config.
+(or `None`), RHIP uses the MCE-IRL endpoint, so $H = \infty$ reproduces
+maximum causal entropy IRL exactly with the same config.
 At finite $H$ the deterministic tail in step 6 is plain hard-max value
 iteration, and $H = 0$ runs no soft backups so the policy is the softmax over
 the deterministic continuation value. The implementation lives in
@@ -250,7 +250,7 @@ over the study replications:
 
 Policy total variation is the distance between the estimated and true choice
 probabilities, lower is better. It falls monotonically as the horizon grows. At
-$H = \infty$ the estimator delegates to MCE-IRL, so its row matches MCE-IRL by
+$H = \infty$ is the MCE-IRL endpoint, so its row matches MCE-IRL by
 construction. The figure is accuracy-only. Wall-clock fit time is not shown,
 because the $H = \infty$ path reuses the optimized MCE-IRL solver and runs faster
 than the finite-horizon path here, which would invert the planning cost the
@@ -282,7 +282,7 @@ Source papers:
 Implementation and reproduction:
 
 - Estimator source and sklearn wrapper: [`econirl.estimators.rhip`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/rhip.py).
-- Infinite-horizon endpoint delegate: [`econirl.estimation.mce_irl`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/mce_irl.py).
+- Infinite-horizon endpoint: [`econirl.estimation.mce_irl`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/mce_irl.py).
 - Study script: [`scripts/study_highdim_route_choice.py`](https://github.com/rawatpranjal/EconIRL/blob/main/scripts/study_highdim_route_choice.py).
 - Endpoint-equivalence test: [`tests/test_rhip.py`](https://github.com/rawatpranjal/EconIRL/blob/main/tests/test_rhip.py).
 - Results file: [`study_highdim_route_choice.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/study_highdim_route_choice.json).

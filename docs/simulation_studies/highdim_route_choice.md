@@ -113,8 +113,8 @@ The horizon $H$ is the single knob that spans a family of methods. The figure tr
 
 **RHIP-H3.** Three soft Bellman backups. It recovers most of the accuracy of the full stochastic planner (H=inf), a middle point on the horizon spectrum between the deterministic and the fully stochastic ends.
 
-**RHIP-Hinf.** The infinite-horizon endpoint delegates to MCE-IRL with the same
-estimator settings, so RHIP-Hinf and MCE-IRL are the same computation here.
+**RHIP-Hinf.** The infinite-horizon endpoint is MCE-IRL with the same estimator
+settings, so RHIP-Hinf and MCE-IRL are the same computation here.
 Their rows match by construction. This anchors the spectrum at the Max Causal
 Entropy end.
 

@@ -281,14 +281,14 @@ print(model.predict_proba([0, 20, 40, 60, 80]))
 ```
 
 Structural counterfactuals re-solve the dynamic program under a modified
-primitive using the lower-level `SEESEstimator` interface. The fitted
+primitive using the full `SEESEstimator` API. The fitted
 structural parameter vector $\hat{\theta}$ supplies the reward specification;
 a changed reward or transition feeds into a new Bellman solve to obtain the
 intervened policy. See the [Counterfactuals](sees/counterfactuals.md) subpage
 for the three counterfactual families and their results.
 
 The [Quick Start](sees/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `SEESEstimator` interface.
+attributes and the full `SEESEstimator` API.
 
 ## Evidence
 
@@ -307,7 +307,7 @@ The recovery study resimulates and refits across 50 replications. The estimator 
 Behavioral fit and counterfactual regret on the `canonical_high_action` cell,
 measured against the known oracle objects from `validation/results/sees.json`.
 The optimizer reached the iteration limit without meeting the gradient
-tolerance; all structural recovery gates pass.
+tolerance, but the structural recovery criteria are satisfied.
 
 | Metric | Value |
 | --- | ---: |
@@ -317,7 +317,7 @@ tolerance; all structural recovery gates pass.
 | Type B regret (transition change) | 0.000183 |
 | Type C regret (action removed) | 1.35e-05 |
 
-All three regret values pass the 0.01 gate. The Bellman violation is
+All three regret values are below 0.01. The Bellman violation is
 $3.08 \times 10^{-6}$, inside the 0.05 threshold. For the cross-estimator
 comparison on the bus-engine panel, see the
 [bus engine simulation study](../simulation_studies/rust_bus.md).

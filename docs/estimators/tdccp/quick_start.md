@@ -48,7 +48,7 @@ basis when states already have meaningful numeric encoders. The neural AVI path
 is available for flexible approximation, but it is not the current
 simulation-study target.
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.td_ccp.TDCCPEstimator` when you need direct control
 over panels, utility objects, basis settings, cross-fitting, robust standard

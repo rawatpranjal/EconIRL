@@ -387,13 +387,13 @@ action-specific payoffs are not identified even with correct transitions. See
 Counterfactual analysis requires re-solving the dynamic program under changed
 primitives. The fitted primitives available for this are `model.reward_matrix_`,
 `model.policy_`, and `model.value_function_`. For controlled payoff, transition,
-or action-set interventions, use the lower-level simulation and evaluation
-utilities with an explicit problem and transition environment. The
+or action-set interventions, use the simulation and evaluation utilities with
+an explicit problem and transition environment. The
 [Counterfactuals](mce_irl/counterfactuals.md) page documents the three
 counterfactual families and the reported regret figures.
 
 The [Quick Start](mce_irl/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `MCEIRLEstimator` interface.
+attributes and the full `MCEIRLEstimator` API.
 
 ## Evidence
 

@@ -35,5 +35,5 @@ oracle counterfactual policy.
 
 For package users, the stable public objects are the fitted reward, policy, and
 value arrays. For controlled payoff, transition, or action-set interventions,
-use the lower-level simulation and evaluation utilities with an explicit
-problem and transition environment.
+use the simulation and evaluation utilities with an explicit problem and
+transition environment.

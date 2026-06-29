@@ -40,7 +40,7 @@ because the oracle policy change is also small.
 ## API Boundary
 
 The stable public objects after fitting are `summary.policy`, `summary.parameters`,
-and the value function accessible from the lower-level result. For controlled
+and the value function on the result object. For controlled
 payoff, transition, or action-set interventions, use the package's simulation
 and evaluation utilities with an explicit problem and transition environment.
 The `AIRLEstimator` does not expose a `.counterfactual()` method; the

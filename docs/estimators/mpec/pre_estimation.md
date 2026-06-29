@@ -12,7 +12,7 @@ starts. Run these checks before treating a result as structural evidence.
 | Action support | Rare actions make their payoff weakly identified. |
 | Reward normalization | Reward level and scale need a valid anchor. |
 | Bellman constraint size | Too many value variables can make the constrained problem impractical. |
-| Transition orientation | MPEC expects action, state, next-state transition tensors internally. |
+| Transition orientation | MPEC expects transition tensors in action, state, next-state order. |
 
 ## Canonical Simulation Checks
 

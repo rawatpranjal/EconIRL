@@ -83,7 +83,7 @@ Do not interpret projected parameters as structural estimates unless the
 projection is well-identified. See the [Pre-Estimation Checks](pre_estimation.md)
 page for the conditions.
 
-## Lower-Level Access
+## Advanced Estimator API
 
 ```python
 # Predict choice probabilities at specific states

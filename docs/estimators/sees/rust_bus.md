@@ -34,7 +34,7 @@ replacement-cost parameters. The fitted policy gives the replacement
 probability by mileage bin. The fitted `alpha_` vector stores the sieve
 coefficients used to approximate the value function.
 
-## Lower-Level Variant
+## Full API Variant
 
 Use `econirl.estimation.sees.SEESEstimator` for package-native `Panel`
 objects, custom reward features, supplied transition tensors, or exact control

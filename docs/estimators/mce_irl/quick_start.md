@@ -68,19 +68,14 @@ diagnostics.
 
 ## Simulation Rerun
 
-To reproduce the simulation, run the lower-level simulation harness:
+To reproduce the simulation, run the validation script:
 
 ```bash
 PYTHONPATH=src:. python validation/estimators/mce_irl/run.py --quiet-progress --enforce-gates
 ```
 
-Output
-
-```text
-hard gates (canonical_low_action): 10 pass, 0 fail
-hard gates (mce_low_high_reward): 10 pass, 0 fail
-hard gates total: 20 pass, 0 fail
-```
+The command writes the results file and reports the pass/fail summary for the
+two simulation cells.
 
 Use `econirl.estimation.mce_irl.MCEIRLEstimator` when you need direct control
 over `Panel` objects, utility objects, `DDCProblem`, transition tensors, the

@@ -68,7 +68,7 @@ Output
 This solves the fitted model again with a higher replacement cost and returns
 the new value function and policy.
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.ccp.CCPEstimator` when you need direct control over
 panel objects, utility objects, transition tensors, CCP smoothing, NPL stopping

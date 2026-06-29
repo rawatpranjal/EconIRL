@@ -48,7 +48,7 @@ finite-state penalty weights.
 | `alpha_` | Estimated sieve coefficients. |
 | `transitions_` | First-stage transition matrix used by the wrapper. |
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.sees.SEESEstimator` when the model already has
 package-native objects or when the simulation study needs exact control over
@@ -79,5 +79,5 @@ Output from the low-dimensional simulation-study objects:
 5.826541219988712e-05
 ```
 
-The synthetic data simulation uses the lower-level API because it supplies the
+The synthetic data simulation uses the full estimator API because it supplies the
 true DDC problem, transition tensor, and reward specification directly.

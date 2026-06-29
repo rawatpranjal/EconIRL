@@ -7,7 +7,7 @@ transition environment for the counterfactual being studied.
 
 The public wrapper does not yet expose the same one-call parameter
 counterfactual interface as NFXP and CCP. The simulation harness evaluates
-counterfactuals directly after fitting the lower-level estimator.
+counterfactuals after fitting the full estimator API.
 
 ## Counterfactual Families
 

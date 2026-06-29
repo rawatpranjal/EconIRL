@@ -351,13 +351,13 @@ print(model.predict_proba([0, 20, 40, 60, 80]))   # shape (5, n_actions)
 
 Counterfactual policy analysis re-solves the structural model under changed
 primitives using the simulation harness. The public wrapper does not expose a
-`counterfactual()` method; the lower-level `NNESEstimator` interface is the
-route for counterfactual re-solves in research workflows. The
+`counterfactual()` method; the full `NNESEstimator` API is the route for
+counterfactual re-solves in research workflows. The
 [Counterfactuals](nnes/counterfactuals.md) subpage documents the three
 counterfactual types and the harness-level results.
 
 The [Quick Start](nnes/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `NNESEstimator` interface.
+attributes and the full `NNESEstimator` API.
 
 ## Evidence
 

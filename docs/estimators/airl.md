@@ -304,7 +304,7 @@ disc_loss  = summary.metadata["final_disc_loss"]   # inspect before interpreting
 ```
 
 The [Quick Start](airl/quick_start.md) page documents the full set of fitted
-attributes and the lower-level interface.
+attributes and the full estimator API.
 
 ## Evidence
 

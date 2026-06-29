@@ -1,6 +1,6 @@
 # Quick Start
 
-The public MPEC surface is the lower-level estimator API. Create an estimator,
+The public MPEC surface is the full estimator API. Create an estimator,
 call `estimate`, and read the returned summary object.
 
 ```python
@@ -66,7 +66,7 @@ See [Counterfactuals](counterfactuals.md) for the reported counterfactual
 cases and [Simulation Study](validation.md) for the generator and results file
 links.
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.mpec.MPECEstimator` when you need direct control over
 panel objects, utility objects, transition tensors, constrained optimizer
