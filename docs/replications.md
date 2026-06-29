@@ -145,15 +145,13 @@ equivalence on the bus-engine data.
 | Hotz-Miller (K = 1) | 1.2872 | 10.9207 | -168.1879 |
 | NPL (run to convergence) | 2.2640 | 10.1432 | -163.7113 |
 
-The one-step estimator sits well below the MLE. NPL run to its fixed point reaches
-it, the operating cost and replacement cost match NFXP to the third and fourth
-figure. At this discount factor the choice likelihood is nearly flat in the
-replacement cost, so NPL and NFXP both sit about 0.0005 from the exact maximizer
-and agree to the fourth figure rather than the twelfth the paper reports on its
-own machine. At lower discount factors, where the replacement cost is better
-identified, NPL matches the maximum likelihood estimate to five figures. An
-earlier build stopped the policy-iteration loop too early and missed the MLE at
-the fourth figure; running NPL to its fixed point closes that gap.
+The one-step estimator sits well below the MLE. NPL run to its fixed point
+reaches it. The operating cost and replacement cost match NFXP to the third and
+fourth figure. At this discount factor the choice likelihood is nearly flat in
+the replacement cost. NPL and NFXP both sit about 0.0005 from the exact
+maximizer and agree to the fourth figure. At lower discount factors, where the
+replacement cost is better identified, NPL matches the maximum-likelihood
+estimate to five figures.
 
 Reproduce:
 
@@ -170,20 +168,20 @@ recovers a shaped advantage that re-optimizes correctly in the training dynamics
 but not under a changed transition model. Their Section 7.1 task is a 16-state,
 4-action MDP with a reward at a single state.
 
-The package reproduces the identification structure:
+The package reproduces the identified parts of the AIRL family:
 
-| Form | Reward | Transitions | Recovers the reward |
+| Public mode | Reward | Required normalization | Recovers the reward |
 | --- | --- | --- | --- |
-| AIRL-1 | R(s) | deterministic | yes |
-| AIRL-2 (default) | R(s,a) | any | no, a shaped advantage |
-| AIRL-2 anchored | R(s,a) with an action anchor | any | yes (see AIRL-Het) |
+| `AIRL(version="state_only")` | R(s) | state-only restriction and deterministic decomposable dynamics | yes |
+| `AIRL(version="anchored")` | R(s,a) | exit-action reward anchor and absorbing-state value anchor | yes |
+| `AIRL(version="heterogeneous")` | R_k(s,a) | the same anchors plus latent-segment separation | yes |
 
-State-only AIRL recovers the reward on the deterministic 16-state task: normalized
-reward error 0.10, policy distance 0.006, counterfactual regret near 0.004. The
-action-dependent reward with no anchor does not recover, normalized reward error
-1.16 and large counterfactual regret. On the Section 7.1 transfer test, the
-state-only reward re-optimizes to optimal behavior under a fresh transition
-matrix, while the state-action reward barely beats a random policy.
+State-only AIRL recovers the reward on the deterministic 16-state task:
+normalized reward error 0.10, policy distance 0.006, counterfactual regret near
+0.004. The unanchored state-action diagnostic is excluded from the public `AIRL`
+entry point because the paper shows it recovers a shaped advantage, not an
+identified structural reward. On the Section 7.1 transfer test, the state-only
+reward re-optimizes to optimal behavior under a fresh transition matrix.
 
 This is simulation evidence of the paper's identification claims. Section 7.1
 reports reward maps and a transfer curve, not a numerical table.
@@ -192,6 +190,41 @@ Reproduce:
 
 ```bash
 python validation/estimators/airl/run.py    # state-only recovers, state-action does not
+```
+
+## AIRL Anchored Heterogeneity (Lee, Sudhir, and Wang, 2026)
+
+Lee, Sudhir, and Wang extend AIRL to dynamic discrete choice settings with
+action-dependent rewards and latent consumer segments. Their identification
+argument adds two anchors: the exit action has known zero flow payoff in every
+state, and the absorbing terminal state has zero continuation value. With those
+anchors, the AIRL pair recovers the action-dependent reward and value rather
+than an arbitrary shaped equivalent. The EM layer assigns users to latent
+segments and estimates segment-specific rewards and policies.
+
+The package reproduces the paper's identification result on the controlled
+serialized-content cell. The empirical serialized-fiction panel is proprietary,
+so this is an identification reproduction rather than a published-number match.
+The controlled cell has 61 states, 3 actions, 2 latent segments, exit action 2,
+absorbing state 60, and 20 content reward features.
+
+| Quantity | Package value | Comparison point |
+| --- | ---: | --- |
+| segment assignment accuracy | 0.895 | 0.5 is random assignment |
+| segment prior L1 | 0.0435 | 0 is an exact segment-share match |
+| max segment policy TV | 0.0591 | 0 is an exact policy match |
+| max segment reward normalized RMSE | 0.2650 | 0 is an exact reward match |
+| max segment value normalized RMSE | 0.1420 | 0 is an exact value match |
+| max segment Q normalized RMSE | 0.2114 | 0 is an exact Q match |
+
+Segment labels are aligned before comparison because latent labels are
+arbitrary up to permutation. In the public API this is
+`AIRL(version="heterogeneous")`.
+
+Reproduce:
+
+```bash
+python validation/estimators/aairl/run.py
 ```
 
 ## TD-CCP (Adusumilli and Eckardt, 2025)
@@ -220,9 +253,9 @@ mean, standard deviation, and mean-squared error sit next to the paper.
 | theta2 (type) | 1.0 | 1.0009 | 1.0044 | 0.0617 | 0.0583 | 0.0038 | 0.0034 |
 
 The means, standard deviations, and mean-squared errors line up with the paper
-across all three parameters. The package's linear semi-gradient recovers the same
-parameter means on this design, but at wider sampling dispersion than maximum
-likelihood; the project validation notes record that gap.
+across all three parameters. The package's linear semigradient recovers the
+same parameter means on this design, but at wider sampling dispersion than
+maximum likelihood. The table above reports the maximum-likelihood comparison.
 
 Reproduce:
 
@@ -270,6 +303,37 @@ Reproduce:
 PYTHONPATH=src python validation/estimators/nnes/bus_renewal_efficiency.py --n-reps 100
 ```
 
+### Four-module renewal (d = 4), 60 buses, T = 20, 100 draws
+
+The paper also reports a four-dimensional design (their Table 2). The four modules
+are independent, so the oracle solves four one-dimensional problems and the joint
+likelihood factorizes. The package estimates each module on its own panel of 1200
+observations. The true values are crep = (2.0, 2.5, 1.5, 1.8) and c = (0.05, 0.07,
+0.09, 0.11).
+
+| Module | Parameter | Package NFXP | Package NNES | Paper NFXP | Paper NNES |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 1 | crep | 2.0286 (0.1459) | 2.0267 (0.1452) | 1.9733 (0.1366) | 1.8947 (0.1401) |
+| 1 | c | 0.0509 (0.0053) | 0.0507 (0.0053) | 0.0501 (0.0053) | 0.0489 (0.0055) |
+| 2 | crep | 2.5329 (0.1842) | 2.5269 (0.1827) | 2.4533 (0.1658) | 2.4393 (0.1665) |
+| 2 | c | 0.0709 (0.0071) | 0.0704 (0.0070) | 0.0715 (0.0067) | 0.0794 (0.0070) |
+| 3 | crep | 1.5125 (0.1383) | 1.5122 (0.1380) | 1.5102 (0.1295) | 1.5111 (0.1301) |
+| 3 | c | 0.0913 (0.0088) | 0.0912 (0.0087) | 0.0897 (0.0085) | 0.0890 (0.0085) |
+| 4 | crep | 1.8211 (0.1426) | 1.8201 (0.1422) | 1.8222 (0.1467) | 1.9023 (0.1503) |
+| 4 | c | 0.1117 (0.0092) | 0.1116 (0.0092) | 0.1104 (0.0098) | 0.1171 (0.0106) |
+
+The equality between NNES and the nested fixed point holds in d = 4 on all eight
+parameters, to the third figure in both mean and standard deviation. The means
+center on the true values. The package computes the value-function gradient in
+closed form. The paper's two derivative methods, finite differences and a gradient
+network, both approximate that same gradient, so they coincide here.
+
+Reproduce:
+
+```bash
+PYTHONPATH=src python validation/estimators/nnes/bus_renewal_d4.py --n-reps 100
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -279,6 +343,5 @@ both the estimates and the standard errors.
 | Estimator | Paper | Status |
 | --- | --- | --- |
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |
-| AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
 | UFXP | Oguz and Bray (2026) | Not yet evaluated. |
