@@ -7,11 +7,12 @@ by the simulation studies and are display curation, not routing.
 
 Routing summary (verified):
 
-* Structural (NFXP, CCP, NNES, SEES, TDCCP, UFXP) and linear IRL (MaxEntIRL,
-  MaxMarginIRL, MCEIRL) and IQLearn: ``path="estimate"``, need transitions, linear.
+* Structural (NFXP, CCP, NNES, SEES, TDCCP, UFXP) and linear IRL (AIRL,
+  MaxEntIRL, MaxMarginIRL, MCEIRL) and IQLearn: ``path="estimate"``, need
+  transitions, linear.
 * Neural model-based (MCEIRLNeural, NeuralUFXP): ``path="fit_features"``, need
   transitions, reward can be linear/nonlinear/neural.
-* Neural model-free (NeuralAIRL, NeuralGLADIUS, and the AIRL/GLADIUS aliases):
+* Neural model-free (NeuralAIRL, NeuralGLADIUS, and the GLADIUS alias):
   ``path="fit_features"``, do not use transitions.
 """
 
@@ -58,33 +59,59 @@ class EstimatorCapability:
 
 def _structural(name: str, group: str, shown: bool) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="structural", needs_transitions=True, reward_forms=_LINEAR,
-        model_free=False, generalizes_to_unvisited=True, path="estimate",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="structural",
+        needs_transitions=True,
+        reward_forms=_LINEAR,
+        model_free=False,
+        generalizes_to_unvisited=True,
+        path="estimate",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
-def _linear_irl(name: str, group: str, shown: bool, generalizes: bool = True) -> EstimatorCapability:
+def _linear_irl(
+    name: str, group: str, shown: bool, generalizes: bool = True
+) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="behavioral", needs_transitions=True, reward_forms=_LINEAR,
-        model_free=False, generalizes_to_unvisited=generalizes, path="estimate",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="behavioral",
+        needs_transitions=True,
+        reward_forms=_LINEAR,
+        model_free=False,
+        generalizes_to_unvisited=generalizes,
+        path="estimate",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
 def _neural_model_based(name: str, group: str, shown: bool) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="behavioral", needs_transitions=True, reward_forms=_NEURAL,
-        model_free=False, generalizes_to_unvisited=True, path="fit_features",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="behavioral",
+        needs_transitions=True,
+        reward_forms=_NEURAL,
+        model_free=False,
+        generalizes_to_unvisited=True,
+        path="fit_features",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
 def _neural_model_free(name: str, group: str, shown: bool) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="behavioral", needs_transitions=False, reward_forms=_NEURAL,
-        model_free=True, generalizes_to_unvisited=True, path="fit_features",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="behavioral",
+        needs_transitions=False,
+        reward_forms=_NEURAL,
+        model_free=True,
+        generalizes_to_unvisited=True,
+        path="fit_features",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
@@ -103,10 +130,12 @@ CAPABILITIES: dict[str, EstimatorCapability] = {
         _structural("SEES", "other", False),
         # Linear IRL (behavioral metrics; reward partially identified).
         _linear_irl("MCEIRL", "causal-entropy", True),
+        _linear_irl("AIRL", "model-free", True),
         # RHIP: horizon-parameterised MaxEnt-family IRL (Barnes et al. 2024).
         # H=inf reproduces MCE-IRL exactly; finite H interpolates to MMP (H=0).
         # Not in the curated headline roster (evidence lives in its own study).
         _linear_irl("RHIP", "other", False),
+        _linear_irl("GenPQR", "other", False, generalizes=False),
         _linear_irl("MaxEntIRL", "other", False),
         _linear_irl("MaxMarginIRL", "other", False),
         # Legacy / not identified: tabular Q, no generalization to unvisited states.
@@ -120,8 +149,6 @@ CAPABILITIES: dict[str, EstimatorCapability] = {
     )
 }
 
-# AIRL and GLADIUS are aliases of the same classes (econirl.AIRL is NeuralAIRL,
-# econirl.GLADIUS is NeuralGLADIUS). Derive their entries from the canonical ones
-# so the records can never drift apart.
-CAPABILITIES["AIRL"] = replace(CAPABILITIES["NeuralAIRL"], name="AIRL")
+# GLADIUS is an alias of NeuralGLADIUS. AIRL is intentionally not an alias:
+# it is the unified identified-only AIRL facade, while NeuralAIRL is explicit.
 CAPABILITIES["GLADIUS"] = replace(CAPABILITIES["NeuralGLADIUS"], name="GLADIUS")

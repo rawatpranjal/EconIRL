@@ -22,9 +22,10 @@ decomposability, the discriminator at the adversarial optimum recovers the true
 reward up to a constant. The shaping potential $h_\phi$ absorbs the
 continuation-value terms that would otherwise contaminate $g_\theta$.
 
-The package implements this setting directly: `reward_arg="state"` projects the
-reward matrix onto the state subspace by averaging across actions before
-computing the discriminator logit.
+The package implements this setting directly through
+`AIRLConfig(version="state_only", reward_arg="state")`: the reward matrix is
+projected onto the state subspace by averaging across actions before computing
+the discriminator logit.
 
 ## Why Action-Dependent Rewards Break the Guarantee
 
@@ -43,22 +44,50 @@ The action-dependent diagnostic cell `airl_anchor_action_dependent` confirms
 this: all eight numerical checks fail, with policy TV of 0.40 and regret values
 in double digits.
 
-## Connection to AIRL-Het
+## Connection to Anchored AIRL
 
-AIRL-Het (Lee, Sudhir, and Wang 2026) adds two design elements to recover
+The Lee-Sudhir-Wang anchored AIRL modes add two design elements to recover
 action-dependent rewards in dynamic discrete choice: an anchor action whose
-reward is pinned to zero to fix the reward normalization, and an absorbing-state row
-pinned to zero to fix the level. These anchors turn the adversarial game into
-one that can identify an action-dependent reward surface. The implementation is
-in `econirl.estimation.adversarial.airl_het`, documented separately.
+reward is pinned to zero to fix the reward normalization, and an absorbing-state
+row pinned to zero to fix the level. These anchors turn the adversarial game
+into one that can identify an action-dependent reward surface. In the public API
+they are reached through `AIRLConfig(version="anchored", ...)` or
+`AIRLConfig(version="heterogeneous", ...)`.
+
+## Two Strategies for Reward-Level Identification
+
+The AIRL potential decomposition and the anchor-action normalization solve the
+same problem (fixing the reward level) by different means. They suit different
+settings.
+
+**Anchor action** (Geng 2020; also Rust 1987, GenPQR). Pins r(s, a†) = 0
+directly for a chosen action a†. Requires a known zero-reward action but works
+in any transition structure, including stochastic ones. DeepPQR, GenPQR, and the
+DDC literature all use this approach.
+
+**AIRL potential decomposition** (Fu et al. 2018). Splits the soft advantage as
+f(s, a, s') = g(s) + β h(s') - h(s), with h absorbing the shaping potential.
+Requires the MDP to satisfy a decomposability condition on the transition graph
+(Fu et al. 2018, Proposition 3.8). Does not require a known zero-reward action.
+
+When a reliable anchor action exists, anchor normalization is simpler and works
+regardless of transition structure. The AIRL decomposition is the right tool when
+no such action is available.
+
+**Discriminator as log density ratio.** Finn, Christiano et al. (2016) show that
+the optimal adversarial discriminator estimates the log density ratio
+log(p_data(τ) / q_gen(τ)). The reward function is embedded as the energy inside
+this ratio. Extracting the state-only component g(s) from the discriminator output
+requires the decomposability condition. Without it, the discriminator identifies the
+policy but not the reward. Finn et al. (2016), Equation 4; Kang (2026), Proposition 3.8.
 
 ## Practical Guidance
 
 Use the state-only mode when the DGP or theory supports a state-only reward. If
 the empirical setting has action-dependent payoffs (entry/exit, product choice,
 capital investment), a state-only reward cannot match the data by construction,
-not by tuning. Switching to AIRL-Het or MCE-IRL is the right move, not
-increasing training length or reward learning rate.
+not by tuning. Switching to an anchored AIRL mode or MCE-IRL is the right move,
+not increasing training length or reward learning rate.
 
 A quick diagnostic: fit with `reward_arg="state"` and inspect policy TV. If TV
 stays above 0.10 after 200 rounds and the discriminator loss plateaus above

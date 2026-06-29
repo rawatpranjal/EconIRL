@@ -1,6 +1,6 @@
-"""Sklearn-style estimators for dynamic discrete choice models.
+"""Estimator convenience imports for dynamic discrete choice models.
 
-This module provides high-level estimators with a scikit-learn style API:
+Most classes in this module expose a scikit-learn style API:
 - NFXP: Nested Fixed Point estimator (Rust 1987, 1988)
 - NNES: Neural Network Estimation of Structural models (Nguyen 2025)
 - CCP: Conditional Choice Probability estimator (Hotz-Miller 1993, NPL)
@@ -40,19 +40,22 @@ Example:
     >>> # Access results (same interface)
     >>> print(model.params_)
     >>> print(model.summary())
+``AIRL`` is the unified identified-only AIRL facade from ``econirl.estimation``;
+``NeuralAIRL`` is the sklearn-style neural wrapper.
 """
 
 from econirl.estimators.ccp import CCP
+from econirl.estimators.genpqr import GenPQR
 from econirl.estimators.max_margin_irl import MaxMarginIRL
 from econirl.estimators.maxent_irl import MaxEntIRL
 from econirl.estimators.mce_irl import MCEIRL, estimate_empirical_transitions
 from econirl.estimators.nfxp import NFXP
 from econirl.estimators.nnes import NNES
+from econirl.estimators.protocol import EstimatorProtocol
 from econirl.estimators.rhip import RHIP
 from econirl.estimators.sees import SEES
 from econirl.estimators.tdccp import TDCCP
 from econirl.estimators.ufxp import UFXP
-from econirl.estimators.protocol import EstimatorProtocol
 
 try:
     from econirl.estimators.gcl import GCL
@@ -71,7 +74,7 @@ try:
 except ImportError:
     NeuralAIRL = None
 
-AIRL = NeuralAIRL
+from econirl.estimation.adversarial import AIRL
 
 try:
     from econirl.estimators.mceirl_neural import MCEIRLNeural
@@ -101,5 +104,6 @@ __all__ = [
     "NeuralAIRL",
     "MCEIRLNeural",
     "NeuralUFXP",
+    "GenPQR",
     "EstimatorProtocol",
 ]
