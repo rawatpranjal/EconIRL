@@ -3,7 +3,7 @@
 These estimators are available for advanced users, checks, and method development.
 They sit outside the core focus, either because they overlap a core method, carry
 caveated public status, or are narrower in scope. The grouping follows the sources
-of complexity in [Choosing an Estimator](landscape.md).
+of complexity in [Choosing and Comparing Estimators](../comparing_estimators.md).
 
 | Estimator | Source of complexity it answers | Use |
 | --- | --- | --- |

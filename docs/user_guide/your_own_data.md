@@ -191,7 +191,8 @@ When the reward is state-only and the dynamics are deterministic, MCE-IRL and AI
 the reward up to an additive constant, with linear features or a neural reward. An anchor
 that pins one reward value fixes the constant too, so the recovered reward equals the true
 reward. See the [estimator map](../estimators.md) for the full set and
-[Choosing an Estimator](../estimators/landscape.md) for the side-by-side comparison.
+[Choosing and Comparing Estimators](../comparing_estimators.md) for the
+side-by-side comparison.
 
 ## A full run, start to finish
 

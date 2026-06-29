@@ -8,7 +8,7 @@ structural and inverse-reinforcement-learning methods that carry the main
 identification stories and method lineages.
 
 For how to choose among them, including the side-by-side table, see
-[Choosing an Estimator](landscape.md).
+[Choosing and Comparing Estimators](../comparing_estimators.md).
 
 | Estimator | Family | Best for |
 | --- | --- | --- |
@@ -26,7 +26,6 @@ GLADIUS is the core neural Q and continuation estimator.
 ```{toctree}
 :maxdepth: 1
 
-landscape
 nfxp
 ccp
 tdccp
