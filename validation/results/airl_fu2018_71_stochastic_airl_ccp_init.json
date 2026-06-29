@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "task": "AIRL Fu-Luo-Levine 2018 section 7.1 (stochastic transition probe)",
+    "paper_target": "Fu, Luo, and Levine 2018 Section 7.1: 16 states, 4 actions, randomly drawn transition matrices, reward 1.0 from state 0, start state 1.",
+    "transition_mode": "stochastic",
+    "paper_transition_target": "random transition matrices",
+    "n_states": 16,
+    "n_actions": 4,
+    "reward": "1.0 at state 0",
+    "start_state": 1,
+    "discount": 0.9,
+    "seeds": [
+      0
+    ],
+    "n_individuals": 5000,
+    "n_periods": 80,
+    "estimator_config": {
+      "max_rounds": 5,
+      "state_min_rounds": 5,
+      "action_min_rounds": 1,
+      "discriminator_steps": 1,
+      "negative_history": 20,
+      "discriminator_data_mode": "sampled",
+      "policy_sample_mode": "rollout",
+      "reward_lr": 0.0005,
+      "shaping_bellman_penalty": 0.0,
+      "state_generator_reward": "recovered",
+      "action_generator_reward": "recovered",
+      "state_policy_step_size": 0.1,
+      "action_policy_step_size": 0.3,
+      "estimator_mode": "airl",
+      "state_initializer": "ccp_inverse",
+      "ccp_alpha": 0.5
+    },
+    "metric": "affine R^2 of recovered reward vs true; transfer = fraction of hard-optimal return under new T'",
+    "numeric_target": "paper reports reward maps and a transfer curve, not a numeric table",
+    "release_status": "claim_reproduction_not_paper_exact",
+    "paper_fidelity": "paper_transition_style_exploratory_not_figure_calibrated",
+    "transition_mode_note": "Dirichlet random transition matrices are closer to the paper setup, but still need figure digitization or original code/seeds before being treated as paper replication evidence.",
+    "initialization_note": "State-only AIRL starts from the empirical state-only inverse-Bellman reward and then runs adversarial AIRL updates. Treat this as a warm-started AIRL continuation, not the paper's from-zero AIRL run.",
+    "probe_status": "state_only_ccp_initialized_airl_continuation_passed"
+  },
+  "summary": {
+    "AIRL-1 (state-only)": {
+      "reward_affine_r2": 0.9656296499833198,
+      "transfer_frac_optimal": 0.990586086613219
+    },
+    "AIRL-2 (state-action)": {
+      "reward_affine_r2": 0.22383610110382912,
+      "transfer_frac_optimal": -0.19057750567642243
+    }
+  },
+  "records": [
+    {
+      "seed": 0,
+      "AIRL-1 (state-only)": {
+        "reward_affine_r2": 0.9656296499833198,
+        "transfer_frac_optimal": 0.990586086613219,
+        "num_iterations": 5,
+        "converged": true,
+        "final_disc_loss": 1.4068437232092397,
+        "initial_reward_affine_r2": 0.9659484119143338,
+        "initial_transfer_frac_optimal": 0.990586086613219,
+        "initial_min_state_count": 17425,
+        "initial_state0_count": 38530,
+        "initial_linear_system_rank": 16,
+        "initial_linear_system_condition_number": 21.388384549708384,
+        "initial_linear_system_min_singular_value": 0.18701739678860121,
+        "initial_linear_system_residual_sum": 0.006683736731543187
+      },
+      "AIRL-2 (state-action)": {
+        "reward_affine_r2": 0.22383610110382912,
+        "transfer_frac_optimal": -0.19057750567642243,
+        "num_iterations": 1,
+        "converged": true,
+        "final_disc_loss": 1.8325814635083126
+      }
+    }
+  ]
+}

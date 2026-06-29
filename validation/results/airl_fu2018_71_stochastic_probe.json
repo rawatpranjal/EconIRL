@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "task": "AIRL Fu-Luo-Levine 2018 section 7.1 (stochastic transition probe)",
+    "paper_target": "Fu, Luo, and Levine 2018 Section 7.1: 16 states, 4 actions, randomly drawn transition matrices, reward 1.0 from state 0, start state 1.",
+    "transition_mode": "stochastic",
+    "paper_transition_target": "random transition matrices",
+    "n_states": 16,
+    "n_actions": 4,
+    "reward": "1.0 at state 0",
+    "start_state": 1,
+    "discount": 0.9,
+    "seeds": [
+      0
+    ],
+    "n_individuals": 250,
+    "n_periods": 20,
+    "estimator_config": {
+      "max_rounds": 50,
+      "state_min_rounds": 40,
+      "action_min_rounds": 10,
+      "discriminator_steps": 3,
+      "negative_history": 20,
+      "discriminator_data_mode": "sampled",
+      "policy_sample_mode": "chain",
+      "reward_lr": 0.02,
+      "shaping_bellman_penalty": 0.0,
+      "state_generator_reward": "log_odds",
+      "action_generator_reward": "log_odds",
+      "state_policy_step_size": 0.1,
+      "action_policy_step_size": 0.3,
+      "estimator_mode": "airl",
+      "state_initializer": "zeros",
+      "ccp_alpha": 0.5
+    },
+    "metric": "affine R^2 of recovered reward vs true; transfer = fraction of hard-optimal return under new T'",
+    "numeric_target": "paper reports reward maps and a transfer curve, not a numeric table",
+    "release_status": "claim_reproduction_not_paper_exact",
+    "paper_fidelity": "paper_transition_style_exploratory_not_figure_calibrated",
+    "transition_mode_note": "Dirichlet random transition matrices are closer to the paper setup, but still need figure digitization or original code/seeds before being treated as paper replication evidence.",
+    "probe_status": "open_gap_state_only_transfer_probe_failed"
+  },
+  "summary": {
+    "AIRL-1 (state-only)": {
+      "reward_affine_r2": 0.030543769944577637,
+      "transfer_frac_optimal": -0.4187384585228288
+    },
+    "AIRL-2 (state-action)": {
+      "reward_affine_r2": 0.020563918786712376,
+      "transfer_frac_optimal": 0.031361076395660034
+    }
+  },
+  "records": [
+    {
+      "seed": 0,
+      "AIRL-1 (state-only)": {
+        "reward_affine_r2": 0.030543769944577637,
+        "transfer_frac_optimal": -0.4187384585228288,
+        "num_iterations": 40,
+        "converged": true,
+        "final_disc_loss": 1.3800431146497463
+      },
+      "AIRL-2 (state-action)": {
+        "reward_affine_r2": 0.020563918786712376,
+        "transfer_frac_optimal": 0.031361076395660034,
+        "num_iterations": 50,
+        "converged": false,
+        "final_disc_loss": 1.3790231719310047
+      }
+    }
+  ]
+}

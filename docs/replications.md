@@ -166,9 +166,10 @@ prove (their Theorems 5.1 and 5.2) that the reward is identified and portable to
 new dynamics only when it is a function of state, R(s). A state-action reward
 recovers a shaped advantage that re-optimizes correctly in the training dynamics
 but not under a changed transition model. Their Section 7.1 task is a 16-state,
-4-action MDP with a reward at a single state.
+4-action MDP with randomly drawn transition matrices and a reward at a single
+state.
 
-The package reproduces the identified parts of the AIRL family:
+The package exposes the identified parts of the AIRL family:
 
 | Public mode | Reward | Required normalization | Recovers the reward |
 | --- | --- | --- | --- |
@@ -176,20 +177,134 @@ The package reproduces the identified parts of the AIRL family:
 | `AIRL(version="anchored")` | R(s,a) | exit-action reward anchor and absorbing-state value anchor | yes |
 | `AIRL(version="heterogeneous")` | R_k(s,a) | the same anchors plus latent-segment separation | yes |
 
-State-only AIRL recovers the reward on the deterministic 16-state task:
-normalized reward error 0.10, policy distance 0.006, counterfactual regret near
-0.004. The unanchored state-action diagnostic is excluded from the public `AIRL`
-entry point because the paper shows it recovers a shaped advantage, not an
-identified structural reward. On the Section 7.1 transfer test, the state-only
-reward re-optimizes to optimal behavior under a fresh transition matrix.
+Section 7.1 uses MaxEnt IRL, the precursor to the adversarial method. The package
+estimator that implements that algorithm is MCE-IRL. The reward recovery (Figure 1)
+is matched to the authors' own tabular code, and the transfer behavior (Figure 2) is
+shown with our own probe.
 
-This is simulation evidence of the paper's identification claims. Section 7.1
-reports reward maps and a transfer curve, not a numerical table.
+Running the authors' recipe at their settings (16 states, 4 actions, seed 1,
+sparsity 0.8), a port of their reference code recovers the ground-truth state-only
+reward to affine R² 1.000 (Figure 1). The package soft-Bellman policy matches their
+soft value iteration to 1e-15. The public MCE-IRL estimator, trained on
+demonstrations from the same expert, recovers the state-only reward to affine R²
+0.987. A state-action reward instead recovers a shaped advantage. It is uncorrelated
+with the ground-truth reward (affine R² near zero), and it still reproduces the
+expert policy under the training dynamics (policy distance near zero).
+
+Figure 2 asks whether a learned reward still works when the world changes. The reward
+that depends only on the state recovers the true goal, so it keeps steering toward that
+goal in every new environment we tried. The reward that also depends on the action
+explains the same training behavior, but it quietly absorbs the training environment, so
+it usually stops working once the dynamics change. This is not all or nothing. The
+action-based reward still works on a minority of new environments and fails on the rest,
+so its average is shaky and one test environment tells you little. Read the transfer
+column as a direction, not a precise score. State-based rewards carry over, action-based
+rewards do not carry over reliably. This is the lesson Fu, Luo, and Levine draw in
+Section 7.1.
+
+| Section 7.1 route (seeds 1-3) | Reward affine R^2 | Transfer fraction of optimal |
+| --- | ---: | ---: |
+| reference code, state-only | 1.000 | 1.000 (steady) |
+| MCE-IRL estimator, state-only | 0.987 | 1.000 (steady) |
+| reference code, state-action | 0.003 (shaped) | 0.28 (varies widely) |
+
+The transfer test is our own probe, because the authors' public tabular code runs the
+recovery experiment only and the Figure 2 tabular transfer curve is not in their
+repository. Matching their code is the bar for recovery, because Section 7.1 publishes
+reward maps, not a numeric table.
+
+A second deterministic-transition diagnostic exercises the adversarial AIRL
+estimator (a different algorithm from the Section 7.1 MaxEnt code). It recovers the
+state-only reward to affine R² 0.977 and transfer 1.000, and the unanchored
+state-action diagnostic recovers a shaped advantage at affine R² 0.244.
+
+The closest code-style stochastic-transition probe uses the sparse random
+transition recipe from the public `inverse_rl` tabular environment: exp(rand)
+weights, default `t_sparsity=0.75` sparse zeroing, row normalization, and one
+reward-state self-loop action. The source is the public
+[`tabular_maxent_irl/simple_env.py`](https://github.com/justinjfu/inverse_rl/blob/master/tabular_maxent_irl/simple_env.py)
+environment used in Justin Fu's `inverse_rl` repository. This still is not a
+paper-table exact match, because the paper reports a reward map and transfer
+curve rather than numeric targets, but it matches the available code recipe more
+closely than a dense Dirichlet matrix. From zero, with sampled rollout negatives
+and previous-20 replay negatives, state-only AIRL gets reward R² 0.940 and
+transfer 1.000.
+
+A denser Dirichlet random-transition probe stresses the adversarial AIRL
+estimator from zero, a harder setting than the Section 7.1 MaxEnt code matched
+above. It is recorded separately and is not a success. With previous-20 policy
+replay negatives and the discriminator log-odds policy reward, the bounded local
+probe gets state-only reward R² 0.031 and transfer -0.419. This is an open stress
+case for the adversarial estimator, not Section 7.1 evidence.
+
+An exact tabular-occupancy from-zero AIRL diagnostic removes Monte Carlo noise
+from the discriminator negatives on the same stochastic MDP. It improves the
+state-only row to reward R² 0.586 and transfer 0.825, but it still misses the
+paper-style recovery target and is recorded as an open gap.
+
+The same stochastic MDP is identifiable from demonstrations in a non-AIRL
+finite-sample inverse-Bellman ceiling. With 5,000 trajectories of length 80, the
+empirical state-only inverse reaches reward R² 0.966 and transfer 0.991. That
+ceiling isolates the remaining problem to AIRL adversarial training rather than
+the random-transition design itself.
+
+A warm-started AIRL continuation now preserves that stochastic signal. Starting
+state-only AIRL from the empirical inverse-Bellman reward, sampling policy
+negatives as rollouts from the same initial distribution, mixing previous-20
+policy negatives, and running 5 adversarial rounds gives reward R² 0.966 and
+transfer 0.991. This is useful package evidence for the AIRL training path, but
+it is not the paper's from-zero run and should not be labeled as paper-exact
+figure replication.
+
+The unanchored state-action diagnostic is excluded from the public `AIRL` entry
+point because the paper shows it recovers a shaped advantage, not an identified
+structural reward. On the Section 7.1 transfer test, the state-only reward
+re-optimizes to near-optimal behavior under a fresh transition matrix.
 
 Reproduce:
 
 ```bash
-python validation/estimators/airl/run.py    # state-only recovers, state-action does not
+python examples/airl-fu2018/run_fu_reference_match.py --seeds 1 2 3 \
+  --out validation/results/airl_fu2018_71_reference_match.json
+python examples/airl-fu2018/run_tabular_71.py --seeds 0
+python examples/airl-fu2018/run_tabular_71.py \
+  --transition-mode stochastic --seeds 0 \
+  --n-individuals 250 --n-periods 20 \
+  --max-rounds 50 --state-min-rounds 40 --action-min-rounds 10 \
+  --discriminator-steps 3 --negative-history 20 \
+  --state-generator-reward log_odds --action-generator-reward log_odds \
+  --out validation/results/airl_fu2018_71_stochastic_probe.json
+python examples/airl-fu2018/run_tabular_71.py \
+  --transition-mode sparse_original --seeds 0 \
+  --n-individuals 1500 --n-periods 40 \
+  --max-rounds 100 --state-min-rounds 100 --action-min-rounds 1 \
+  --discriminator-steps 20 --negative-history 20 \
+  --policy-sample-mode rollout \
+  --state-generator-reward recovered --action-generator-reward recovered \
+  --state-policy-step-size 0.1 --reward-lr 0.01 \
+  --out validation/results/airl_fu2018_71_sparse_original.json
+python examples/airl-fu2018/run_tabular_71.py \
+  --transition-mode stochastic --estimator-mode ccp_inverse --seeds 0 \
+  --n-individuals 5000 --n-periods 80 \
+  --out validation/results/airl_fu2018_71_stochastic_ccp_ceiling.json
+python examples/airl-fu2018/run_tabular_71.py \
+  --transition-mode stochastic --seeds 0 \
+  --n-individuals 5000 --n-periods 80 \
+  --max-rounds 100 --state-min-rounds 100 --action-min-rounds 1 \
+  --discriminator-steps 20 --negative-history 0 \
+  --discriminator-data-mode occupancy \
+  --state-generator-reward log_odds --action-generator-reward recovered \
+  --state-policy-step-size 0.1 --reward-lr 0.01 \
+  --out validation/results/airl_fu2018_71_stochastic_airl_occupancy.json
+python examples/airl-fu2018/run_tabular_71.py \
+  --transition-mode stochastic --seeds 0 \
+  --n-individuals 5000 --n-periods 80 \
+  --max-rounds 5 --state-min-rounds 5 --action-min-rounds 1 \
+  --discriminator-steps 1 --negative-history 20 \
+  --policy-sample-mode rollout \
+  --state-generator-reward recovered --action-generator-reward recovered \
+  --state-initializer ccp_inverse --reward-lr 0.0005 \
+  --out validation/results/airl_fu2018_71_stochastic_airl_ccp_init.json
 ```
 
 ## AIRL Anchored Heterogeneity (Lee, Sudhir, and Wang, 2026)
@@ -202,13 +317,14 @@ anchors, the AIRL pair recovers the action-dependent reward and value rather
 than an arbitrary shaped equivalent. The EM layer assigns users to latent
 segments and estimates segment-specific rewards and policies.
 
-The package reproduces the paper's identification result on the controlled
-serialized-content cell. The empirical serialized-fiction panel is proprietary,
-so this is an identification reproduction rather than a published-number match.
-The controlled cell has 61 states, 3 actions, 2 latent segments, exit action 2,
-absorbing state 60, and 20 content reward features.
+The empirical paper replication is blocked without the serialized-fiction
+platform data. The paper uses K = 4 latent segments and a large platform panel;
+its reported empirical targets include segment marginal effects and
+out-of-sample prediction errors. The package cell below is therefore a synthetic
+mechanism validation only. It has 61 states, 3 actions, 2 latent segments, exit
+action 2, absorbing state 60, and 20 content reward features.
 
-| Quantity | Package value | Comparison point |
+| Synthetic mechanism diagnostic | Package value | Comparison point |
 | --- | ---: | --- |
 | segment assignment accuracy | 0.895 | 0.5 is random assignment |
 | segment prior L1 | 0.0435 | 0 is an exact segment-share match |
@@ -216,6 +332,13 @@ absorbing state 60, and 20 content reward features.
 | max segment reward normalized RMSE | 0.2650 | 0 is an exact reward match |
 | max segment value normalized RMSE | 0.1420 | 0 is an exact value match |
 | max segment Q normalized RMSE | 0.2114 | 0 is an exact Q match |
+
+The same realized synthetic panel has an oracle-MAP assignment reference, using
+the true segment policies, of 0.716 for individual book trajectories and 0.901
+after pooling all books from the same user. The fitted assignment accuracy of
+0.895 is therefore close to the user-pooled oracle reference, while the
+finite-panel stochastic choices rule out treating 1.000 as a fitted replication
+target.
 
 Segment labels are aligned before comparison because latent labels are
 arbitrary up to permutation. In the public API this is

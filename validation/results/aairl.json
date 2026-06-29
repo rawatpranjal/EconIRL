@@ -1,6 +1,36 @@
 {
   "estimator": "AIRL-Het",
   "interpretation": "AIRL-Het passes the anchored serialized-content latent-segment known-truth cell.",
+  "local_validation_scope": {
+    "cell": "airl_het_paper_identification",
+    "not_empirical_replication": true,
+    "num_segments": 2,
+    "reason": "The proprietary platform data required for the paper's empirical tables and field-experiment validation are not available in the repo.",
+    "scope": "synthetic_mechanism_validation_only",
+    "segment_interpretation": [
+      "synthetic pay/read-like segment",
+      "synthetic wait/read-like segment"
+    ]
+  },
+  "paper_target": {
+    "data_requirement": "15-month serialized-fiction platform panel with over one million users, over 10,000 titles, and episode-level pay/wait access records.",
+    "empirical_targets": [
+      "Figure 3 latent-segment engagement and purchasing behavior",
+      "Table 5 marginal effects for Pay & Read and Wait & Read segments",
+      "Figure 4 wait-time reduction validation",
+      "Table 6 aggregate and series-level out-of-sample prediction errors"
+    ],
+    "num_segments": 4,
+    "paper": "Lee, Sudhir, and Wang 2026 AIRL-HET",
+    "replication_status": "blocked_without_proprietary_platform_data",
+    "training_schedule": {
+      "discount_factor": 0.99,
+      "epochs": 1000,
+      "optimizer": "Adam, learning rate 3e-4",
+      "posterior_fixed_after_epoch": 500,
+      "trajectories_per_epoch": 16384
+    }
+  },
   "primary_cell_id": "airl_het_paper_identification",
   "results": [
     {
@@ -85,7 +115,7 @@
           "operator": "<=",
           "passed": true,
           "threshold": 0.35,
-          "value": 0.043477813304278856
+          "value": 0.0434778133042788
         },
         {
           "name": "segment_assignment_accuracy",
@@ -106,21 +136,21 @@
           "operator": "<=",
           "passed": true,
           "threshold": 0.12,
-          "value": 0.05913144436746753
+          "value": 0.059131444367467215
         },
         {
           "name": "max_segment_value_normalized_rmse",
           "operator": "<=",
           "passed": true,
           "threshold": 0.3,
-          "value": 0.14197337719868644
+          "value": 0.14197337719868555
         },
         {
           "name": "max_segment_q_normalized_rmse",
           "operator": "<=",
           "passed": true,
           "threshold": 0.3,
-          "value": 0.21138937605956745
+          "value": 0.21138937605956615
         },
         {
           "name": "type_a_max_regret",
@@ -150,10 +180,10 @@
           "type_b": 0.11893310781701327,
           "type_c": 0.00686809129514554
         },
-        "max_segment_policy_tv": 0.05913144436746753,
-        "max_segment_q_normalized_rmse": 0.21138937605956745,
+        "max_segment_policy_tv": 0.059131444367467215,
+        "max_segment_q_normalized_rmse": 0.21138937605956615,
         "max_segment_reward_normalized_rmse": 0.2650011487814588,
-        "max_segment_value_normalized_rmse": 0.14197337719868644,
+        "max_segment_value_normalized_rmse": 0.14197337719868555,
         "segment_assignment_accuracy": 0.895,
         "segment_permutation": {
           "estimated_to_true": {
@@ -165,20 +195,31 @@
             0
           ]
         },
-        "segment_prior_l1": 0.043477813304278856,
+        "segment_prior_l1": 0.0434778133042788,
         "segment_prior_max_abs_error": 0.021738921553300594,
         "segment_q_normalized_rmse": [
-          0.13125537952018404,
-          0.21138937605956745
+          0.1312553795201841,
+          0.21138937605956615
         ],
         "segment_reward_normalized_rmse": [
           0.24404583135758476,
           0.2650011487814588
         ],
         "segment_value_normalized_rmse": [
-          0.09269394540489886,
-          0.14197337719868644
+          0.09269394540489935,
+          0.14197337719868555
         ]
+      },
+      "oracle_assignment_reference": {
+        "definition": "Bayes-MAP assignment using true segment policies on the realized synthetic panel; user-pooled pools per-book posterior scores.",
+        "num_trajectories": 3200,
+        "num_users": 800,
+        "segment_priors": [
+          0.4800000035762788,
+          0.5199999964237212
+        ],
+        "trajectory_map_accuracy": 0.7159375,
+        "user_pooled_map_accuracy": 0.90125
       },
       "simulation": {
         "n_individuals": 800,
@@ -189,12 +230,12 @@
       "summary": {
         "converged": true,
         "convergence_message": "EM converged",
-        "estimation_time": 30.698772192001343,
-        "log_likelihood": -11614.762960734517,
+        "estimation_time": 17.786699056625366,
+        "log_likelihood": -11614.762960734519,
         "metadata": {
           "em_log_likelihoods": [
-            -11609.662028932702,
-            -11614.762960734517
+            -11609.662028932706,
+            -11614.762960734519
           ],
           "generator_reward": "f",
           "initialization": "behavioral_anchor",
@@ -204,7 +245,7 @@
           "min_airl_rounds": 1,
           "num_segments": 2,
           "segment_priors": [
-            0.4982610891755354,
+            0.49826108917553547,
             0.5017389108244645
           ]
         },

@@ -1,0 +1,156 @@
+{
+  "meta": {
+    "task": "AIRL (Fu, Luo, Levine 2018) Section 7.1 tabular replication, matched to the reference code",
+    "paper_target": "Fu, Luo, and Levine 2018 Section 7.1 (Figure 1): 16 states, 4 actions, randomly drawn transition matrices, reward 1.0 from state 0, start state 1. MaxEnt IRL with a state-only reward recovers the ground-truth reward and transfers to new dynamics; a state-action reward instead recovers a shaped advantage function (uncorrelated with the truth but reproducing the expert under the training dynamics).",
+    "method": "exact-occupancy MaxEnt IRL (gradient mu_D - mu_pi), package estimator MCEIRLEstimator",
+    "n_states": 16,
+    "n_actions": 4,
+    "reward": "1.0 at state 0",
+    "start_state": 1,
+    "discount": 0.9,
+    "entropy_weight": 1.0,
+    "visitation_horizon": 5,
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "n_individuals": 8000,
+    "n_periods": 60,
+    "n_transfer_envs": 30,
+    "bar": "reference_implementation_equivalence",
+    "numeric_target": "paper reports reward maps and a transfer curve, not a numeric table",
+    "source_code_reference": {
+      "repository": "justinjfu/inverse_rl",
+      "paths": [
+        "tabular_maxent_irl/maxent_irl.py",
+        "tabular_maxent_irl/q_iteration.py",
+        "tabular_maxent_irl/simple_env.py"
+      ],
+      "url": "https://github.com/justinjfu/inverse_rl/blob/master/tabular_maxent_irl/",
+      "reference_config": {
+        "n_states": 16,
+        "n_actions": 4,
+        "seed": 1,
+        "t_sparsity": 0.8,
+        "ent_wt": 1.0,
+        "discount": 0.9,
+        "visitation_horizon_T": 5,
+        "adam_lr": 0.01,
+        "num_itrs": 1000
+      },
+      "transfer_experiment_in_public_repo": false
+    },
+    "probe_status": "section_71_recovery_and_state_only_transfer_reference_match_passed",
+    "note": "Section 7.1 uses MaxEnt IRL (the precursor), not the adversarial AIRL method of Sections 7.2+; the package estimator that implements it is MCEIRLEstimator. GATED (method-intrinsic): Figure 1 recovery, matched to the authors' public code (maxent_irl.py, the only experiment in their tabular repo); and the Figure 2 state-only transfer, which is intrinsic because the recovered state-only reward IS the true reward, so it is optimal under any dynamics (transfer 1.0, std 0 on every T'). DESCRIPTIVE (reported, NOT gated): the from-zero state-action reward transfers far worse on average (mean ~0.27 over n_transfer_envs fresh T'), consistent with the paper's 'marginal over random' claim, BUT this is not a clean replication number. It is high variance (transfer_frac_std ~0.4: near-optimal on about a quarter of T', a single T' once read 0.99 by luck) AND representative-dependent: the state-action reward is identified only up to a potential, and the recovered representative equals the advantage A(s,a)=Q(s,a)-V(s) up to a potential, which bakes in the training dynamics. The state-only-minus-state-action 'contrast' is just 1 minus that same mean, so it inherits the same variance and is not gated either. The authors' tabular transfer code is not public, so the transfer side cannot be matched to their code. The adversarial AIRLEstimator from-zero on dense transitions is a separate, harder regime tracked in airl_fu2018_71_stochastic_probe.json."
+  },
+  "summary": {
+    "reference": {
+      "state_only": {
+        "reward_affine_r2": 1.0,
+        "reward_inf_norm_error": 9.909110569121065e-13,
+        "transfer_frac_optimal": 0.9999999999997965,
+        "transfer_frac_std": 1.6688786496290596e-14
+      },
+      "state_action": {
+        "reward_affine_r2_train": 0.0032991535645391,
+        "shaping_policy_tv_train": 3.1765678050928634e-15,
+        "transfer_frac_optimal": 0.27692740150972867,
+        "transfer_frac_std": 0.4303957166428301
+      }
+    },
+    "package": {
+      "state_only": {
+        "reward_affine_r2": 0.9873583141347145,
+        "transfer_frac_optimal": 0.9999055034711112,
+        "transfer_frac_std": 0.0002342126605765615
+      }
+    },
+    "transfer_contrast_state_only_minus_state_action": 0.7230725984900679,
+    "soft_policy_max_gap": 9.3443771239284e-16,
+    "package_vs_reference_state_only_r2": 0.9873583141346657
+  },
+  "records": [
+    {
+      "seed": 1,
+      "reference": {
+        "state_only": {
+          "reward_affine_r2": 1.0,
+          "reward_inf_norm_error": 2.911337837474548e-12,
+          "transfer_frac_optimal": 0.9999999999997965,
+          "transfer_frac_std": 1.663866353569757e-14,
+          "final_occupancy_inf_norm": 4.4027281820291364e-15
+        },
+        "state_action": {
+          "reward_affine_r2_train": 6.118095677187796e-06,
+          "shaping_policy_tv_train": 5.725454832461452e-15,
+          "transfer_frac_optimal": 0.2727891683822779,
+          "transfer_frac_std": 0.4304584861425403
+        }
+      },
+      "package": {
+        "state_only": {
+          "reward_affine_r2": 0.987997060527841,
+          "transfer_frac_optimal": 0.999965192579117,
+          "transfer_frac_std": 0.00010532125808245417
+        }
+      },
+      "soft_policy_max_gap": 8.326672684688674e-16,
+      "package_vs_reference_state_only_r2": 0.9879970605276944
+    },
+    {
+      "seed": 2,
+      "reference": {
+        "state_only": {
+          "reward_affine_r2": 1.0,
+          "reward_inf_norm_error": 2.5590640717609858e-14,
+          "transfer_frac_optimal": 0.9999999999997967,
+          "transfer_frac_std": 1.6731629889915743e-14,
+          "final_occupancy_inf_norm": 1.3877787807814457e-16
+        },
+        "state_action": {
+          "reward_affine_r2_train": 0.007658960117728486,
+          "shaping_policy_tv_train": 3.0895425107146934e-15,
+          "transfer_frac_optimal": 0.2697825561188086,
+          "transfer_frac_std": 0.43398317782498935
+        }
+      },
+      "package": {
+        "state_only": {
+          "reward_affine_r2": 0.9853478278039408,
+          "transfer_frac_optimal": 0.9998561326525828,
+          "transfer_frac_std": 0.00035828641347225836
+        }
+      },
+      "soft_policy_max_gap": 8.604228440844963e-16,
+      "package_vs_reference_state_only_r2": 0.9853478278039369
+    },
+    {
+      "seed": 3,
+      "reference": {
+        "state_only": {
+          "reward_affine_r2": 1.0,
+          "reward_inf_norm_error": 3.58046925441613e-14,
+          "transfer_frac_optimal": 0.999999999999796,
+          "transfer_frac_std": 1.6696066063258474e-14,
+          "final_occupancy_inf_norm": 2.498001805406602e-16
+        },
+        "state_action": {
+          "reward_affine_r2_train": 0.0022323824802116254,
+          "shaping_policy_tv_train": 7.147060721024445e-16,
+          "transfer_frac_optimal": 0.2882104800280994,
+          "transfer_frac_std": 0.4267454859609607
+        }
+      },
+      "package": {
+        "state_only": {
+          "reward_affine_r2": 0.9887300540723617,
+          "transfer_frac_optimal": 0.9998951851816341,
+          "transfer_frac_std": 0.00023903031017497196
+        }
+      },
+      "soft_policy_max_gap": 1.1102230246251565e-15,
+      "package_vs_reference_state_only_r2": 0.9887300540723655
+    }
+  ]
+}
