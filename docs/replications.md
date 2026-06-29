@@ -270,6 +270,53 @@ Reproduce:
 PYTHONPATH=src python validation/estimators/nnes/bus_renewal_efficiency.py --n-reps 100
 ```
 
+## GLADIUS (Kang, Yoganarasimhan, and Jain, 2025)
+
+GLADIUS learns a reward by inverse Q-learning from offline choices. It fits a
+neural Q-network and a continuation-value network, then reads the reward as
+r(s, a) = Q(s, a) minus beta times the expected next value. An anchor action with
+a known reward sets the absolute level (their Assumption 3).
+
+The paper's first simulation is the Rust bus-engine problem on 20 mileage states.
+Maintenance costs theta0 per mileage unit. Replacement costs theta1 and resets the
+mileage to one. The true values are theta0 = 1 and theta1 = 5, with discount 0.95.
+The reported quantity is the mean absolute percentage error of the recovered
+reward, measured on the state-action pairs the expert visits (their Table 2). Most
+of those samples sit at low mileage.
+
+The package runs two estimators on this design. The nested fixed point is the
+oracle, with the true linear form and known transitions. GLADIUS uses a two-layer
+network over mileage, no transitions, and the replacement action as the anchor.
+
+### Bus-engine reward MAPE (percent), 80/20 split, two draws per cell
+
+| Trajectories (H=100) | NFXP oracle | Paper Rust | GLADIUS | Paper GLADIUS |
+| --- | ---: | ---: | ---: | ---: |
+| 50 | 3.91 | 3.62 | 7.0 | 3.44 |
+| 250 | 0.97 | 1.37 | 4.2 | 0.84 |
+
+The nested fixed point reproduces the paper's oracle column to the precision the
+paper reports, with recovered costs near [1.0, 5.0]. This confirms the design and
+the metric.
+
+GLADIUS recovers the reward direction on the same data. The recovered maintenance
+cost rises about one unit per mileage step, as it should. The level is the weak
+point. The reward is a difference of two large value terms, so a small level error
+in Q shows up in the low-mileage reward, where the metric puts most of its weight.
+The package reward MAPE sits above the paper's GLADIUS column, and the gap grows
+with the sample size. The fitted-Q anchor target (the package default) pins the
+level far better than the literal bi-conjugate variant, which does not pin it.
+
+This reproduces the paper's oracle recovery and the GLADIUS reward direction. It is
+not yet a match to the paper's GLADIUS error. That would need the absolute level
+pinned as tightly as the oracle.
+
+Reproduce:
+
+```bash
+PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py --traj 250 --reps 2
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -280,5 +327,4 @@ both the estimates and the standard errors.
 | --- | --- | --- |
 | RHIP | Barnes et al. (2024) | Not yet evaluated. |
 | AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
-| GLADIUS | Kang-Yoganarasimhan-Jain (2025) | Not yet evaluated. |
 | UFXP | Oguz and Bray (2026) | Not yet evaluated. |

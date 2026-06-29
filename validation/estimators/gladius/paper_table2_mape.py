@@ -154,17 +154,25 @@ def fit_gladius(env, train_panel, *, max_epochs: int, batch_size: int) -> np.nda
         num_states=S, num_actions=A, discount_factor=base.discount_factor,
         scale_parameter=base.scale_parameter, state_dim=1, state_encoder=state_enc,
     )
+    # anchor_moment (the package default), NOT paper_minimax: anchor_moment uses a
+    # stop-gradient zeta target (r + beta*zeta - Q), a fitted-Q form that pins the
+    # absolute reward LEVEL via the beta-contraction. paper_minimax lets gradient
+    # flow through V(s'), giving a (1-beta)-weak level gradient, so the level sits
+    # at its init and the recovered reward is shifted (MAPE ~80-200). See the
+    # internal replication note for the diagnosis.
     cfg = GLADIUSConfig(
-        network_mode="shared_trunk",
-        anchor_bellman_mode="paper_minimax",
+        anchor_bellman_mode="anchor_moment",
         anchor_bellman_loss=True,
         anchor_action=REPLACE,                       # known r(s, replace) = -theta1
         anchor_rewards=tuple([-THETA1] * S),
         q_hidden_dim=10, q_num_layers=2,             # paper: MLP 2 x 10
         v_hidden_dim=10, v_num_layers=2,
         q_lr=1e-3, v_lr=1e-3, lr_decay_rate=5e-4,
-        batch_size=batch_size, max_epochs=max_epochs, patience=250,
+        batch_size=batch_size, max_epochs=max_epochs, patience=400,
         gradient_clip_mode="value",
+        # Predict Q directly (value_scale=1.0) from a zero bias; anchor_moment is
+        # init-robust and converges the absolute level via the fitted-Q contraction.
+        output_bias_init=0.0,
         compute_se=False, verbose=False,
     )
     est = GLADIUSEstimator(config=cfg)
@@ -173,7 +181,22 @@ def fit_gladius(env, train_panel, *, max_epochs: int, batch_size: int) -> np.nda
     return np.asarray(s.metadata["reward_table"], dtype=np.float64)
 
 
-def run_one(n_traj: int, seed: int, *, max_epochs: int, batch_size: int) -> dict:
+def fit_nfxp_oracle(env, train_panel, test_states, test_actions) -> float:
+    """Rust (1987) NFXP oracle: full-likelihood MLE with the true linear form and
+    known transitions (as the paper's 'Rust (Oracle)' baseline). Returns reward MAPE.
+    Validates the DGP + metric: this MAPE should track the paper's Rust column."""
+    from econirl.estimation.nfxp import NFXPEstimator
+    phi = np.asarray(env.feature_matrix)  # (S, A, K)
+    util = ActionDependentReward(jnp.asarray(env.feature_matrix), env.parameter_names)
+    summ = NFXPEstimator(compute_hessian=False).estimate(
+        panel=train_panel, utility=util, problem=env.problem_spec,
+        transitions=jnp.asarray(env.transition_matrices))
+    r_hat = phi @ np.asarray(summ.parameters)  # reward = theta_hat . phi, shape (S, A)
+    return mape_on_samples(r_hat, test_states, test_actions)
+
+
+def run_one(n_traj: int, seed: int, *, max_epochs: int, batch_size: int,
+            oracle: bool = True) -> dict:
     env = PaperBusEnvironment(seed=seed)
     panel = simulate_panel(env, n_individuals=n_traj, n_periods=100, seed=seed)
     trajs = list(panel.trajectories)
@@ -186,8 +209,10 @@ def run_one(n_traj: int, seed: int, *, max_epochs: int, batch_size: int) -> dict
     t0 = time.time()
     r_hat = fit_gladius(env, train, max_epochs=max_epochs, batch_size=batch_size)
     mape = mape_on_samples(r_hat, test_states, test_actions)
+    nfxp_mape = (fit_nfxp_oracle(env, train, test_states, test_actions)
+                 if oracle else None)
     return {
-        "n_traj": n_traj, "seed": seed, "mape": mape,
+        "n_traj": n_traj, "seed": seed, "mape": mape, "nfxp_oracle_mape": nfxp_mape,
         "r_hat_maintain": [round(float(r_hat[i, MAINTAIN]), 4) for i in range(10)],
         "seconds": round(time.time() - t0, 1),
     }
@@ -218,15 +243,20 @@ def main():
             rec = run_one(n_traj, seed, max_epochs=args.max_epochs, batch_size=args.batch_size)
             records.append(rec)
             mapes.append(rec["mape"])
-            print(f"[n_traj={n_traj:5d} seed={seed}] MAPE={rec['mape']:.3f}  "
-                  f"r_hat_maint[1:5]={rec['r_hat_maintain'][:5]}  ({rec['seconds']}s)")
+            nf = rec.get("nfxp_oracle_mape")
+            nf_str = f" NFXP-oracle={nf:.3f}" if nf is not None else ""
+            print(f"[n_traj={n_traj:5d} seed={seed}] GLADIUS MAPE={rec['mape']:.3f}"
+                  f"{nf_str}  r_hat_maint[1:5]={rec['r_hat_maintain'][:5]} ({rec['seconds']}s)")
         mean_mape = float(np.mean(mapes))
+        nfm = [r["nfxp_oracle_mape"] for r in records
+               if r["n_traj"] == n_traj and r.get("nfxp_oracle_mape") is not None]
+        nfxp_str = f" | NFXP-oracle {np.mean(nfm):.3f} (paper Rust {PAPER_RUST.get(n_traj)})" if nfm else ""
         paper = PAPER_GLADIUS.get(n_traj)
         if paper is not None:
-            print(f"  -> n_traj={n_traj}: package MAPE {mean_mape:.3f}  "
-                  f"| paper GLADIUS {paper}  (ratio {mean_mape/paper:.1f}x)")
+            print(f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f} "
+                  f"(paper {paper}, {mean_mape/paper:.1f}x){nfxp_str}")
         else:
-            print(f"  -> n_traj={n_traj}: package MAPE {mean_mape:.3f}")
+            print(f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f}{nfxp_str}")
 
     if args.out:
         args.out.write_text(json.dumps(
