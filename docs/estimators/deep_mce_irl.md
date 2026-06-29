@@ -22,6 +22,16 @@ this framework, noting that the occupancy-mismatch gradient flows through the
 reward matrix entry by entry and can be backpropagated through any
 differentiable reward network.
 
+## Theory Connections
+
+For the proof route behind this page, start with
+[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
+for the soft planning identity,
+[Identification and Anchors](../theory/identification.md) for why the reward
+matrix must be anchored, and
+[IRL Identification Boundaries](../theory/irl_boundaries.md) for why neural
+weights are not themselves the identified structural object.
+
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action,

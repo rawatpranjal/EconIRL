@@ -27,6 +27,15 @@ under stochastic ones. The causal form matches the logit dynamic-discrete-choice
 structure, which is why MCE-IRL is the reference entropy IRL route for these
 comparisons.
 
+## Theory Connections
+
+For the proof route behind this page, start with
+[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
+for the maximum-causal-entropy and logit-DDC equivalence,
+[Identification and Anchors](../theory/identification.md) for reward
+normalization, and [IRL Identification Boundaries](../theory/irl_boundaries.md)
+for what feature matching can and cannot identify.
+
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action,

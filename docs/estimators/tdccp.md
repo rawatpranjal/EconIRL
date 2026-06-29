@@ -25,6 +25,13 @@ procedure for valid inference. The CCP foundation is
 dynamic programming problem in terms of conditional choice probabilities and
 inverts the CCP mapping to recover structural parameters.
 
+## Theory Connections
+
+For the proof route behind this page, start with
+[Identification and Anchors](../theory/identification.md) for the normalization
+problem and [Classical DDC Estimators](../theory/classical_ddc.md) for how the
+CCP route replaces repeated Bellman solves with recursive continuation objects.
+
 ## Notation
 
 Throughout, $x$ indexes the discrete state and $a$ the discrete action,

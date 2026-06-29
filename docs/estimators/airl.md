@@ -20,6 +20,16 @@ The estimator follows {ref}`Fu, Luo, and Levine (2018) <fu-2018>`, which
 introduces the structured adversarial discriminator and proves the
 disentanglement result for state-only rewards in decomposable MDPs.
 
+## Theory Connections
+
+For the proof route behind this page, start with
+[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
+for the soft advantage identity,
+[Identification and Anchors](../theory/identification.md) for reward-shaping
+non-identification, and
+[IRL Identification Boundaries](../theory/irl_boundaries.md) for the exact
+state-only AIRL guarantee and its action-dependent boundary.
+
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action,

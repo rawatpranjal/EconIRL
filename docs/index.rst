@@ -41,6 +41,13 @@ the data you have, and the reward object you want to recover.
 `GLADIUS <estimators/gladius.html>`__ ·
 `IQ-Learn <estimators/iq_learn.html>`__
 
+Theory
+------
+
+See `Theory <theory/index.html>`__ for the proof map behind the core estimators:
+soft Bellman equivalence, reward identification, classical DDC inversion, IRL
+identification boundaries, and the GLADIUS empirical-risk objective.
+
 Replications
 ------------
 
@@ -83,6 +90,7 @@ Output
    estimators/other
    comparing_estimators
    user_guide/post_estimation
+   theory/index
    replications
    simulation_studies/index
    api/index

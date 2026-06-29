@@ -19,6 +19,16 @@ bus-engine replacement model and the nested fixed-point algorithm.
 constrained-optimization alternatives and motivate the polyalgorithm inner
 solver used in the package.
 
+## Theory Connections
+
+For the proof route behind this page, start with
+[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
+for the contraction and logit-choice identities,
+[Identification and Anchors](../theory/identification.md) for why action
+contrasts need a reward anchor, and
+[Classical DDC Estimators](../theory/classical_ddc.md) for the NFXP likelihood
+argument.
+
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed

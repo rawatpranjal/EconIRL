@@ -21,6 +21,13 @@ choice models. {ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>`
 introduce the nested pseudo-likelihood algorithm that iterates the Hotz-Miller step
 to approach full maximum likelihood efficiency.
 
+## Theory Connections
+
+For the proof route behind this page, start with
+[Identification and Anchors](../theory/identification.md) for the normalization
+problem and [Classical DDC Estimators](../theory/classical_ddc.md) for the
+Hotz-Miller inversion and nested pseudo-likelihood argument.
+
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed for
