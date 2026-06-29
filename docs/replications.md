@@ -225,10 +225,27 @@ near-maximum-likelihood precision. The mean-squared errors sit within Monte Carl
 noise of the paper, which reports 1000 draws. The nested fixed point reproduces the
 same Table B.1 numbers and serves as the oracle reference.
 
+With the locally robust correction (two-fold cross-fitting, columns 4 and 5 of
+Table B.1), the same estimator recovers the parameters at the same precision, across
+50 draws.
+
+### Bus-engine recovery, locally robust, 1000 buses, T = 30, 50 draws
+
+| Parameter | True | Package mean | Paper mean | Package SD | Paper SD |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| theta0 (intercept) | 2.0 | 2.0055 | 1.9778 | 0.1136 | 0.0870 |
+| theta1 (mileage) | -0.15 | -0.1502 | -0.1489 | 0.0045 | 0.0034 |
+| theta2 (type) | 1.0 | 1.0010 | 1.0032 | 0.0739 | 0.0584 |
+
+The paper notes the two versions differ little in practice, with slightly higher
+variance for the locally robust one from the sample splitting. The package shows the
+same pattern.
+
 Reproduce:
 
 ```bash
-PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 200 --skip-lr
+# columns 2-3 (not locally robust) and 4-5 (locally robust):
+PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 200 --lr-reps 50
 ```
 
 ## NNES (Nguyen, 2025)
