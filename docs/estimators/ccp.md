@@ -60,7 +60,7 @@ $E[\varepsilon_a \mid a = \operatorname{argmax}_b] = \sigma(\gamma - \log \hat\p
 This is $\sigma \cdot e_{\hat\pi}(s,a)$ in scaled units. The implementation
 stores $e_{\hat\pi}$ in utility units and applies the $\sigma$ factor only when
 computing the logit probabilities via $\exp(\tilde Q / \sigma)$. The two
-conventions coincide at $\sigma = 1$, the scale used in the validation cell.
+conventions coincide at $\sigma = 1$, the scale used in the reported study.
 See Rust (1994) or Hotz and Miller (1993) Lemma 1.
 
 The integrated Bellman equation under $\hat\pi$ is:
@@ -223,6 +223,38 @@ pseudo-likelihood. It is not the score used for standard errors. Those come from
 Hessian of the full structural log-likelihood, re-solving the Bellman equation at each
 perturbation. That matches the NFXP convention and avoids the rank deficiency of the
 pseudo-likelihood Hessian.
+
+## System View
+
+CCP keeps the structural target from NFXP but changes where the computation
+happens. Instead of solving a new dynamic program for every trial parameter, it
+first reads the policy from observed choice frequencies and uses that policy to
+build a one-shot continuation-value correction.
+
+```text
+Observed panel: state, action, next state
+Reward features, transition model, discount factor
+        |
+        v
+Estimate first-stage choice probabilities by state
+        |
+        v
+Invert the policy into continuation-value terms
+        |
+        v
+Fit a logit pseudo-likelihood for theta
+        |
+        +---- stop after one Hotz-Miller step
+        |
+        +---- or update the policy and iterate as NPL
+        |
+        v
+Recovered reward parameters and implied policy
+```
+
+The key tradeoff is support. CCP is fast when every relevant state-action cell
+is observed often enough. Thin cells make the first-stage policy noisy, and the
+inversion turns that noise into reward noise.
 
 ## Algorithm
 

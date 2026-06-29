@@ -15,8 +15,10 @@ Install
 Estimators
 ----------
 
-Start with `Choosing an Estimator <estimators/landscape.html>`__, then open the
-estimator that matches your decision problem.
+Start with `Choosing an Estimator <estimators/landscape.html>`__, or use
+`Comparing Core Estimators <comparing_estimators.html>`__ for a focused
+comparison of core estimator variants, reward targets, transitions, and
+identification strategies.
 
 `NFXP <estimators/nfxp.html>`__ ·
 `CCP <estimators/ccp.html>`__ ·
@@ -71,6 +73,7 @@ Output
    user_guide/your_own_data
    estimators/core
    estimators/other
+   comparing_estimators
    user_guide/post_estimation
    replications
    simulation_studies/index

@@ -17,12 +17,11 @@ For how to choose among them, including the side-by-side table, see
 | [TD-CCP](tdccp.md) | Structural | Reward parameters without modeling the transition density. |
 | [MCE-IRL](mce_irl.md) | IRL | Maximum causal entropy reward-feature matching. |
 | [Neural MCE-IRL](deep_mce_irl.md) | IRL | Unrestricted neural reward map under the MCE objective. |
-| [AIRL](airl.md) | IRL | AIRL-1: adversarial transferable state-only reward. |
-| [AIRL-Het](airl_het.md) | IRL | AIRL-2: segment-specific rewards under an anchor. |
+| [AIRL](airl.md) | IRL | Adversarial state-only reward recovery under the original AIRL transfer assumptions. |
+| [AIRL-Het](airl_het.md) | IRL | Segment-specific action-dependent rewards under exit and absorbing-state anchors. |
 | [GLADIUS](gladius.md) | IRL | Neural Q and continuation reward recovery at scale. |
 
-GLADIUS is the package's neural estimator. The `GLADIUS` class is the
-`NeuralGLADIUS` implementation, so the two names refer to the same estimator.
+GLADIUS is the core neural Q and continuation estimator.
 
 ```{toctree}
 :maxdepth: 1

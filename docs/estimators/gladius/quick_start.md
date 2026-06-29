@@ -2,8 +2,7 @@
 
 ## Sklearn-Style API
 
-`GLADIUS` is the public alias for `NeuralGLADIUS`, which accepts a pandas
-DataFrame directly.
+`GLADIUS` accepts a pandas DataFrame directly.
 
 ```python
 from econirl import GLADIUS

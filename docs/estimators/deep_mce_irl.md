@@ -246,6 +246,36 @@ robust from any start but converges more slowly near the solution. The outer
 optimizer is AdamW with a global gradient-norm clip of 1.0, implemented via
 Equinox and Optax.
 
+## System View
+
+Neural MCE-IRL keeps the MCE-IRL training logic but replaces the linear reward
+basis with a neural reward map. The policy is still produced by a soft dynamic
+program, so the transition model remains part of the estimator.
+
+```text
+Expert demonstrations
+Known transition model, state/action encodings, discount factor
+        |
+        v
+Neural network proposes a reward map
+        |
+        v
+Solve the soft dynamic program under that map
+        |
+        v
+Compare model occupancy to expert occupancy
+        |
+        v
+Backpropagate the occupancy mismatch into the reward network
+        |
+        v
+Anchored reward matrix and induced policy
+```
+
+The fitted object is the anchored reward matrix on the state-action grid. Many
+network weights can represent the same matrix, so the weights themselves are not
+the thing to interpret.
+
 ## Applicability
 
 | Applicable when | Prefer an alternative when |

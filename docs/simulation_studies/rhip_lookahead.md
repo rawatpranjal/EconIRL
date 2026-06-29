@@ -1,7 +1,3 @@
----
-orphan: true
----
-
 # RHIP recovers the demonstrator's planning horizon
 
 A traveller moves through a road network one step at a time, choosing among the
@@ -35,7 +31,7 @@ mis-set is the horizon.
 Nodes are scattered uniformly in the unit square. Edges connect pairs within a
 fixed radius, with a spanning tree overlaid for connectivity. Demonstrations are
 drawn from the finite-lookahead policy at the true reward. Each demonstrator draws
-300 agents over 40 periods, 3
+300 agents over 40 periods, 10
 replications, on a 25-node graph.
 
 The finite-lookahead demonstrators are genuinely between the two endpoints.
@@ -49,9 +45,9 @@ in each row is in bold.
 
 | Demonstrator | $H=0$ | $H=1$ | $H=2$ | $H=3$ | $H=5$ | $H=\infty$ |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| lookahead $h=1$ | 0.0352 | **0.0113** | 0.0282 | 0.0365 | 0.0482 | 0.0601 |
-| lookahead $h=2$ | 0.0569 | 0.0340 | **0.0156** | 0.0182 | 0.0287 | 0.0419 |
-| lookahead $h=3$ | 0.0678 | 0.0404 | 0.0206 | **0.0116** | 0.0161 | 0.0309 |
+| lookahead $h=1$ | 0.0330 | **0.0114** | 0.0281 | 0.0362 | 0.0473 | 0.0602 |
+| lookahead $h=2$ | 0.0517 | 0.0304 | **0.0128** | 0.0179 | 0.0283 | 0.0422 |
+| lookahead $h=3$ | 0.0624 | 0.0401 | 0.0210 | **0.0130** | 0.0174 | 0.0314 |
 
 The recovery-optimal estimator horizon is interior and tracks the demonstrator's lookahead exactly: $h=1 \to H=1$, $h=2 \to H=2$, $h=3 \to H=3$. In every case both endpoints, the myopic $H=0$ and the fully stochastic $H=\infty$, are worse. Neither classic method dominates. The matching horizon recovers the behavior, and the optimal horizon moves with the demonstrator.
 
@@ -69,4 +65,4 @@ python scripts/study_rhip_lookahead.py            # run + write JSON + page + fi
 python scripts/study_rhip_lookahead.py --page      # re-render from the saved JSON
 ```
 
-Raw facts: `validation/results/study_rhip_lookahead.json`.
+Results file: `validation/results/study_rhip_lookahead.json`.

@@ -27,7 +27,10 @@ $$
 
 and the panel simulates $N$ buses for $T$ periods from $\pi^*$. The figure shows the sawtooth mileage paths (rising drift, replacement resets) and the declining value of holding higher mileage. Every estimator below sees the same panels.
 
-Harold Zurcher's bus-engine replacement problem (Rust 1987): a binary keep-or-replace choice over a discretized mileage state, with linear operating and replacement costs. `RustBusEnvironment(num_mileage_bins=20, operating_cost=0.01, replacement_cost=2.0, discount_factor=0.95)`. 500 x 80 observations, 3 replications, seed 42. True theta `[0.01, 2.0]`. Design rank 2/2, condition number 1.11e+01, action-contrast rank 2/2 (the rank that identification from choices actually uses). Generated 2026-06-12 with econirl 0.0.4.
+The study uses 20 mileage bins, 500 buses, 80 periods, and 3 replications.
+The true parameters are $[0.01,\;2.0]$. The action-contrast feature matrix
+has full rank, so the operating-cost and replacement-cost parameters are both
+identified from choices.
 
 ![Simulated trajectories and the optimal value function for Bus engine (20 mileage bins)](../_static/simulation_studies/rust_bus_dgp.png)
 
@@ -87,6 +90,8 @@ python scripts/sim_rust_bus.py --page          # regenerate this page
 python scripts/sim_rust_bus.py --verify        # re-derive the table from JSON
 ```
 
-Raw facts: `validation/results/sim_rust_bus.json`.
+Results file: `validation/results/sim_rust_bus.json`.
 
-Not shown on this page: MPEC, NNES, SEES, UFXP (Other-tier structural estimators; this study shows the core structural family (NFXP, CCP, TD-CCP). They ran and their records remain in the results file); AIRL, Deep-MCE-IRL (core IRL methods shown on the gridworld study, whose deterministic state-only reward suits them); MaxEnt-IRL, IQ-Learn (trajectory MaxEnt and inverse soft-Q; not part of the core roster); AIRL-Het / AAIRL (designed for latent-type heterogeneity; this panel has one agent type); MMP, GAIL (too slow for this page's per-fit budget); GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code, not benchmarked); MaxMargin-IRL (its unit-norm reward direction has no link to the choice model's noise scale, so it is not a like-for-like baseline on this problem; it ran 3/3 and its raw records remain in the results file); f-IRL, BC (they recover a tabular reward and a choice-probability table, objects in a different parameterization; their raw records remain in the results file).
+The page focuses on the core structural family and two reward-recovery
+comparators. Gridworld carries the state-only IRL comparison. Content
+consumption carries the heterogeneous AIRL comparison.

@@ -17,3 +17,7 @@ The estimators are organized into two sections:
 
 For the reasoning behind the split and a side-by-side decision table, see
 [Choosing an Estimator](estimators/landscape.md).
+
+For a focused comparison of core estimator variants, reward targets,
+transitions, and identification strategies, see
+[Comparing Core Estimators](comparing_estimators.md).

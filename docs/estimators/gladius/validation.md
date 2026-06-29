@@ -32,7 +32,7 @@ GLADIUS is compared against the full structural and IRL rosters on the
 [bus engine](../../simulation_studies/rust_bus.md),
 [taxi gridworld](../../simulation_studies/taxi_gridworld.md), and
 [direct optimization](../../simulation_studies/direct_optimization.md) pages.
-The NeuralGLADIUS variant also appears on the
+GLADIUS also appears on the
 [route choice](../../simulation_studies/route_choice.md),
 [stockpiling](../../simulation_studies/stockpiling.md), and
 [fleet maintenance](../../simulation_studies/fleet_maintenance.md) pages. See

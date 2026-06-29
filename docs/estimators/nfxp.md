@@ -173,6 +173,36 @@ where $P_\pi = \sum_a \operatorname{diag}_s(\pi_\theta(a \mid s))\, P_a \in \mat
 is the policy-weighted transition matrix, with $\operatorname{diag}_s(\pi_\theta(a \mid s))$
 denoting the $S \times S$ diagonal matrix whose $(s,s)$ entry is $\pi_\theta(a \mid s)$.
 
+## System View
+
+NFXP is easiest to read as two nested questions. The outside question asks which
+reward parameters make the observed choices most likely. The inside question
+asks how a forward-looking agent would behave if those parameters were true.
+
+```text
+Observed panel: state, action, next state
+Reward features, transition model, discount factor
+        |
+        v
+Try one candidate reward parameter theta
+        |
+        v
+Solve the agent's dynamic program
+        |
+        v
+Convert values into logit choice probabilities
+        |
+        v
+Score the observed actions under those probabilities
+        |
+        v
+Update theta and repeat until the likelihood is maximized
+```
+
+Use NFXP when that inside solve is affordable. Its advantage is clarity: the
+estimated reward, value function, policy, and counterfactuals all come from the
+same fully specified dynamic choice model.
+
 ## Algorithm
 
 ```text

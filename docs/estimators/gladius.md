@@ -213,15 +213,13 @@ the same form). Setting `anchor_bellman_mode="paper_minimax"` retains the
 literal Eq. 12 objective. The two modes differ in sign and structure: the
 paper_minimax mode subtracts the variance correction $\beta^2(V_Q(s')-\zeta)^2$
 from the squared TD error, whereas the anchor_moment mode treats
-$Q - r_{\text{anch}} - \beta\zeta$ as a direct residual
-(see Kang et al. 2025, Eq. 12 vs. package implementation notes).
+$Q - r_{\text{anch}} - \beta\zeta$ as a direct residual.
 
 In the paper, $\zeta(s, a) = \mathbb{E}[V_Q(s') \mid s, a]$ is the
 closed-form conditional expectation that solves the inner maximisation in
 Theorem 5. It is an analytic object, not a separate network. The package
 approximates this conditional expectation with a neural network $\zeta_\xi$
-trained by MSE regression (the bi-conjugate EV representation of the internal
-docs):
+trained by MSE regression:
 
 $$
 L_\zeta = \mathbb{E}\!\left[
@@ -312,6 +310,36 @@ minimax term from the paper rather than the continuation-moment anchor. It is
 available for comparison and is not the default.
 Setting `alternating_updates=False` updates both networks jointly in each
 step, which is the legacy behavior.
+
+## System View
+
+GLADIUS replaces repeated tabular dynamic-programming solves with learned Q and
+continuation objects. After those objects are trained, it reads reward
+information from action differences.
+
+```text
+Offline panel: state, action, next state
+State/action features, discount factor, anchor action
+        |
+        v
+Train Q network to fit observed choices
+        |
+        v
+Train continuation network to predict next-state soft value
+        |
+        v
+Use the anchor action to pin the Q level
+        |
+        v
+Compute implied reward from Q minus discounted continuation
+        |
+        v
+Project action contrasts onto structural reward features
+```
+
+The most defensible structural object is the projected action contrast. Raw
+Bellman reward levels are weaker unless the paper-style anchor conditions are
+met well in the data.
 
 ## Applicability
 
@@ -413,8 +441,8 @@ GLADIUS recovers the imitation policy and the action-contrast reward well, but n
 the absolute reward and value that counterfactual re-solving needs. The small
 regret figures alone do not establish structural counterfactual validity.
 
-For cross-estimator behavioral comparisons, including NeuralGLADIUS alongside
-the structural and IRL rosters, see the
+For cross-estimator behavioral comparisons, including GLADIUS alongside the
+structural and IRL rosters, see the
 [fleet maintenance simulation study](../simulation_studies/fleet_maintenance.md).
 
 ## References

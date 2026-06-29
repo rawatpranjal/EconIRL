@@ -44,13 +44,13 @@ estimates the reward parameters without modeling the transition density at all.
 **The reward form is unknown.** NFXP assumes the payoff is linear in known features.
 When the reward must be learned from demonstrations, the problem becomes inverse
 reinforcement learning: [MCE-IRL](mce_irl.md), [Neural MCE-IRL](deep_mce_irl.md)
-for an unrestricted reward map, [AIRL](airl.md) for a transferable state-only
-reward, and [GLADIUS](gladius.md) for neural reward recovery in high-dimensional
-states.
+for an unrestricted reward map, [AIRL](airl.md) for transferable state-only
+reward, [AIRL-Het](airl_het.md) for anchored latent heterogeneity, and
+[GLADIUS](gladius.md) for neural reward recovery in high-dimensional states.
 
 **The agents are not homogeneous.** The canonical case is one representative agent.
 Latent types with different preferences motivate [AIRL-Het](airl_het.md), which
-recovers segment-specific rewards under an anchor.
+recovers segment-specific rewards under exit and absorbing-state anchors.
 
 **The agent is not an optimal infinite-horizon planner.** Real demonstrators may
 plan to a finite depth. [RHIP](rhip.md) makes the planning horizon a parameter and
@@ -78,12 +78,11 @@ Use this table to narrow the choice before opening a method page.
 | [TD-CCP](tdccp.md) | Transition-density modeling is hard but the reward has known finite features. | Panel trajectories with current and next state-action information; transition environment still needed for post-fit counterfactuals. | Finite linear structural reward. | Encoded or higher-dimensional discrete states. | State space is small enough for tabular likelihood methods, support is sparse, or the target is a neural reward map. | Encoded-state finite-theta hard case with locally robust standard errors. |
 | [MCE-IRL](mce_irl.md) | Demonstrations should be explained by maximum causal entropy feature matching. | Demonstrations from a discrete dynamic decision problem; transitions known or supplied. | Supplied finite reward features. | Tabular state-action spaces. | You need likelihood-based structural standard errors or reward features are unknown. | Synthetic supplied-feature simulations. |
 | [Neural MCE-IRL](deep_mce_irl.md) | Demonstrations should be explained by an unrestricted neural reward under the maximum causal entropy objective. | Demonstrations from a discrete dynamic decision problem; transitions known or supplied. | Neural reward map. | Tabular or encoded state-action spaces. | You need finite structural parameters with standard errors, or supplied reward features are enough. | Synthetic neural-reward recovery simulation. |
-| [AIRL](airl.md) | AIRL-1: adversarial recovery under the original state-only AIRL assumptions is the research object. | Demonstrations from a discrete dynamic decision problem; transitions available for validation or post-fit evaluation. | State-only reward with shaping term under a fixed normalization. | Discrete dynamic decision settings. | Reward is action-dependent, an absorbing-state normalization is central, or structural action-dependent recovery is required. | Synthetic state-only AIRL simulation. |
-| [AIRL-Het](airl_het.md) | AIRL-2: latent segments have different dynamic preferences and segment-specific counterfactuals matter. | Repeated user trajectories; credible anchor action and absorbing-state normalization. | Segment-specific action-dependent reward. | Encoded discrete dynamic choice settings. | Segment membership is weakly identified, no credible reward anchor exists, or a homogeneous estimator is enough. | Synthetic serialized-content simulation. |
+| [AIRL](airl.md) | Adversarial recovery under the original state-only AIRL assumptions is the research object. | Demonstrations from a discrete dynamic decision problem; transitions available for validation or post-fit evaluation. | State-only reward with shaping term under a fixed normalization. | Discrete dynamic decision settings. | Reward is action-dependent, an absorbing-state normalization is central, or structural action-dependent recovery is required. | Synthetic state-only AIRL simulation. |
+| [AIRL-Het](airl_het.md) | Latent segments have different dynamic preferences and segment-specific counterfactuals matter. | Repeated user trajectories; credible exit-action and absorbing-state anchors. | Segment-specific action-dependent reward. | Encoded discrete dynamic choice settings. | Segment membership is weakly identified, no credible reward anchor exists, or a homogeneous estimator is enough. | Synthetic serialized-content simulation. |
 | [GLADIUS](gladius.md) | You want neural Q and continuation modeling with anchor-moment reward recovery. | Dynamic discrete choices; known transitions; credible anchor action with known rewards. | Neural reward recovered from neural Q/continuation objects. | High-dimensional encoded state features. | No credible anchor action exists or you need tabular structural estimation. | Preview: projected reward diagnostics. |
 
-GLADIUS is the package's neural estimator. The `GLADIUS` class is the
-`NeuralGLADIUS` implementation, so the two names refer to the same estimator.
+GLADIUS is the core neural Q and continuation estimator.
 
 ## Other estimators side by side
 

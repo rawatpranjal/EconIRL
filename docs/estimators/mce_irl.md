@@ -257,6 +257,36 @@ $\mu_E - \mu_\theta = 0$ without maximizing the log likelihood. A gradient-desce
 path (`optimizer="gradient"`) is also available, using Adam or plain SGD as
 the outer update.
 
+## System View
+
+MCE-IRL starts from demonstrations rather than a structural likelihood. It asks
+which reward makes a soft-optimal agent visit the same state-action features as
+the expert.
+
+```text
+Expert demonstrations
+Known transition model, reward features, discount factor
+        |
+        v
+Compute expert feature moments from observed behavior
+        |
+        v
+Try one candidate reward parameter theta
+        |
+        v
+Solve the soft dynamic program under that reward
+        |
+        v
+Compute the model's feature moments
+        |
+        v
+Update theta until model moments match expert moments
+```
+
+The reward is identified only inside the supplied feature span and
+normalization. If the features omit the real action contrast, the estimator can
+fit behavior without recovering the intended reward.
+
 ## Applicability
 
 | Applicable when | Prefer an alternative when |

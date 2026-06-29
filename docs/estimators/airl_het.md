@@ -215,6 +215,36 @@ Initialization defaults to `initialization="random"`; the
 inverts the anchored soft policy into a starting reward, and typically reduces
 the number of EM iterations required.
 
+## System View
+
+AIRL-Het adds a segment layer to anchored adversarial reward recovery. Each
+person or trajectory receives a persistent segment probability, and each
+segment gets its own reward and policy.
+
+```text
+Trajectories grouped by person
+Exit action, absorbing state, transition model, discount factor
+        |
+        v
+Initialize segment shares and trajectory memberships
+        |
+        v
+For each segment, run anchored AIRL with the two reward anchors
+        |
+        v
+Update which segment each trajectory most likely belongs to
+        |
+        v
+Repeat until memberships and segment policies stabilize
+        |
+        v
+Segment-specific rewards, policies, shares, and assignments
+```
+
+The latent segment is a person-level or trajectory-level type. It is not a new
+random draw at each decision. That distinction matters for reading the recovered
+segments and their counterfactual policies.
+
 ## Applicability
 
 | Applicable when | Prefer an alternative when |

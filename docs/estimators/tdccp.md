@@ -259,6 +259,35 @@ iteratively; it
 is more flexible for high-dimensional state spaces and does not use
 cross-fitting or locally robust standard errors in the current implementation.
 
+## System View
+
+TD-CCP keeps the finite reward-parameter target but avoids estimating a full
+transition density during parameter estimation. It does this by learning the
+recursive continuation terms directly from observed successor state-action
+pairs.
+
+```text
+Observed tuples: current action/state and next action/state
+Reward features, first-stage choice probabilities, discount factor
+        |
+        v
+Estimate continuation accumulators from successor pairs
+        |
+        v
+Build a CCP pseudo-likelihood using those accumulators
+        |
+        v
+Estimate finite reward parameters theta
+        |
+        v
+Use a post-fit transition environment for policy, value,
+and counterfactual evaluation
+```
+
+"Transition-density-free" describes the estimation step. It does not remove the
+economics of transitions, and it does not make counterfactuals possible without
+an environment to re-solve.
+
 ## Applicability
 
 | Applicable when | Prefer an alternative when |
