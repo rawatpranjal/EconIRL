@@ -173,6 +173,18 @@ class TDCCPConfig:
     epochs_per_avi: int = 30
     learning_rate: float = 1e-3
     batch_size: int = 8192
+    avi_functional_class: Literal["neural", "gbm"] = "neural"
+    """For ``method="neural"`` (approximate value iteration): the function class
+    for the h and g approximators. ``"neural"`` trains MLPs (the existing path).
+    ``"gbm"`` fits a fresh gradient-boosting regressor each AVI iteration, which is
+    the paper's any-ML AVI (eq 3.2 is an argmin per iteration, so any sklearn-style
+    regressor works). Uses ``avi_regressor`` if supplied, else sklearn
+    HistGradientBoostingRegressor."""
+    avi_regressor: Any = None
+    """Optional zero-argument callable returning a fresh sklearn-style regressor
+    (``fit``/``predict``), used when ``avi_functional_class="gbm"``. Lets any ML
+    method drive AVI (e.g. ``lambda: lightgbm.LGBMRegressor(...)``,
+    RandomForestRegressor, Lasso). ``None`` uses HistGradientBoostingRegressor."""
 
     # --- CCP estimation ---
     ccp_method: Literal["frequency", "logit"] = "frequency"
@@ -912,6 +924,15 @@ class TDCCPEstimator(BaseEstimator):
             for s, a in zip(next_states, next_actions)
         ])  # (N,)
 
+        # Any-ML AVI: a gradient-boosting (or any sklearn) regressor in place of the
+        # neural function class. The AVI recursion is identical; only the per-round
+        # approximator changes (the paper's eq 3.2 admits any ML method).
+        if cfg.avi_functional_class == "gbm":
+            return self._avi_solve_gbm(
+                feat_ax, feat_ax_next, z_values, e_next, gamma, problem,
+                num_features, num_states, num_actions,
+            )
+
         # -----------------------------------------------------------------
         # Train one network per component of h, plus one for g.
         # -----------------------------------------------------------------
@@ -1085,6 +1106,107 @@ class TDCCPEstimator(BaseEstimator):
                         break
 
         return net, losses
+
+    def _avi_regressor_factory(self):
+        """Return a zero-argument callable producing a fresh AVI regressor.
+
+        Uses the user-supplied ``avi_regressor`` when given (any ML method:
+        LightGBM, random forest, LASSO, ...), else sklearn's
+        HistGradientBoostingRegressor (a gradient-boosting backend that needs no
+        extra dependency).
+        """
+        if self._config.avi_regressor is not None:
+            return self._config.avi_regressor
+        try:
+            from sklearn.ensemble import HistGradientBoostingRegressor
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            raise ImportError(
+                "avi_functional_class='gbm' needs scikit-learn "
+                "(HistGradientBoostingRegressor) or a custom avi_regressor. "
+                "Install scikit-learn or pass config.avi_regressor."
+            ) from exc
+        return lambda: HistGradientBoostingRegressor(
+            max_iter=200, learning_rate=0.1, max_depth=3, l2_regularization=1.0,
+        )
+
+    def _avi_solve_gbm(
+        self, feat_ax, feat_ax_next, z_values, e_next, gamma, problem,
+        num_features, num_states, num_actions,
+    ):
+        """Approximate value iteration with a gradient-boosting (any-ML) class.
+
+        Mirrors ``_neural_avi_solve`` but the per-round approximator is any
+        sklearn-style regressor (the paper's eq 3.2 is an argmin per iteration, so
+        the function class is free). Returns the same (h_table, g_table,
+        loss_histories) contract.
+        """
+        make_regressor = self._avi_regressor_factory()
+        X = np.asarray(feat_ax, dtype=np.float64)
+        X_next = np.asarray(feat_ax_next, dtype=np.float64)
+        loss_histories: dict[str, list[float]] = {}
+
+        h_table = np.zeros((num_states, num_actions, num_features), dtype=np.float64)
+        g_table = np.zeros((num_states, num_actions), dtype=np.float64)
+
+        feat_sa_by_action = []
+        for a in range(num_actions):
+            all_s = np.arange(num_states)
+            all_a = np.full(num_states, a, dtype=np.int32)
+            feat_sa_by_action.append(
+                np.asarray(self._build_action_state_features(all_a, all_s, problem),
+                           dtype=np.float64)
+            )
+
+        for j in range(num_features):
+            self._log(f"Training h component {j} via {('custom' if self._config.avi_regressor else 'GBM')} AVI")
+            init_value = float(np.mean(z_values[:, j])) / (1.0 - gamma)
+            reg, losses = self._train_single_avi_gbm(
+                X, X_next, np.asarray(z_values[:, j], dtype=np.float64),
+                init_value, gamma, make_regressor,
+            )
+            loss_histories[f"h_{j}"] = losses
+            for a in range(num_actions):
+                h_table[:, a, j] = reg.predict(feat_sa_by_action[a])
+
+        self._log("Training g via GBM AVI")
+        g_init = gamma * float(np.mean(e_next)) / (1.0 - gamma)
+        g_reg, g_losses = self._train_single_avi_gbm(
+            X, X_next, np.asarray(gamma * e_next, dtype=np.float64),
+            g_init, gamma, make_regressor,
+        )
+        loss_histories["g"] = g_losses
+        for a in range(num_actions):
+            g_table[:, a] = g_reg.predict(feat_sa_by_action[a])
+
+        return h_table, g_table, loss_histories
+
+    def _train_single_avi_gbm(self, X, X_next, reward, init_value, gamma, make_regressor):
+        """One h/g component via AVI with a generic regressor.
+
+        Each iteration fits a FRESH regressor to ``reward + beta * f_prev(X_next)``
+        (the paper's eq 3.2 argmin), with the footnote-9 relative-change early stop.
+        ``f_0`` is the constant ``init_value`` (the paper's AVI initialization).
+        """
+        cfg = self._config
+        preds_next = np.full(X_next.shape[0], init_value, dtype=np.float64)  # f_0(X')
+        reg = None
+        prev_preds = None
+        losses: list[float] = []
+        for it in range(cfg.avi_iterations):
+            targets = reward + gamma * preds_next
+            reg = make_regressor()
+            reg.fit(X, targets)
+            fit_pred = reg.predict(X)
+            losses.append(float(np.mean((fit_pred - targets) ** 2)))
+            preds_next = reg.predict(X_next)
+            if cfg.avi_early_stop_tol > 0 and prev_preds is not None:
+                change = float(np.mean((fit_pred - prev_preds) ** 2))
+                var = float(np.var(prev_preds))
+                if var > 1e-12 and change / var < cfg.avi_early_stop_tol:
+                    self._log(f"  GBM AVI early stop at iter {it + 1}")
+                    break
+            prev_preds = fit_pred
+        return reg, losses
 
     # ==================================================================
     # Step 4: Pseudo-log-likelihood and partial MLE
