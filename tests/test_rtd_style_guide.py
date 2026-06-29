@@ -392,6 +392,7 @@ def test_references_page_is_in_public_navigation() -> None:
 
     assert "   references\n" in index
     assert references.startswith("# References\n")
+    assert "A Lecture Note on Offline RL and IRL" in references
     assert missing_ids == []
 
 

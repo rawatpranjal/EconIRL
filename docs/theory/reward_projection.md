@@ -11,8 +11,11 @@ reward contrasts must live in the span of the supplied features.
 
 ## Setup
 
-Let $a_0(s)$ be the reference or anchor action in state $s$. Suppose the reward
-model is linear:
+This page starts after the dynamic part of identification has been handled:
+$\beta$ is fixed, the relevant transition or continuation object is known or
+identified, and the previous pages have recovered reward contrasts on the
+covered state-action support. Let $a_0(s)$ be the reference or anchor action in
+state $s$. Suppose the reward model is linear:
 
 $$
 r_\theta(s,a)=\phi(s,a)^\top\theta.
@@ -137,6 +140,11 @@ $X^\top W X$ to obtain the displayed formula.
 best linear projection under the chosen weighting, not the literal primitive
 reward. This is why reward plots, action contrasts, and counterfactual checks
 matter even when a finite parameter is reported.
+
+For counterfactual work, the projection has to preserve the reward directions
+that the new policy or transition law will use. A projection that is accurate on
+frequent observed contrasts can still be fragile if the counterfactual puts mass
+on poorly approximated states or actions.
 
 ## Neural Rewards Are Function Objects First
 

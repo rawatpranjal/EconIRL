@@ -83,7 +83,9 @@ r(s,a)+\beta\mathbb{E}[V_Q(s')\mid s,a]-Q(s,a)
 $$
 
 The second term depends on $Q$. It is not a constant that can be ignored. This
-is the double-sampling problem in this setting.
+is the double-sampling problem in this setting. If transitions are deterministic
+conditional on $(s,a)$, the conditional variance is zero and this correction is
+unnecessary. The correction matters for the stochastic-transition case.
 
 ## Bias Correction
 
@@ -165,6 +167,13 @@ $$
 \widehat r(s,a)=\widehat Q(s,a)-\beta\widehat\zeta(s,a).
 $$
 
+The anchor-weighted corrected Bellman term identifies the state-wise level of
+$Q$. The $\zeta$ regression has a second role: it is fit over observed
+state-action pairs so that, at the solution,
+$\zeta(s,a)=\mathbb{E}[V_Q(s')\mid s,a]$. That all-pair conditional-mean object
+is what makes reward recovery transition-estimation-free for non-anchor actions
+as well as the anchor action.
+
 ## Why the Anchor Still Matters
 
 The likelihood part cannot see state-wise shifts in $Q$. The corrected Bellman
@@ -192,5 +201,9 @@ are easy. The proof uses complementary geometry:
 Under the stated realizability, conditioning, stability, and stepsize
 assumptions, the empirical optimization error decreases with iterations and the
 population excess risk decreases with sample size. The page should be read as a
-conditional guarantee: when the support and conditioning assumptions are weak,
-the simulation-study diagnostics are the place to look.
+conditional guarantee. In particular, the result relies on the network classes
+being able to represent the relevant $Q$ and $\zeta$ objects, empirical-output
+Jacobian lower bounds transferring output-space control to parameters, and
+PL-style descent/ascent geometry for the alternating updates. When support,
+conditioning, or realizability is weak, the simulation-study diagnostics are the
+place to look.

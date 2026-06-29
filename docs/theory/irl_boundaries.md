@@ -107,6 +107,13 @@ The restrictions are the point:
 condition in mind. The AIRL-Het page uses extra economic anchors instead of
 relying only on AIRL's original state-only decomposition.
 
+The stochastic-transition problem has two parts. First, the target advantage
+$Q^*(s,a)-V^*(s)$ does not depend on the realized next state $s'$, while the
+AIRL score $g(s)+\beta h(s')-h(s)$ generally does. Second, even if one replaces
+$h(s')$ by a conditional expectation, reward recovery still requires a
+completeness or normalization condition that rules out nonconstant shaping
+potentials.
+
 ## GAIL and Occupancy Matching
 
 GAIL minimizes a divergence between the generated and expert occupancy measures.
@@ -124,6 +131,22 @@ imitate behavior, but it does not impose the pointwise equation
 $$
 Q(s,a)=r(s,a)+\beta\mathbb{E}[V(s')\mid s,a].
 $$
+
+The limitation can be seen from the Bellman-flow identity. For normalized
+discounted occupancy $d^\pi$,
+
+$$
+\mathbb{E}_{d^\pi}\!\left[
+Q(s,a)-\beta\mathbb{E}[Q(s',a')\mid s,a]
+\right]
+=(1-\beta)\mathbb{E}[Q(s_0,a_0)].
+$$
+
+This is a weighted average over the states and actions visited by $\pi$. A
+weighted average Bellman residual can be zero while the pointwise residual is
+positive in one region and negative in another. Occupancy matching therefore
+controls where the policy goes; it does not by itself enforce the Bellman
+equation of a primitive reward.
 
 **Estimator consequence.** Occupancy matching is an imitation route. It needs
 additional structure before its discriminator can be read as a primitive reward.
@@ -154,6 +177,18 @@ $$
 which is the same potential-shaped ambiguity from the identification page. A
 regularizer can choose one representative from this class, but that choice is a
 penalty preference unless an identifying normalization is added.
+
+The key cancellation is in the objective. The return-gap part can be written as
+
+$$
+\mathbb{E}_{d^{\pi^*}}[r_Q(s,a)]
+-(1-\beta)\mathbb{E}[V_Q(s_0)].
+$$
+
+Under $Q_c(s,a)=Q(s,a)+c(s)$, the reward term changes by
+$(1-\beta)\mathbb{E}[c(s_0)]$ and the initial-value term changes by the same
+amount with the opposite sign. The policy-fit part is therefore invariant to
+state-only shifts; only the regularizer chooses a representative.
 
 **Estimator consequence.** IQ-Learn is useful as an inverse soft-Q diagnostic,
 but the public docs should not describe its regularized reward as a uniquely

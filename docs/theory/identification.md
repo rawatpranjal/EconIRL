@@ -8,6 +8,12 @@ Read this page before interpreting a recovered reward. Choice data identify
 relative action values first. Reward levels and some reward shapes require
 normalizations or restrictions.
 
+The arguments below take the transition kernel $P$ and discount factor $\beta$
+as known inputs. In empirical work, $P$ may be estimated in a first stage and
+then treated as known for the reward-recovery step. That is still a substantive
+rational-expectations assumption: the transition law used in the estimator must
+match the transition law the agent expects.
+
 ## What Behavior Identifies First
 
 The softmax policy satisfies
@@ -85,6 +91,19 @@ behavior can distinguish $r$ from $\tilde r$. This is why the estimator pages
 talk about reward normalizations, anchors, state-only restrictions, and
 counterfactual caveats.
 
+The caveat becomes operational under counterfactuals. The shaped reward above is
+observationally equivalent under the original transition law $P$. If a
+counterfactual changes the law to $\lambda(s'\mid s,a)$, the shaping correction
+becomes
+
+$$
+\Phi(s)-\beta\mathbb{E}_{\lambda}[\Phi(s')\mid s,a],
+$$
+
+which need not equal the correction under $P$. Two rewards that fit the same
+observed policy can therefore imply different policies after the transition law
+changes.
+
 ## Anchor-Action Identification
 
 The DDC route fixes the missing state-wise level by declaring one action's
@@ -150,6 +169,12 @@ $$
 
 That pins down the reward on the support where the policy and transition
 objects are known.
+
+The anchor is an identifying assumption, not something the choices prove. If the
+researcher supplies the wrong anchor payoff, the recovered reward will still be
+internally consistent with the observed policy and the supplied anchor, but it
+will not equal the primitive reward. Counterfactual predictions can then differ
+from the behavior that the true reward would imply.
 
 ## What Each Core Estimator Uses
 

@@ -11,8 +11,9 @@ package.
 ## Theory Surveys and Lecture Notes
 
 (kang-2026-lecture)=
-- Kang, E. H. (2026). "Dynamic Discrete Choice and Inverse Reinforcement
-  Learning." arXiv preprint arXiv:2605.30843.
+- Kang, E. H. (2026). "A Lecture Note on Offline RL and IRL: Part II:
+  Foundations of Inverse Reinforcement Learning and Dynamic Discrete Choice
+  Models." arXiv preprint arXiv:2605.30843.
 
 (rawat-rust-2026)=
 - Rawat, P., and Rust, J. (2026). "Dynamic Discrete Choice and Inverse

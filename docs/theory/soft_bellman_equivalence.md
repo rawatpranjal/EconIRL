@@ -12,6 +12,21 @@ observable policy equation is the same.
 
 ## Setup
 
+This page uses the unit convention: the Type-I extreme-value shock scale is one
+and the maximum-entropy temperature is one. With a general scale $\tau>0$, the
+same formulas become
+
+$$
+V_Q^\tau(s)=\tau\log\sum_a\exp(Q(s,a)/\tau),
+\qquad
+\pi_Q^\tau(a\mid s)=
+\frac{\exp(Q(s,a)/\tau)}{\sum_b\exp(Q(s,b)/\tau)}.
+$$
+
+The DDC and maximum-entropy formulations line up literally only when they use
+the same scale. In applications, the logit scale is a normalization: changing it
+rescales utility units unless some outside information fixes the scale.
+
 Let $Q$ be a bounded choice-specific value function and define
 
 $$
@@ -112,6 +127,12 @@ $$
 Thus entropy-regularized control produces exactly the soft value $V_Q$ and the
 softmax policy above.
 
+This is the causal-entropy version. The entropy term is policy randomness at
+each decision time, not randomness in the next state. Trajectory entropy and
+causal entropy coincide when transitions are deterministic. With stochastic
+transitions, trajectory entropy also rewards environmental randomness, so it is
+not the same object as the logit DDC shock.
+
 ## Type-I Extreme-Value Choice
 
 DDC starts with a different story. The agent observes
@@ -152,8 +173,11 @@ Q^*(s,a)
 $$
 
 If the shock mean is not normalized to zero, the Bellman equation is shifted by
-a constant. The softmax policy is unchanged because adding the same constant to
-all actions at a state does not affect action probabilities.
+a common constant. If the shock mean is $\mu_\epsilon$, the fixed point shifts
+by $\beta\mu_\epsilon/(1-\beta)$ relative to the mean-zero convention. The
+softmax policy is unchanged because adding the same constant to all actions at a
+state does not affect action probabilities. The clean equality with
+unit-temperature maximum-entropy IRL uses the mean-zero normalization.
 
 ## Equivalence Theorem
 
