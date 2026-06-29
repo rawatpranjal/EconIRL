@@ -248,6 +248,35 @@ Reproduce:
 PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 200 --lr-reps 50
 ```
 
+### High-dimensional state, robustness to irrelevant variables
+
+Temporal-difference estimation is built for high-dimensional state spaces.
+Following the paper's high-dimensional design, the bus state is augmented with K
+dummy variables drawn uniformly from minus ten to ten that affect neither the
+reward nor the transitions. The estimator should recover the structural parameters
+regardless of K. Each observation is treated as its own point in feature space, so
+the policy solve over an enumerable state set is skipped. The parameters and
+standard errors do not need it.
+
+| K dummy variables | theta0 | theta1 | theta2 |
+| --- | ---: | ---: | ---: |
+| 0 | 1.897 | -0.1472 | 1.034 |
+| 5 | 1.913 | -0.1465 | 1.021 |
+| 10 | 1.889 | -0.1481 | 1.050 |
+| 20 | 1.902 | -0.1465 | 1.032 |
+
+True values are theta0 = 2, theta1 = -0.15, theta2 = 1. Five draws per cell, 150
+buses over 30 periods. The estimates stay on the true values as K grows to twenty
+irrelevant dimensions, with the mileage coefficient holding at about -0.147
+throughout. Recovery rests on the dynamic continuation, not a static fit. Breaking
+the state-to-successor link sends the mileage coefficient to about -0.35.
+
+Reproduce:
+
+```bash
+PYTHONPATH=src python validation/estimators/tdccp/highdim_dummies.py --ks 0,5,10,20 --seeds 5
+```
+
 ## NNES (Nguyen, 2025)
 
 Nguyen proposes the neural-network efficient estimator (NNES) for structural
