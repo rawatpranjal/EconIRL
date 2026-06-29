@@ -38,7 +38,7 @@ References:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import equinox as eqx
@@ -46,6 +46,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.optimizer import minimize_lbfgsb
 from econirl.core.solvers import value_iteration
@@ -54,10 +55,10 @@ from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod, compute_numerical_hessian
 from econirl.preferences.base import UtilityFunction
 
-
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TDCCPConfig:
@@ -213,6 +214,12 @@ class TDCCPConfig:
     outer_tol: float = 1e-6
     theta_l2_penalty: float = 0.0
     compute_se: bool = True
+    compute_policy: bool = True
+    """Solve the model for the output policy and value after recovering theta.
+    Set ``False`` for continuous or high-dimensional state spaces, where the
+    relevant state set is not enumerable and the exact (A, S, S) Bellman solve is
+    infeasible. theta and its standard errors are still recovered; ``policy_`` and
+    ``value_`` are then ``None``. The parameter stage never needs the kernel."""
     verbose: bool = False
 
 
@@ -254,6 +261,7 @@ def make_state_action_tabular_utility(
 # Neural network for AVI method
 # ---------------------------------------------------------------------------
 
+
 class _EVComponentNetwork(eqx.Module):
     """MLP for approximating a single component of h(a,x) or g(a,x).
 
@@ -290,6 +298,7 @@ class _EVComponentNetwork(eqx.Module):
 # ---------------------------------------------------------------------------
 # Main estimator
 # ---------------------------------------------------------------------------
+
 
 class TDCCPEstimator(BaseEstimator):
     """TD-CCP Estimator implementing Adusumilli and Eckardt (2025).
@@ -387,7 +396,10 @@ class TDCCPEstimator(BaseEstimator):
         return ccps
 
     def _estimate_ccps_logit(
-        self, panel: Panel, num_states: int, num_actions: int,
+        self,
+        panel: Panel,
+        num_states: int,
+        num_actions: int,
         problem: DDCProblem | None = None,
     ) -> jnp.ndarray:
         """Logit CCP estimator with polynomial features.
@@ -425,7 +437,7 @@ class TDCCPEstimator(BaseEstimator):
                     blocks.append(np.power(feats, p))
                 return np.concatenate(blocks, axis=1)
             x_norm = np.asarray(state_idx, dtype=np.float64) / max(num_states - 1, 1)
-            return np.column_stack([x_norm ** p for p in range(degree + 1)])
+            return np.column_stack([x_norm**p for p in range(degree + 1)])
 
         X_poly = poly_design(all_states)
 
@@ -443,7 +455,10 @@ class TDCCPEstimator(BaseEstimator):
                 return -ll.sum()
 
             from econirl.core.optimizer import minimize_lbfgsb
-            result = minimize_lbfgsb(neg_ll_binary, jnp.zeros(X_poly.shape[1], dtype=jnp.float64), maxiter=200, tol=1e-6)
+
+            result = minimize_lbfgsb(
+                neg_ll_binary, jnp.zeros(X_poly.shape[1], dtype=jnp.float64), maxiter=200, tol=1e-6
+            )
             beta = np.asarray(result.x)
 
             # Predict P(a=1|s) for all states
@@ -468,7 +483,10 @@ class TDCCPEstimator(BaseEstimator):
                 return -ll.sum()
 
             from econirl.core.optimizer import minimize_lbfgsb
-            result = minimize_lbfgsb(neg_ll_multi, jnp.zeros(n_params, dtype=jnp.float64), maxiter=200, tol=1e-6)
+
+            result = minimize_lbfgsb(
+                neg_ll_multi, jnp.zeros(n_params, dtype=jnp.float64), maxiter=200, tol=1e-6
+            )
             beta = np.asarray(result.x).reshape(num_actions - 1, X_poly.shape[1])
 
             X_all = poly_design(np.arange(num_states))
@@ -600,7 +618,9 @@ class TDCCPEstimator(BaseEstimator):
 
         if cfg.basis_type == "encoded":
             if problem is not None and problem.state_encoder is not None:
-                state_feats = np.asarray(problem.state_encoder(jnp.asarray(states)), dtype=np.float64)
+                state_feats = np.asarray(
+                    problem.state_encoder(jnp.asarray(states)), dtype=np.float64
+                )
             else:
                 denom = max(num_states - 1, 1)
                 state_feats = (states.astype(np.float64) / denom)[:, None]
@@ -658,7 +678,7 @@ class TDCCPEstimator(BaseEstimator):
 
         phi = np.zeros((n, total_basis), dtype=np.float64)
         for a in range(num_actions):
-            mask = (actions == a)
+            mask = actions == a
             offset = a * n_basis_per_action
             for p in range(n_basis_per_action):
                 phi[mask, offset + p] = x_norm[mask] ** p
@@ -779,10 +799,9 @@ class TDCCPEstimator(BaseEstimator):
 
         safe_ccps = np.clip(np.array(ccps), 1e-10, 1.0)
         # beta * e(a',x') for each observed transition tuple.
-        e_vals = gamma * np.array([
-            EULER_MASCHERONI - np.log(safe_ccps[s, a])
-            for s, a in zip(next_states, next_actions)
-        ])
+        e_vals = gamma * np.array(
+            [EULER_MASCHERONI - np.log(safe_ccps[s, a]) for s, a in zip(next_states, next_actions)]
+        )
         b_g = (phi.T @ e_vals) / n_samples
         g_omega = A_inv @ b_g
 
@@ -910,27 +929,30 @@ class TDCCPEstimator(BaseEstimator):
         # Compute z_j(a,x) values for each transition tuple.
         # z(a,x) = feature_matrix[x, a, :] is the known utility feature vector.
         # -----------------------------------------------------------------
-        z_values = np.array([
-            feature_matrix[s, a]
-            for s, a in zip(states, actions)
-        ])  # (N, K)
+        z_values = np.array([feature_matrix[s, a] for s, a in zip(states, actions)])  # (N, K)
 
         # Compute e(a,x) = euler - ln P(a|x) for g. The g recursion in
         # eq. (2.2) is beta * E[e(a',x') + g(a',x') | a,x], so the AVI
         # target uses next-period e values.
         safe_ccps = np.clip(np.array(ccps), 1e-10, 1.0)
-        e_next = np.array([
-            EULER_MASCHERONI - np.log(safe_ccps[s, a])
-            for s, a in zip(next_states, next_actions)
-        ])  # (N,)
+        e_next = np.array(
+            [EULER_MASCHERONI - np.log(safe_ccps[s, a]) for s, a in zip(next_states, next_actions)]
+        )  # (N,)
 
         # Any-ML AVI: a gradient-boosting (or any sklearn) regressor in place of the
         # neural function class. The AVI recursion is identical; only the per-round
         # approximator changes (the paper's eq 3.2 admits any ML method).
         if cfg.avi_functional_class == "gbm":
             return self._avi_solve_gbm(
-                feat_ax, feat_ax_next, z_values, e_next, gamma, problem,
-                num_features, num_states, num_actions,
+                feat_ax,
+                feat_ax_next,
+                z_values,
+                e_next,
+                gamma,
+                problem,
+                num_features,
+                num_states,
+                num_actions,
             )
 
         # -----------------------------------------------------------------
@@ -1038,12 +1060,14 @@ class TDCCPEstimator(BaseEstimator):
             def loss_fn(model):
                 preds = jax.vmap(model)(batch_feat)
                 return jnp.mean((preds - batch_targets) ** 2)
+
             loss, grads = eqx.filter_value_and_grad(loss_fn)(model)
             updates, new_opt_state = optimizer.update(grads, opt_state, model)
             new_model = eqx.apply_updates(model, updates)
             return new_model, new_opt_state, loss
 
         from tqdm import tqdm
+
         pbar = tqdm(
             range(cfg.avi_iterations),
             desc="TD-CCP AVI",
@@ -1072,20 +1096,20 @@ class TDCCPEstimator(BaseEstimator):
                 for start in range(0, n_samples, cfg.batch_size):
                     end = min(start + cfg.batch_size, n_samples)
                     idx = perm[start:end]
-                    net, opt_state, loss = train_step(
-                        net, opt_state, feat_ax[idx], targets[idx]
-                    )
+                    net, opt_state, loss = train_step(net, opt_state, feat_ax[idx], targets[idx])
                     epoch_loss += float(loss)
                     n_batches += 1
 
                 avg_loss = epoch_loss / max(n_batches, 1)
                 losses.append(avg_loss)
 
-            pbar.set_postfix({
-                "loss": f"{avg_loss:.4f}",
-                "avi": f"{avi_iter+1}/{cfg.avi_iterations}",
-                "ep/avi": cfg.epochs_per_avi,
-            })
+            pbar.set_postfix(
+                {
+                    "loss": f"{avg_loss:.4f}",
+                    "avi": f"{avi_iter + 1}/{cfg.avi_iterations}",
+                    "ep/avi": cfg.epochs_per_avi,
+                }
+            )
 
             # ---------------------------------------------------------
             # Early stopping check (footnote 9 of the paper):
@@ -1102,7 +1126,9 @@ class TDCCPEstimator(BaseEstimator):
                 if variance > 1e-12:
                     epsilon_j = change_sq / variance
                     if epsilon_j < cfg.avi_early_stop_tol:
-                        self._log(f"  AVI early stop at iter {avi_iter + 1}, epsilon={epsilon_j:.6f}")
+                        self._log(
+                            f"  AVI early stop at iter {avi_iter + 1}, epsilon={epsilon_j:.6f}"
+                        )
                         break
 
         return net, losses
@@ -1126,12 +1152,23 @@ class TDCCPEstimator(BaseEstimator):
                 "Install scikit-learn or pass config.avi_regressor."
             ) from exc
         return lambda: HistGradientBoostingRegressor(
-            max_iter=200, learning_rate=0.1, max_depth=3, l2_regularization=1.0,
+            max_iter=200,
+            learning_rate=0.1,
+            max_depth=3,
+            l2_regularization=1.0,
         )
 
     def _avi_solve_gbm(
-        self, feat_ax, feat_ax_next, z_values, e_next, gamma, problem,
-        num_features, num_states, num_actions,
+        self,
+        feat_ax,
+        feat_ax_next,
+        z_values,
+        e_next,
+        gamma,
+        problem,
+        num_features,
+        num_states,
+        num_actions,
     ):
         """Approximate value iteration with a gradient-boosting (any-ML) class.
 
@@ -1153,16 +1190,23 @@ class TDCCPEstimator(BaseEstimator):
             all_s = np.arange(num_states)
             all_a = np.full(num_states, a, dtype=np.int32)
             feat_sa_by_action.append(
-                np.asarray(self._build_action_state_features(all_a, all_s, problem),
-                           dtype=np.float64)
+                np.asarray(
+                    self._build_action_state_features(all_a, all_s, problem), dtype=np.float64
+                )
             )
 
         for j in range(num_features):
-            self._log(f"Training h component {j} via {('custom' if self._config.avi_regressor else 'GBM')} AVI")
+            self._log(
+                f"Training h component {j} via {('custom' if self._config.avi_regressor else 'GBM')} AVI"
+            )
             init_value = float(np.mean(z_values[:, j])) / (1.0 - gamma)
             reg, losses = self._train_single_avi_gbm(
-                X, X_next, np.asarray(z_values[:, j], dtype=np.float64),
-                init_value, gamma, make_regressor,
+                X,
+                X_next,
+                np.asarray(z_values[:, j], dtype=np.float64),
+                init_value,
+                gamma,
+                make_regressor,
             )
             loss_histories[f"h_{j}"] = losses
             for a in range(num_actions):
@@ -1171,8 +1215,12 @@ class TDCCPEstimator(BaseEstimator):
         self._log("Training g via GBM AVI")
         g_init = gamma * float(np.mean(e_next)) / (1.0 - gamma)
         g_reg, g_losses = self._train_single_avi_gbm(
-            X, X_next, np.asarray(gamma * e_next, dtype=np.float64),
-            g_init, gamma, make_regressor,
+            X,
+            X_next,
+            np.asarray(gamma * e_next, dtype=np.float64),
+            g_init,
+            gamma,
+            make_regressor,
         )
         loss_histories["g"] = g_losses
         for a in range(num_actions):
@@ -1284,18 +1332,20 @@ class TDCCPEstimator(BaseEstimator):
             # The paper's criterion Q(theta) is an empirical average. Keep
             # the optimizer on that scale so outer_tol is sample-size stable;
             # report the summed log-likelihood below for standard model stats.
-            loss = -self._pseudo_log_likelihood_jax(
-                params, h_table_jax, g_table_jax, feature_matrix_jax,
-                obs_states_jax, obs_actions_jax, sigma,
-            ) / n_obs
-            if self._config.theta_l2_penalty > 0:
-                loss = (
-                    loss
-                    + 0.5
-                    * self._config.theta_l2_penalty
-                    * jnp.sum(params**2)
-                    / n_obs
+            loss = (
+                -self._pseudo_log_likelihood_jax(
+                    params,
+                    h_table_jax,
+                    g_table_jax,
+                    feature_matrix_jax,
+                    obs_states_jax,
+                    obs_actions_jax,
+                    sigma,
                 )
+                / n_obs
+            )
+            if self._config.theta_l2_penalty > 0:
+                loss = loss + 0.5 * self._config.theta_l2_penalty * jnp.sum(params**2) / n_obs
             return loss
 
         if initial_params is None:
@@ -1313,15 +1363,17 @@ class TDCCPEstimator(BaseEstimator):
         )
 
         params_opt = np.array(result.x)
-        ll_opt = float(self._pseudo_log_likelihood_jax(
-            jnp.asarray(params_opt, dtype=jnp.float64),
-            h_table_jax,
-            g_table_jax,
-            feature_matrix_jax,
-            obs_states_jax,
-            obs_actions_jax,
-            sigma,
-        ))
+        ll_opt = float(
+            self._pseudo_log_likelihood_jax(
+                jnp.asarray(params_opt, dtype=jnp.float64),
+                h_table_jax,
+                g_table_jax,
+                feature_matrix_jax,
+                obs_states_jax,
+                obs_actions_jax,
+                sigma,
+            )
+        )
         diagnostics = {
             "message": str(result.message),
             "success": bool(result.success),
@@ -1719,17 +1771,13 @@ class TDCCPEstimator(BaseEstimator):
         else:
             omega = (zeta.T @ zeta) / n_obs
         omega = 0.5 * (omega + omega.T)
-        G = self._moment_jacobian(
-            params, h_table, g_table, states, problem.scale_parameter
-        )
+        G = self._moment_jacobian(params, h_table, g_table, states, problem.scale_parameter)
 
         omega_inv = np.linalg.pinv(omega, rcond=1e-10)
         info = G.T @ omega_inv @ G
         info = 0.5 * (info + info.T)
         asymptotic_covariance = np.linalg.pinv(info, rcond=1e-10)
-        asymptotic_covariance = 0.5 * (
-            asymptotic_covariance + asymptotic_covariance.T
-        )
+        asymptotic_covariance = 0.5 * (asymptotic_covariance + asymptotic_covariance.T)
 
         psi_table = -self._score_table(
             tilde_params,
@@ -1750,15 +1798,11 @@ class TDCCPEstimator(BaseEstimator):
             "zeta": zeta,
             "zeta_mean": zeta.mean(axis=0),
             "zeta_norm": float(np.linalg.norm(zeta.mean(axis=0))),
-            "lambda_fixed_point_residual_norm": float(
-                np.linalg.norm(lambda_residual.mean(axis=0))
-            ),
+            "lambda_fixed_point_residual_norm": float(np.linalg.norm(lambda_residual.mean(axis=0))),
             "lambda_fixed_point_residual_rms": float(
                 np.sqrt(np.mean(lambda_residual * lambda_residual))
             ),
-            "lambda_fixed_point_residual_max_abs": float(
-                np.max(np.abs(lambda_residual))
-            ),
+            "lambda_fixed_point_residual_max_abs": float(np.max(np.abs(lambda_residual))),
             "G": G,
             "Omega": omega,
             "V_asymptotic": asymptotic_covariance,
@@ -1854,9 +1898,7 @@ class TDCCPEstimator(BaseEstimator):
             # TD errors for h components
             for j in range(num_params):
                 delta_h_j = (
-                    feature_matrix[s, a, j]
-                    + gamma * h_table[s_next, a_next, j]
-                    - h_table[s, a, j]
+                    feature_matrix[s, a, j] + gamma * h_table[s_next, a_next, j] - h_table[s, a, j]
                 )
                 # Correction: lambda_j at CURRENT state (a,x) per paper eq (4.4)
                 m_i[j] += lambda_table[s, a, j] * delta_h_j
@@ -1909,7 +1951,9 @@ class TDCCPEstimator(BaseEstimator):
             h_w_minus = np.einsum("sak,k->sa", h_table, params_minus)
             v_minus = (h_w_minus + g_table) / sigma
             v_max_m = v_minus.max(axis=1, keepdims=True)
-            pi_minus = np.exp(v_minus - v_max_m) / np.exp(v_minus - v_max_m).sum(axis=1, keepdims=True)
+            pi_minus = np.exp(v_minus - v_max_m) / np.exp(v_minus - v_max_m).sum(
+                axis=1, keepdims=True
+            )
 
             # Mean score at plus and minus
             score_plus = np.zeros(num_params)
@@ -1997,8 +2041,8 @@ class TDCCPEstimator(BaseEstimator):
         score_i = np.zeros((n_samples, n_params), dtype=np.float64)
         for i in range(n_samples):
             s, a = int(all_states[i]), int(all_actions[i])
-            z_obs = z_h[s, a]                                    # (K,)
-            z_exp = np.einsum("a,ak->k", pi[s], z_h[s])         # (K,)
+            z_obs = z_h[s, a]  # (K,)
+            z_exp = np.einsum("a,ak->k", pi[s], z_h[s])  # (K,)
             score_i[i] = (z_obs - z_exp) / sigma
 
         # Cluster: sum scores within individual
@@ -2018,9 +2062,9 @@ class TDCCPEstimator(BaseEstimator):
 
         # Sandwich: V = H_inv @ B_cluster @ H_inv
         try:
-            H_inv = np.linalg.inv(-H)   # -H is positive semi-definite at optimum
+            H_inv = np.linalg.inv(-H)  # -H is positive semi-definite at optimum
             V = correction * (H_inv @ B_cluster @ H_inv)
-            H_eff = -np.linalg.inv(V)   # base class computes inv(-H_eff) = V → SE = sqrt(diag(V))
+            H_eff = -np.linalg.inv(V)  # base class computes inv(-H_eff) = V → SE = sqrt(diag(V))
             return jnp.array(H_eff)
         except np.linalg.LinAlgError:
             self._log("Warning: clustered SE computation failed, falling back to naive Hessian")
@@ -2083,16 +2127,43 @@ class TDCCPEstimator(BaseEstimator):
         # -----------------------------------------------------------------
         paper_inference = None
         if cfg.cross_fitting:
-            params_opt, ll_opt, total_nit, total_nfev, opt_msg, opt_success, h_table, g_table, loss_hists, paper_inference = \
-                self._estimate_with_cross_fitting(
-                    panel, utility, problem, transitions, ccps,
-                    actions, states, next_actions, next_states,
-                    feature_matrix, gamma, key, initial_params,
-                )
+            (
+                params_opt,
+                ll_opt,
+                total_nit,
+                total_nfev,
+                opt_msg,
+                opt_success,
+                h_table,
+                g_table,
+                loss_hists,
+                paper_inference,
+            ) = self._estimate_with_cross_fitting(
+                panel,
+                utility,
+                problem,
+                transitions,
+                ccps,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                feature_matrix,
+                gamma,
+                key,
+                initial_params,
+            )
         else:
             h_table, g_table, loss_hists = self._estimate_h_g(
-                actions, states, next_actions, next_states,
-                feature_matrix, np.array(ccps), problem, gamma, key,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                feature_matrix,
+                np.array(ccps),
+                problem,
+                gamma,
+                key,
             )
             (
                 params_opt,
@@ -2103,7 +2174,12 @@ class TDCCPEstimator(BaseEstimator):
                 opt_success,
                 _plugin_diagnostics,
             ) = self._partial_mle(
-                panel, utility, problem, h_table, g_table, initial_params,
+                panel,
+                utility,
+                problem,
+                h_table,
+                g_table,
+                initial_params,
             )
 
         self._log(f"  Params: {params_opt}, LL: {ll_opt:.4f}")
@@ -2130,8 +2206,15 @@ class TDCCPEstimator(BaseEstimator):
             # Re-estimate h, g with new CCPs
             key, iter_key = jax.random.split(key)
             h_table, g_table, iter_losses = self._estimate_h_g(
-                actions, states, next_actions, next_states,
-                feature_matrix, np.array(ccps), problem, gamma, iter_key,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                feature_matrix,
+                np.array(ccps),
+                problem,
+                gamma,
+                iter_key,
             )
             (
                 params_opt,
@@ -2142,7 +2225,11 @@ class TDCCPEstimator(BaseEstimator):
                 iter_success,
                 _plugin_diagnostics,
             ) = self._partial_mle(
-                panel, utility, problem, h_table, g_table,
+                panel,
+                utility,
+                problem,
+                h_table,
+                g_table,
                 np.array(params_opt),
             )
             opt_success = bool(opt_success and iter_success)
@@ -2150,13 +2237,20 @@ class TDCCPEstimator(BaseEstimator):
             total_nfev += nfev
 
         # -----------------------------------------------------------------
-        # Final policy and value function via exact value iteration
+        # Final policy and value function via exact value iteration.
+        # Skipped for continuous / high-dimensional state spaces: the exact
+        # (A, S, S) Bellman solve is infeasible there, and the parameter stage
+        # never needs the kernel. theta and its SEs are unaffected.
         # -----------------------------------------------------------------
         reward_matrix = utility.compute(jnp.array(params_opt))
-        operator = SoftBellmanOperator(problem, transitions)
-        vi_result = value_iteration(operator, reward_matrix, tol=1e-8, max_iter=5000)
-        policy = vi_result.policy
-        V = vi_result.V
+        if cfg.compute_policy:
+            operator = SoftBellmanOperator(problem, transitions)
+            vi_result = value_iteration(operator, reward_matrix, tol=1e-8, max_iter=5000)
+            policy = vi_result.policy
+            V = vi_result.V
+        else:
+            policy = None
+            V = None
 
         # -----------------------------------------------------------------
         # Standard errors
@@ -2176,10 +2270,17 @@ class TDCCPEstimator(BaseEstimator):
                 all_actions_np = np.array(panel.get_all_actions())
 
                 def ll_fn(p):
-                    return jnp.array(self._pseudo_log_likelihood_jax(
-                        np.array(p), h_table, g_table, feature_matrix,
-                        all_states_np, all_actions_np, problem.scale_parameter,
-                    ))
+                    return jnp.array(
+                        self._pseudo_log_likelihood_jax(
+                            np.array(p),
+                            h_table,
+                            g_table,
+                            feature_matrix,
+                            all_states_np,
+                            all_actions_np,
+                            problem.scale_parameter,
+                        )
+                    )
 
                 H = compute_numerical_hessian(jnp.array(params_opt), ll_fn)
                 if cfg.robust_se:
@@ -2188,9 +2289,15 @@ class TDCCPEstimator(BaseEstimator):
                     # but not first-stage h/g error.
                     self._log("Computing clustered sandwich standard errors (no cross-fitting)")
                     hessian = self._compute_clustered_se(
-                        params_opt, h_table, g_table, feature_matrix,
-                        all_states_np, all_actions_np, panel,
-                        problem.scale_parameter, np.array(H),
+                        params_opt,
+                        h_table,
+                        g_table,
+                        feature_matrix,
+                        all_states_np,
+                        all_actions_np,
+                        panel,
+                        problem.scale_parameter,
+                        np.array(H),
                     )
 
                 if hessian is None:
@@ -2201,7 +2308,10 @@ class TDCCPEstimator(BaseEstimator):
 
         # Store the log-likelihood function for external use
         self._log_likelihood_fn = lambda p: self._pseudo_log_likelihood_jax(
-            np.array(p), h_table, g_table, feature_matrix,
+            np.array(p),
+            h_table,
+            g_table,
+            feature_matrix,
             np.array(panel.get_all_states()),
             np.array(panel.get_all_actions()),
             problem.scale_parameter,
@@ -2257,8 +2367,15 @@ class TDCCPEstimator(BaseEstimator):
 
     def _estimate_h_g(
         self,
-        actions, states, next_actions, next_states,
-        feature_matrix, ccps, problem, gamma, key,
+        actions,
+        states,
+        next_actions,
+        next_states,
+        feature_matrix,
+        ccps,
+        problem,
+        gamma,
+        key,
     ):
         """Dispatch to semi-gradient or neural AVI for h,g estimation."""
         cfg = self._config
@@ -2268,22 +2385,48 @@ class TDCCPEstimator(BaseEstimator):
         if cfg.method == "semigradient":
             self._log("Step 3: Linear semi-gradient solve (eq 3.5)")
             h_table, g_table = self._semigradient_solve(
-                actions, states, next_actions, next_states,
-                feature_matrix, ccps, num_states, num_actions, gamma, problem,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                feature_matrix,
+                ccps,
+                num_states,
+                num_actions,
+                gamma,
+                problem,
             )
             return h_table, g_table, {}
         else:
             self._log("Step 3: Neural AVI solve (Algorithm 1)")
             h_table, g_table, losses = self._neural_avi_solve(
-                actions, states, next_actions, next_states,
-                feature_matrix, ccps, problem, gamma, key,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                feature_matrix,
+                ccps,
+                problem,
+                gamma,
+                key,
             )
             return h_table, g_table, losses
 
     def _estimate_with_cross_fitting(
-        self, panel, utility, problem, transitions, ccps,
-        actions, states, next_actions, next_states,
-        feature_matrix, gamma, key, initial_params,
+        self,
+        panel,
+        utility,
+        problem,
+        transitions,
+        ccps,
+        actions,
+        states,
+        next_actions,
+        next_states,
+        feature_matrix,
+        gamma,
+        key,
+        initial_params,
     ):
         """2-fold cross-fitting (Algorithm 2 of the paper).
 
@@ -2352,9 +2495,7 @@ class TDCCPEstimator(BaseEstimator):
             fold2_panel = panel
 
         else:
-            raise ValueError(
-                f"split_unit must be 'individual' or 'row', got {split_unit!r}"
-            )
+            raise ValueError(f"split_unit must be 'individual' or 'row', got {split_unit!r}")
 
         if not np.any(fold1_trans_mask) or not np.any(fold2_trans_mask):
             raise ValueError("TD-CCP cross-fitting produced an empty fold")
@@ -2364,16 +2505,28 @@ class TDCCPEstimator(BaseEstimator):
 
         key, k1 = jax.random.split(key)
         h1, g1, losses1 = self._estimate_h_g(
-            actions[fold1_trans_mask], states[fold1_trans_mask],
-            next_actions[fold1_trans_mask], next_states[fold1_trans_mask],
-            feature_matrix, np.array(ccps1), problem, gamma, k1,
+            actions[fold1_trans_mask],
+            states[fold1_trans_mask],
+            next_actions[fold1_trans_mask],
+            next_states[fold1_trans_mask],
+            feature_matrix,
+            np.array(ccps1),
+            problem,
+            gamma,
+            k1,
         )
 
         key, k2 = jax.random.split(key)
         h2, g2, losses2 = self._estimate_h_g(
-            actions[fold2_trans_mask], states[fold2_trans_mask],
-            next_actions[fold2_trans_mask], next_states[fold2_trans_mask],
-            feature_matrix, np.array(ccps2), problem, gamma, k2,
+            actions[fold2_trans_mask],
+            states[fold2_trans_mask],
+            next_actions[fold2_trans_mask],
+            next_states[fold2_trans_mask],
+            feature_matrix,
+            np.array(ccps2),
+            problem,
+            gamma,
+            k2,
         )
 
         (
@@ -2385,7 +2538,12 @@ class TDCCPEstimator(BaseEstimator):
             success_tilde1,
             diag_tilde1,
         ) = self._partial_mle(
-            fold1_panel, utility, problem, h1, g1, initial_params,
+            fold1_panel,
+            utility,
+            problem,
+            h1,
+            g1,
+            initial_params,
         )
         (
             tilde2,
@@ -2396,7 +2554,11 @@ class TDCCPEstimator(BaseEstimator):
             success_tilde2,
             diag_tilde2,
         ) = self._partial_mle(
-            fold2_panel, utility, problem, h2, g2,
+            fold2_panel,
+            utility,
+            problem,
+            h2,
+            g2,
             initial_params,
         )
 
@@ -2498,9 +2660,7 @@ class TDCCPEstimator(BaseEstimator):
 
             params_avg = (np.asarray(theta1) + np.asarray(theta2)) / 2.0
             ll_total = ll1 + ll2
-            asymptotic_covariance = 0.5 * (
-                cov1["V_asymptotic"] + cov2["V_asymptotic"]
-            )
+            asymptotic_covariance = 0.5 * (cov1["V_asymptotic"] + cov2["V_asymptotic"])
             sample_covariance = 0.25 * (
                 cov1["V_asymptotic"] / cov1["n_effective_units"]
                 + cov2["V_asymptotic"] / cov2["n_effective_units"]
@@ -2518,8 +2678,7 @@ class TDCCPEstimator(BaseEstimator):
                     diag.get("success")
                     or (
                         diag.get("projected_gradient_norm") is not None
-                        and float(diag["projected_gradient_norm"])
-                        <= preliminary_stationarity_tol
+                        and float(diag["projected_gradient_norm"]) <= preliminary_stationarity_tol
                     )
                 )
                 for diag in (diag_tilde1, diag_tilde2)
@@ -2530,8 +2689,7 @@ class TDCCPEstimator(BaseEstimator):
                     diag.get("success")
                     or (
                         diag.get("projected_gradient_norm") is not None
-                        and float(diag["projected_gradient_norm"])
-                        <= robust_stationarity_tol
+                        and float(diag["projected_gradient_norm"]) <= robust_stationarity_tol
                     )
                 )
                 for diag in (diag1, diag2)
@@ -2572,9 +2730,7 @@ class TDCCPEstimator(BaseEstimator):
                         "lambda_fixed_point_residual_norm": cov1[
                             "lambda_fixed_point_residual_norm"
                         ],
-                        "lambda_fixed_point_residual_rms": cov1[
-                            "lambda_fixed_point_residual_rms"
-                        ],
+                        "lambda_fixed_point_residual_rms": cov1["lambda_fixed_point_residual_rms"],
                         "lambda_fixed_point_residual_max_abs": cov1[
                             "lambda_fixed_point_residual_max_abs"
                         ],
@@ -2598,9 +2754,7 @@ class TDCCPEstimator(BaseEstimator):
                         "lambda_fixed_point_residual_norm": cov2[
                             "lambda_fixed_point_residual_norm"
                         ],
-                        "lambda_fixed_point_residual_rms": cov2[
-                            "lambda_fixed_point_residual_rms"
-                        ],
+                        "lambda_fixed_point_residual_rms": cov2["lambda_fixed_point_residual_rms"],
                         "lambda_fixed_point_residual_max_abs": cov2[
                             "lambda_fixed_point_residual_max_abs"
                         ],
@@ -2639,9 +2793,7 @@ class TDCCPEstimator(BaseEstimator):
                 else "mixed",
                 "asymptotic_covariance": asymptotic_covariance,
                 "sample_covariance": sample_covariance,
-                "standard_errors": np.sqrt(
-                    np.maximum(np.diag(sample_covariance), 0.0)
-                ),
+                "standard_errors": np.sqrt(np.maximum(np.diag(sample_covariance), 0.0)),
             }
             preliminary_ok = bool(
                 np.all(np.isfinite(tilde1))
@@ -2656,10 +2808,7 @@ class TDCCPEstimator(BaseEstimator):
                 ll_total,
                 nit_tilde1 + nit_tilde2 + nit1 + nit2,
                 nfev_tilde1 + nfev_tilde2 + nfev1 + nfev2,
-                (
-                    "algorithm2 locally robust: "
-                    f"{msg_tilde1}; {msg_tilde2}; {msg1}; {msg2}"
-                ),
+                (f"algorithm2 locally robust: {msg_tilde1}; {msg_tilde2}; {msg1}; {msg2}"),
                 bool(preliminary_ok and all(robust_stationary) and success1 and success2),
                 h_avg,
                 g_avg,
@@ -2671,10 +2820,19 @@ class TDCCPEstimator(BaseEstimator):
         # fold -k. This is a plug-in estimator only; it is not the paper's
         # locally robust inference path.
         params1, ll1, nit1, nfev1, msg1, success1, _diag1 = self._partial_mle(
-            fold1_panel, utility, problem, h2, g2, initial_params,
+            fold1_panel,
+            utility,
+            problem,
+            h2,
+            g2,
+            initial_params,
         )
         params2, ll2, nit2, nfev2, msg2, success2, _diag2 = self._partial_mle(
-            fold2_panel, utility, problem, h1, g1,
+            fold2_panel,
+            utility,
+            problem,
+            h1,
+            g1,
             np.array(params1) if initial_params is None else initial_params,
         )
 
@@ -2686,15 +2844,21 @@ class TDCCPEstimator(BaseEstimator):
         h_avg = (h1 + h2) / 2.0
         g_avg = (g1 + g2) / 2.0
 
-        losses = {**{f"fold1_{k}": v for k, v in losses1.items()},
-                  **{f"fold2_{k}": v for k, v in losses2.items()}}
+        losses = {
+            **{f"fold1_{k}": v for k, v in losses1.items()},
+            **{f"fold2_{k}": v for k, v in losses2.items()},
+        }
 
         return (
-            params_avg, ll_avg,
-            nit1 + nit2, nfev1 + nfev2,
+            params_avg,
+            ll_avg,
+            nit1 + nit2,
+            nfev1 + nfev2,
             f"cross-fitted: {msg1}; {msg2}",
             bool(success1 and success2),
-            h_avg, g_avg, losses,
+            h_avg,
+            g_avg,
+            losses,
             None,
         )
 

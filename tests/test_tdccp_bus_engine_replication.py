@@ -28,6 +28,7 @@ for _p in (str(ROOT), str(ROOT / "src"), str(DRIVER_DIR)):
         sys.path.insert(0, _p)
 
 import bus_engine_mc as be  # noqa: E402
+import highdim_dummies as hd  # noqa: E402,F401
 import jax.numpy as jnp  # noqa: E402
 
 from econirl.core.bellman import SoftBellmanOperator  # noqa: E402
@@ -151,3 +152,27 @@ def test_ccp_design_robust_for_type_coefficient():
     off = _fit_thetas(ccp_use_encoder=False)["theta2_type"]
     assert on >= 0.85, f"encoder CCP should recover theta2, got {on}"
     assert off >= 0.85, f"scalar-index CCP should also recover theta2 post-fix, got {off}"
+
+
+@pytest.mark.slow
+def test_highdim_recovers_and_is_dynamic():
+    """High-dimensional TD-CCP: recover theta with irrelevant dummy state variables,
+    and confirm the dynamic continuation is load-bearing (not static logit).
+
+    The bus is augmented with K=5 iid dummy state vars that affect neither reward nor
+    transitions. Each observation is its own point in feature space, so the estimator
+    runs with compute_policy=False (no enumerable state set). theta1 (mileage) must
+    recover near -0.15 despite the dummies. Breaking the s->s' continuation (shuffle)
+    must SEND theta1 far from -0.15, which proves the dynamic term carries the
+    identification (a static-logit experiment would recover either way).
+    """
+    dgp, truth, init = hd._relevant_truth()
+    p, u, pr, _ = hd.build_highdim(dgp, truth, init, K=5, seed=0, n_buses=150)
+    theta = hd.fit(p, u, pr, basis_dim=2)
+    assert -0.20 <= theta[1] <= -0.10, f"high-dim theta1 should recover ~-0.15, got {theta[1]}"
+
+    ps, us, prs, _ = hd.build_highdim(dgp, truth, init, K=5, seed=0, n_buses=150, shuffle=True)
+    theta_shuf = hd.fit(ps, us, prs, basis_dim=2)
+    assert not (-0.20 <= theta_shuf[1] <= -0.10), (
+        f"shuffling s' should break theta1 recovery (dynamics load-bearing), got {theta_shuf[1]}"
+    )
