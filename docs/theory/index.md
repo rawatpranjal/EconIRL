@@ -22,8 +22,9 @@ known, what is normalized, and whether the transition kernel must be estimated.
 | [Soft Bellman and DDC-MaxEnt Equivalence](soft_bellman_equivalence.md) | Why do logit DDC and entropy-regularized IRL produce the same policy equation? | NFXP, CCP, TD-CCP, MCE-IRL, AIRL, GLADIUS. |
 | [Identification and Anchors](identification.md) | What is recoverable from behavior alone, and what does an anchor action add? | NFXP, CCP, TD-CCP, AIRL-Het, GLADIUS. |
 | [Classical DDC Proof Routes](classical_ddc.md) | How do NFXP, CCP, and TD-CCP enforce the identifying equations? | NFXP, CCP, TD-CCP. |
-| [IRL Boundaries](irl_boundaries.md) | What do MCE-IRL, AIRL, GAIL, and IQ-Learn identify? | MCE-IRL, Neural MCE-IRL, AIRL, AIRL-Het, IQ-Learn. |
+| [IRL Identification Boundaries](irl_boundaries.md) | What do MCE-IRL, AIRL, GAIL, and IQ-Learn identify? | MCE-IRL, Neural MCE-IRL, AIRL, AIRL-Het, IQ-Learn. |
 | [GLADIUS and ERM](gladius_erm.md) | How does the ERM route avoid transition-density estimation while keeping the Bellman identification condition? | GLADIUS. |
+| [Reward Projection and Feature Rank](reward_projection.md) | When does a recovered reward imply a finite parameter vector? | NFXP, CCP, TD-CCP, MCE-IRL, Neural MCE-IRL, AIRL-Het, GLADIUS. |
 
 ## The Common Object
 
@@ -56,4 +57,5 @@ identification
 classical_ddc
 irl_boundaries
 gladius_erm
+reward_projection
 ```

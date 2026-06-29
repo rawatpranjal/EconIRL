@@ -26,7 +26,9 @@ to approach full maximum likelihood efficiency.
 For the proof route behind this page, start with
 [Identification and Anchors](../theory/identification.md) for the normalization
 problem and [Classical DDC Estimators](../theory/classical_ddc.md) for the
-Hotz-Miller inversion and nested pseudo-likelihood argument.
+Hotz-Miller inversion and nested pseudo-likelihood argument. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+rank condition that turns recovered reward contrasts into parameters.
 
 ## Notation
 

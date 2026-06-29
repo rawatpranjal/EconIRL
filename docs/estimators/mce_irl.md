@@ -34,7 +34,9 @@ For the proof route behind this page, start with
 for the maximum-causal-entropy and logit-DDC equivalence,
 [Identification and Anchors](../theory/identification.md) for reward
 normalization, and [IRL Identification Boundaries](../theory/irl_boundaries.md)
-for what feature matching can and cannot identify.
+for what feature matching can and cannot identify. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+feature-rank condition behind finite reward parameters.
 
 ## Notation
 

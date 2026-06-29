@@ -27,7 +27,8 @@ for the contraction and logit-choice identities,
 [Identification and Anchors](../theory/identification.md) for why action
 contrasts need a reward anchor, and
 [Classical DDC Estimators](../theory/classical_ddc.md) for the NFXP likelihood
-argument.
+argument. Use [Reward Projection and Feature Rank](../theory/reward_projection.md)
+for the final step from recovered reward contrasts to finite parameters.
 
 ## Notation
 

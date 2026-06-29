@@ -406,6 +406,7 @@ def test_theory_section_is_public_and_sourced() -> None:
         "classical_ddc.md",
         "irl_boundaries.md",
         "gladius_erm.md",
+        "reward_projection.md",
     ]
     pages = [DOCS / "theory" / name for name in expected_pages]
 

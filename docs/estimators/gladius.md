@@ -30,7 +30,9 @@ For the proof route behind this page, start with
 [Identification and Anchors](../theory/identification.md) for the state-shift
 non-identification problem and [GLADIUS and ERM](../theory/gladius_erm.md) for
 the empirical-risk objective, the sampled squared-TD bias, and the anchor-action
-identification argument.
+identification argument. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+final projection from anchored reward contrasts to structural parameters.
 
 ## Notation
 

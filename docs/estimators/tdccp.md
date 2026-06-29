@@ -31,6 +31,8 @@ For the proof route behind this page, start with
 [Identification and Anchors](../theory/identification.md) for the normalization
 problem and [Classical DDC Estimators](../theory/classical_ddc.md) for how the
 CCP route replaces repeated Bellman solves with recursive continuation objects.
+Use [Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+rank condition behind the projected parameter recovery step.
 
 ## Notation
 
