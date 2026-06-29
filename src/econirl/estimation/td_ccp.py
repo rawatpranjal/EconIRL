@@ -505,33 +505,33 @@ class TDCCPEstimator(BaseEstimator):
             Tuple of (actions, states, next_actions, next_states), each a
             1D numpy array of the same length (total number of transitions).
         """
-        states = np.array(panel.get_all_states())
-        actions = np.array(panel.get_all_actions())
-        next_states = np.array(panel.get_all_next_states())
-
-        # For next_actions, we need the action taken at time t+1.
-        # Panel stores trajectories; we need a_{t+1} for each (s_t, a_t, s_{t+1}).
-        # The next_actions are the actions shifted by one period within each
-        # individual's trajectory. We reconstruct them from the panel.
-        next_actions_list = []
+        # Build all four arrays per trajectory and keep them aligned. Transition t
+        # uses (a_t, s_t, a_{t+1}, s_{t+1}) for t = 0..T-2, so every array drops
+        # that trajectory's last period.
+        #
+        # CRITICAL: get_all_states/get_all_actions/get_all_next_states keep the
+        # full T periods of every trajectory. Concatenating those (T-length blocks)
+        # against a per-trajectory next_actions = actions[1:] (T-1-length blocks)
+        # and truncating to a single global min_len misaligns a_{t+1} with
+        # (s_t, s_{t+1}) across every trajectory boundary (the offset drifts by one
+        # per trajectory). That feeds the semi-gradient the wrong next action and
+        # systematically biases the estimated continuation h(a,x), and hence theta.
+        # Slice each trajectory together so the tuples stay aligned.
+        a_list, s_list, na_list, ns_list = [], [], [], []
         for traj in panel.trajectories:
-            # Each trajectory has states[0..T-1] and actions[0..T-1].
-            # Transition t uses (a_t, s_t, a_{t+1}, s_{t+1}) for t=0..T-2.
             if len(traj.actions) > 1:
-                next_actions_list.append(np.array(traj.actions[1:]))
-        if next_actions_list:
-            next_actions = np.concatenate(next_actions_list)
-        else:
-            next_actions = np.array([], dtype=np.int32)
-
-        # Truncate to match lengths (states/actions from get_all_states
-        # already exclude the last period of each trajectory)
-        min_len = min(len(states), len(next_actions))
+                a_list.append(np.asarray(traj.actions[:-1]))
+                s_list.append(np.asarray(traj.states[:-1]))
+                na_list.append(np.asarray(traj.actions[1:]))
+                ns_list.append(np.asarray(traj.next_states[:-1]))
+        if not a_list:
+            empty = np.array([], dtype=np.int64)
+            return (empty, empty, empty, empty)
         return (
-            actions[:min_len],
-            states[:min_len],
-            next_actions[:min_len],
-            next_states[:min_len],
+            np.concatenate(a_list),
+            np.concatenate(s_list),
+            np.concatenate(na_list),
+            np.concatenate(ns_list),
         )
 
     # ==================================================================

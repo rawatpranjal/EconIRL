@@ -73,10 +73,17 @@ def test_encoder_ccp_recovers_bus_engine_thetas():
 
 
 @pytest.mark.slow
-def test_encoder_ccp_fixes_type_coefficient():
-    """The scalar-index CCP biases theta2 low; the encoder CCP recovers it."""
+def test_ccp_design_robust_for_type_coefficient():
+    """theta2 recovers under BOTH the scalar-index and the encoder logit CCP.
+
+    Historically the scalar-index CCP appeared to bias theta2 low (~0.64) while the
+    encoder CCP "fixed" it (~0.96). That gap was a symptom of a transition-tuple
+    misalignment in ``_extract_transitions`` (a_{t+1} misaligned with (s_t, s_{t+1})
+    across trajectory boundaries), not the CCP design. With the alignment fixed,
+    theta2 recovers regardless of the CCP encoder, so the encoder is no longer
+    load-bearing for theta2.
+    """
     on = _fit_thetas(ccp_use_encoder=True)["theta2_type"]
     off = _fit_thetas(ccp_use_encoder=False)["theta2_type"]
-    assert off < 0.85, f"scalar-index CCP should bias theta2 low, got {off}"
     assert on >= 0.85, f"encoder CCP should recover theta2, got {on}"
-    assert on > off + 0.1, (on, off)
+    assert off >= 0.85, f"scalar-index CCP should also recover theta2 post-fix, got {off}"
