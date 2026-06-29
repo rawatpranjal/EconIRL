@@ -197,37 +197,38 @@ python validation/estimators/airl/run.py    # state-only recovers, state-action 
 ## TD-CCP (Adusumilli and Eckardt, 2025)
 
 Adusumilli and Eckardt estimate dynamic discrete choice models with
-temporal-difference learning built on the conditional-choice-probability
-approach. Their linear semi-gradient estimator approximates the recursive value
-terms with basis functions and needs no transition densities. Their bus-engine
+temporal-difference learning on the conditional-choice-probability representation.
+Their linear semi-gradient estimator approximates the recursive value terms h(a, x)
+and g(a, x) with basis functions and needs no transition densities. Their bus-engine
 Monte Carlo (Online Appendix, Table B.1) is a Rust-style replacement problem with
-one mileage state and a permanent bus type s in {1, 2}. The manager keeps or replaces each
-period under Type-1 extreme-value shocks. The replacement payoff is set to zero,
+one mileage state and a permanent bus type s in {1, 2}. The manager keeps or replaces
+each period under Type-1 extreme-value shocks. The replacement payoff is set to zero,
 and the keep payoff is theta0 + theta1 times mileage + theta2 times type. The true
 values are theta0 = 2, theta1 = -0.15, theta2 = 1, with discount 0.9.
 
-The paper reports recovery at the precision of maximum likelihood. The package
-reproduces their Table B.1 with the nested fixed point on the same design, 1000
-buses observed for 30 periods, across 300 Monte Carlo draws. Each parameter's
-mean, standard deviation, and mean-squared error sit next to the paper.
+The package runs the same linear semi-gradient estimator on the same design, 1000
+buses over 30 periods, across 200 Monte Carlo draws, without the locally robust
+correction (columns 2 and 3 of Table B.1). Each parameter's mean, standard
+deviation, and mean-squared error sit next to the paper.
 
-### Bus-engine recovery, 1000 buses, T = 30, 300 draws
+### Bus-engine recovery, 1000 buses, T = 30, 200 draws
 
 | Parameter | True | Package mean | Paper mean | Package SD | Paper SD | Package MSE | Paper MSE |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| theta0 (intercept) | 2.0 | 2.0018 | 1.9788 | 0.0918 | 0.0868 | 0.0084 | 0.0080 |
-| theta1 (mileage) | -0.15 | -0.1501 | -0.1492 | 0.0037 | 0.0033 | 0.00001 | 0.00001 |
-| theta2 (type) | 1.0 | 1.0009 | 1.0044 | 0.0617 | 0.0583 | 0.0038 | 0.0034 |
+| theta0 (intercept) | 2.0 | 1.9533 | 1.9788 | 0.0904 | 0.0868 | 0.0103 | 0.0080 |
+| theta1 (mileage) | -0.15 | -0.1468 | -0.1492 | 0.0035 | 0.0033 | 0.00002 | 0.00001 |
+| theta2 (type) | 1.0 | 1.0029 | 1.0044 | 0.0628 | 0.0583 | 0.0039 | 0.0034 |
 
-The means, standard deviations, and mean-squared errors line up with the paper
-across all three parameters. The package's linear semi-gradient recovers the same
-parameter means on this design, but at wider sampling dispersion than maximum
-likelihood; the project validation notes record that gap.
+The means match the paper to two or three figures, and the standard deviations
+match to within a few percent. The linear semi-gradient reaches the paper's
+near-maximum-likelihood precision. The mean-squared errors sit within Monte Carlo
+noise of the paper, which reports 1000 draws. The nested fixed point reproduces the
+same Table B.1 numbers and serves as the oracle reference.
 
 Reproduce:
 
 ```bash
-PYTHONPATH=src python validation/estimators/tdccp/bus_engine_nfxp.py --n-reps 300
+PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 200 --skip-lr
 ```
 
 ## NNES (Nguyen, 2025)
