@@ -258,12 +258,15 @@ The paper defines two approximation methods, each in a plug-in and a locally
 robust form. The package implements the linear semigradient in both forms. It also
 implements the second method, approximate value iteration (`method="neural"`),
 which trains approximators for $h$ and $g$ by target-network iteration in place of
-the matrix solves. Two scope notes apply to this second method. The paper's value
-iteration admits any machine-learning function class, for example LASSO, random
-forests, or gradient boosting. The package's value iteration currently uses neural
-networks only, and it does not yet support cross-fitting or locally robust
-standard errors. The linear semigradient is the variant reproduced against the
-paper's Table B.1.
+the matrix solves. The paper's value iteration admits any machine-learning function
+class. The package supports neural networks (`avi_functional_class="neural"`, the
+default) and gradient boosting (`"gbm"`, a histogram gradient-boosting regressor).
+The `avi_regressor` option accepts any other fit/predict object, for example
+LightGBM, a random forest, or LASSO. The value iteration also runs under the
+cross-fitting and locally robust path. The linear semigradient is the variant
+reproduced against the paper's Table B.1. The value-iteration variants recover the
+same parameters, with the small-sample bias the paper reports for plug-in value
+iteration.
 
 The recursive terms $\hat{h}$ and $\hat{g}$ are identified from the observed
 successor pairs $(a_t, x_t, a_{t+1}, x_{t+1})$ within each trajectory, and the
