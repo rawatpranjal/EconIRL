@@ -1,0 +1,75 @@
+{
+  "dgp": "paper bus (20 mileage, +1..4, theta=[1,5], beta=0.95)",
+  "estimator": "GLADIUSEstimator paper_minimax+shared_trunk, anchor=replace",
+  "anchor": "paper_minimax",
+  "paper_gladius_mape": {
+    "50": 3.44,
+    "250": 0.84,
+    "500": 0.55,
+    "1000": 0.52,
+    "2500": 0.13,
+    "5000": 0.12
+  },
+  "records": [
+    {
+      "n_traj": 50,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 291.9329614280806,
+      "nfxp_oracle_mape": 2.3459457869249336,
+      "r_hat_maintain": [
+        5.8642,
+        1.4325,
+        -1.0264,
+        -1.0173,
+        -1.0083,
+        -0.9992,
+        -1.3487,
+        -1.7894,
+        -2.4613,
+        -3.1332
+      ],
+      "seconds": 148.1
+    },
+    {
+      "n_traj": 250,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 372.3788266265359,
+      "nfxp_oracle_mape": 1.5172807143645561,
+      "r_hat_maintain": [
+        7.7174,
+        2.0945,
+        -0.134,
+        -0.0354,
+        0.0633,
+        0.162,
+        0.2606,
+        0.3593,
+        0.458,
+        0.5608
+      ],
+      "seconds": 488.3
+    },
+    {
+      "n_traj": 500,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 0.8784545695098933,
+      "nfxp_oracle_mape": 1.6145934050910453,
+      "r_hat_maintain": [
+        -0.9938,
+        -1.8759,
+        -3.0659,
+        -4.0316,
+        -4.9973,
+        -5.6185,
+        -6.4909,
+        -7.3633,
+        -8.2357,
+        -9.1081
+      ],
+      "seconds": 1554.8
+    }
+  ]
+}

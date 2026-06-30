@@ -28,6 +28,7 @@ Usage:
   PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py --probe
   PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py --sweep --reps 20
 """
+
 from __future__ import annotations
 
 import argparse
@@ -99,7 +100,7 @@ class PaperBusEnvironment(DDCEnvironment):
         phi = np.zeros((n, 2, 2), dtype=np.float32)
         mileage = np.arange(1, n + 1, dtype=np.float32)
         phi[:, MAINTAIN, 0] = -mileage  # U(maintain) = -theta0 * mileage
-        phi[:, REPLACE, 1] = -1.0       # U(replace)  = -theta1
+        phi[:, REPLACE, 1] = -1.0  # U(replace)  = -theta1
         return jnp.asarray(phi)
 
     @property
@@ -142,7 +143,9 @@ def mape_on_samples(r_hat: np.ndarray, states: np.ndarray, actions: np.ndarray) 
     return float(100.0 * np.mean(np.abs(r_pred - r_true) / np.abs(r_true)))
 
 
-def fit_gladius(env, train_panel, *, max_epochs: int, batch_size: int) -> np.ndarray:
+def fit_gladius(
+    env, train_panel, *, max_epochs: int, batch_size: int, anchor: str = "paper_minimax"
+) -> np.ndarray:
     """Paper-faithful GLADIUS; returns raw recovered reward r_hat(s,a), shape (S,A)."""
     S, A = env.num_states, env.num_actions
     phi = jnp.asarray(env.feature_matrix, dtype=jnp.float32)
@@ -151,33 +154,49 @@ def fit_gladius(env, train_panel, *, max_epochs: int, batch_size: int) -> np.nda
     state_enc = lambda s: mileage[jnp.asarray(s, dtype=jnp.int32)][:, None]
     base = env.problem_spec
     prob = DDCProblem(
-        num_states=S, num_actions=A, discount_factor=base.discount_factor,
-        scale_parameter=base.scale_parameter, state_dim=1, state_encoder=state_enc,
+        num_states=S,
+        num_actions=A,
+        discount_factor=base.discount_factor,
+        scale_parameter=base.scale_parameter,
+        state_dim=1,
+        state_encoder=state_enc,
     )
-    # anchor_moment (the package default), NOT paper_minimax: anchor_moment uses a
-    # stop-gradient zeta target (r + beta*zeta - Q), a fitted-Q form that pins the
-    # absolute reward LEVEL via the beta-contraction. paper_minimax lets gradient
-    # flow through V(s'), giving a (1-beta)-weak level gradient, so the level sits
-    # at its init and the recovered reward is shifted (MAPE ~80-200). See the
-    # internal replication note for the diagnosis.
+    # anchor selects the Bellman target. paper_minimax (default) is the paper's
+    # literal bi-conjugate term and the faithful headline: it lets gradient flow
+    # through V(s'), a (1-beta)-weak level gradient, so the absolute reward LEVEL
+    # sits near its init and the recovered reward is shifted (the documented level
+    # gap). anchor_moment is the fitted-Q diagnostic, a stop-gradient zeta target
+    # (r + beta*zeta - Q) that pins the level via the beta-contraction but departs
+    # from the paper's Bellman term. See the internal replication note.
     cfg = GLADIUSConfig(
-        anchor_bellman_mode="anchor_moment",
+        anchor_bellman_mode=anchor,
         anchor_bellman_loss=True,
-        anchor_action=REPLACE,                       # known r(s, replace) = -theta1
+        anchor_action=REPLACE,  # known r(s, replace) = -theta1
         anchor_rewards=tuple([-THETA1] * S),
-        q_hidden_dim=10, q_num_layers=2,             # paper: MLP 2 x 10
-        v_hidden_dim=10, v_num_layers=2,
-        q_lr=1e-3, v_lr=1e-3, lr_decay_rate=5e-4,
-        batch_size=batch_size, max_epochs=max_epochs, patience=400,
+        q_hidden_dim=10,
+        q_num_layers=2,  # paper: MLP 2 x 10
+        v_hidden_dim=10,
+        v_num_layers=2,
+        q_lr=1e-3,
+        v_lr=1e-3,
+        lr_decay_rate=5e-4,
+        batch_size=batch_size,
+        max_epochs=max_epochs,
+        patience=400,
         gradient_clip_mode="value",
         # Predict Q directly (value_scale=1.0) from a zero bias; anchor_moment is
         # init-robust and converges the absolute level via the fitted-Q contraction.
         output_bias_init=0.0,
-        compute_se=False, verbose=False,
+        compute_se=False,
+        verbose=False,
     )
     est = GLADIUSEstimator(config=cfg)
-    s = est.estimate(panel=train_panel, utility=util, problem=prob,
-                     transitions=jnp.asarray(env.transition_matrices))
+    s = est.estimate(
+        panel=train_panel,
+        utility=util,
+        problem=prob,
+        transitions=jnp.asarray(env.transition_matrices),
+    )
     return np.asarray(s.metadata["reward_table"], dtype=np.float64)
 
 
@@ -186,17 +205,28 @@ def fit_nfxp_oracle(env, train_panel, test_states, test_actions) -> float:
     known transitions (as the paper's 'Rust (Oracle)' baseline). Returns reward MAPE.
     Validates the DGP + metric: this MAPE should track the paper's Rust column."""
     from econirl.estimation.nfxp import NFXPEstimator
+
     phi = np.asarray(env.feature_matrix)  # (S, A, K)
     util = ActionDependentReward(jnp.asarray(env.feature_matrix), env.parameter_names)
     summ = NFXPEstimator(compute_hessian=False).estimate(
-        panel=train_panel, utility=util, problem=env.problem_spec,
-        transitions=jnp.asarray(env.transition_matrices))
+        panel=train_panel,
+        utility=util,
+        problem=env.problem_spec,
+        transitions=jnp.asarray(env.transition_matrices),
+    )
     r_hat = phi @ np.asarray(summ.parameters)  # reward = theta_hat . phi, shape (S, A)
     return mape_on_samples(r_hat, test_states, test_actions)
 
 
-def run_one(n_traj: int, seed: int, *, max_epochs: int, batch_size: int,
-            oracle: bool = True) -> dict:
+def run_one(
+    n_traj: int,
+    seed: int,
+    *,
+    max_epochs: int,
+    batch_size: int,
+    oracle: bool = True,
+    anchor: str = "paper_minimax",
+) -> dict:
     env = PaperBusEnvironment(seed=seed)
     panel = simulate_panel(env, n_individuals=n_traj, n_periods=100, seed=seed)
     trajs = list(panel.trajectories)
@@ -207,12 +237,15 @@ def run_one(n_traj: int, seed: int, *, max_epochs: int, batch_size: int,
     test_actions = np.concatenate([np.asarray(t.actions) for t in test])
 
     t0 = time.time()
-    r_hat = fit_gladius(env, train, max_epochs=max_epochs, batch_size=batch_size)
+    r_hat = fit_gladius(env, train, max_epochs=max_epochs, batch_size=batch_size, anchor=anchor)
     mape = mape_on_samples(r_hat, test_states, test_actions)
-    nfxp_mape = (fit_nfxp_oracle(env, train, test_states, test_actions)
-                 if oracle else None)
+    nfxp_mape = fit_nfxp_oracle(env, train, test_states, test_actions) if oracle else None
     return {
-        "n_traj": n_traj, "seed": seed, "mape": mape, "nfxp_oracle_mape": nfxp_mape,
+        "n_traj": n_traj,
+        "seed": seed,
+        "anchor": anchor,
+        "mape": mape,
+        "nfxp_oracle_mape": nfxp_mape,
         "r_hat_maintain": [round(float(r_hat[i, MAINTAIN]), 4) for i in range(10)],
         "seconds": round(time.time() - t0, 1),
     }
@@ -222,15 +255,26 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--probe", action="store_true", help="1 rep at 1000 trajs (cheap)")
     ap.add_argument("--sweep", action="store_true", help="full trajectory sweep")
+    ap.add_argument(
+        "--sizes", type=str, default=None, help="comma list of n_traj, overrides --sweep"
+    )
     ap.add_argument("--traj", type=int, default=1000)
     ap.add_argument("--reps", type=int, default=1)
     ap.add_argument("--max-epochs", type=int, default=800)
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument(
+        "--anchor",
+        choices=["paper_minimax", "anchor_moment"],
+        default="paper_minimax",
+        help="paper_minimax = faithful headline; anchor_moment = fitted-Q diagnostic",
+    )
     args = ap.parse_args()
 
     if args.probe:
         traj_list, reps = [1000], 1
+    elif args.sizes:
+        traj_list, reps = [int(x) for x in args.sizes.split(",")], args.reps
     elif args.sweep:
         traj_list, reps = [50, 250, 500, 1000, 2500, 5000], args.reps
     else:
@@ -240,29 +284,54 @@ def main():
     for n_traj in traj_list:
         mapes = []
         for seed in range(reps):
-            rec = run_one(n_traj, seed, max_epochs=args.max_epochs, batch_size=args.batch_size)
+            rec = run_one(
+                n_traj,
+                seed,
+                max_epochs=args.max_epochs,
+                batch_size=args.batch_size,
+                anchor=args.anchor,
+            )
             records.append(rec)
             mapes.append(rec["mape"])
             nf = rec.get("nfxp_oracle_mape")
             nf_str = f" NFXP-oracle={nf:.3f}" if nf is not None else ""
-            print(f"[n_traj={n_traj:5d} seed={seed}] GLADIUS MAPE={rec['mape']:.3f}"
-                  f"{nf_str}  r_hat_maint[1:5]={rec['r_hat_maintain'][:5]} ({rec['seconds']}s)")
+            print(
+                f"[n_traj={n_traj:5d} seed={seed}] GLADIUS MAPE={rec['mape']:.3f}"
+                f"{nf_str}  r_hat_maint[1:5]={rec['r_hat_maintain'][:5]} ({rec['seconds']}s)"
+            )
         mean_mape = float(np.mean(mapes))
-        nfm = [r["nfxp_oracle_mape"] for r in records
-               if r["n_traj"] == n_traj and r.get("nfxp_oracle_mape") is not None]
-        nfxp_str = f" | NFXP-oracle {np.mean(nfm):.3f} (paper Rust {PAPER_RUST.get(n_traj)})" if nfm else ""
+        nfm = [
+            r["nfxp_oracle_mape"]
+            for r in records
+            if r["n_traj"] == n_traj and r.get("nfxp_oracle_mape") is not None
+        ]
+        nfxp_str = (
+            f" | NFXP-oracle {np.mean(nfm):.3f} (paper Rust {PAPER_RUST.get(n_traj)})"
+            if nfm
+            else ""
+        )
         paper = PAPER_GLADIUS.get(n_traj)
         if paper is not None:
-            print(f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f} "
-                  f"(paper {paper}, {mean_mape/paper:.1f}x){nfxp_str}")
+            print(
+                f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f} "
+                f"(paper {paper}, {mean_mape / paper:.1f}x){nfxp_str}"
+            )
         else:
             print(f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f}{nfxp_str}")
 
     if args.out:
-        args.out.write_text(json.dumps(
-            {"dgp": "paper bus (20 mileage, +1..4, theta=[1,5], beta=0.95)",
-             "estimator": "GLADIUSEstimator paper_minimax+shared_trunk, anchor=replace",
-             "paper_gladius_mape": PAPER_GLADIUS, "records": records}, indent=2))
+        args.out.write_text(
+            json.dumps(
+                {
+                    "dgp": "paper bus (20 mileage, +1..4, theta=[1,5], beta=0.95)",
+                    "estimator": f"GLADIUSEstimator {args.anchor}+shared_trunk, anchor=replace",
+                    "anchor": args.anchor,
+                    "paper_gladius_mape": PAPER_GLADIUS,
+                    "records": records,
+                },
+                indent=2,
+            )
+        )
         print(f"\nwrote {args.out}")
 
 
