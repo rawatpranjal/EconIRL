@@ -201,13 +201,13 @@ class BaseEstimator(ABC):
         # Compute standard errors
         needs_bootstrap_se = self._se_method == "bootstrap"
         needs_full_likelihood_se = (
-            self._se_method == "full_likelihood_bhhh"
-            and result.gradient_contributions is not None
+            self._se_method == "full_likelihood_bhhh" and result.gradient_contributions is not None
         )
         if result.hessian is not None or needs_bootstrap_se or needs_full_likelihood_se:
             # For bootstrap, create a function that re-estimates on a new panel
             estimate_fn = None
             if self._se_method == "bootstrap":
+
                 def _bootstrap_estimate_fn(bootstrap_panel: Panel) -> jnp.ndarray:
                     """Re-estimate on bootstrap sample (silent, fast settings)."""
                     saved_compute_hessian = self._compute_hessian
@@ -226,6 +226,7 @@ class BaseEstimator(ABC):
                         self._compute_hessian = saved_compute_hessian
                         self._verbose = saved_verbose
                     return bootstrap_result.parameters
+
                 estimate_fn = _bootstrap_estimate_fn
 
             se_result = compute_standard_errors(
@@ -248,9 +249,7 @@ class BaseEstimator(ABC):
 
         # Identification diagnostics
         if result.hessian is not None:
-            identification = check_identification(
-                result.hessian, utility.parameter_names
-            )
+            identification = check_identification(result.hessian, utility.parameter_names)
         else:
             identification = None
 
@@ -265,12 +264,26 @@ class BaseEstimator(ABC):
             num_observations=n_obs,
             aic=-2 * ll + 2 * n_params,
             bic=-2 * ll + n_params * float(jnp.log(jnp.array(n_obs))),
-            prediction_accuracy=self._compute_prediction_accuracy(
-                panel, result.policy
-            ),
+            prediction_accuracy=self._compute_prediction_accuracy(panel, result.policy),
         )
 
         total_time = time.time() - start_time
+
+        # Expanded diagnostics: data / pre-estimation / first-stage transition.
+        # Auxiliary reporting only -- never let it break a real fit.
+        from econirl.inference.results import compute_fit_diagnostics
+
+        dataset = pre_estimation = transition_first_stage = None
+        try:
+            feature_matrix = getattr(utility, "feature_matrix", None)
+            dataset, pre_estimation, transition_first_stage = compute_fit_diagnostics(
+                panel,
+                problem.num_states,
+                problem.num_actions,
+                feature_matrix=feature_matrix,
+            )
+        except Exception:  # noqa: BLE001 - diagnostics are non-critical
+            pass
 
         return EstimationSummary(
             parameters=result.parameters,
@@ -293,6 +306,12 @@ class BaseEstimator(ABC):
             value_function=result.value_function,
             policy=result.policy,
             estimation_time=total_time,
+            num_states=problem.num_states,
+            num_actions=problem.num_actions,
+            optimizer=result.metadata.get("optimizer"),
+            dataset=dataset,
+            pre_estimation=pre_estimation,
+            transition_first_stage=transition_first_stage,
             metadata={
                 **result.metadata,
                 "se_method": self._se_method,
@@ -300,9 +319,7 @@ class BaseEstimator(ABC):
             },
         )
 
-    def _compute_prediction_accuracy(
-        self, panel: Panel, policy: jnp.ndarray
-    ) -> float:
+    def _compute_prediction_accuracy(self, panel: Panel, policy: jnp.ndarray) -> float:
         """Compute fraction of correctly predicted choices.
 
         Args:
