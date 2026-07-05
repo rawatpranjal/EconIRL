@@ -25,15 +25,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Callable
+from typing import Any
 
-import numpy as np
-import jax
 import jax.numpy as jnp
+import numpy as np
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
-from econirl.core.types import DDCProblem, Panel
+from econirl.core.types import DDCProblem
 from econirl.inference.results import EstimationSummary
 from econirl.preferences.base import UtilityFunction
 
@@ -41,6 +40,20 @@ from econirl.preferences.base import UtilityFunction
 def _to_jax(x):
     """Convert any array-like (numpy, list, etc.) to JAX array."""
     return jnp.asarray(x)
+
+
+def _policy_total_variation(pi_a: jnp.ndarray, pi_b: jnp.ndarray) -> float:
+    """Mean over states of the total-variation distance between two policies."""
+    a = np.asarray(pi_a)
+    b = np.asarray(pi_b)
+    return float(0.5 * np.abs(a - b).sum(axis=-1).mean())
+
+
+def _value_rmse(v_a: jnp.ndarray, v_b: jnp.ndarray) -> float:
+    """Root mean squared error between two value functions."""
+    a = np.asarray(v_a)
+    b = np.asarray(v_b)
+    return float(np.sqrt(((a - b) ** 2).mean()))
 
 
 class CounterfactualType(IntEnum):
@@ -85,6 +98,170 @@ class CounterfactualResult:
     counterfactual_type: CounterfactualType = CounterfactualType.REWARD_CHANGE
     description: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Baseline transition kernel (A, S, S). When set, ``summary()`` reports
+    # long-run (stationary-weighted) demand and welfare, not just state means.
+    transitions: jnp.ndarray | None = None
+    # Counterfactual kernel, when it differs (Type 2 environment change). The
+    # counterfactual policy's long-run distribution is computed under this one.
+    counterfactual_transitions: jnp.ndarray | None = None
+
+    def summary(
+        self,
+        oracle: "CounterfactualResult | None" = None,
+        *,
+        transitions: jnp.ndarray | None = None,
+        mu_income: float | None = None,
+        reward_level_identified: bool = True,
+    ) -> str:
+        """Compare the baseline and counterfactual policies, Rust (1987) style.
+
+        Reports the two policies side by side (baseline, counterfactual, change)
+        over long-run demand, long-run state mean, and welfare, then the policy
+        shift distribution and the welfare change. When ``oracle`` (the true
+        counterfactual) is supplied, appends recovery error against it.
+
+        Parameters
+        ----------
+        oracle : CounterfactualResult, optional
+            The known-truth counterfactual (sim studies). Adds a recovery block
+            with policy total variation, welfare error, and value RMSE.
+        transitions : ndarray, optional
+            Baseline transition kernel ``(A, S, S)``; overrides ``self.transitions``.
+            Enables the long-run (stationary-weighted) rows.
+        mu_income : float, optional
+            Marginal utility of income. When given, the welfare change is also
+            reported in money units (``Delta V / mu_income``).
+        reward_level_identified : bool, default True
+            Set False for IRL/neural fits where the reward level is not
+            identified; welfare-in-levels rows are then withheld.
+        """
+        trans = transitions if transitions is not None else self.transitions
+        width = 74
+        sep = "=" * width
+        dash = "-" * width
+
+        pol_b = np.asarray(self.baseline_policy)
+        pol_c = np.asarray(self.counterfactual_policy)
+        n_actions = pol_b.shape[1]
+
+        head = self.description or (
+            f"Type {int(self.counterfactual_type)} ({self.counterfactual_type.name})"
+        )
+        lines = [
+            "Counterfactual Summary".center(width),
+            sep,
+            f"{head}{'':6}Oracle: {'known' if oracle is not None else 'none'}",
+        ]
+        change = self._change_line()
+        if change:
+            lines.append(f"Change:  {change}")
+        lines.append(dash)
+
+        # --- baseline | counterfactual | change table ---
+        if trans is not None:
+            cf_trans = (
+                self.counterfactual_transitions
+                if self.counterfactual_transitions is not None
+                else trans
+            )
+            mu_b = np.asarray(compute_stationary_distribution(self.baseline_policy, trans))
+            mu_c = np.asarray(compute_stationary_distribution(self.counterfactual_policy, cf_trans))
+            lines.append(f"  {'':26}{'baseline':>10}{'counterfactual':>16}{'change':>10}")
+            for a in range(n_actions):
+                rate_b = float((mu_b * pol_b[:, a]).sum())
+                rate_c = float((mu_c * pol_c[:, a]).sum())
+                lines.append(self._row(f"Action rate a={a} (long-run)", rate_b, rate_c))
+            states = np.arange(pol_b.shape[0])
+            sm_b = float((mu_b * states).sum())
+            sm_c = float((mu_c * states).sum())
+            lines.append(self._row("Long-run state mean", sm_b, sm_c))
+
+            if reward_level_identified:
+                welfare = compute_welfare_effect(self, trans, use_stationary=True)
+                ev_b = float(welfare["baseline_expected_value"])
+                ev_c = float(welfare["counterfactual_expected_value"])
+                lines.append(self._row("Expected value  E_mu[V]", ev_b, ev_c))
+        else:
+            # No transitions: fall back to unweighted action frequencies.
+            lines.append(f"  {'':26}{'baseline':>10}{'counterfactual':>16}{'change':>10}")
+            for a in range(n_actions):
+                lines.append(
+                    self._row(
+                        f"Mean choice prob a={a}",
+                        float(pol_b[:, a].mean()),
+                        float(pol_c[:, a].mean()),
+                    )
+                )
+
+        lines.append(dash)
+
+        # --- policy shift distribution ---
+        dpi = np.abs(np.asarray(self.policy_change)).ravel()
+        q = {
+            "max": float(dpi.max()),
+            "p95": float(np.percentile(dpi, 95)),
+            "p50": float(np.percentile(dpi, 50)),
+            "p5": float(np.percentile(dpi, 5)),
+        }
+        lines.append(
+            "  Policy shift |dpi|:   "
+            f"max {q['max']:.2f} . p95 {q['p95']:.2f} . p50 {q['p50']:.2f}"
+            f" . p5 {q['p5']:.2f}"
+        )
+
+        # --- welfare change (inclusive value / consumer surplus) ---
+        if reward_level_identified:
+            mean_dv = float(np.asarray(self.value_change).mean())
+            stat_txt = ""
+            if trans is not None:
+                welfare = compute_welfare_effect(self, trans, use_stationary=True)
+                stat_txt = f" , {float(welfare['total_welfare_change']):+.2f} (stationary)"
+            lines.append(f"  Welfare change:       {mean_dv:+.2f} utils (mean states){stat_txt}")
+            lines.append("  (welfare = E[V], the inclusive value / consumer surplus)")
+            if mu_income is not None and trans is not None:
+                welfare = compute_welfare_effect(self, trans, use_stationary=True)
+                dollars = float(welfare["total_welfare_change"]) / mu_income
+                lines.append(f"  Welfare change ($):   {dollars:+.2f}")
+        else:
+            lines.append(
+                "  Welfare:              not identified in levels -- behavioral comparison only"
+            )
+
+        # --- oracle recovery ---
+        if oracle is not None:
+            lines.append(dash)
+            lines.append("  -- recovery vs oracle --")
+            tv = _policy_total_variation(self.counterfactual_policy, oracle.counterfactual_policy)
+            lines.append(f"  Policy TV vs truth:      {tv:.4f}")
+            if reward_level_identified:
+                w_est = float(np.asarray(self.value_change).mean())
+                w_true = float(np.asarray(oracle.value_change).mean())
+                lines.append(
+                    f"  Welfare error:          {w_est - w_true:+.4f}"
+                    f"  (est {w_est:+.3f} vs true {w_true:+.3f})"
+                )
+            vr = _value_rmse(self.counterfactual_value, oracle.counterfactual_value)
+            lines.append(f"  Value RMSE vs truth:     {vr:.4f}")
+
+        lines.append(sep)
+        return "\n".join(lines)
+
+    def _change_line(self) -> str:
+        """One-line description of the change, drawn from metadata."""
+        m = self.metadata
+        if "baseline_parameters" in m and "counterfactual_parameters" in m:
+            b = m["baseline_parameters"]
+            c = m["counterfactual_parameters"]
+            return f"parameters {np.round(b, 3).tolist()} -> {np.round(c, 3).tolist()}"
+        if "baseline_discount" in m and "counterfactual_discount" in m:
+            return f"discount {m['baseline_discount']} -> {m['counterfactual_discount']}"
+        if "state_mapping" in m:
+            return "state remapping"
+        return ""
+
+    def _row(self, label: str, base: float, cf: float) -> str:
+        """Format one baseline | counterfactual | change row."""
+        return f"  {label:26}{base:>10.3f}{cf:>16.3f}{cf - base:>+10.3f}"
 
 
 def state_extrapolation(
@@ -149,6 +326,7 @@ def state_extrapolation(
         counterfactual_type=CounterfactualType.STATE_EXTRAPOLATION,
         description="Type 1: state-value extrapolation",
         metadata={"state_mapping": mapping_arr.tolist()},
+        transitions=transitions,
     )
 
 
@@ -226,6 +404,7 @@ def counterfactual_policy(
             "baseline_parameters": result.parameters.tolist(),
             "counterfactual_parameters": new_params.tolist(),
         },
+        transitions=transitions,
     )
 
 
@@ -275,6 +454,8 @@ def counterfactual_transitions(
         counterfactual_type=CounterfactualType.ENVIRONMENT_CHANGE,
         description="Type 2: environment change",
         metadata={},
+        transitions=baseline_transitions,
+        counterfactual_transitions=new_transitions,
     )
 
 
@@ -343,24 +524,26 @@ def simulate_counterfactual(
     cf_states = cf_panel.get_all_states()
 
     # Action frequencies (functional — no in-place mutation)
-    baseline_action_freq = jnp.array([
-        float((baseline_actions == a).astype(jnp.float32).mean())
-        for a in range(problem.num_actions)
-    ])
-    cf_action_freq = jnp.array([
-        float((cf_actions == a).astype(jnp.float32).mean())
-        for a in range(problem.num_actions)
-    ])
+    baseline_action_freq = jnp.array(
+        [
+            float((baseline_actions == a).astype(jnp.float32).mean())
+            for a in range(problem.num_actions)
+        ]
+    )
+    cf_action_freq = jnp.array(
+        [float((cf_actions == a).astype(jnp.float32).mean()) for a in range(problem.num_actions)]
+    )
 
     # State frequencies
-    baseline_state_freq = jnp.array([
-        float((baseline_states == s).astype(jnp.float32).mean())
-        for s in range(problem.num_states)
-    ])
-    cf_state_freq = jnp.array([
-        float((cf_states == s).astype(jnp.float32).mean())
-        for s in range(problem.num_states)
-    ])
+    baseline_state_freq = jnp.array(
+        [
+            float((baseline_states == s).astype(jnp.float32).mean())
+            for s in range(problem.num_states)
+        ]
+    )
+    cf_state_freq = jnp.array(
+        [float((cf_states == s).astype(jnp.float32).mean()) for s in range(problem.num_states)]
+    )
 
     return {
         "baseline_action_frequencies": baseline_action_freq,
@@ -435,21 +618,15 @@ def compute_welfare_effect(
     """
     if use_stationary:
         # Weight by stationary distribution under baseline policy
-        mu_baseline = compute_stationary_distribution(
-            counterfactual.baseline_policy, transitions
-        )
-        mu_cf = compute_stationary_distribution(
-            counterfactual.counterfactual_policy, transitions
-        )
+        mu_baseline = compute_stationary_distribution(counterfactual.baseline_policy, transitions)
+        mu_cf = compute_stationary_distribution(counterfactual.counterfactual_policy, transitions)
 
         # Expected value under each distribution
         ev_baseline = (mu_baseline * counterfactual.baseline_value).sum()
         ev_cf = (mu_cf * counterfactual.counterfactual_value).sum()
 
         # Welfare change holding distribution fixed
-        welfare_fixed_dist = (
-            mu_baseline * counterfactual.value_change
-        ).sum()
+        welfare_fixed_dist = (mu_baseline * counterfactual.value_change).sum()
 
         return {
             "baseline_expected_value": ev_baseline,
@@ -523,6 +700,7 @@ def discount_factor_change(
             "baseline_discount": problem.discount_factor,
             "counterfactual_discount": new_discount,
         },
+        transitions=transitions,
     )
 
 
@@ -560,20 +738,14 @@ def welfare_decomposition(
         components sum to the total.
     """
     if new_parameters is None and new_transitions is None:
-        raise ValueError(
-            "At least one of new_parameters or new_transitions must be provided"
-        )
+        raise ValueError("At least one of new_parameters or new_transitions must be provided")
 
     old_reward = _to_jax(utility.compute(result.parameters))
     new_reward = (
-        _to_jax(utility.compute(new_parameters))
-        if new_parameters is not None
-        else old_reward
+        _to_jax(utility.compute(new_parameters)) if new_parameters is not None else old_reward
     )
     cf_transitions = (
-        _to_jax(new_transitions)
-        if new_transitions is not None
-        else _to_jax(baseline_transitions)
+        _to_jax(new_transitions) if new_transitions is not None else _to_jax(baseline_transitions)
     )
 
     operator_old_p = SoftBellmanOperator(problem, _to_jax(baseline_transitions))
@@ -660,9 +832,7 @@ def counterfactual(
     # Type 1: state mapping only
     if has_mapping:
         if has_params or has_transitions or has_discount:
-            raise ValueError(
-                "state_mapping (Type 1) cannot be combined with other changes"
-            )
+            raise ValueError("state_mapping (Type 1) cannot be combined with other changes")
         return state_extrapolation(result, state_mapping, problem, transitions)
 
     # Type 3: discount factor change
@@ -677,15 +847,11 @@ def counterfactual(
 
     # Type 2: transition change only
     if has_transitions and not has_params:
-        return counterfactual_transitions(
-            result, new_transitions, utility, problem, transitions
-        )
+        return counterfactual_transitions(result, new_transitions, utility, problem, transitions)
 
     # Type 3: parameter change only
     if has_params and not has_transitions:
-        return counterfactual_policy(
-            result, new_parameters, utility, problem, transitions
-        )
+        return counterfactual_policy(result, new_parameters, utility, problem, transitions)
 
     # Combined Type 2+3: both parameter and transition change
     if has_params and has_transitions:
@@ -785,12 +951,8 @@ def elasticity_analysis(
     # Compute approximate elasticities
     if len(pct_changes) >= 2:
         # Use central difference if we have symmetric changes
-        policy_elasticity = np.gradient(
-            results["policy_changes"], pct_changes
-        ).mean()
-        welfare_elasticity = np.gradient(
-            results["welfare_changes"], pct_changes
-        ).mean()
+        policy_elasticity = np.gradient(results["policy_changes"], pct_changes).mean()
+        welfare_elasticity = np.gradient(results["welfare_changes"], pct_changes).mean()
 
         results["policy_elasticity"] = policy_elasticity
         results["welfare_elasticity"] = welfare_elasticity
@@ -987,7 +1149,10 @@ def neural_global_perturbation(
     reward_matrix = _to_jax(reward_matrix)
     cf_reward = reward_matrix.at[:, action].add(-delta)
     return neural_reward_counterfactual(
-        reward_matrix, cf_reward, problem, transitions,
+        reward_matrix,
+        cf_reward,
+        problem,
+        transitions,
         description=f"Global perturbation: action {action}, delta={delta}",
     )
 
@@ -1022,9 +1187,12 @@ def neural_local_perturbation(
     perturbation = jnp.where(state_mask, -delta, 0.0)
     cf_reward = reward_matrix.at[:, action].add(perturbation)
     return neural_reward_counterfactual(
-        reward_matrix, cf_reward, problem, transitions,
+        reward_matrix,
+        cf_reward,
+        problem,
+        transitions,
         description=f"Local perturbation: action {action}, delta={delta}, "
-                    f"{int(state_mask.sum())} states affected",
+        f"{int(state_mask.sum())} states affected",
     )
 
 
@@ -1109,7 +1277,10 @@ def neural_choice_set_counterfactual(
     cf_reward = jnp.where(action_mask, reward_matrix, -1e30)
     n_blocked = int((~action_mask).sum())
     return neural_reward_counterfactual(
-        reward_matrix, cf_reward, problem, transitions,
+        reward_matrix,
+        cf_reward,
+        problem,
+        transitions,
         description=f"Choice set counterfactual: {n_blocked} state-action pairs blocked",
     )
 
@@ -1158,15 +1329,15 @@ def neural_sieve_compression(
         dr_list.append(reward_matrix[:, a] - reward_matrix[:, 0])
         dphi_list.append(feature_matrix[:, a, :] - feature_matrix[:, 0, :])
 
-    dr = jnp.concatenate(dr_list)               # ((A-1)*S,)
-    dphi = jnp.concatenate(dphi_list, axis=0)    # ((A-1)*S, K)
+    dr = jnp.concatenate(dr_list)  # ((A-1)*S,)
+    dphi = jnp.concatenate(dphi_list, axis=0)  # ((A-1)*S, K)
 
     # Least-squares: theta = (dPhi'dPhi)^{-1} dPhi' dr
     theta, residuals_arr, rank, sv = jnp.linalg.lstsq(dphi, dr, rcond=None)
 
     predicted = dphi @ theta
     resid = dr - predicted
-    ss_res = float((resid ** 2).sum())
+    ss_res = float((resid**2).sum())
     ss_tot = float(((dr - dr.mean()) ** 2).sum())
     r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
 
