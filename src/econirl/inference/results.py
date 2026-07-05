@@ -148,6 +148,52 @@ def _quantiles(values: Any) -> dict[str, float]:
     }
 
 
+def _coverage_checks(
+    sa_counts: np.ndarray,
+    panel: Any,
+    num_states: int,
+    num_actions: int,
+) -> PreEstimationChecks:
+    """Coverage-kind pre-estimation block for IRL / neural estimators.
+
+    Reuses the ``(S, A)`` counts already accumulated in
+    ``compute_fit_diagnostics`` -- no re-read of the panel's flat arrays.
+    ``effective_occupancy_support`` needs transitions plus a policy and is left
+    unset here.
+    """
+    obs_per_state = sa_counts.sum(axis=1)
+    visited = obs_per_state > 0
+    state_action_coverage = float((sa_counts > 0).sum()) / (num_states * num_actions)
+    state_coverage = float(visited.sum()) / num_states
+
+    total_obs = float(obs_per_state.sum())
+    entropies: list[float] = []
+    weights: list[float] = []
+    for s in range(num_states):
+        n_s = obs_per_state[s]
+        if n_s == 0:
+            continue
+        p = sa_counts[s] / n_s
+        p_nonzero = p[p > 0]
+        entropies.append(float(-(p_nonzero * np.log(p_nonzero)).sum()))
+        weights.append(float(n_s) / total_obs)
+    demo_policy_entropy = float(np.average(entropies, weights=weights)) if entropies else 0.0
+
+    first_states = np.array([int(traj.states[0]) for traj in panel.trajectories])
+    _, init_counts = np.unique(first_states, return_counts=True)
+    p_init = init_counts / init_counts.sum()
+    initial_state_entropy = float(-(p_init * np.log(p_init)).sum())
+
+    return PreEstimationChecks(
+        kind="coverage",
+        state_action_coverage=state_action_coverage,
+        state_coverage=state_coverage,
+        demo_policy_entropy=demo_policy_entropy,
+        initial_states=int(init_counts.size),
+        initial_state_entropy=initial_state_entropy,
+    )
+
+
 def compute_fit_diagnostics(
     panel: Any,
     num_states: int,
@@ -158,8 +204,9 @@ def compute_fit_diagnostics(
     """Compute the DATA, PRE-ESTIMATION, and FIRST-STAGE TRANSITION blocks.
 
     Reads the panel once. ``feature_matrix`` of shape ``(S, A, K)`` selects the
-    structural feature-rank pre-estimation block; when ``None`` the block is
-    left unset (the IRL / neural coverage block is added in a later pass).
+    structural feature-rank pre-estimation block; when ``None`` a coverage-kind
+    block is returned instead (panel-coverage statistics, no linear reward
+    design to check).
 
     Counts are accumulated sparsely (via ``np.unique`` over observed tuples), so
     this scales to large state spaces without materializing an ``(A, S, S)``
@@ -211,6 +258,8 @@ def compute_fit_diagnostics(
             contrast_condition_number=float(fd["contrast_condition_number"]),
             verdict=verdict,
         )
+    else:
+        pre_estimation = _coverage_checks(sa_counts, panel, num_states, num_actions)
 
     # --- first-stage transition estimate + multinomial SE (sparse) ---
     transition_first_stage: TransitionFirstStage | None = None

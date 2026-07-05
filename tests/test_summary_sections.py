@@ -124,6 +124,26 @@ def test_summary_shows_obs_count_without_dataset_block():
     assert "[1] DATA" not in out  # no diagnostics block was attached
 
 
+def test_pre_estimation_coverage_block_when_no_feature_matrix():
+    panel = _hand_panel()
+    _dataset, pre, _trans = compute_fit_diagnostics(panel, num_states=3, num_actions=2)
+
+    assert pre is not None
+    assert pre.kind == "coverage"
+    # all 3 states visited (s0, s1, s2)
+    assert pre.state_coverage == 1.0
+    # observed (s,a) pairs: (0,0), (1,1), (2,1) out of 3 states x 2 actions
+    assert pre.state_action_coverage == 0.5
+    assert pre.demo_policy_entropy is not None
+    assert pre.demo_policy_entropy >= 0.0
+    # every visited state has a single action here -> zero-entropy demo policy
+    assert abs(pre.demo_policy_entropy - 0.0) < 1e-9
+    # two trajectories, first states 0 and 1 -> 2 distinct initial states
+    assert pre.initial_states == 2
+    assert pre.initial_state_entropy is not None
+    assert abs(pre.initial_state_entropy - np.log(2)) < 1e-9
+
+
 def test_summary_oracle_columns():
     s = EstimationSummary(
         parameters=np.array([1.0, -2.0]),
