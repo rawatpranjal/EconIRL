@@ -18,6 +18,38 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from econirl.core.reward_spec import RewardSpec
+
+
+def rust_bus_reward_spec(
+    n_states: int = 90,
+    names: tuple[str, str] = ("operating_cost", "replacement_cost"),
+) -> RewardSpec:
+    """Generic reward specification for the Rust (1987) bus engine problem.
+
+    Keep pays an operating cost that grows linearly with mileage; replace pays
+    one fixed cost. This is the explicit, generic form of the reward the old
+    ``"linear_cost"`` string preset used to build internally. Copy and adapt it
+    for your own model.
+
+    Parameters
+    ----------
+    n_states : int, default=90
+        Number of mileage bins.
+    names : tuple of str, default=("operating_cost", "replacement_cost")
+        Parameter names, in feature order.
+
+    Returns
+    -------
+    RewardSpec
+        Action-dependent features of shape ``(n_states, 2, 2)``.
+    """
+    mileage = np.arange(n_states, dtype=np.float32)
+    features = np.zeros((n_states, 2, 2), dtype=np.float32)
+    features[:, 0, 0] = -mileage  # keep: operating cost grows with mileage
+    features[:, 1, 1] = -1.0  # replace: one fixed replacement cost
+    return RewardSpec.state_action_dependent(features, names=list(names))
+
 
 def load_rust_bus(
     group: Optional[int] = None,
@@ -98,8 +130,9 @@ def load_rust_bus(
         df = df[df["group"] == group].copy()
 
     if as_panel:
-        from econirl.core.types import Panel, Trajectory
         import jax.numpy as jnp
+
+        from econirl.core.types import Panel, Trajectory
 
         # Convert to Panel format
         bus_ids = df["bus_id"].unique()
@@ -153,8 +186,8 @@ def _generate_rust_bus_data() -> pd.DataFrame:
         {"n_buses": 15, "n_periods": 120, "base_mileage_rate": 1.1},  # Group 2
         {"n_buses": 10, "n_periods": 100, "base_mileage_rate": 0.9},  # Group 3
         {"n_buses": 12, "n_periods": 110, "base_mileage_rate": 1.0},  # Group 4
-        {"n_buses": 10, "n_periods": 90, "base_mileage_rate": 1.2},   # Group 5
-        {"n_buses": 8, "n_periods": 80, "base_mileage_rate": 0.8},    # Group 6
+        {"n_buses": 10, "n_periods": 90, "base_mileage_rate": 1.2},  # Group 5
+        {"n_buses": 8, "n_periods": 80, "base_mileage_rate": 0.8},  # Group 6
         {"n_buses": 10, "n_periods": 100, "base_mileage_rate": 1.0},  # Group 7
         {"n_buses": 10, "n_periods": 95, "base_mileage_rate": 1.05},  # Group 8
     ]
@@ -186,14 +219,16 @@ def _generate_rust_bus_data() -> pd.DataFrame:
                 replaced = int(np.random.random() < prob_replace)
 
                 # Record observation
-                records.append({
-                    "bus_id": bus_id_counter,
-                    "period": period,
-                    "mileage": cumulative_mileage,
-                    "mileage_bin": mileage_bin,
-                    "replaced": replaced,
-                    "group": group,
-                })
+                records.append(
+                    {
+                        "bus_id": bus_id_counter,
+                        "period": period,
+                        "mileage": cumulative_mileage,
+                        "mileage_bin": mileage_bin,
+                        "replaced": replaced,
+                        "group": group,
+                    }
+                )
 
                 # State transition
                 if replaced:

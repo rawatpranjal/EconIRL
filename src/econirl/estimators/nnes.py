@@ -35,9 +35,8 @@ import pandas as pd
 from scipy.stats import norm as scipy_norm
 
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
+from econirl.core.types import DDCProblem, Panel, TrajectoryPanel
 from econirl.estimation.nnes import NNESConfig, NNESEstimator, NNESNFXPEstimator
-from econirl.preferences.linear import LinearUtility
 from econirl.transitions import TransitionEstimator
 
 
@@ -57,10 +56,10 @@ class NNES:
         Number of discrete actions (e.g., keep/replace).
     discount : float, default=0.9999
         Time discount factor (beta).
-    utility : str or RewardSpec, default="linear_cost"
-        Utility specification.  Pass ``"linear_cost"`` for the classic Rust
-        bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
-        ``RewardSpec`` for custom features.
+    utility : RewardSpec
+        Utility specification as a ``RewardSpec``.  For the classic Rust bus
+        model, use ``rust_bus_reward_spec(n_states)`` from
+        ``econirl.datasets``.
     bellman : str, default="npl"
         Which Bellman equation to use in Phase 1.  ``"npl"`` uses the NPL
         Bellman with Hotz-Miller emax correction (has Neyman orthogonality,
@@ -118,7 +117,7 @@ class NNES:
         n_states: int = 90,
         n_actions: int = 2,
         discount: float = 0.9999,
-        utility: str | RewardSpec = "linear_cost",
+        utility: RewardSpec | None = None,
         bellman: Literal["npl", "nfxp"] = "npl",
         se_method: Literal["robust", "asymptotic"] = "asymptotic",
         hidden_dim: int = 32,
@@ -203,33 +202,27 @@ class NNES:
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
-        # --- Handle reward: RewardSpec or string ---
+        # --- Handle reward: RewardSpec ---
         if isinstance(reward_spec, RewardSpec):
             self.reward_spec_ = reward_spec
             self._utility_fn = reward_spec.to_linear_utility()
-        elif reward_spec == "linear_cost":
-            self._utility_fn = self._create_utility()
-            # Also create RewardSpec from the utility for consistency
-            self.reward_spec_ = RewardSpec(
-                self._utility_fn.feature_matrix,
-                self._utility_fn.parameter_names,
-            )
         else:
-            raise ValueError(f"Unknown reward/utility specification: {reward_spec}")
+            raise ValueError(
+                "utility must be a RewardSpec; the 'linear_cost' preset was "
+                "removed. Build features explicitly, e.g. "
+                "rust_bus_reward_spec(n_states) from econirl.datasets for "
+                "the Rust bus."
+            )
 
         # Estimate transitions if not provided
         if transitions is None:
@@ -252,7 +245,9 @@ class NNES:
             discount_factor=self.discount,
             scale_parameter=1.0,
             state_dim=1,
-            state_encoder=lambda s: jnp.expand_dims(jnp.asarray(s, dtype=jnp.float32) / max(self.n_states - 1, 1), axis=-1),
+            state_encoder=lambda s: jnp.expand_dims(
+                jnp.asarray(s, dtype=jnp.float32) / max(self.n_states - 1, 1), axis=-1
+            ),
         )
 
         # Create the underlying NNES estimator (NPL or NFXP variant)
@@ -306,8 +301,7 @@ class NNES:
             expected_shape = (self.n_actions, self.n_states, self.n_states)
             if keep_transitions.shape != expected_shape:
                 raise ValueError(
-                    "3D transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
             return jnp.array(keep_transitions)
 
@@ -322,34 +316,6 @@ class NNES:
             transitions[1, s, :] = transitions[0, 0, :]
 
         return jnp.array(transitions)
-
-    def _create_utility(self) -> LinearUtility:
-        """Create utility function for estimation.
-
-        Returns
-        -------
-        LinearUtility
-            Utility function with appropriate features.
-        """
-        if self.utility != "linear_cost":
-            raise ValueError(f"Unknown utility specification: {self.utility}")
-
-        # Build feature matrix for linear cost utility
-        # U(s, keep) = -theta_c * s
-        # U(s, replace) = -RC
-        n = self.n_states
-        features = jnp.zeros((n, self.n_actions, 2))
-        mileage = jnp.arange(n, dtype=jnp.float32)
-
-        # Keep action (a=0): feature = [-s, 0]
-        features = features.at[:, 0, 0].set(-mileage)
-        # Replace action (a=1): feature = [0, -1]
-        features = features.at[:, 1, 1].set(-1.0)
-
-        return LinearUtility(
-            feature_matrix=features,
-            parameter_names=["theta_c", "RC"],
-        )
 
     def _extract_results(self) -> None:
         """Extract results from estimation into sklearn-style attributes."""
@@ -385,9 +351,7 @@ class NNES:
                 se_val = self.se_[name]
                 if se_val and se_val > 0:
                     t_stat = self.params_[name] / se_val
-                    pvalues[name] = float(
-                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
-                    )
+                    pvalues[name] = float(2 * (1 - scipy_norm.cdf(abs(t_stat))))
                 else:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues

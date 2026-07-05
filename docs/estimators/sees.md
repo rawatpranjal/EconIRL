@@ -253,7 +253,7 @@ penalty is strong, SEES approaches the MPEC formulation in finite state spaces.
 ## Usage
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import SEES
 
 df = load_rust_bus()
@@ -261,7 +261,7 @@ df = load_rust_bus()
 model = SEES(
     n_states=90,
     discount=0.9999,
-    utility="linear_cost",
+    utility=rust_bus_reward_spec(90),
     solution="value",
     basis_type="fourier",
     basis_dim=8,

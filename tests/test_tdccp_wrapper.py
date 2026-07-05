@@ -6,20 +6,21 @@ Full Rust bus tests are marked @pytest.mark.slow.
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import pytest
-import jax.numpy as jnp
 
-from econirl.estimators.tdccp import TDCCP
-from econirl.estimators.protocol import EstimatorProtocol
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import TrajectoryPanel
-
+from econirl.datasets import rust_bus_reward_spec
+from econirl.estimators.protocol import EstimatorProtocol
+from econirl.estimators.tdccp import TDCCP
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def small_df():
@@ -30,12 +31,14 @@ def small_df():
         state = 0
         for period in range(30):
             action = 1 if np.random.random() < 0.05 * state else 0
-            records.append({
-                "bus_id": bus_id,
-                "period": period,
-                "mileage_bin": state,
-                "replaced": action,
-            })
+            records.append(
+                {
+                    "bus_id": bus_id,
+                    "period": period,
+                    "mileage_bin": state,
+                    "replaced": action,
+                }
+            )
             state = 0 if action == 1 else min(state + np.random.choice([0, 1]), 4)
     return pd.DataFrame(records)
 
@@ -55,7 +58,7 @@ def fitted_model(small_df):
         n_states=5,
         n_actions=2,
         discount=0.95,
-        utility="linear_cost",
+        utility=rust_bus_reward_spec(5),
         avi_iterations=2,
         epochs_per_avi=5,
         n_policy_iterations=1,
@@ -77,14 +80,20 @@ def fitted_model(small_df):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestBasicFit:
     """Test that basic fitting works without errors."""
 
     def test_fit_returns_self(self, small_df):
         model = TDCCP(
-            n_states=5, discount=0.95,
-            avi_iterations=2, epochs_per_avi=5,
-            n_policy_iterations=1, hidden_dim=16, num_hidden_layers=1,
+            n_states=5,
+            discount=0.95,
+            utility=rust_bus_reward_spec(5),
+            avi_iterations=2,
+            epochs_per_avi=5,
+            n_policy_iterations=1,
+            hidden_dim=16,
+            num_hidden_layers=1,
         )
         result = model.fit(
             data=small_df,
@@ -102,8 +111,8 @@ class TestParametersPresent:
     """Test that estimated parameters have expected keys."""
 
     def test_params_keys(self, fitted_model):
-        assert "theta_c" in fitted_model.params_
-        assert "RC" in fitted_model.params_
+        assert "operating_cost" in fitted_model.params_
+        assert "replacement_cost" in fitted_model.params_
 
     def test_params_are_floats(self, fitted_model):
         for name, val in fitted_model.params_.items():
@@ -127,13 +136,13 @@ class TestAttributes:
 
     def test_pvalues_present(self, fitted_model):
         assert fitted_model.pvalues_ is not None
-        assert "theta_c" in fitted_model.pvalues_
-        assert "RC" in fitted_model.pvalues_
+        assert "operating_cost" in fitted_model.pvalues_
+        assert "replacement_cost" in fitted_model.pvalues_
 
     def test_se_present(self, fitted_model):
         assert fitted_model.se_ is not None
-        assert "theta_c" in fitted_model.se_
-        assert "RC" in fitted_model.se_
+        assert "operating_cost" in fitted_model.se_
+        assert "replacement_cost" in fitted_model.se_
 
     def test_log_likelihood(self, fitted_model):
         assert fitted_model.log_likelihood_ is not None
@@ -156,8 +165,8 @@ class TestConfInt:
     def test_conf_int_returns_dict(self, fitted_model):
         ci = fitted_model.conf_int()
         assert isinstance(ci, dict)
-        assert "theta_c" in ci
-        assert "RC" in ci
+        assert "operating_cost" in ci
+        assert "replacement_cost" in ci
 
     def test_conf_int_has_lower_upper(self, fitted_model):
         ci = fitted_model.conf_int()
@@ -212,9 +221,13 @@ class TestRewardSpecInput:
         spec = RewardSpec(features, ["cost", "replace_cost"])
 
         model = TDCCP(
-            n_states=n_states, discount=0.95,
-            avi_iterations=2, epochs_per_avi=5,
-            n_policy_iterations=1, hidden_dim=16, num_hidden_layers=1,
+            n_states=n_states,
+            discount=0.95,
+            avi_iterations=2,
+            epochs_per_avi=5,
+            n_policy_iterations=1,
+            hidden_dim=16,
+            num_hidden_layers=1,
         )
         model.fit(
             data=small_df,
@@ -239,7 +252,7 @@ class TestEVFeatures:
             assert isinstance(ev, np.ndarray)
             # Shape should be (n_states, n_features)
             assert ev.shape[0] == 5  # n_states
-            assert ev.shape[1] == 2  # n_features (theta_c, RC)
+            assert ev.shape[1] == 2  # n_features (operating_cost, replacement_cost)
 
     def test_ev_features_type(self, fitted_model):
         ev = fitted_model.ev_features_
@@ -300,9 +313,14 @@ class TestTrajectoryPanelInput:
 
     def test_fit_with_panel(self, small_panel):
         model = TDCCP(
-            n_states=5, discount=0.95,
-            avi_iterations=2, epochs_per_avi=5,
-            n_policy_iterations=1, hidden_dim=16, num_hidden_layers=1,
+            n_states=5,
+            discount=0.95,
+            utility=rust_bus_reward_spec(5),
+            avi_iterations=2,
+            epochs_per_avi=5,
+            n_policy_iterations=1,
+            hidden_dim=16,
+            num_hidden_layers=1,
         )
         model.fit(data=small_panel)
         assert model.params_ is not None

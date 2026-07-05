@@ -7,7 +7,7 @@ the current engine or replace it.
 SEES can be used through the dataframe wrapper for a quick package smoke test.
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import SEES
 
 df = load_rust_bus()
@@ -16,7 +16,7 @@ model = SEES(
     n_states=90,
     n_actions=2,
     discount=0.9999,
-    utility="linear_cost",
+    utility=rust_bus_reward_spec(90),
     basis_type="fourier",
     basis_dim=8,
     penalty_weight=10.0,

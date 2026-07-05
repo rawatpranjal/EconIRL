@@ -6,7 +6,7 @@ it does for NFXP. Change a parameter, re-solve the dynamic program once, and
 read off the new policy and value function.
 
 ```python
-result = model.counterfactual(RC=15.0)
+result = model.counterfactual(replacement_cost=15.0)
 
 print(result.params)   # parameters used for the counterfactual solve
 print(result.policy)   # choice probabilities under the new world

@@ -297,12 +297,12 @@ when the state space makes NFXP's repeated solves expensive.
 ## Usage
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import UFXP
 
 df = load_rust_bus()
 
-model = UFXP(n_states=90, discount=0.9999, utility="linear_cost")
+model = UFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
@@ -313,7 +313,7 @@ Counterfactual analysis re-solves the fitted dynamic program under a changed
 primitive:
 
 ```python
-cf = model.counterfactual(RC=4.0)      # raise the replacement cost
+cf = model.counterfactual(replacement_cost=4.0)   # raise the replacement cost
 print(cf.params)
 print(cf.policy)                       # new replacement probability by state
 ```

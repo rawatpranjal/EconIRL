@@ -4,7 +4,7 @@ The public `counterfactual` method handles structural parameter changes. It
 solves the fitted model again after changing one or more fitted parameters.
 
 ```python
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 
 print(cf.params)
 print(cf.value_function)

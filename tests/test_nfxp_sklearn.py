@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from econirl.core.types import Panel, Trajectory
+from econirl.datasets import rust_bus_reward_spec
 
 
 class TestNFXPInit:
@@ -24,7 +25,7 @@ class TestNFXPInit:
         assert estimator.n_states == 90
         assert estimator.n_actions == 2
         assert estimator.discount == 0.9999
-        assert estimator.utility == "linear_cost"
+        assert estimator.utility is None
         assert estimator.se_method == "robust"
         assert estimator.n_bootstrap == 400
         assert estimator.se_seed is None
@@ -34,11 +35,12 @@ class TestNFXPInit:
         """NFXP can be initialized with custom parameters."""
         from econirl.estimators import NFXP
 
+        utility = rust_bus_reward_spec(50)
         estimator = NFXP(
             n_states=50,
             n_actions=3,
             discount=0.95,
-            utility="linear_cost",
+            utility=utility,
             se_method="clustered",
             n_bootstrap=17,
             se_seed=123,
@@ -48,7 +50,7 @@ class TestNFXPInit:
         assert estimator.n_states == 50
         assert estimator.n_actions == 3
         assert estimator.discount == 0.95
-        assert estimator.utility == "linear_cost"
+        assert estimator.utility is utility
         assert estimator.se_method == "clustered"
         assert estimator.n_bootstrap == 17
         assert estimator.se_seed == 123
@@ -72,14 +74,20 @@ class TestNFXPFit:
             for t in range(n_periods):
                 # Simple stochastic policy
                 action = 1 if state > 50 or np.random.random() < 0.05 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.3, 0.6, 0.1]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.3, 0.6, 0.1]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         return pd.DataFrame(data)
@@ -104,7 +112,7 @@ class TestNFXPFit:
         """fit() should return self for method chaining."""
         from econirl.estimators import NFXP
 
-        estimator = NFXP(n_states=90, verbose=False)
+        estimator = NFXP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         result = estimator.fit(
             data=sample_dataframe,
             state="mileage_bin",
@@ -126,7 +134,7 @@ class TestNFXPFit:
                 s_next = min(s + delta, n_states - 1)
                 transitions[s, s_next] += p
 
-        estimator = NFXP(n_states=n_states, verbose=False)
+        estimator = NFXP(n_states=n_states, utility=rust_bus_reward_spec(n_states), verbose=False)
         result = estimator.fit(
             data=sample_dataframe,
             state="mileage_bin",
@@ -179,6 +187,7 @@ class TestNFXPFit:
         estimator = NFXP(
             n_states=8,
             discount=0.9,
+            utility=rust_bus_reward_spec(8),
             se_method=se_method,
             verbose=False,
         )
@@ -202,6 +211,7 @@ class TestNFXPFit:
         estimator = NFXP(
             n_states=8,
             discount=0.9,
+            utility=rust_bus_reward_spec(8),
             se_method="bootstrap",
             n_bootstrap=3,
             se_seed=11,
@@ -231,6 +241,7 @@ class TestNFXPFit:
         estimator = NFXP(
             n_states=8,
             discount=0.9,
+            utility=rust_bus_reward_spec(8),
             se_method="full_likelihood_bhhh",
             verbose=False,
         )
@@ -246,23 +257,22 @@ class TestNFXPFit:
         assert estimator.joint_se_ is not None
         assert estimator.joint_covariance_ is not None
         assert estimator.joint_parameter_names_ == [
-            "theta_c",
-            "RC",
+            "operating_cost",
+            "replacement_cost",
             "transition_p0",
             "transition_p1",
         ]
         assert np.all(np.isfinite(np.asarray(list(estimator.se_.values()))))
         assert np.all(np.isfinite(np.asarray(list(estimator.transition_se_.values()))))
 
-    def test_nfxp_full_likelihood_bhhh_rejects_explicit_transition_matrix(
-        self, small_se_dataframe
-    ):
+    def test_nfxp_full_likelihood_bhhh_rejects_explicit_transition_matrix(self, small_se_dataframe):
         """A fixed matrix alone is not enough for joint transition inference."""
         from econirl.estimators import NFXP
 
         estimator = NFXP(
             n_states=8,
             discount=0.9,
+            utility=rust_bus_reward_spec(8),
             se_method="full_likelihood_bhhh",
             verbose=False,
         )
@@ -294,19 +304,25 @@ class TestNFXPAttributes:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = NFXP(n_states=90, verbose=False)
+        estimator = NFXP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -317,42 +333,44 @@ class TestNFXPAttributes:
         return estimator
 
     def test_nfxp_params_(self, fitted_estimator):
-        """params_ should be a dict with theta_c and RC."""
+        """params_ should be a dict with operating_cost and replacement_cost."""
         assert hasattr(fitted_estimator, "params_")
         assert isinstance(fitted_estimator.params_, dict)
-        assert "theta_c" in fitted_estimator.params_
-        assert "RC" in fitted_estimator.params_
+        assert "operating_cost" in fitted_estimator.params_
+        assert "replacement_cost" in fitted_estimator.params_
 
         # Parameters should be finite
-        assert np.isfinite(fitted_estimator.params_["theta_c"])
-        assert np.isfinite(fitted_estimator.params_["RC"])
+        assert np.isfinite(fitted_estimator.params_["operating_cost"])
+        assert np.isfinite(fitted_estimator.params_["replacement_cost"])
 
     def test_nfxp_se_(self, fitted_estimator):
         """se_ should be a dict with standard errors."""
         assert hasattr(fitted_estimator, "se_")
         assert isinstance(fitted_estimator.se_, dict)
-        assert "theta_c" in fitted_estimator.se_
-        assert "RC" in fitted_estimator.se_
+        assert "operating_cost" in fitted_estimator.se_
+        assert "replacement_cost" in fitted_estimator.se_
 
         # Standard errors should be positive
-        assert fitted_estimator.se_["theta_c"] >= 0
-        assert fitted_estimator.se_["RC"] >= 0
+        assert fitted_estimator.se_["operating_cost"] >= 0
+        assert fitted_estimator.se_["replacement_cost"] >= 0
 
     def test_nfxp_coef_(self, fitted_estimator):
         """coef_ should be a numpy array of coefficients."""
         assert hasattr(fitted_estimator, "coef_")
         assert isinstance(fitted_estimator.coef_, np.ndarray)
-        assert len(fitted_estimator.coef_) == 2  # theta_c and RC
+        assert len(fitted_estimator.coef_) == 2  # operating_cost and replacement_cost
 
         # Should match params_
-        assert np.isclose(fitted_estimator.coef_[0], fitted_estimator.params_["theta_c"])
-        assert np.isclose(fitted_estimator.coef_[1], fitted_estimator.params_["RC"])
+        assert np.isclose(fitted_estimator.coef_[0], fitted_estimator.params_["operating_cost"])
+        assert np.isclose(fitted_estimator.coef_[1], fitted_estimator.params_["replacement_cost"])
 
     def test_nfxp_log_likelihood_(self, fitted_estimator):
         """log_likelihood_ should be available and negative."""
         assert hasattr(fitted_estimator, "log_likelihood_")
         assert isinstance(fitted_estimator.log_likelihood_, float)
-        assert fitted_estimator.log_likelihood_ < 0  # Log-likelihood is negative for probabilities < 1
+        assert (
+            fitted_estimator.log_likelihood_ < 0
+        )  # Log-likelihood is negative for probabilities < 1
 
     def test_nfxp_value_function_(self, fitted_estimator):
         """value_function_ should be a numpy array."""
@@ -364,7 +382,10 @@ class TestNFXPAttributes:
         """transitions_ should be available after fit."""
         assert hasattr(fitted_estimator, "transitions_")
         assert isinstance(fitted_estimator.transitions_, np.ndarray)
-        assert fitted_estimator.transitions_.shape == (fitted_estimator.n_states, fitted_estimator.n_states)
+        assert fitted_estimator.transitions_.shape == (
+            fitted_estimator.n_states,
+            fitted_estimator.n_states,
+        )
 
         # Rows should sum to 1
         row_sums = fitted_estimator.transitions_.sum(axis=1)
@@ -393,19 +414,25 @@ class TestNFXPSummary:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 55 or np.random.random() < 0.03 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.4, 0.55, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.4, 0.55, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = NFXP(n_states=90, verbose=False)
+        estimator = NFXP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -435,7 +462,9 @@ class TestNFXPSummary:
 
         # Should contain at least some of: log-likelihood, observations, etc.
         has_ll = "likelihood" in summary.lower() or "log" in summary.lower()
-        has_obs = "observation" in summary.lower() or "obs" in summary.lower() or "n=" in summary.lower()
+        has_obs = (
+            "observation" in summary.lower() or "obs" in summary.lower() or "n=" in summary.lower()
+        )
 
         assert has_ll or has_obs
 
@@ -457,19 +486,25 @@ class TestNFXPPredictProba:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = NFXP(n_states=90, verbose=False)
+        estimator = NFXP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -561,19 +596,25 @@ class TestNFXPSimulate:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = NFXP(n_states=90, verbose=False)
+        estimator = NFXP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -651,7 +692,9 @@ class TestNFXPSimulate:
 
         # Results should differ (at least in some rows)
         # Note: there's a tiny chance this could fail randomly, but extremely unlikely
-        assert not result1["action"].equals(result2["action"]) or not result1["state"].equals(result2["state"])
+        assert not result1["action"].equals(result2["action"]) or not result1["state"].equals(
+            result2["state"]
+        )
 
 
 class TestNFXPCounterfactual:
@@ -671,19 +714,25 @@ class TestNFXPCounterfactual:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = NFXP(n_states=90, verbose=False)
+        estimator = NFXP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -697,25 +746,25 @@ class TestNFXPCounterfactual:
         """counterfactual() should return a CounterfactualResult."""
         from econirl.estimators.nfxp import CounterfactualResult
 
-        result = fitted_estimator.counterfactual(RC=15.0)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0)
 
         assert isinstance(result, CounterfactualResult)
 
     def test_nfxp_counterfactual_has_params(self, fitted_estimator):
         """CounterfactualResult should have params dict."""
-        result = fitted_estimator.counterfactual(RC=15.0)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0)
 
         assert hasattr(result, "params")
         assert isinstance(result.params, dict)
-        assert "RC" in result.params
-        assert result.params["RC"] == 15.0
-        # theta_c should be from original estimate
-        assert "theta_c" in result.params
-        assert result.params["theta_c"] == fitted_estimator.params_["theta_c"]
+        assert "replacement_cost" in result.params
+        assert result.params["replacement_cost"] == 15.0
+        # operating_cost should be from original estimate
+        assert "operating_cost" in result.params
+        assert result.params["operating_cost"] == fitted_estimator.params_["operating_cost"]
 
     def test_nfxp_counterfactual_has_value_function(self, fitted_estimator):
         """CounterfactualResult should have value_function array."""
-        result = fitted_estimator.counterfactual(RC=15.0)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0)
 
         assert hasattr(result, "value_function")
         assert isinstance(result.value_function, np.ndarray)
@@ -723,7 +772,7 @@ class TestNFXPCounterfactual:
 
     def test_nfxp_counterfactual_has_policy(self, fitted_estimator):
         """CounterfactualResult should have policy array."""
-        result = fitted_estimator.counterfactual(RC=15.0)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0)
 
         assert hasattr(result, "policy")
         assert isinstance(result.policy, np.ndarray)
@@ -732,14 +781,16 @@ class TestNFXPCounterfactual:
         # Policy should be valid probabilities
         assert (result.policy >= 0).all()
         assert (result.policy <= 1).all()
-        np.testing.assert_allclose(result.policy.sum(axis=1), np.ones(fitted_estimator.n_states), atol=1e-6)
+        np.testing.assert_allclose(
+            result.policy.sum(axis=1), np.ones(fitted_estimator.n_states), atol=1e-6
+        )
 
     def test_nfxp_counterfactual_changes_policy(self, fitted_estimator):
-        """counterfactual() with different RC should change policy."""
-        # Use very different RC values to ensure policy changes
+        """counterfactual() with different replacement_cost should change policy."""
+        # Use very different replacement_cost values to ensure policy changes
         # even with small/noisy estimated parameters
-        result_low_RC = fitted_estimator.counterfactual(RC=1.0)
-        result_high_RC = fitted_estimator.counterfactual(RC=100.0)
+        result_low_RC = fitted_estimator.counterfactual(replacement_cost=1.0)
+        result_high_RC = fitted_estimator.counterfactual(replacement_cost=100.0)
 
         # With higher replacement cost, probability of replacement should generally decrease
         # (At least at some states)
@@ -754,10 +805,10 @@ class TestNFXPCounterfactual:
 
     def test_nfxp_counterfactual_multiple_params(self, fitted_estimator):
         """counterfactual() should accept multiple parameter changes."""
-        result = fitted_estimator.counterfactual(RC=15.0, theta_c=0.05)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0, operating_cost=0.05)
 
-        assert result.params["RC"] == 15.0
-        assert result.params["theta_c"] == 0.05
+        assert result.params["replacement_cost"] == 15.0
+        assert result.params["operating_cost"] == 0.05
 
     def test_nfxp_counterfactual_invalid_param_raises(self, fitted_estimator):
         """counterfactual() should raise error for unknown parameters."""

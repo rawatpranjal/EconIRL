@@ -58,9 +58,10 @@ class UFXP(NFXP):
         Number of discrete actions (e.g., keep/replace).
     discount : float, default=0.9999
         Time discount factor (beta).
-    utility : str or RewardSpec, default="linear_cost"
-        Utility specification.  Pass ``"linear_cost"`` for the classic bus
-        engine model, or a ``RewardSpec`` for custom features.
+    utility : RewardSpec
+        Utility specification as a ``RewardSpec``.  For the classic Rust bus
+        model, use ``rust_bus_reward_spec(n_states)`` from
+        ``econirl.datasets``.
     weights : str, default="optimal"
         ``"optimal"`` is the efficient OUFXP weighting with standard errors;
         ``"random"`` is the plain random-projection UFXP (no standard errors).
@@ -101,7 +102,7 @@ class UFXP(NFXP):
         n_states: int = 90,
         n_actions: int = 2,
         discount: float = 0.9999,
-        utility: str | RewardSpec = "linear_cost",
+        utility: RewardSpec | None = None,
         weights: Literal["optimal", "random"] = "optimal",
         num_projections: int = 32,
         verbose: bool = False,
@@ -150,31 +151,26 @@ class UFXP(NFXP):
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
         if isinstance(reward_spec, RewardSpec):
             self.reward_spec_ = reward_spec
             self._utility_fn = reward_spec.to_linear_utility()
-        elif reward_spec == "linear_cost":
-            self._utility_fn = self._create_utility()
-            self.reward_spec_ = RewardSpec(
-                self._utility_fn.feature_matrix,
-                self._utility_fn.parameter_names,
-            )
         else:
-            raise ValueError(f"Unknown reward/utility specification: {reward_spec}")
+            raise ValueError(
+                "utility must be a RewardSpec; the 'linear_cost' preset was "
+                "removed. Build features explicitly, e.g. "
+                "rust_bus_reward_spec(n_states) from econirl.datasets for "
+                "the Rust bus."
+            )
 
         if transitions is None:
             trans_estimator = TransitionEstimator(

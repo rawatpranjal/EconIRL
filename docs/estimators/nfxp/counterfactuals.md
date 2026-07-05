@@ -6,7 +6,7 @@ change a parameter, re-solve the dynamic program once, and read off the new
 policy and value function.
 
 ```python
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 
 print(cf.params)
 print(cf.value_function)

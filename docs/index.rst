@@ -49,11 +49,12 @@ Here is an example that estimates Rust (1987):
 
 .. code-block:: python
 
-   from econirl.datasets import load_rust_bus
+   from econirl.datasets import load_rust_bus, rust_bus_reward_spec
    from econirl import NFXP
 
    df = load_rust_bus()
-   model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+   reward = rust_bus_reward_spec(n_states=90)   # explicit features, your own names
+   model = NFXP(n_states=90, discount=0.9999, utility=reward)
    model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
    print(model.summary())
@@ -96,8 +97,8 @@ inference).
    [4] RESULTS
      4a. Estimation
                             coef   std err       t   P>|t|   [0.025   0.975]
-       theta_c            0.0010    0.0004    2.50   0.012   0.0002   0.0018
-       RC                 3.0723    0.0740   41.52   0.000   2.9273   3.2173
+       operating_cost      0.0010    0.0004    2.50   0.012   0.0002   0.0018
+       replacement_cost    3.0723    0.0740   41.52   0.000   2.9273   3.2173
      4b. Identification
        Hessian condition:  72,738.9     Min eigenvalue: 180.93
        Status:             potentially weakly identified
@@ -118,7 +119,7 @@ higher mileage.
 
 .. code-block:: python
 
-   cf = model.counterfactual(RC=4.0)   # raise the replacement cost
+   cf = model.counterfactual(replacement_cost=4.0)   # raise the replacement cost
    print(cf.summary())
 
 .. code-block:: text
