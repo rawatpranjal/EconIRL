@@ -5,12 +5,11 @@ interface for the Hotz-Miller / NPL algorithm (Hotz & Miller 1993,
 Aguirregabiria & Mira 2002).
 """
 
-import pytest
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
+import pytest
 
-from econirl.core.types import Panel, Trajectory
+from econirl.datasets import rust_bus_reward_spec
 
 
 class TestCCPInit:
@@ -25,7 +24,7 @@ class TestCCPInit:
         assert estimator.n_states == 90
         assert estimator.n_actions == 2
         assert estimator.discount == 0.9999
-        assert estimator.utility == "linear_cost"
+        assert estimator.utility is None
         assert estimator.se_method == "robust"
         assert estimator.verbose is False
 
@@ -33,11 +32,12 @@ class TestCCPInit:
         """CCP can be initialized with custom parameters."""
         from econirl.estimators import CCP
 
+        utility = rust_bus_reward_spec(50)
         estimator = CCP(
             n_states=50,
             n_actions=3,
             discount=0.95,
-            utility="linear_cost",
+            utility=utility,
             se_method="asymptotic",
             verbose=True,
         )
@@ -45,7 +45,7 @@ class TestCCPInit:
         assert estimator.n_states == 50
         assert estimator.n_actions == 3
         assert estimator.discount == 0.95
-        assert estimator.utility == "linear_cost"
+        assert estimator.utility is utility
         assert estimator.se_method == "asymptotic"
         assert estimator.verbose is True
 
@@ -75,14 +75,20 @@ class TestCCPFit:
             for t in range(n_periods):
                 # Simple stochastic policy
                 action = 1 if state > 50 or np.random.random() < 0.05 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.3, 0.6, 0.1]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.3, 0.6, 0.1]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         return pd.DataFrame(data)
@@ -91,7 +97,7 @@ class TestCCPFit:
         """fit() should return self for method chaining."""
         from econirl.estimators import CCP
 
-        estimator = CCP(n_states=90, verbose=False)
+        estimator = CCP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         result = estimator.fit(
             data=sample_dataframe,
             state="mileage_bin",
@@ -113,7 +119,7 @@ class TestCCPFit:
                 s_next = min(s + delta, n_states - 1)
                 transitions[s, s_next] += p
 
-        estimator = CCP(n_states=n_states, verbose=False)
+        estimator = CCP(n_states=n_states, utility=rust_bus_reward_spec(n_states), verbose=False)
         result = estimator.fit(
             data=sample_dataframe,
             state="mileage_bin",
@@ -144,19 +150,25 @@ class TestCCPAttributes:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = CCP(n_states=90, verbose=False)
+        estimator = CCP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -167,42 +179,44 @@ class TestCCPAttributes:
         return estimator
 
     def test_ccp_params_(self, fitted_estimator):
-        """params_ should be a dict with theta_c and RC."""
+        """params_ should be a dict with operating_cost and replacement_cost."""
         assert hasattr(fitted_estimator, "params_")
         assert isinstance(fitted_estimator.params_, dict)
-        assert "theta_c" in fitted_estimator.params_
-        assert "RC" in fitted_estimator.params_
+        assert "operating_cost" in fitted_estimator.params_
+        assert "replacement_cost" in fitted_estimator.params_
 
         # Parameters should be finite
-        assert np.isfinite(fitted_estimator.params_["theta_c"])
-        assert np.isfinite(fitted_estimator.params_["RC"])
+        assert np.isfinite(fitted_estimator.params_["operating_cost"])
+        assert np.isfinite(fitted_estimator.params_["replacement_cost"])
 
     def test_ccp_se_(self, fitted_estimator):
         """se_ should be a dict with standard errors."""
         assert hasattr(fitted_estimator, "se_")
         assert isinstance(fitted_estimator.se_, dict)
-        assert "theta_c" in fitted_estimator.se_
-        assert "RC" in fitted_estimator.se_
+        assert "operating_cost" in fitted_estimator.se_
+        assert "replacement_cost" in fitted_estimator.se_
 
         # Standard errors should be non-negative
-        assert fitted_estimator.se_["theta_c"] >= 0
-        assert fitted_estimator.se_["RC"] >= 0
+        assert fitted_estimator.se_["operating_cost"] >= 0
+        assert fitted_estimator.se_["replacement_cost"] >= 0
 
     def test_ccp_coef_(self, fitted_estimator):
         """coef_ should be a numpy array of coefficients."""
         assert hasattr(fitted_estimator, "coef_")
         assert isinstance(fitted_estimator.coef_, np.ndarray)
-        assert len(fitted_estimator.coef_) == 2  # theta_c and RC
+        assert len(fitted_estimator.coef_) == 2  # operating_cost and replacement_cost
 
         # Should match params_
-        assert np.isclose(fitted_estimator.coef_[0], fitted_estimator.params_["theta_c"])
-        assert np.isclose(fitted_estimator.coef_[1], fitted_estimator.params_["RC"])
+        assert np.isclose(fitted_estimator.coef_[0], fitted_estimator.params_["operating_cost"])
+        assert np.isclose(fitted_estimator.coef_[1], fitted_estimator.params_["replacement_cost"])
 
     def test_ccp_log_likelihood_(self, fitted_estimator):
         """log_likelihood_ should be available and negative."""
         assert hasattr(fitted_estimator, "log_likelihood_")
         assert isinstance(fitted_estimator.log_likelihood_, float)
-        assert fitted_estimator.log_likelihood_ < 0  # Log-likelihood is negative for probabilities < 1
+        assert (
+            fitted_estimator.log_likelihood_ < 0
+        )  # Log-likelihood is negative for probabilities < 1
 
     def test_ccp_value_function_(self, fitted_estimator):
         """value_function_ should be a numpy array."""
@@ -214,7 +228,10 @@ class TestCCPAttributes:
         """transitions_ should be available after fit."""
         assert hasattr(fitted_estimator, "transitions_")
         assert isinstance(fitted_estimator.transitions_, np.ndarray)
-        assert fitted_estimator.transitions_.shape == (fitted_estimator.n_states, fitted_estimator.n_states)
+        assert fitted_estimator.transitions_.shape == (
+            fitted_estimator.n_states,
+            fitted_estimator.n_states,
+        )
 
         # Rows should sum to 1
         row_sums = fitted_estimator.transitions_.sum(axis=1)
@@ -238,35 +255,29 @@ class TestCCPSameInterfaceAsNFXP:
         ccp = CCP()
 
         # Get public methods and attributes (not starting with _)
-        nfxp_interface = {
-            name for name in dir(nfxp)
-            if not name.startswith('_')
-        }
-        ccp_interface = {
-            name for name in dir(ccp)
-            if not name.startswith('_')
-        }
+        nfxp_interface = {name for name in dir(nfxp) if not name.startswith("_")}
+        ccp_interface = {name for name in dir(ccp) if not name.startswith("_")}
 
         # Key methods and attributes that must be present
         required_interface = {
-            'fit',
-            'params_',
-            'se_',
-            'coef_',
-            'log_likelihood_',
-            'value_function_',
-            'transitions_',
-            'converged_',
-            'summary',
-            'simulate',
-            'counterfactual',
-            'predict_proba',
-            'n_states',
-            'n_actions',
-            'discount',
-            'utility',
-            'se_method',
-            'verbose',
+            "fit",
+            "params_",
+            "se_",
+            "coef_",
+            "log_likelihood_",
+            "value_function_",
+            "transitions_",
+            "converged_",
+            "summary",
+            "simulate",
+            "counterfactual",
+            "predict_proba",
+            "n_states",
+            "n_actions",
+            "discount",
+            "utility",
+            "se_method",
+            "verbose",
         }
 
         # CCP should have all required interface elements
@@ -275,12 +286,13 @@ class TestCCPSameInterfaceAsNFXP:
 
         # CCP should have same __init__ parameters as NFXP
         import inspect
+
         nfxp_params = set(inspect.signature(NFXP.__init__).parameters.keys())
         ccp_params = set(inspect.signature(CCP.__init__).parameters.keys())
 
         # Remove 'self' from comparison
-        nfxp_params.discard('self')
-        ccp_params.discard('self')
+        nfxp_params.discard("self")
+        ccp_params.discard("self")
 
         # CCP should have at least the same parameters as NFXP
         # (it may have additional ones like num_policy_iterations)
@@ -289,15 +301,16 @@ class TestCCPSameInterfaceAsNFXP:
 
     def test_ccp_fit_signature_matches_nfxp(self):
         """CCP.fit() has same signature as NFXP.fit()."""
-        from econirl.estimators import CCP, NFXP
         import inspect
+
+        from econirl.estimators import CCP, NFXP
 
         nfxp_sig = inspect.signature(NFXP.fit)
         ccp_sig = inspect.signature(CCP.fit)
 
         # Get parameter names (excluding self)
-        nfxp_params = [p for p in nfxp_sig.parameters.keys() if p != 'self']
-        ccp_params = [p for p in ccp_sig.parameters.keys() if p != 'self']
+        nfxp_params = [p for p in nfxp_sig.parameters.keys() if p != "self"]
+        ccp_params = [p for p in ccp_sig.parameters.keys() if p != "self"]
 
         assert nfxp_params == ccp_params
 
@@ -319,19 +332,25 @@ class TestCCPSummary:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 55 or np.random.random() < 0.03 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.4, 0.55, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.4, 0.55, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = CCP(n_states=90, verbose=False)
+        estimator = CCP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -373,19 +392,25 @@ class TestCCPPredictProba:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = CCP(n_states=90, verbose=False)
+        estimator = CCP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -440,19 +465,25 @@ class TestCCPSimulate:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = CCP(n_states=90, verbose=False)
+        estimator = CCP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -504,19 +535,25 @@ class TestCCPCounterfactual:
             state = 0
             for t in range(n_periods):
                 action = 1 if state > 60 or np.random.random() < 0.02 else 0
-                next_state = 0 if action == 1 else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
-                data.append({
-                    "bus_id": i,
-                    "period": t,
-                    "mileage_bin": state,
-                    "replaced": action,
-                    "next_mileage": next_state,
-                })
+                next_state = (
+                    0
+                    if action == 1
+                    else min(state + np.random.choice([0, 1, 2], p=[0.35, 0.60, 0.05]), 89)
+                )
+                data.append(
+                    {
+                        "bus_id": i,
+                        "period": t,
+                        "mileage_bin": state,
+                        "replaced": action,
+                        "next_mileage": next_state,
+                    }
+                )
                 state = next_state
 
         df = pd.DataFrame(data)
 
-        estimator = CCP(n_states=90, verbose=False)
+        estimator = CCP(n_states=90, utility=rust_bus_reward_spec(90), verbose=False)
         estimator.fit(
             data=df,
             state="mileage_bin",
@@ -530,22 +567,22 @@ class TestCCPCounterfactual:
         """counterfactual() should return a CounterfactualResult."""
         from econirl.estimators.nfxp import CounterfactualResult
 
-        result = fitted_estimator.counterfactual(RC=15.0)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0)
 
         assert isinstance(result, CounterfactualResult)
 
     def test_ccp_counterfactual_has_params(self, fitted_estimator):
         """CounterfactualResult should have params dict."""
-        result = fitted_estimator.counterfactual(RC=15.0)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0)
 
         assert hasattr(result, "params")
         assert isinstance(result.params, dict)
-        assert "RC" in result.params
-        assert result.params["RC"] == 15.0
+        assert "replacement_cost" in result.params
+        assert result.params["replacement_cost"] == 15.0
 
     def test_ccp_counterfactual_has_policy(self, fitted_estimator):
         """CounterfactualResult should have policy array."""
-        result = fitted_estimator.counterfactual(RC=15.0)
+        result = fitted_estimator.counterfactual(replacement_cost=15.0)
 
         assert hasattr(result, "policy")
         assert isinstance(result.policy, np.ndarray)

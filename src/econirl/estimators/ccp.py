@@ -60,10 +60,10 @@ class CCP(NFXP):
         Number of discrete actions (e.g., keep/replace).
     discount : float, default=0.9999
         Time discount factor (beta).
-    utility : str or RewardSpec, default="linear_cost"
-        Utility specification.  Pass ``"linear_cost"`` for the classic Rust
-        bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
-        ``RewardSpec`` for custom features.
+    utility : RewardSpec
+        Utility specification as a ``RewardSpec``.  For the classic Rust bus
+        model, use ``rust_bus_reward_spec(n_states)`` from
+        ``econirl.datasets``.
     se_method : str, default="robust"
         Method for computing standard errors.
     n_bootstrap : int, default=400
@@ -135,7 +135,7 @@ class CCP(NFXP):
         n_states: int = 90,
         n_actions: int = 2,
         discount: float = 0.9999,
-        utility: str | RewardSpec = "linear_cost",
+        utility: RewardSpec | None = None,
         se_method: Literal["asymptotic", "robust", "clustered", "bootstrap"] = "robust",
         n_bootstrap: int = 400,
         se_seed: int | None = None,
@@ -152,9 +152,10 @@ class CCP(NFXP):
             Number of discrete actions.
         discount : float, default=0.9999
             Time discount factor (beta).
-        utility : str or RewardSpec, default="linear_cost"
-            Utility specification to use.  Pass ``"linear_cost"`` for the
-            classic Rust bus model, or a ``RewardSpec`` for custom features.
+        utility : RewardSpec
+            Utility specification as a ``RewardSpec``.  For the classic Rust
+            bus model, use ``rust_bus_reward_spec(n_states)`` from
+            ``econirl.datasets``.
         se_method : str, default="robust"
             Method for computing standard errors.
         n_bootstrap : int, default=400
@@ -224,33 +225,27 @@ class CCP(NFXP):
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
-        # --- Handle reward: RewardSpec or string ---
+        # --- Handle reward: RewardSpec ---
         if isinstance(reward_spec, RewardSpec):
             self.reward_spec_ = reward_spec
             self._utility_fn = reward_spec.to_linear_utility()
-        elif reward_spec == "linear_cost":
-            self._utility_fn = self._create_utility()
-            # Also create RewardSpec from the utility for consistency
-            self.reward_spec_ = RewardSpec(
-                self._utility_fn.feature_matrix,
-                self._utility_fn.parameter_names,
-            )
         else:
-            raise ValueError(f"Unknown reward/utility specification: {reward_spec}")
+            raise ValueError(
+                "utility must be a RewardSpec; the 'linear_cost' preset was "
+                "removed. Build features explicitly, e.g. "
+                "rust_bus_reward_spec(n_states) from econirl.datasets for "
+                "the Rust bus."
+            )
 
         # Estimate transitions if not provided
         if transitions is None:

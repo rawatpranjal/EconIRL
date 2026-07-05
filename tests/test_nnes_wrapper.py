@@ -1,8 +1,8 @@
 """Tests for NNES sklearn-style wrapper.
 
 Tests that the NNES estimator:
-1. Fits with DataFrame + "linear_cost" (basic functionality)
-2. Recovers positive parameters (theta_c > 0, RC > 0)
+1. Fits with DataFrame + a RewardSpec (basic functionality)
+2. Recovers positive parameters (operating_cost > 0, replacement_cost > 0)
 3. Exposes policy_, value_, pvalues_ attributes
 4. conf_int() returns valid intervals
 5. Satisfies EstimatorProtocol
@@ -14,17 +14,16 @@ Tests that the NNES estimator:
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import pytest
-import jax
-import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.types import Panel, TrajectoryPanel
+from econirl.core.types import TrajectoryPanel
+from econirl.datasets import rust_bus_reward_spec
 from econirl.estimators.nnes import NNES
 from econirl.estimators.protocol import EstimatorProtocol
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -53,9 +52,7 @@ def _generate_bus_dataframe(
     for i in range(n_individuals):
         state = 0
         for t in range(n_periods):
-            action = (
-                1 if state > n_states * 2 // 3 or np.random.random() < 0.05 else 0
-            )
+            action = 1 if state > n_states * 2 // 3 or np.random.random() < 0.05 else 0
             next_state = (
                 0
                 if action == 1
@@ -88,6 +85,7 @@ def fitted_model_fast(bus_df_fast):
     model = NNES(
         n_states=_N_STATES_FAST,
         discount=_DISCOUNT_FAST,
+        utility=rust_bus_reward_spec(_N_STATES_FAST),
         hidden_dim=8,
         num_layers=1,
         v_lr=1e-2,
@@ -105,26 +103,25 @@ def fitted_model_fast(bus_df_fast):
 
 
 class TestBasicFit:
-    """NNES fits with DataFrame + linear_cost."""
+    """NNES fits with DataFrame + a RewardSpec."""
 
     def test_fit_produces_params(self, fitted_model_fast):
         assert fitted_model_fast.params_ is not None
-        assert "theta_c" in fitted_model_fast.params_
-        assert "RC" in fitted_model_fast.params_
+        assert "operating_cost" in fitted_model_fast.params_
+        assert "replacement_cost" in fitted_model_fast.params_
 
     def test_fit_returns_self(self, bus_df_fast):
         model = NNES(
             n_states=_N_STATES_FAST,
             discount=_DISCOUNT_FAST,
+            utility=rust_bus_reward_spec(_N_STATES_FAST),
             hidden_dim=8,
             num_layers=1,
             v_epochs=_V_EPOCHS_FAST,
             n_outer_iterations=_N_OUTER_FAST,
             verbose=False,
         )
-        result = model.fit(
-            bus_df_fast, state="mileage_bin", action="replaced", id="bus_id"
-        )
+        result = model.fit(bus_df_fast, state="mileage_bin", action="replaced", id="bus_id")
         assert result is model
 
     def test_coef_array(self, fitted_model_fast):
@@ -141,18 +138,18 @@ class TestBasicFit:
 
 
 # ---------------------------------------------------------------------------
-# 2. Parameters recovered (positive theta_c and RC)
+# 2. Parameters recovered (positive operating_cost and replacement_cost)
 # ---------------------------------------------------------------------------
 
 
 class TestParametersRecovered:
     """Estimated parameters are positive (basic sanity)."""
 
-    def test_theta_c_positive(self, fitted_model_fast):
-        assert fitted_model_fast.params_["theta_c"] > 0
+    def test_operating_cost_positive(self, fitted_model_fast):
+        assert fitted_model_fast.params_["operating_cost"] > 0
 
-    def test_RC_positive(self, fitted_model_fast):
-        assert fitted_model_fast.params_["RC"] > 0
+    def test_replacement_cost_positive(self, fitted_model_fast):
+        assert fitted_model_fast.params_["replacement_cost"] > 0
 
 
 @pytest.mark.slow
@@ -170,6 +167,7 @@ class TestParameterRecoveryFull:
         model = NNES(
             n_states=_N_STATES_FULL,
             discount=_DISCOUNT_FULL,
+            utility=rust_bus_reward_spec(_N_STATES_FULL),
             hidden_dim=32,
             num_layers=2,
             v_lr=1e-3,
@@ -178,14 +176,14 @@ class TestParameterRecoveryFull:
             verbose=False,
         )
         model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
-        # RC (replacement cost) should be positive and in a reasonable range
-        assert model.params_["RC"] > 0
-        # theta_c (operating cost) is small and hard to identify with neural
+        # replacement_cost should be positive and in a reasonable range
+        assert model.params_["replacement_cost"] > 0
+        # operating_cost is small and hard to identify with neural
         # approximation on limited data — just check it's finite
-        assert np.isfinite(model.params_["theta_c"])
+        assert np.isfinite(model.params_["operating_cost"])
         # Should have reasonable standard errors
-        assert np.isfinite(model.se_["theta_c"])
-        assert np.isfinite(model.se_["RC"])
+        assert np.isfinite(model.se_["operating_cost"])
+        assert np.isfinite(model.se_["replacement_cost"])
 
 
 # ---------------------------------------------------------------------------
@@ -212,8 +210,8 @@ class TestAttributes:
 
     def test_pvalues_present(self, fitted_model_fast):
         assert fitted_model_fast.pvalues_ is not None
-        assert "theta_c" in fitted_model_fast.pvalues_
-        assert "RC" in fitted_model_fast.pvalues_
+        assert "operating_cost" in fitted_model_fast.pvalues_
+        assert "replacement_cost" in fitted_model_fast.pvalues_
 
     def test_pvalues_in_range(self, fitted_model_fast):
         for name, pv in fitted_model_fast.pvalues_.items():
@@ -222,8 +220,8 @@ class TestAttributes:
 
     def test_se_present(self, fitted_model_fast):
         assert fitted_model_fast.se_ is not None
-        assert "theta_c" in fitted_model_fast.se_
-        assert "RC" in fitted_model_fast.se_
+        assert "operating_cost" in fitted_model_fast.se_
+        assert "replacement_cost" in fitted_model_fast.se_
 
     def test_transitions_estimated(self, fitted_model_fast):
         assert fitted_model_fast.transitions_ is not None
@@ -239,8 +237,8 @@ class TestConfInt:
 
     def test_conf_int_keys(self, fitted_model_fast):
         ci = fitted_model_fast.conf_int()
-        assert "theta_c" in ci
-        assert "RC" in ci
+        assert "operating_cost" in ci
+        assert "replacement_cost" in ci
 
     def test_conf_int_brackets_estimate(self, fitted_model_fast):
         ci = fitted_model_fast.conf_int()
@@ -251,8 +249,7 @@ class TestConfInt:
             if np.isnan(lower) or np.isnan(upper):
                 continue
             assert lower <= est <= upper, (
-                f"CI for {name}: ({lower}, {upper}) does not contain "
-                f"estimate {est}"
+                f"CI for {name}: ({lower}, {upper}) does not contain estimate {est}"
             )
 
     def test_conf_int_custom_alpha(self, fitted_model_fast):
@@ -337,11 +334,14 @@ class TestRewardSpec:
         assert "RC" in model.params_
         assert model.reward_spec_ is spec
 
-    def test_reward_spec_auto_created_for_linear_cost(self, fitted_model_fast):
-        """linear_cost mode should also populate reward_spec_."""
+    def test_reward_spec_auto_created_for_default_reward_spec(self, fitted_model_fast):
+        """Fitting with a RewardSpec should also populate reward_spec_."""
         assert fitted_model_fast.reward_spec_ is not None
         assert isinstance(fitted_model_fast.reward_spec_, RewardSpec)
-        assert fitted_model_fast.reward_spec_.parameter_names == ["theta_c", "RC"]
+        assert fitted_model_fast.reward_spec_.parameter_names == [
+            "operating_cost",
+            "replacement_cost",
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -428,6 +428,7 @@ class TestDataInputs:
         model = NNES(
             n_states=_N_STATES_FAST,
             discount=_DISCOUNT_FAST,
+            utility=rust_bus_reward_spec(_N_STATES_FAST),
             hidden_dim=8,
             num_layers=1,
             v_epochs=_V_EPOCHS_FAST,
@@ -498,6 +499,7 @@ class TestBellmanVariant:
         model = NNES(
             n_states=_N_STATES_FAST,
             discount=_DISCOUNT_FAST,
+            utility=rust_bus_reward_spec(_N_STATES_FAST),
             bellman="nfxp",
             hidden_dim=8,
             num_layers=1,
@@ -508,13 +510,14 @@ class TestBellmanVariant:
         )
         model.fit(bus_df_fast, state="mileage_bin", action="replaced", id="bus_id")
         assert model.params_ is not None
-        assert model.params_["theta_c"] > 0
-        assert model.params_["RC"] > 0
+        assert model.params_["operating_cost"] > 0
+        assert model.params_["replacement_cost"] > 0
 
     def test_npl_variant_fits(self, bus_df_fast):
         model = NNES(
             n_states=_N_STATES_FAST,
             discount=_DISCOUNT_FAST,
+            utility=rust_bus_reward_spec(_N_STATES_FAST),
             bellman="npl",
             hidden_dim=8,
             num_layers=1,
@@ -525,8 +528,8 @@ class TestBellmanVariant:
         )
         model.fit(bus_df_fast, state="mileage_bin", action="replaced", id="bus_id")
         assert model.params_ is not None
-        assert model.params_["theta_c"] > 0
-        assert model.params_["RC"] > 0
+        assert model.params_["operating_cost"] > 0
+        assert model.params_["replacement_cost"] > 0
 
     def test_repr_shows_bellman(self):
         model_npl = NNES(n_states=_N_STATES_FAST, bellman="npl")

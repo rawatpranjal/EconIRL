@@ -12,11 +12,12 @@ Example:
     >>> df = pd.read_csv("zurcher_bus.csv")
     >>>
     >>> # Create estimator and fit
-    >>> model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+    >>> from econirl.datasets import rust_bus_reward_spec
+    >>> model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
     >>> model.fit(data=df, state="mileage_bin", action="replaced", id="bus_id")
     >>>
     >>> # Access results sklearn-style
-    >>> print(model.params_)        # {"theta_c": 0.001, "RC": 9.35}
+    >>> print(model.params_)        # {"operating_cost": 0.001, "replacement_cost": 9.35}
     >>> print(model.coef_)          # numpy array [0.001, 9.35]
     >>> print(model.log_likelihood_)
     >>> print(model.summary())
@@ -27,8 +28,8 @@ Example:
     >>> # Simulate new data under estimated policy
     >>> sim_df = model.simulate(n_agents=100, n_periods=50, seed=42)
     >>>
-    >>> # Counterfactual analysis: what if RC was higher?
-    >>> cf_result = model.counterfactual(RC=15.0)
+    >>> # Counterfactual analysis: what if the replacement cost was higher?
+    >>> cf_result = model.counterfactual(replacement_cost=15.0)
     >>> print(cf_result.policy)  # New policy under higher replacement cost
 """
 
@@ -47,7 +48,6 @@ from econirl.core.reward_spec import RewardSpec
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.nfxp import NFXPEstimator
-from econirl.preferences.linear import LinearUtility
 from econirl.transitions import TransitionEstimator
 
 
@@ -93,10 +93,10 @@ class NFXP:
         Number of discrete actions (e.g., keep/replace).
     discount : float, default=0.9999
         Time discount factor (beta).
-    utility : str or RewardSpec, default="linear_cost"
-        Utility specification.  Pass ``"linear_cost"`` for the classic Rust
-        bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
-        ``RewardSpec`` for custom features.
+    utility : RewardSpec
+        Utility specification as a ``RewardSpec``.  For the classic Rust bus
+        model, use ``rust_bus_reward_spec(n_states)`` from
+        ``econirl.datasets``.
     se_method : str, default="robust"
         Method for computing standard errors. Options: "asymptotic", "robust",
         "clustered", "bootstrap", and "full_likelihood_bhhh".
@@ -155,7 +155,7 @@ class NFXP:
         n_states: int = 90,
         n_actions: int = 2,
         discount: float = 0.9999,
-        utility: str | RewardSpec = "linear_cost",
+        utility: RewardSpec | None = None,
         se_method: Literal[
             "asymptotic",
             "robust",
@@ -177,9 +177,10 @@ class NFXP:
             Number of discrete actions.
         discount : float, default=0.9999
             Time discount factor (beta).
-        utility : str or RewardSpec, default="linear_cost"
-            Utility specification to use.  Pass ``"linear_cost"`` for the
-            classic Rust bus model, or a ``RewardSpec`` for custom features.
+        utility : RewardSpec
+            Utility specification as a ``RewardSpec``.  For the classic Rust
+            bus model, use ``rust_bus_reward_spec(n_states)`` from
+            ``econirl.datasets``.
         se_method : str, default="robust"
             Method for computing standard errors.
         n_bootstrap : int, default=400
@@ -275,34 +276,28 @@ class NFXP:
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
             self._validate_dataframe(data, state=state, action=action)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
-        # --- Handle reward: RewardSpec or string ---
+        # --- Handle reward: RewardSpec ---
         if isinstance(reward_spec, RewardSpec):
             self.reward_spec_ = reward_spec
             self._utility_fn = reward_spec.to_linear_utility()
-        elif reward_spec == "linear_cost":
-            self._utility_fn = self._create_utility()
-            # Also create RewardSpec from the utility for consistency
-            self.reward_spec_ = RewardSpec(
-                self._utility_fn.feature_matrix,
-                self._utility_fn.parameter_names,
-            )
         else:
-            raise ValueError(f"Unknown reward/utility specification: {reward_spec}")
+            raise ValueError(
+                "utility must be a RewardSpec; the 'linear_cost' preset was "
+                "removed. Build features explicitly, e.g. "
+                "rust_bus_reward_spec(n_states) from econirl.datasets for "
+                "the Rust bus."
+            )
 
         # Validate the feature matrix matches the declared state/action space so a
         # mismatch raises a clear error instead of a cryptic broadcasting TypeError.
@@ -535,8 +530,7 @@ class NFXP:
             expected_shape = (self.n_actions, self.n_states, self.n_states)
             if keep_transitions.shape != expected_shape:
                 raise ValueError(
-                    "3D transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
             return keep_transitions
 
@@ -554,38 +548,6 @@ class NFXP:
             transitions[1, s, :] = transitions[0, 0, :]
 
         return transitions
-
-    def _create_utility(self) -> LinearUtility:
-        """Create utility function for estimation.
-
-        Returns
-        -------
-        LinearUtility
-            Utility function with appropriate features.
-        """
-        if self.utility != "linear_cost":
-            raise ValueError(f"Unknown utility specification: {self.utility}")
-
-        # Build feature matrix for linear cost utility
-        # U(s, keep) = -theta_c * s
-        # U(s, replace) = -RC
-        n = self.n_states
-        features = np.zeros((n, self.n_actions, 2), dtype=np.float32)
-
-        mileage = np.arange(n, dtype=np.float32)
-
-        # Keep action (a=0): feature = [-s, 0]
-        features[:, 0, 0] = -mileage
-        features[:, 0, 1] = 0.0
-
-        # Replace action (a=1): feature = [0, -1]
-        features[:, 1, 0] = 0.0
-        features[:, 1, 1] = -1.0
-
-        return LinearUtility(
-            feature_matrix=features,
-            parameter_names=["theta_c", "RC"],
-        )
 
     def _extract_results(self) -> None:
         """Extract results from estimation into sklearn-style attributes."""
@@ -623,12 +585,9 @@ class NFXP:
                 joint_cov = np.array([])
             if joint_se.size == len(joint_names):
                 self.joint_parameter_names_ = joint_names
-                self.joint_se_ = {
-                    name: float(val) for name, val in zip(joint_names, joint_se)
-                }
+                self.joint_se_ = {name: float(val) for name, val in zip(joint_names, joint_se)}
                 self.transition_se_ = {
-                    name: self.joint_se_[name]
-                    for name in full_metadata["transition_score_columns"]
+                    name: self.joint_se_[name] for name in full_metadata["transition_score_columns"]
                 }
             if joint_cov.shape == (len(joint_names), len(joint_names)):
                 self.joint_covariance_ = joint_cov
@@ -660,9 +619,7 @@ class NFXP:
                 se_val = self.se_[name]
                 if se_val and se_val > 0:
                     t_stat = self.params_[name] / se_val
-                    pvalues[name] = float(
-                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
-                    )
+                    pvalues[name] = float(2 * (1 - scipy_norm.cdf(abs(t_stat))))
                 else:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues
@@ -843,12 +800,14 @@ class NFXP:
                 action = np.random.choice(self.n_actions, p=action_probs)
 
                 # Record observation
-                data.append({
-                    "agent_id": agent_id,
-                    "period": period,
-                    "state": state,
-                    "action": action,
-                })
+                data.append(
+                    {
+                        "agent_id": agent_id,
+                        "period": period,
+                        "state": state,
+                        "action": action,
+                    }
+                )
 
                 # Transition to next state
                 if action == 1:  # Replace: reset to state 0, then transition

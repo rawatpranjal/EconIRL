@@ -30,45 +30,44 @@ Hybrid Datasets (real data with synthetic fallback):
 """
 
 # Real DDC datasets
-from econirl.datasets.rust_bus import load_rust_bus
-from econirl.datasets.occupational_choice import load_occupational_choice
-from econirl.datasets.robinson_crusoe import load_robinson_crusoe, get_robinson_crusoe_info
-from econirl.datasets.equipment_replacement import load_equipment_replacement
-from econirl.datasets.icu_sepsis import load_icu_sepsis, load_icu_sepsis_mdp, get_icu_sepsis_info
-from econirl.datasets.supermarket import load_supermarket, get_supermarket_info
-from econirl.datasets.keane_wolpin import load_keane_wolpin, get_keane_wolpin_info
-from econirl.datasets.rdw_scrappage import load_rdw_scrappage, get_rdw_scrappage_info
-from econirl.datasets.scania import load_scania, get_scania_info
-
 # Hybrid datasets (real data + synthetic fallback)
-from econirl.datasets.citibike_route import load_citibike_route, get_citibike_route_info
-from econirl.datasets.citibike_usage import load_citibike_usage, get_citibike_usage_info
-
-# Real IRL / trajectory datasets
-from econirl.datasets.tdrive import load_tdrive, get_tdrive_info
-from econirl.datasets.geolife import load_geolife, get_geolife_info
-from econirl.datasets.stanford_drone import load_stanford_drone, get_stanford_drone_info
-from econirl.datasets.eth_ucy import load_eth_ucy, get_eth_ucy_info
+from econirl.datasets.citibike_route import get_citibike_route_info, load_citibike_route
+from econirl.datasets.citibike_usage import get_citibike_usage_info, load_citibike_usage
+from econirl.datasets.equipment_replacement import load_equipment_replacement
+from econirl.datasets.eth_ucy import get_eth_ucy_info, load_eth_ucy
+from econirl.datasets.geolife import get_geolife_info, load_geolife
+from econirl.datasets.icu_sepsis import get_icu_sepsis_info, load_icu_sepsis, load_icu_sepsis_mdp
+from econirl.datasets.keane_wolpin import get_keane_wolpin_info, load_keane_wolpin
 
 # Real-world DDC/IRL datasets
-from econirl.datasets.ngsim import load_ngsim, get_ngsim_info
-from econirl.datasets.taxi_gridworld import load_taxi_gridworld, get_taxi_gridworld_info
+from econirl.datasets.ngsim import get_ngsim_info, load_ngsim
+from econirl.datasets.occupational_choice import load_occupational_choice
+from econirl.datasets.rdw_scrappage import get_rdw_scrappage_info, load_rdw_scrappage
+from econirl.datasets.robinson_crusoe import get_robinson_crusoe_info, load_robinson_crusoe
+from econirl.datasets.rust_bus import load_rust_bus, rust_bus_reward_spec
+from econirl.datasets.scania import get_scania_info, load_scania
 from econirl.datasets.shanghai_route import (
+    build_edge_features,
+    build_state_action_features,
+    build_transition_matrix,
     load_shanghai_network,
     load_shanghai_route,
     load_shanghai_trajectories,
-    build_transition_matrix,
-    build_edge_features,
-    build_state_action_features,
 )
+from econirl.datasets.stanford_drone import get_stanford_drone_info, load_stanford_drone
+from econirl.datasets.supermarket import get_supermarket_info, load_supermarket
+from econirl.datasets.taxi_gridworld import get_taxi_gridworld_info, load_taxi_gridworld
+
+# Real IRL / trajectory datasets
+from econirl.datasets.tdrive import get_tdrive_info, load_tdrive
 from econirl.datasets.trivago_search import (
-    load_trivago_search,
-    load_trivago_sessions,
+    build_trivago_features,
     build_trivago_mdp,
     build_trivago_panel,
-    build_trivago_features,
     build_trivago_transitions,
     get_trivago_info,
+    load_trivago_search,
+    load_trivago_sessions,
 )
 
 # Soft aliases so the curated dataset names used in the JSS paper line
@@ -77,13 +76,14 @@ load_rust_small = load_rust_bus
 load_ziebart_small = load_taxi_gridworld
 
 from econirl.datasets.shapeshifter import (
-    load_shapeshifter,
     get_shapeshifter_info,
+    load_shapeshifter,
 )
 
 __all__ = [
     # Real DDC Datasets
     "load_rust_bus",
+    "rust_bus_reward_spec",
     # Legacy synthetic generators (pending conversion to environments)
     "load_occupational_choice",
     "load_robinson_crusoe",

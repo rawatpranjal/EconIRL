@@ -4,7 +4,7 @@ The public wrapper accepts dataframe-style panel data. Create a model, call
 `fit`, and read the fitted sklearn-style attributes.
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import SEES
 
 df = load_rust_bus()
@@ -13,7 +13,7 @@ model = SEES(
     n_states=90,
     n_actions=2,
     discount=0.9999,
-    utility="linear_cost",
+    utility=rust_bus_reward_spec(90),
     solution="value",
     basis_type="fourier",
     basis_dim=8,
