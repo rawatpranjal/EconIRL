@@ -35,7 +35,7 @@ import pandas as pd
 from scipy.stats import norm as scipy_norm
 
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
+from econirl.core.types import DDCProblem, Panel, TrajectoryPanel
 from econirl.estimation.nnes import NNESConfig, NNESEstimator, NNESNFXPEstimator
 from econirl.preferences.linear import LinearUtility
 from econirl.transitions import TransitionEstimator
@@ -68,7 +68,13 @@ class NNES:
         the NFXP soft Bellman operator (no orthogonality, V-errors
         contaminate the score).
     se_method : str, default="asymptotic"
-        Method for computing standard errors. Options: "robust", "asymptotic".
+        Method for computing standard errors. Options: "robust", "asymptotic",
+        "bootstrap".
+    n_bootstrap : int, default=400
+        Number of pairs-cluster bootstrap replications when
+        ``se_method="bootstrap"``.
+    se_seed : int, optional
+        Random seed for bootstrap standard errors.
     hidden_dim : int, default=32
         Number of hidden units per layer in the V-network.
     num_layers : int, default=2
@@ -120,7 +126,9 @@ class NNES:
         discount: float = 0.9999,
         utility: str | RewardSpec = "linear_cost",
         bellman: Literal["npl", "nfxp"] = "npl",
-        se_method: Literal["robust", "asymptotic"] = "asymptotic",
+        se_method: Literal["robust", "asymptotic", "bootstrap"] = "asymptotic",
+        n_bootstrap: int = 400,
+        se_seed: int | None = None,
         hidden_dim: int = 32,
         num_layers: int = 2,
         v_lr: float = 1e-3,
@@ -134,6 +142,8 @@ class NNES:
         self.utility = utility
         self.bellman = bellman
         self.se_method = se_method
+        self.n_bootstrap = n_bootstrap
+        self.se_seed = se_seed
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.v_lr = v_lr
@@ -203,18 +213,14 @@ class NNES:
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
         # --- Handle reward: RewardSpec or string ---
@@ -252,7 +258,9 @@ class NNES:
             discount_factor=self.discount,
             scale_parameter=1.0,
             state_dim=1,
-            state_encoder=lambda s: jnp.expand_dims(jnp.asarray(s, dtype=jnp.float32) / max(self.n_states - 1, 1), axis=-1),
+            state_encoder=lambda s: jnp.expand_dims(
+                jnp.asarray(s, dtype=jnp.float32) / max(self.n_states - 1, 1), axis=-1
+            ),
         )
 
         # Create the underlying NNES estimator (NPL or NFXP variant)
@@ -277,6 +285,8 @@ class NNES:
             utility=self._utility_fn,
             problem=self._problem,
             transitions=transition_tensor,
+            n_bootstrap=self.n_bootstrap,
+            se_seed=self.se_seed,
         )
 
         # Extract results
@@ -306,8 +316,7 @@ class NNES:
             expected_shape = (self.n_actions, self.n_states, self.n_states)
             if keep_transitions.shape != expected_shape:
                 raise ValueError(
-                    "3D transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
             return jnp.array(keep_transitions)
 
@@ -385,9 +394,7 @@ class NNES:
                 se_val = self.se_[name]
                 if se_val and se_val > 0:
                     t_stat = self.params_[name] / se_val
-                    pvalues[name] = float(
-                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
-                    )
+                    pvalues[name] = float(2 * (1 - scipy_norm.cdf(abs(t_stat))))
                 else:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues
