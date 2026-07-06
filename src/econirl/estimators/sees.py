@@ -44,10 +44,10 @@ from scipy.stats import norm as scipy_norm
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import DDCProblem, Panel, TrajectoryPanel
 from econirl.estimation.sees import (
+    VALID_SEES_SOLUTIONS,
     SEESConfig,
     SEESEstimator,
     SEESSolution,
-    VALID_SEES_SOLUTIONS,
 )
 from econirl.preferences.linear import LinearUtility
 from econirl.transitions import TransitionEstimator
@@ -74,7 +74,13 @@ class SEES:
         bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
         ``RewardSpec`` for custom features.
     se_method : str, default="asymptotic"
-        Method for computing standard errors.
+        Method for computing standard errors. Options: "robust", "asymptotic",
+        "bootstrap".
+    n_bootstrap : int, default=400
+        Number of pairs-cluster bootstrap replications when
+        ``se_method="bootstrap"``.
+    se_seed : int, optional
+        Random seed for bootstrap standard errors.
     basis_type : str, default="fourier"
         Sieve basis type. Options: "fourier", "polynomial".
     basis_dim : int, default=8
@@ -125,7 +131,9 @@ class SEES:
         n_actions: int = 2,
         discount: float = 0.9999,
         utility: str | RewardSpec = "linear_cost",
-        se_method: Literal["robust", "asymptotic"] = "asymptotic",
+        se_method: Literal["robust", "asymptotic", "bootstrap"] = "asymptotic",
+        n_bootstrap: int = 400,
+        se_seed: int | None = None,
         basis_type: str = "fourier",
         basis_dim: int = 8,
         solution: SEESSolution = "value",
@@ -146,6 +154,8 @@ class SEES:
         self.discount = discount
         self.utility = utility
         self.se_method = se_method
+        self.n_bootstrap = n_bootstrap
+        self.se_seed = se_seed
         self.basis_type = basis_type
         self.basis_dim = basis_dim
         self.solution = solution
@@ -217,18 +227,14 @@ class SEES:
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
         # --- Handle reward: RewardSpec or string ---
@@ -286,6 +292,8 @@ class SEES:
             utility=self._utility_fn,
             problem=self._problem,
             transitions=transition_tensor,
+            n_bootstrap=self.n_bootstrap,
+            se_seed=self.se_seed,
         )
 
         # Extract results
@@ -315,8 +323,7 @@ class SEES:
             expected_shape = (self.n_actions, self.n_states, self.n_states)
             if keep_transitions.shape != expected_shape:
                 raise ValueError(
-                    "3D transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
             return jnp.array(keep_transitions)
 
@@ -391,9 +398,7 @@ class SEES:
                 se_val = self.se_[name]
                 if se_val and se_val > 0:
                     t_stat = self.params_[name] / se_val
-                    pvalues[name] = float(
-                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
-                    )
+                    pvalues[name] = float(2 * (1 - scipy_norm.cdf(abs(t_stat))))
                 else:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues

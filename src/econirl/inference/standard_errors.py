@@ -277,7 +277,8 @@ def _clustered_se(
     where:
         B_cluster = sum_c (sum_{i in c} g_i)(sum_{i in c} g_i)'
 
-    This sums gradients within clusters before taking outer products.
+    This sums gradients within clusters before taking outer products
+    (Cameron and Miller 2015, the analytic CRVE).
     """
     if hessian is None:
         raise ValueError("Hessian required for clustered SEs")
@@ -358,17 +359,13 @@ def _full_likelihood_bhhh_se(
     structural block of ``inv(G'G)``.
     """
     if gradient_contributions is None:
-        raise ValueError(
-            "Gradient contributions required for full_likelihood_bhhh SEs"
-        )
+        raise ValueError("Gradient contributions required for full_likelihood_bhhh SEs")
 
     n_structural = len(parameters)
     if gradient_contributions.ndim != 2:
         raise ValueError("gradient_contributions must be a two-dimensional matrix")
     if gradient_contributions.shape[1] < n_structural:
-        raise ValueError(
-            "gradient_contributions must include all structural score columns"
-        )
+        raise ValueError("gradient_contributions must include all structural score columns")
 
     scores = jnp.asarray(gradient_contributions, dtype=jnp.float64)
     n_joint = int(scores.shape[1])
@@ -384,9 +381,7 @@ def _full_likelihood_bhhh_se(
             break
 
     if joint_cov is None:
-        structural_cov = jnp.full(
-            (n_structural, n_structural), float("nan"), dtype=scores.dtype
-        )
+        structural_cov = jnp.full((n_structural, n_structural), float("nan"), dtype=scores.dtype)
         se = jnp.full((n_structural,), float("nan"), dtype=scores.dtype)
         return StandardErrorResult(
             standard_errors=se,
