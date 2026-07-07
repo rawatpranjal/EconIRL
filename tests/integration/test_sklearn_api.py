@@ -17,6 +17,7 @@ Reference:
 import pytest
 import numpy as np
 import pandas as pd
+from econirl.datasets import rust_bus_reward_spec
 
 
 @pytest.fixture
@@ -60,7 +61,7 @@ class TestNFXPIntegration:
         from econirl.estimators import NFXP
 
         # Create estimator with Rust's discount factor
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
 
         # Fit to original data
         model.fit(
@@ -133,7 +134,7 @@ class TestNFXPIntegration:
         from econirl.estimators import NFXP
 
         # Fit model to subset for speed
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -183,7 +184,7 @@ class TestNFXPIntegration:
         from econirl.estimators import NFXP
 
         # Fit model
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -264,7 +265,7 @@ class TestCCPIntegration:
 
         # Create estimator with Rust's discount factor
         # Using Hotz-Miller (num_policy_iterations=1)
-        model = CCP(n_states=90, discount=0.9999, verbose=False)
+        model = CCP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
 
         # Fit to original data
         model.fit(
@@ -323,7 +324,7 @@ class TestCCPIntegration:
         from econirl.estimators import NFXP, CCP
 
         # Fit NFXP
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         nfxp.fit(
             data=rust_data,
             state="mileage_bin",
@@ -332,7 +333,7 @@ class TestCCPIntegration:
         )
 
         # Fit CCP (Hotz-Miller)
-        ccp = CCP(n_states=90, discount=0.9999, verbose=False)
+        ccp = CCP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         ccp.fit(
             data=rust_data,
             state="mileage_bin",
@@ -384,7 +385,7 @@ class TestCCPIntegration:
         from econirl.estimators import NFXP, CCP
 
         # Fit NFXP as the benchmark
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         nfxp.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -393,7 +394,7 @@ class TestCCPIntegration:
         )
 
         # Fit CCP with 1 iteration (Hotz-Miller)
-        ccp_1 = CCP(n_states=90, discount=0.9999, num_policy_iterations=1, verbose=False)
+        ccp_1 = CCP(n_states=90, discount=0.9999, num_policy_iterations=1, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         ccp_1.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -402,7 +403,7 @@ class TestCCPIntegration:
         )
 
         # Fit CCP with more iterations (NPL)
-        ccp_5 = CCP(n_states=90, discount=0.9999, num_policy_iterations=5, verbose=False)
+        ccp_5 = CCP(n_states=90, discount=0.9999, num_policy_iterations=5, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         ccp_5.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -548,7 +549,7 @@ class TestEndToEndWorkflow:
         from econirl.estimators import NFXP
 
         # Step 1: Estimate from real data
-        model_real = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model_real = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         model_real.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -569,7 +570,7 @@ class TestEndToEndWorkflow:
 
         # Step 3: Re-estimate from simulated data
         # Use the same transitions as the original model to focus on utility estimation
-        model_sim = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model_sim = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         model_sim.fit(
             data=sim_data,
             state="mileage_bin",
@@ -600,7 +601,7 @@ class TestEndToEndWorkflow:
         from econirl.estimators import NFXP
 
         # Fit model
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -649,7 +650,7 @@ class TestEndToEndWorkflow:
         from econirl.estimators import NFXP
 
         # Fit model
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",

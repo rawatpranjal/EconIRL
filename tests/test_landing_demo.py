@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 from econirl import NFXP, NNES
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl.estimators.protocol import EstimatorProtocol
 
 
@@ -14,14 +14,14 @@ def rust_bus_df():
 
 @pytest.fixture(scope="module")
 def nfxp_fitted(rust_bus_df):
-    return NFXP(n_states=90, discount=0.9999).fit(
+    return NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90, names=("theta_c", "RC"))).fit(
         rust_bus_df, state="mileage_bin", action="replaced", id="bus_id"
     )
 
 
 @pytest.fixture(scope="module")
 def nnes_fitted(rust_bus_df):
-    return NNES(n_states=90, discount=0.9999, v_epochs=300, n_outer_iterations=2).fit(
+    return NNES(n_states=90, discount=0.9999, v_epochs=300, n_outer_iterations=2, utility=rust_bus_reward_spec(90, names=("theta_c", "RC"))).fit(
         rust_bus_df, state="mileage_bin", action="replaced", id="bus_id"
     )
 
