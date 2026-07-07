@@ -60,17 +60,14 @@ from econirl.environments.rust_bus import RustBusEnvironment
 # Preferences
 from econirl.preferences.linear import LinearUtility
 
-# Legacy Estimators — handled by __getattr__ with deprecation warnings
+# Legacy and demoted estimators — handled by __getattr__ with deprecation warnings
 
-# Sklearn-style Estimators (JAX backend)
-from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES, SEES, TDCCP, UFXP
-from econirl.estimators import RHIP
+# Core estimators: 5 families plus sub-variants (the supported public API).
+# Everything else stays reachable via econirl.contrib (see __getattr__ below).
+from econirl.estimators import NFXP, CCP, MCEIRL, MCEIRLNeural
 from econirl.estimators import GLADIUS, NeuralGLADIUS
-from econirl.estimators import AIRL, NeuralAIRL
-from econirl.estimation import IQLearnEstimator as IQLearn
-from econirl.estimation import MPEC
-from econirl.estimators import MCEIRLNeural
-from econirl.estimators import NeuralUFXP
+from econirl.estimators import NeuralAIRL
+from econirl.estimation import AIRL, AIRLHet
 
 # Sklearn-style Utilities
 from econirl.utilities import Utility, LinearCost, make_utility
@@ -102,25 +99,16 @@ __all__ = [
     "Trajectory",
     # Environments
     "RustBusEnvironment",
-    # Sklearn-style Estimators (recommended)
+    # Core estimators: 5 families plus sub-variants (the supported public API)
     "NFXP",
     "CCP",
-    "MaxEntIRL",
-    "MaxMarginIRL",
     "MCEIRL",
-    "RHIP",
-    "NNES",
-    "SEES",
-    "TDCCP",
-    "UFXP",
-    "MPEC",
-    "GLADIUS",
-    "AIRL",
-    "IQLearn",
-    "NeuralGLADIUS",
-    "NeuralAIRL",
     "MCEIRLNeural",
-    "NeuralUFXP",
+    "AIRL",
+    "NeuralAIRL",
+    "AIRLHet",
+    "GLADIUS",
+    "NeuralGLADIUS",
     # Core types (new)
     "RewardSpec",
     "TrajectoryPanel",
@@ -148,6 +136,22 @@ _DEPRECATED_LEGACY = {
     "CCPEstimator": ("econirl.estimation.ccp", "CCPEstimator", "CCP"),
 }
 
+# Estimators demoted from the core API to econirl.contrib. Still resolvable at the
+# top level (with a warning) so existing imports keep working through a removal
+# window. Attribute name equals the demoted name; each maps to its current home.
+_DEMOTED_TO_CONTRIB = {
+    "MaxEntIRL": "econirl.estimators.maxent_irl",
+    "MaxMarginIRL": "econirl.estimators.max_margin_irl",
+    "RHIP": "econirl.estimators.rhip",
+    "NNES": "econirl.estimators.nnes",
+    "SEES": "econirl.estimators.sees",
+    "TDCCP": "econirl.estimators.tdccp",
+    "UFXP": "econirl.estimators.ufxp",
+    "NeuralUFXP": "econirl.estimators.ufxp_neural",
+    "MPEC": "econirl.estimation",
+    "IQLearn": "econirl.estimation",
+}
+
 
 def __getattr__(name: str):
     if name in _DEPRECATED_LEGACY:
@@ -161,4 +165,16 @@ def __getattr__(name: str):
         )
         mod = importlib.import_module(module_path)
         return getattr(mod, class_name)
+    if name in _DEMOTED_TO_CONTRIB:
+        import warnings
+        import importlib
+
+        warnings.warn(
+            f"econirl.{name} is no longer part of the core API. "
+            f"Import it from econirl.contrib.{name} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        mod = importlib.import_module(_DEMOTED_TO_CONTRIB[name])
+        return getattr(mod, name)
     raise AttributeError(f"module 'econirl' has no attribute {name!r}")

@@ -29,4 +29,49 @@ __all__ = [
     "BayesianIRLEstimator",
     "GAILEstimator",
     "GAILConfig",
+    # Estimators demoted from the core API, re-exported here (see __getattr__)
+    "TDCCP",
+    "MPEC",
+    "NNES",
+    "SEES",
+    "UFXP",
+    "NeuralUFXP",
+    "NeuralMPEC",
+    "RHIP",
+    "IQLearn",
+    "FIRL",
+    "BC",
+    "GenPQR",
+    "MaxEntIRL",
+    "MaxMarginIRL",
 ]
+
+# Demoted estimators are imported lazily so contrib can re-export the sklearn
+# wrappers (econirl.estimators.*) without a circular import: those wrapper modules
+# import back into econirl.contrib at module load, so eager imports here would
+# deadlock. Attribute name equals the class name; each maps to its current home.
+_DEMOTED = {
+    "TDCCP": ("econirl.estimators.tdccp", "TDCCP"),
+    "MPEC": ("econirl.estimation", "MPEC"),
+    "NNES": ("econirl.estimators.nnes", "NNES"),
+    "SEES": ("econirl.estimators.sees", "SEES"),
+    "UFXP": ("econirl.estimators.ufxp", "UFXP"),
+    "NeuralUFXP": ("econirl.estimators.ufxp_neural", "NeuralUFXP"),
+    "NeuralMPEC": ("econirl.estimation", "NeuralMPEC"),
+    "RHIP": ("econirl.estimators.rhip", "RHIP"),
+    "IQLearn": ("econirl.estimation", "IQLearn"),
+    "FIRL": ("econirl.estimation", "FIRL"),
+    "BC": ("econirl.estimation", "BC"),
+    "GenPQR": ("econirl.estimators.genpqr", "GenPQR"),
+    "MaxEntIRL": ("econirl.estimators.maxent_irl", "MaxEntIRL"),
+    "MaxMarginIRL": ("econirl.estimators.max_margin_irl", "MaxMarginIRL"),
+}
+
+
+def __getattr__(name: str):
+    if name in _DEMOTED:
+        import importlib
+
+        module_path, attr = _DEMOTED[name]
+        return getattr(importlib.import_module(module_path), attr)
+    raise AttributeError(f"module 'econirl.contrib' has no attribute {name!r}")

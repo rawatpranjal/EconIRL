@@ -14,7 +14,6 @@ For how to choose among them, including the side-by-side table, see
 | --- | --- | --- |
 | [NFXP](nfxp.md) | Structural | Exact tabular DDC, replicated to Rust (1987) Table IX. |
 | [CCP](ccp.md) | Structural | Hotz-Miller and NPL tabular DDC without a nested solve. |
-| [TD-CCP](tdccp.md) | Structural | Reward parameters without modeling the transition density. |
 | [MCE-IRL](mce_irl.md) | IRL | Maximum causal entropy reward-feature matching. |
 | [Neural MCE-IRL](deep_mce_irl.md) | IRL | Unrestricted neural reward map under the MCE objective. |
 | [AIRL](airl.md) | IRL | Unified identified AIRL: state-only transfer, anchored action-dependent reward, and anchored latent heterogeneity. |
@@ -55,7 +54,6 @@ they treat as given and what they estimate from data.
 landscape
 nfxp
 ccp
-tdccp
 mce_irl
 deep_mce_irl
 airl

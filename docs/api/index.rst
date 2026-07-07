@@ -33,10 +33,6 @@ Linear-utility dynamic discrete choice estimators with statistical inference.
 
    NFXP
    CCP
-   TDCCP
-   UFXP
-   NNES
-   SEES
 
 Inverse reinforcement learning estimators
 ----------------------------------------------------------
@@ -47,19 +43,42 @@ estimators; they are also importable as ``NeuralGLADIUS`` and ``NeuralAIRL``.
 .. autosummary::
    :toctree: generated/
 
-   MaxEntIRL
-   MaxMarginIRL
    MCEIRL
    MCEIRLNeural
-   IQLearn
-   GLADIUS
    AIRL
+   NeuralAIRL
+   AIRLHet
+   GLADIUS
+   NeuralGLADIUS
+
+Contrib estimators
+----------------------------------------------------------
+
+Research and baseline estimators outside the core roster, importable from
+``econirl.contrib`` (for example ``from econirl.contrib import TDCCP``).
+
+.. currentmodule:: econirl.contrib
+
+.. autosummary::
+   :toctree: generated/
+
+   TDCCP
+   MPEC
+   NNES
+   SEES
+   UFXP
+   RHIP
+   IQLearn
+   MaxEntIRL
+   MaxMarginIRL
    NeuralUFXP
 
 Environments and simulation
 ----------------------------------------------------------
 
 Markov decision process environments and the panel simulator.
+
+.. currentmodule:: econirl
 
 .. autosummary::
    :toctree: generated/
