@@ -96,6 +96,12 @@ experiments/jss_deep_run/results/
 /experiments/*
 !/experiments/README.md
 
+# RAG navigator chatbot over these docs (a separate FastAPI + LanceDB service, own
+# uv env). Folded in from the former sibling repo econirl-assistant; kept local-only
+# like experiments/ and docs/research/, never published, never built into the site.
+/assistant/*
+!/assistant/README.md
+
 # Cache
 cache/
 .cache/
@@ -151,3 +157,6 @@ acceptance/loop/
 
 # Raw NFXP source data + PDFs (downloaded on demand by `make rust-table-ix`)
 downloads/
+
+# Local scratch / throwaway experiments (incl. rescued pod artifacts)
+scratchpad/
