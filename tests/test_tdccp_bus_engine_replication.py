@@ -12,6 +12,7 @@ Marked slow because each fit solves a small DGP and runs the semi-gradient + log
 first stage. Reproduce the full Monte Carlo with
 ``validation/estimators/tdccp/bus_engine_mc.py``.
 """
+
 from __future__ import annotations
 
 import sys
@@ -26,39 +27,55 @@ for _p in (str(ROOT), str(ROOT / "src"), str(DRIVER_DIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import bus_engine_mc as be  # noqa: E402
+import highdim_dummies as hd  # noqa: E402,F401
 import jax.numpy as jnp  # noqa: E402
+
 from econirl.core.bellman import SoftBellmanOperator  # noqa: E402
 from econirl.core.solvers import value_iteration  # noqa: E402
 from econirl.estimation.td_ccp import TDCCPConfig, TDCCPEstimator  # noqa: E402
 from econirl.simulation.synthetic import simulate_panel_from_policy  # noqa: E402
 
-import bus_engine_mc as be  # noqa: E402
 
-
-def _fit_thetas(ccp_use_encoder: bool, seed: int = 20250,
-                n_buses: int = 600, n_periods: int = 30) -> dict[str, float]:
+def _fit_thetas(
+    ccp_use_encoder: bool, seed: int = 20250, n_buses: int = 600, n_periods: int = 30
+) -> dict[str, float]:
     dgp = be.build_dgp()
     operator = SoftBellmanOperator(dgp["problem"], dgp["transitions"])
     true_reward = dgp["utility"].compute(jnp.asarray(be.THETA_TRUE))
     truth = value_iteration(operator, true_reward, tol=1e-12, max_iter=20_000)
-    init = be.stationary_initial_distribution(
-        dgp["problem"], dgp["transitions"], truth.policy
-    )
+    init = be.stationary_initial_distribution(dgp["problem"], dgp["transitions"], truth.policy)
     panel = simulate_panel_from_policy(
-        dgp["problem"], dgp["transitions"], truth.policy, init,
-        n_individuals=n_buses, n_periods=n_periods, seed=seed,
+        dgp["problem"],
+        dgp["transitions"],
+        truth.policy,
+        init,
+        n_individuals=n_buses,
+        n_periods=n_periods,
+        seed=seed,
     )
     cfg = TDCCPConfig(
-        method="semigradient", basis_type="encoded", basis_dim=3,
-        basis_ridge=1e-5, ccp_method="logit", ccp_poly_degree=3,
-        ccp_use_encoder=ccp_use_encoder, cross_fitting=False, robust_se=False,
-        compute_se=False, n_policy_iterations=1, outer_max_iter=500,
-        outer_tol=1e-8, verbose=False,
+        method="semigradient",
+        basis_type="encoded",
+        basis_dim=3,
+        basis_ridge=1e-5,
+        ccp_method="logit",
+        ccp_poly_degree=3,
+        ccp_use_encoder=ccp_use_encoder,
+        cross_fitting=False,
+        robust_se=False,
+        compute_se=False,
+        n_policy_iterations=1,
+        outer_max_iter=500,
+        outer_tol=1e-8,
+        verbose=False,
     )
     est = TDCCPEstimator(config=cfg, seed=seed)
     summary = est.estimate(
-        panel=panel, utility=dgp["utility"],
-        problem=dgp["problem"], transitions=dgp["transitions"],
+        panel=panel,
+        utility=dgp["utility"],
+        problem=dgp["problem"],
+        transitions=dgp["transitions"],
     )
     return dict(zip(be.PARAM_NAMES, np.asarray(summary.parameters, dtype=float)))
 
@@ -73,10 +90,89 @@ def test_encoder_ccp_recovers_bus_engine_thetas():
 
 
 @pytest.mark.slow
-def test_encoder_ccp_fixes_type_coefficient():
-    """The scalar-index CCP biases theta2 low; the encoder CCP recovers it."""
+def test_gbm_avi_recovers_bus_engine_thetas():
+    """The any-ML AVI (gradient boosting) recovers the bus-engine thetas.
+
+    ``method="neural"`` with ``avi_functional_class="gbm"`` runs approximate value
+    iteration with a sklearn HistGradientBoostingRegressor in place of a neural
+    network (the paper's any-ML AVI, eq 3.2). The plug-in AVI carries some
+    small-sample bias, so the tolerance is looser than the semigradient's.
+    """
+    dgp = be.build_dgp()
+    operator = SoftBellmanOperator(dgp["problem"], dgp["transitions"])
+    true_reward = dgp["utility"].compute(jnp.asarray(be.THETA_TRUE))
+    truth = value_iteration(operator, true_reward, tol=1e-12, max_iter=20_000)
+    init = be.stationary_initial_distribution(dgp["problem"], dgp["transitions"], truth.policy)
+    panel = simulate_panel_from_policy(
+        dgp["problem"],
+        dgp["transitions"],
+        truth.policy,
+        init,
+        n_individuals=600,
+        n_periods=30,
+        seed=20250,
+    )
+    cfg = TDCCPConfig(
+        method="neural",
+        avi_functional_class="gbm",
+        ccp_method="logit",
+        ccp_poly_degree=3,
+        ccp_use_encoder=True,
+        avi_iterations=20,
+        cross_fitting=False,
+        robust_se=False,
+        compute_se=False,
+        verbose=False,
+    )
+    est = TDCCPEstimator(config=cfg, seed=20250)
+    summary = est.estimate(
+        panel=panel,
+        utility=dgp["utility"],
+        problem=dgp["problem"],
+        transitions=dgp["transitions"],
+    )
+    th = dict(zip(be.PARAM_NAMES, np.asarray(summary.parameters, dtype=float)))
+    assert 1.6 <= th["theta0_intercept"] <= 2.4, th
+    assert -0.20 <= th["theta1_mileage"] <= -0.10, th
+    assert 0.8 <= th["theta2_type"] <= 1.25, th
+
+
+@pytest.mark.slow
+def test_ccp_design_robust_for_type_coefficient():
+    """theta2 recovers under BOTH the scalar-index and the encoder logit CCP.
+
+    Historically the scalar-index CCP appeared to bias theta2 low (~0.64) while the
+    encoder CCP "fixed" it (~0.96). That gap was a symptom of a transition-tuple
+    misalignment in ``_extract_transitions`` (a_{t+1} misaligned with (s_t, s_{t+1})
+    across trajectory boundaries), not the CCP design. With the alignment fixed,
+    theta2 recovers regardless of the CCP encoder, so the encoder is no longer
+    load-bearing for theta2.
+    """
     on = _fit_thetas(ccp_use_encoder=True)["theta2_type"]
     off = _fit_thetas(ccp_use_encoder=False)["theta2_type"]
-    assert off < 0.85, f"scalar-index CCP should bias theta2 low, got {off}"
     assert on >= 0.85, f"encoder CCP should recover theta2, got {on}"
-    assert on > off + 0.1, (on, off)
+    assert off >= 0.85, f"scalar-index CCP should also recover theta2 post-fix, got {off}"
+
+
+@pytest.mark.slow
+def test_highdim_recovers_and_is_dynamic():
+    """High-dimensional TD-CCP: recover theta with irrelevant dummy state variables,
+    and confirm the dynamic continuation is load-bearing (not static logit).
+
+    The bus is augmented with K=5 iid dummy state vars that affect neither reward nor
+    transitions. Each observation is its own point in feature space, so the estimator
+    runs with compute_policy=False (no enumerable state set). theta1 (mileage) must
+    recover near -0.15 despite the dummies. Breaking the s->s' continuation (shuffle)
+    must SEND theta1 far from -0.15, which proves the dynamic term carries the
+    identification (a static-logit experiment would recover either way).
+    """
+    dgp, truth, init = hd._relevant_truth()
+    p, u, pr, _ = hd.build_highdim(dgp, truth, init, K=5, seed=0, n_buses=150)
+    theta = hd.fit(p, u, pr, basis_dim=2)
+    assert -0.20 <= theta[1] <= -0.10, f"high-dim theta1 should recover ~-0.15, got {theta[1]}"
+
+    ps, us, prs, _ = hd.build_highdim(dgp, truth, init, K=5, seed=0, n_buses=150, shuffle=True)
+    theta_shuf = hd.fit(ps, us, prs, basis_dim=2)
+    assert not (-0.20 <= theta_shuf[1] <= -0.10), (
+        f"shuffling s' should break theta1 recovery (dynamics load-bearing), got {theta_shuf[1]}"
+    )

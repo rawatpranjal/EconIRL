@@ -70,7 +70,7 @@ def _run_nfxp(env, panel):
 def _run_ccp(env, panel):
     from econirl.estimation import CCPEstimator
 
-    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
+    est = CCPEstimator(num_policy_iterations=5, compute_hessian=True, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -291,7 +291,7 @@ _HEADLINE_CELL = Cell(
     n_individuals=500,
     n_periods=80,
     seed=42,
-    n_replications=3,
+    n_replications=30,
     fit_timeout=600,
     figure=FIGURE_PNG,
     results_figure=RESULTS_FIG,
@@ -319,7 +319,7 @@ def _scaling_cell(num_mileage_bins):
         n_individuals=500,
         n_periods=80,
         seed=42,
-        n_replications=2,
+        n_replications=5,
         fit_timeout=600,
         scaling_only=True,
     )

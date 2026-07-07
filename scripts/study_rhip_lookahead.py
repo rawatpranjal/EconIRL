@@ -66,7 +66,7 @@ FIGURE_PNG = os.path.join(_STATIC, "rhip_lookahead.png")
 NODES = 25
 N_INDIVIDUALS = 300
 N_PERIODS = 40
-N_REPS = 3
+N_REPS = 10
 SEED = 42
 # Demonstrator lookaheads. All interior and identifiable: the receding-horizon
 # policy is genuinely between the H=0 and H=inf endpoints for small h, and

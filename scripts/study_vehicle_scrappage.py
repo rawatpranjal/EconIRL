@@ -73,7 +73,7 @@ def _run_nfxp(env, panel):
 def _run_ccp(env, panel):
     from econirl.estimation import CCPEstimator
 
-    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
+    est = CCPEstimator(num_policy_iterations=5, compute_hessian=True, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -231,7 +231,7 @@ CELLS = (
         n_individuals=200,
         n_periods=35,
         seed=42,
-        n_replications=2,
+        n_replications=30,
         fit_timeout=240,
         param_block=True,
         figure=FIGURE_PNG,

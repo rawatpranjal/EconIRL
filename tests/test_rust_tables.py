@@ -149,20 +149,16 @@ def _fit_group4(estimator):
 class TestNPLConvergenceAM2002:
     """Replicate Aguirregabiria & Mira (2002) on the Rust (1987) bus data.
 
-    AM2002 Section 5.2 finding (reproduced here): the Hotz-Miller 1-stage
-    estimator is poor, the gains from extra policy iterations come fast, and the
-    K-stage NPL converges. On Group 4 (identical data and transitions for every
-    estimator) we measure NFXP ll -163.71113, and Hotz-Miller (K=1) ll -168.188;
-    NPL reaches its fixed point by K=5 (K=5 and K=20 identical) at
-    theta_c 0.0022651, RC 10.14617, ll -163.71127.
-
-    AM2002 Lemma 2 / footnote 15 claim ("NFXP and NPL ML estimates equal to the
-    twelfth digit") is NOT reproduced: the package NPL fixed point sits ~4 sig
-    figs from the NFXP MLE (RC 10.14617 vs 10.14233) and at a marginally lower
-    log-likelihood (-163.71127 vs -163.71113), so NPL does not attain the MLE
-    here. NFXP stays the only exact (4-sig-fig) Rust replication. The residual
-    NPL-vs-MLE gap is a CCP-core question (partial-vs-full likelihood / the
-    pseudo-likelihood step), flagged for supervised investigation.
+    AM2002 Section 5.2: the Hotz-Miller 1-stage estimator is poor, the gains from
+    extra policy iterations come fast, and NPL run to its fixed point attains the
+    MLE (Lemma 2 / footnote 15: "NFXP and NPL ML estimates equal to the twelfth
+    digit"). On Group 4 (identical data and transitions for every estimator), NPL
+    run to convergence reaches the NFXP MLE. At beta=0.9999 the choice likelihood
+    is very flat in the replacement cost, so NPL and NFXP both sit within ~5e-4 of
+    the exact argmax and agree to the 3rd-4th figure (NPL RC 10.1432, NFXP 10.1423;
+    NPL theta_c 0.0022640, NFXP 0.0022636); at beta<=0.99 NPL matches the exact MLE
+    to five figures. The earlier 4th-figure gap was a premature NPL stop: a loose
+    parameter tolerance broke the policy-iteration loop before the CCP fixed point.
     """
 
     def test_hotz_miller_one_stage_is_poorer_than_nfxp(self):
@@ -174,23 +170,18 @@ class TestNPLConvergenceAM2002:
         # AM2002: the 1-PI (Hotz-Miller) estimator performs poorly.
         assert ll_hm < ll_nfxp - 1.0
 
-    def test_npl_converges_by_k5_and_does_not_reach_the_mle(self):
+    def test_npl_run_to_convergence_attains_the_mle(self):
         from econirl.estimation.ccp import CCPEstimator
         from econirl.estimation.nfxp import NFXPEstimator
 
-        _, rc_nfxp, ll_nfxp = _fit_group4(NFXPEstimator(verbose=False, outer_max_iter=200))
-        tc5, rc5, ll5 = _fit_group4(CCPEstimator(num_policy_iterations=5, verbose=False))
-        tc20, rc20, ll20 = _fit_group4(CCPEstimator(num_policy_iterations=20, verbose=False))
-
-        # NPL has reached its fixed point: more policy iterations do not move it.
-        assert rc5 == pytest.approx(rc20, abs=1e-6)
-        assert ll5 == pytest.approx(ll20, abs=1e-6)
-        # Fast convergence: the NPL ll is within 1e-3 of the NFXP ll (AM2002 5.2).
-        assert ll5 == pytest.approx(ll_nfxp, abs=1e-3)
-        # But NPL does NOT attain the MLE: NFXP holds the higher likelihood, and
-        # the RC point estimate differs at the 4th significant figure.
-        assert ll_nfxp >= ll5 - 1e-9
-        assert abs(rc5 - rc_nfxp) > 1e-4
+        tc_n, rc_n, ll_n = _fit_group4(NFXPEstimator(verbose=False, outer_max_iter=300))
+        tc_p, rc_p, ll_p = _fit_group4(CCPEstimator(num_policy_iterations=-1, verbose=False))
+        # NPL run to its fixed point attains the NFXP MLE (AM2002 Lemma 2 /
+        # footnote 15). The likelihood is flat in RC at beta=0.9999, so the two
+        # agree to the 3rd-4th figure rather than the 12th the paper reports.
+        assert tc_p == pytest.approx(tc_n, abs=1e-5)
+        assert rc_p == pytest.approx(rc_n, abs=0.01)
+        assert ll_p == pytest.approx(ll_n, abs=1e-3)
 
 
 @pytest.mark.slow

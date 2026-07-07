@@ -266,14 +266,29 @@ accumulators $\hat{h}$ and $\hat{g}$ are identified entirely from observed
 successor pairs $(a_t, x_t, a_{t+1}, x_{t+1})$.
 
 The default estimator uses `method="semigradient"`, `cross_fitting=True`, and
-`robust_se=True`, implementing the locally robust cross-fitting procedure of
-Adusumilli and Eckardt (2025). The semigradient steps (4 and 5) reduce to single
-matrix solves, making recursive-term estimation fast. The alternative
-`method="neural"` replaces the semigradient closed-form solves with neural
-approximate value iteration, which trains neural networks for $h$ and $g$
-iteratively; it
-is more flexible for high-dimensional state spaces and does not use
-cross-fitting or locally robust standard errors in the current implementation.
+`robust_se=True`, the locally robust cross-fitting procedure of Adusumilli and
+Eckardt (2025). The semigradient steps (4 and 5) reduce to single matrix solves,
+so recursive-term estimation is fast.
+
+The paper defines two approximation methods, each in a plug-in and a locally
+robust form. The package implements the linear semigradient in both forms. It also
+implements the second method, approximate value iteration (`method="neural"`),
+which trains approximators for $h$ and $g$ by target-network iteration in place of
+the matrix solves. The paper's value iteration admits any machine-learning function
+class. The package supports neural networks (`avi_functional_class="neural"`, the
+default) and gradient boosting (`"gbm"`, a histogram gradient-boosting regressor).
+The `avi_regressor` option accepts any other fit/predict object, for example
+LightGBM, a random forest, or LASSO. The value iteration also runs under the
+cross-fitting and locally robust path. The linear semigradient is the variant
+reproduced against the paper's Table B.1. The value-iteration variants recover the
+same parameters, with the small-sample bias the paper reports for plug-in value
+iteration.
+
+The recursive terms $\hat{h}$ and $\hat{g}$ are identified from the observed
+successor pairs $(a_t, x_t, a_{t+1}, x_{t+1})$ within each trajectory, and the
+parameter stage models no transition kernel. The method is designed for continuous
+or high-dimensional state spaces, where it avoids discretization. The package
+applies it on discrete-state problems, the regime of the paper's bus-engine check.
 
 ## System View
 

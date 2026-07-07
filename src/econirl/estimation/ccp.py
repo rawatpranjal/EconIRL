@@ -106,7 +106,7 @@ class CCPEstimator(BaseEstimator):
         num_policy_iterations: int | None = None,
         ccp_min_count: int = 1,
         ccp_smoothing: float = 1e-6,
-        convergence_tol: float = 1e-6,
+        convergence_tol: float = 1e-10,
         outer_tol: float = 1e-6,
         outer_max_iter: int = 1000,
         se_method: SEMethod = "asymptotic",
@@ -548,8 +548,12 @@ class CCPEstimator(BaseEstimator):
         # Track iterations
         num_policy_iterations = 0
         converged = False
+        # NPL-until-convergence cap. The NPL CCP fixed point contracts at rate
+        # ~beta, so high-discount problems need many policy iterations to reach it;
+        # the old cap of 100 with a loose 1e-6 parameter tolerance stopped well
+        # short of the fixed point and missed the MLE (Aguirregabiria-Mira Lemma 2).
         max_iterations = (
-            self._num_policy_iterations if self._num_policy_iterations > 0 else 100
+            self._num_policy_iterations if self._num_policy_iterations > 0 else 1000
         )
 
         # ── One-time setup before NPL loop ─────────────────────────────────

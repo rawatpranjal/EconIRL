@@ -66,7 +66,7 @@ def _run_nfxp(env, panel):
 def _run_ccp(env, panel):
     from econirl.estimation import CCPEstimator
 
-    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
+    est = CCPEstimator(num_policy_iterations=5, compute_hessian=True, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -107,7 +107,7 @@ def _run_deep_mce_irl(env, panel):
     # transfer uses that projection, not the raw network.
     m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),
                      discount=float(env.problem_spec.discount_factor),
-                     max_epochs=200, verbose=False)
+                     max_epochs=300, verbose=False)
     m.fit(panel, features=np.asarray(env.feature_matrix),
           transitions=np.asarray(env.transition_matrices))
     return SimpleNamespace(parameters=m.coef_, standard_errors=None, policy=m.policy_,
@@ -264,7 +264,7 @@ CELLS = (
         n_individuals=500,
         n_periods=20,
         seed=7,
-        n_replications=3,
+        n_replications=10,
         fit_timeout=900,
         figure=FIGURE_PNG,
         results_figure=RESULTS_FIG,

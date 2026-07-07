@@ -1,8 +1,8 @@
 {
   "meta": {
     "title": "Simulation study: route choice on a road network",
-    "date": "2026-06-23",
-    "package_version": "0.0.7",
+    "date": "2026-06-28",
+    "package_version": "0.0.8",
     "cells": [
       {
         "cell_id": "route_choice",
@@ -14,7 +14,7 @@
         "n_individuals": 200,
         "n_periods": 35,
         "seed": 42,
-        "n_replications": 2,
+        "n_replications": 30,
         "param_block": true,
         "show_params": true,
         "show_regret": true,
@@ -52,22 +52,10 @@
             "uses_transitions": true
           },
           {
-            "name": "MPEC",
-            "family": "structural",
-            "max_reps": null,
-            "uses_transitions": true
-          },
-          {
             "name": "MCE-IRL",
             "family": "behavioral",
             "max_reps": null,
             "uses_transitions": true
-          },
-          {
-            "name": "NeuralGLADIUS",
-            "family": "behavioral",
-            "max_reps": null,
-            "uses_transitions": false
           }
         ]
       },
@@ -81,7 +69,7 @@
         "n_individuals": 200,
         "n_periods": 35,
         "seed": 42,
-        "n_replications": 2,
+        "n_replications": 5,
         "param_block": false,
         "show_params": true,
         "show_regret": true,
@@ -119,22 +107,10 @@
             "uses_transitions": true
           },
           {
-            "name": "MPEC",
-            "family": "structural",
-            "max_reps": null,
-            "uses_transitions": true
-          },
-          {
             "name": "MCE-IRL",
             "family": "behavioral",
             "max_reps": null,
             "uses_transitions": true
-          },
-          {
-            "name": "NeuralGLADIUS",
-            "family": "behavioral",
-            "max_reps": null,
-            "uses_transitions": false
           }
         ]
       },
@@ -148,7 +124,7 @@
         "n_individuals": 200,
         "n_periods": 35,
         "seed": 42,
-        "n_replications": 2,
+        "n_replications": 5,
         "param_block": false,
         "show_params": true,
         "show_regret": true,
@@ -186,22 +162,10 @@
             "uses_transitions": true
           },
           {
-            "name": "MPEC",
-            "family": "structural",
-            "max_reps": null,
-            "uses_transitions": true
-          },
-          {
             "name": "MCE-IRL",
             "family": "behavioral",
             "max_reps": null,
             "uses_transitions": true
-          },
-          {
-            "name": "NeuralGLADIUS",
-            "family": "behavioral",
-            "max_reps": null,
-            "uses_transitions": false
           }
         ]
       }
@@ -209,6 +173,10 @@
     "oracle": "true-parameter policy/value via SoftBellmanOperator + value_iteration",
     "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
     "excluded": [
+      {
+        "name": "MPEC",
+        "reason": "an Other-tier constrained-optimization form of the same MLE; NFXP and CCP carry the structural recovery here"
+      },
       {
         "name": "IQ-Learn, f-IRL",
         "reason": "not separately identified from choices on this problem; reward is only partially identified from behavior"
@@ -220,22 +188,23 @@
       {
         "name": "MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL",
         "reason": "trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here"
+      },
+      {
+        "name": "NeuralGLADIUS",
+        "reason": "a model-free neural policy learner; on a 25-node tabular state space it reduces to behavioral cloning on the choice likelihood with no structural edge, and it trailed every method shown. Its arena is scalability and predictive likelihood on large state spaces where full-solution methods become intractable, a regime outside these policy-recovery studies"
       }
     ],
     "regret": "Counterfactual regret follows the package Type A (payoff shift), Type B (transition change), Type C (action penalty) taxonomy; regret = initial_distribution . (oracle_value - estimated_value), lower is better. Estimators with a recovered reward re-solve it under each intervention (transfer); estimators without one keep their fixed policy (cannot adapt).",
     "snippets": {
       "NFXP": "def _run_nfxp(env, panel):\n    from econirl.estimation import NFXPEstimator\n\n    est = NFXPEstimator(\n        inner_solver=\"hybrid\", inner_tol=1e-10,\n        inner_max_iter=100_000, compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MPEC": "def _run_mpec(env, panel):\n    from econirl.estimation.mpec import MPECConfig, MPECEstimator\n\n    # solver=\"sqp\" is the real constrained MLE; \"slsqp\" is a legacy alias for\n    # the augmented-Lagrangian penalty solver and does not check optimality.\n    est = MPECEstimator(\n        config=MPECConfig(solver=\"sqp\", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),\n        compute_hessian=True, verbose=False,\n    )\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
-      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(\n        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,\n        compute_se=False, verbose=False,\n    ))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n",
-      "NeuralGLADIUS": "def _run_neural_gladius(env, panel):\n    from types import SimpleNamespace\n\n    from econirl.estimators import NeuralGLADIUS\n\n    ps = env.problem_spec\n    m = NeuralGLADIUS(\n        n_actions=int(env.num_actions),\n        discount=float(ps.discount_factor),\n        max_epochs=200,\n        verbose=False,\n    )\n    m.fit(\n        panel,\n        features=np.asarray(env.feature_matrix),\n        transitions=np.asarray(env.transition_matrices),\n    )\n    return SimpleNamespace(\n        parameters=None,\n        standard_errors=None,\n        policy=m.policy_,\n        value_function=getattr(m, \"value_\", None),\n        converged=bool(getattr(m, \"converged_\", True)),\n    )\n"
+      "CCP": "def _run_ccp(env, panel):\n    from econirl.estimation import CCPEstimator\n\n    est = CCPEstimator(num_policy_iterations=5, compute_hessian=True, verbose=False)\n    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)\n",
+      "MCE-IRL": "def _run_mce_irl(env, panel):\n    from econirl.estimation import MCEIRLConfig, MCEIRLEstimator\n\n    est = MCEIRLEstimator(config=MCEIRLConfig(\n        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,\n        compute_se=False, verbose=False,\n    ))\n    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)\n"
     },
     "diagnoses": {
       "NFXP": "Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum; all three parameters are identified from the edge-feature contrast.",
       "CCP": "CCP uses a first-step nonparametric policy estimate to avoid the inner Bellman loop. One policy-iteration step corrects the bias from the nonparametric first stage.",
       "MPEC": "Mathematical programming with equilibrium constraints. MPEC is not in the CAPABILITIES registry (so run_form does not surface it automatically) but runs correctly via the direct .estimate() path. Uses solver='sqp' for real constrained MLE; the legacy 'slsqp' alias checks only Bellman feasibility.",
-      "MCE-IRL": "Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate.",
-      "NeuralGLADIUS": "Model-free neural policy learner. Uses only the feature matrix and the observed panel; it does not use transition matrices. Capped at 200 epochs here for short compute."
+      "MCE-IRL": "Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate."
     },
     "honesty": "Every number in the rendered table is recomputed from the records below. Crashes carry the verbatim exception. true_theta per cell is included so bias can be recomputed independently."
   },
@@ -246,25 +215,25 @@
       "cell": "route_choice",
       "rep": 0,
       "params": [
-        1.12262348702863,
-        0.49670513006979655,
-        0.9932613402875569
+        1.1226405883824953,
+        0.4967024700885211,
+        0.9932530286327821
       ],
       "standard_errors": [
-        0.16129013895988464,
-        0.025753702968358994,
-        0.051198456436395645
+        0.16202890463894956,
+        0.025855829088946573,
+        0.05223576344772497
       ],
-      "policy_tv": 0.0035779616535840364,
-      "value_rmse": 0.10000356118773925,
+      "policy_tv": 0.003579234487117539,
+      "value_rmse": 0.09992343384433172,
       "regret": {
-        "baseline": 0.0008198545459641464,
-        "type_a": 0.0007828848656283309,
-        "type_b": 0.0010239300516892735,
-        "type_c": 0.0011456925681538638,
+        "baseline": 0.000820140378412547,
+        "type_a": 0.0007831358821575293,
+        "type_b": 0.001024386443522785,
+        "type_c": 0.0011463467985743069,
         "transferred": true
       },
-      "runtime": 3.7290470600128174,
+      "runtime": 2.221144914627075,
       "converged": true,
       "error": null
     },
@@ -274,31 +243,31 @@
       "cell": "route_choice",
       "rep": 0,
       "params": [
-        1.1069785356521606,
-        0.4743184745311737,
-        0.9397772550582886
+        1.1226259469985962,
+        0.49670565128326416,
+        0.9932629466056824
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.011662658141107476,
-      "value_rmse": 0.8497481212936658,
+      "policy_tv": 0.00357785018707497,
+      "value_rmse": 0.10002709110400157,
       "regret": {
-        "baseline": 0.0028360370834341737,
-        "type_a": 0.0026527350859103698,
-        "type_b": 0.009464288821972913,
-        "type_c": 0.009247853382786499,
+        "baseline": 0.0008198754523191971,
+        "type_a": 0.0007829086316416947,
+        "type_b": 0.001023932053059125,
+        "type_c": 0.0011456586586044738,
         "transferred": true
       },
-      "runtime": 2.9767961502075195,
-      "converged": true,
+      "runtime": 4.011443853378296,
+      "converged": false,
       "error": null
     },
     {
-      "estimator": "MPEC",
-      "family": "structural",
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
       "cell": "route_choice",
       "rep": 0,
       "params": [
@@ -307,69 +276,21 @@
         0.9932613372802734
       ],
       "standard_errors": [
-        0.16129015386104584,
-        0.025753701105713844,
-        0.05119845271110535
-      ],
-      "policy_tv": 0.003577961371419828,
-      "value_rmse": 0.1000033066858521,
-      "regret": {
-        "baseline": 0.0008198551319153278,
-        "type_a": 0.0007828850807107199,
-        "type_b": 0.0010239299352908472,
-        "type_c": 0.0011456935813520886,
-        "transferred": true
-      },
-      "runtime": 0.2942221164703369,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MCE-IRL",
-      "family": "behavioral",
-      "cell": "route_choice",
-      "rep": 0,
-      "params": [
-        1.1226234436035156,
-        0.4967051148414612,
-        0.9932612776756287
-      ],
-      "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.00357796754201489,
-      "value_rmse": 0.10000269749247297,
+      "policy_tv": 0.003577959534657376,
+      "value_rmse": 0.10000360818207697,
       "regret": {
-        "baseline": 0.0008198559807888845,
-        "type_a": 0.0007828852925844426,
-        "type_b": 0.001023931407462248,
-        "type_c": 0.0011456957815586945,
+        "baseline": 0.0008198551319138443,
+        "type_a": 0.0007828850807052294,
+        "type_b": 0.0010239299352870102,
+        "type_c": 0.001145693581349506,
         "transferred": true
       },
-      "runtime": 6.23435115814209,
+      "runtime": 5.091820001602173,
       "converged": false,
-      "error": null
-    },
-    {
-      "estimator": "NeuralGLADIUS",
-      "family": "behavioral",
-      "cell": "route_choice",
-      "rep": 0,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.26944430757623883,
-      "value_rmse": 11.05851961769085,
-      "regret": {
-        "baseline": 4.313843703307576,
-        "type_a": 4.299478934067137,
-        "type_b": 3.3922251978193487,
-        "type_c": 43.35478984792226,
-        "transferred": false
-      },
-      "runtime": 6.046600818634033,
-      "converged": true,
       "error": null
     },
     {
@@ -378,25 +299,25 @@
       "cell": "route_choice",
       "rep": 1,
       "params": [
-        1.240633463058755,
-        0.5190725010417877,
-        1.0046820036270532
+        1.2406268366786546,
+        0.5190758161959791,
+        1.004685870807053
       ],
       "standard_errors": [
-        0.17322002351284027,
-        0.024746624752879143,
-        0.04949481412768364
+        0.17011551375534076,
+        0.02508001756721168,
+        0.049602571225246916
       ],
-      "policy_tv": 0.00988869627208555,
-      "value_rmse": 0.2830818748360424,
+      "policy_tv": 0.009889196396925988,
+      "value_rmse": 0.2831073628499433,
       "regret": {
-        "baseline": 0.00805000863494402,
-        "type_a": 0.005467419252939839,
-        "type_b": 0.0076977838557182226,
-        "type_c": 0.003933997615906076,
+        "baseline": 0.008050713664014714,
+        "type_a": 0.005467765534393047,
+        "type_b": 0.007698456740384613,
+        "type_c": 0.00393390513911161,
         "transferred": true
       },
-      "runtime": 2.3096299171447754,
+      "runtime": 0.6224491596221924,
       "converged": true,
       "error": null
     },
@@ -406,54 +327,26 @@
       "cell": "route_choice",
       "rep": 1,
       "params": [
-        1.2271605730056763,
-        0.502231776714325,
-        0.9655818343162537
+        1.2406282424926758,
+        0.519071102142334,
+        1.0046803951263428
       ],
       "standard_errors": [
-        NaN,
-        NaN,
-        NaN
+        0.007447282492804821,
+        0.029704727121986775,
+        0.03448041017829334
       ],
-      "policy_tv": 0.013552657054727944,
-      "value_rmse": 0.4956599907216595,
+      "policy_tv": 0.009888605853586176,
+      "value_rmse": 0.28306190065110937,
       "regret": {
-        "baseline": 0.008748081218319863,
-        "type_a": 0.005773812164384698,
-        "type_b": 0.007668813928565357,
-        "type_c": 0.008322461771850673,
+        "baseline": 0.008049467882009371,
+        "type_a": 0.005467067125743839,
+        "type_b": 0.00769720434021068,
+        "type_c": 0.00393384451752249,
         "transferred": true
       },
-      "runtime": 1.3616390228271484,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "route_choice",
-      "rep": 1,
-      "params": [
-        1.2406339645385742,
-        0.5190725922584534,
-        1.0046820640563965
-      ],
-      "standard_errors": [
-        0.17322000861167908,
-        0.024746766313910484,
-        0.04949510842561722
-      ],
-      "policy_tv": 0.009888730056438193,
-      "value_rmse": 0.2830823263618569,
-      "regret": {
-        "baseline": 0.008050065508435851,
-        "type_a": 0.005467454531930736,
-        "type_b": 0.0076978363181374135,
-        "type_c": 0.003934019266628433,
-        "transferred": true
-      },
-      "runtime": 0.22617292404174805,
-      "converged": true,
+      "runtime": 2.792393922805786,
+      "converged": false,
       "error": null
     },
     {
@@ -462,46 +355,2378 @@
       "cell": "route_choice",
       "rep": 1,
       "params": [
-        1.2406734228134155,
-        0.5190679430961609,
-        1.0046736001968384
+        1.2406620979309082,
+        0.5190691947937012,
+        1.0046757459640503
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.00988894865688711,
-      "value_rmse": 0.28304361565188885,
+      "policy_tv": 0.009888894329874016,
+      "value_rmse": 0.28305115845876133,
       "regret": {
-        "baseline": 0.008050747817942712,
-        "type_a": 0.005468118747447543,
-        "type_b": 0.007698190780289684,
-        "type_c": 0.0039351773874913495,
+        "baseline": 0.008050577388648098,
+        "type_a": 0.005467937933142366,
+        "type_b": 0.007698078985808875,
+        "type_c": 0.003934863280758849,
         "transferred": true
       },
-      "runtime": 3.8183212280273438,
+      "runtime": 2.4222521781921387,
       "converged": false,
       "error": null
     },
     {
-      "estimator": "NeuralGLADIUS",
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 2,
+      "params": [
+        1.0478561939614321,
+        0.4980569973087617,
+        0.968957490015402
+      ],
+      "standard_errors": [
+        0.16525557446057831,
+        0.024441231830403833,
+        0.048179200581152576
+      ],
+      "policy_tv": 0.0066737886926606935,
+      "value_rmse": 0.5943429241571372,
+      "regret": {
+        "baseline": 0.002714786836783643,
+        "type_a": 0.001686088948348252,
+        "type_b": 0.002800236608032393,
+        "type_c": 0.003305512670360876,
+        "transferred": true
+      },
+      "runtime": 0.7252700328826904,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 2,
+      "params": [
+        1.047864556312561,
+        0.49805381894111633,
+        0.9689534306526184
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006674462873257565,
+      "value_rmse": 0.5943803612108067,
+      "regret": {
+        "baseline": 0.002714547494296177,
+        "type_a": 0.0016860192268189913,
+        "type_b": 0.002800639248381692,
+        "type_c": 0.0033059811087874833,
+        "transferred": true
+      },
+      "runtime": 2.857391834259033,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
       "family": "behavioral",
       "cell": "route_choice",
-      "rep": 1,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.26219238395928496,
-      "value_rmse": 11.087597523206831,
+      "rep": 2,
+      "params": [
+        1.0478651523590088,
+        0.4980555772781372,
+        0.9689537286758423
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006674452100220951,
+      "value_rmse": 0.5943953510614151,
       "regret": {
-        "baseline": 4.214164767876853,
-        "type_a": 4.210952704375231,
-        "type_b": 3.3516764561221155,
-        "type_c": 45.48466162400763,
-        "transferred": false
+        "baseline": 0.002715087437165585,
+        "type_a": 0.0016863084814632953,
+        "type_b": 0.0028008009972305763,
+        "type_c": 0.0033062110116601423,
+        "transferred": true
       },
-      "runtime": 6.235297918319702,
+      "runtime": 2.955247163772583,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 3,
+      "params": [
+        1.1759258673108874,
+        0.5008179196029958,
+        0.974366808307297
+      ],
+      "standard_errors": [
+        0.16328443075832041,
+        0.025472855227443192,
+        0.051628355492405645
+      ],
+      "policy_tv": 0.008925746831497263,
+      "value_rmse": 0.34997450355727,
+      "regret": {
+        "baseline": 0.004515260589633753,
+        "type_a": 0.003069340549767748,
+        "type_b": 0.004256072036835635,
+        "type_c": 0.00456399250560708,
+        "transferred": true
+      },
+      "runtime": 0.6517431735992432,
       "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 3,
+      "params": [
+        1.1759157180786133,
+        0.5008240938186646,
+        0.974385142326355
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008923705738126344,
+      "value_rmse": 0.34968427602030583,
+      "regret": {
+        "baseline": 0.004513674151105994,
+        "type_a": 0.0030682803920336434,
+        "type_b": 0.004253968726740824,
+        "type_c": 0.004560808409059626,
+        "transferred": true
+      },
+      "runtime": 2.850438117980957,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 3,
+      "params": [
+        1.1759146451950073,
+        0.5008255839347839,
+        0.974385142326355
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008923711737402458,
+      "value_rmse": 0.3497038143137747,
+      "regret": {
+        "baseline": 0.004514224905324442,
+        "type_a": 0.0030685564586239874,
+        "type_b": 0.004254208380861859,
+        "type_c": 0.004560975406004492,
+        "transferred": true
+      },
+      "runtime": 3.712498903274536,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 4,
+      "params": [
+        0.8360601182483518,
+        0.5061017735394743,
+        1.0481217904441966
+      ],
+      "standard_errors": [
+        0.1588365461815197,
+        0.026755419278630926,
+        0.05445357913064441
+      ],
+      "policy_tv": 0.01128752141867152,
+      "value_rmse": 0.7530592222973932,
+      "regret": {
+        "baseline": 0.005362731530106303,
+        "type_a": 0.0037046652897409905,
+        "type_b": 0.007357832945418987,
+        "type_c": 0.007681859338582792,
+        "transferred": true
+      },
+      "runtime": 0.6474320888519287,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 4,
+      "params": [
+        0.836072564125061,
+        0.5061044692993164,
+        1.0481284856796265
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.011288435945120667,
+      "value_rmse": 0.7531869619345362,
+      "regret": {
+        "baseline": 0.005362923873205514,
+        "type_a": 0.0037048051228341593,
+        "type_b": 0.007358827310652374,
+        "type_c": 0.007682725449660334,
+        "transferred": true
+      },
+      "runtime": 2.8168139457702637,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 4,
+      "params": [
+        0.8360714912414551,
+        0.5061023831367493,
+        1.0481277704238892
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.011288293257234808,
+      "value_rmse": 0.7531966246313754,
+      "regret": {
+        "baseline": 0.005363508045327741,
+        "type_a": 0.0037050981752303805,
+        "type_b": 0.00735899185547158,
+        "type_c": 0.00768278720668101,
+        "transferred": true
+      },
+      "runtime": 3.20345401763916,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 5,
+      "params": [
+        1.0931717404044003,
+        0.5152810422285407,
+        1.0262165872973026
+      ],
+      "standard_errors": [
+        0.16014634338682482,
+        0.026157697893497096,
+        0.052848225289440796
+      ],
+      "policy_tv": 0.004575347375301063,
+      "value_rmse": 0.5241701541851046,
+      "regret": {
+        "baseline": 0.0011554067974009288,
+        "type_a": 0.0010353824054887483,
+        "type_b": 0.0031119677517468473,
+        "type_c": 0.0011445464933575978,
+        "transferred": true
+      },
+      "runtime": 0.6888561248779297,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 5,
+      "params": [
+        1.093157410621643,
+        0.5152752995491028,
+        1.0262014865875244
+      ],
+      "standard_errors": [
+        0.03783155050537652,
+        0.05991146437546297,
+        0.01999884745643258
+      ],
+      "policy_tv": 0.004573968408869265,
+      "value_rmse": 0.5238904654046901,
+      "regret": {
+        "baseline": 0.0011548551284194662,
+        "type_a": 0.0010347924469939925,
+        "type_b": 0.003109527116426372,
+        "type_c": 0.0011435124773746467,
+        "transferred": true
+      },
+      "runtime": 2.89306378364563,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 5,
+      "params": [
+        1.0931655168533325,
+        0.5152742862701416,
+        1.026200294494629
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004573814729331681,
+      "value_rmse": 0.5238897836291999,
+      "regret": {
+        "baseline": 0.0011548535996744676,
+        "type_a": 0.0010348054167461593,
+        "type_b": 0.003109407603299874,
+        "type_c": 0.0011434603187779652,
+        "transferred": true
+      },
+      "runtime": 2.9699649810791016,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 6,
+      "params": [
+        0.9957071001305416,
+        0.5084573878275975,
+        1.009351345794486
+      ],
+      "standard_errors": [
+        0.1575581086358366,
+        0.02607739643088756,
+        0.05201264249014369
+      ],
+      "policy_tv": 0.0026120943106671428,
+      "value_rmse": 0.09414237374543175,
+      "regret": {
+        "baseline": 0.00028058826597210373,
+        "type_a": 0.0001919986548138631,
+        "type_b": 0.0004647162565325866,
+        "type_c": 0.000250137312738113,
+        "transferred": true
+      },
+      "runtime": 0.735684871673584,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 6,
+      "params": [
+        0.9957014322280884,
+        0.5084695219993591,
+        1.0093830823898315
+      ],
+      "standard_errors": [
+        0.013107335310945645,
+        0.012319855348399742,
+        0.004306872832008335
+      ],
+      "policy_tv": 0.002614852246413172,
+      "value_rmse": 0.09467417580561095,
+      "regret": {
+        "baseline": 0.0002807198135678529,
+        "type_a": 0.00019224516334839358,
+        "type_b": 0.0004664034989777577,
+        "type_c": 0.00025112368007140605,
+        "transferred": true
+      },
+      "runtime": 3.268887996673584,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 6,
+      "params": [
+        0.9956962466239929,
+        0.5084695816040039,
+        1.009379506111145
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0026148188976994895,
+      "value_rmse": 0.09458648966307945,
+      "regret": {
+        "baseline": 0.00028085464775038483,
+        "type_a": 0.00019230739012965434,
+        "type_b": 0.0004663297744094368,
+        "type_c": 0.0002510897564748042,
+        "transferred": true
+      },
+      "runtime": 3.205331802368164,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 7,
+      "params": [
+        1.0885519383684912,
+        0.5103370279280119,
+        1.0528367550924367
+      ],
+      "standard_errors": [
+        0.17028777296286302,
+        0.02643829671130882,
+        0.05495883299613315
+      ],
+      "policy_tv": 0.008055461923013625,
+      "value_rmse": 1.1597712722864946,
+      "regret": {
+        "baseline": 0.00395873705353133,
+        "type_a": 0.003018307472580553,
+        "type_b": 0.007378043589170026,
+        "type_c": 0.004309995994227176,
+        "transferred": true
+      },
+      "runtime": 0.7061309814453125,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 7,
+      "params": [
+        1.0885473489761353,
+        0.5103269815444946,
+        1.0528329610824585
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008056088580507364,
+      "value_rmse": 1.1598066621405134,
+      "regret": {
+        "baseline": 0.003960818067782899,
+        "type_a": 0.0030193145902792265,
+        "type_b": 0.00737730452787459,
+        "type_c": 0.004310242932956228,
+        "transferred": true
+      },
+      "runtime": 2.9304802417755127,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 7,
+      "params": [
+        1.0885518789291382,
+        0.5103291869163513,
+        1.05283522605896
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008056331939271544,
+      "value_rmse": 1.15983541630822,
+      "regret": {
+        "baseline": 0.003960657714396724,
+        "type_a": 0.003019306815948632,
+        "type_b": 0.0073778895180635,
+        "type_c": 0.00431041608494298,
+        "transferred": true
+      },
+      "runtime": 2.437049150466919,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 8,
+      "params": [
+        1.0812740530260845,
+        0.4655719452345068,
+        0.9409735431317697
+      ],
+      "standard_errors": [
+        0.15597100628973762,
+        0.025536007833079022,
+        0.050966978928092675
+      ],
+      "policy_tv": 0.010908831854614815,
+      "value_rmse": 0.7509638968869429,
+      "regret": {
+        "baseline": 0.0031127937308268188,
+        "type_a": 0.002904034537723511,
+        "type_b": 0.01071972863178904,
+        "type_c": 0.008257095904918108,
+        "transferred": true
+      },
+      "runtime": 0.6940197944641113,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 8,
+      "params": [
+        1.0812695026397705,
+        0.46556994318962097,
+        0.9409734010696411
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.010909109958875497,
+      "value_rmse": 0.7509472263799087,
+      "regret": {
+        "baseline": 0.0031131238747335757,
+        "type_a": 0.002904259824896066,
+        "type_b": 0.010720298012607614,
+        "type_c": 0.008257135608964001,
+        "transferred": true
+      },
+      "runtime": 3.1399829387664795,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 8,
+      "params": [
+        1.0812774896621704,
+        0.4655706286430359,
+        0.9409734606742859
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.010909118086751017,
+      "value_rmse": 0.7509445724823395,
+      "regret": {
+        "baseline": 0.0031130520704685046,
+        "type_a": 0.002904226259504048,
+        "type_b": 0.010720104909150924,
+        "type_c": 0.008257256248864456,
+        "transferred": true
+      },
+      "runtime": 2.3793740272521973,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 9,
+      "params": [
+        0.7531951199452781,
+        0.540267379907251,
+        1.071203387472893
+      ],
+      "standard_errors": [
+        0.16338661276444538,
+        0.026440450364649416,
+        0.05458441681745594
+      ],
+      "policy_tv": 0.014593463828396632,
+      "value_rmse": 0.7048589237119787,
+      "regret": {
+        "baseline": 0.006228328516497397,
+        "type_a": 0.006035261107681043,
+        "type_b": 0.016179455580004446,
+        "type_c": 0.01639991367150023,
+        "transferred": true
+      },
+      "runtime": 0.7286059856414795,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 9,
+      "params": [
+        0.753187894821167,
+        0.5402666926383972,
+        1.0712069272994995
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.014593678739865924,
+      "value_rmse": 0.7049359912958139,
+      "regret": {
+        "baseline": 0.006228340422708365,
+        "type_a": 0.006035373899296981,
+        "type_b": 0.016180312932790444,
+        "type_c": 0.016400982305267275,
+        "transferred": true
+      },
+      "runtime": 3.0148801803588867,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 9,
+      "params": [
+        0.7531958222389221,
+        0.5402668714523315,
+        1.0712066888809204
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.014593523064470912,
+      "value_rmse": 0.7049384306949333,
+      "regret": {
+        "baseline": 0.006228195901368725,
+        "type_a": 0.006035218580699075,
+        "type_b": 0.016180124881260728,
+        "type_c": 0.01640057622915231,
+        "transferred": true
+      },
+      "runtime": 2.814291000366211,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 10,
+      "params": [
+        0.9500067565749355,
+        0.46458047814769815,
+        0.9589311094835209
+      ],
+      "standard_errors": [
+        0.1580191178779368,
+        0.025808519584524514,
+        0.05160797928816256
+      ],
+      "policy_tv": 0.010905339344694582,
+      "value_rmse": 0.5432029851919455,
+      "regret": {
+        "baseline": 0.004705602476910557,
+        "type_a": 0.0033689896278943925,
+        "type_b": 0.00941405108723686,
+        "type_c": 0.003976983279289262,
+        "transferred": true
+      },
+      "runtime": 0.9492921829223633,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 10,
+      "params": [
+        0.9500492811203003,
+        0.4645862281322479,
+        0.9589545130729675
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.010903902454608046,
+      "value_rmse": 0.5427067568186095,
+      "regret": {
+        "baseline": 0.004705800420697842,
+        "type_a": 0.0033684623187750467,
+        "type_b": 0.009408776851218877,
+        "type_c": 0.003974689018743431,
+        "transferred": true
+      },
+      "runtime": 3.417975902557373,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 10,
+      "params": [
+        0.9500433206558228,
+        0.46458810567855835,
+        0.9589539170265198
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01090369885616942,
+      "value_rmse": 0.5427482556473601,
+      "regret": {
+        "baseline": 0.004705059994428159,
+        "type_a": 0.003368037750814925,
+        "type_b": 0.009408188041644231,
+        "type_c": 0.003974411489019358,
+        "transferred": true
+      },
+      "runtime": 2.822625160217285,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 11,
+      "params": [
+        1.0030974938420003,
+        0.4750909441455333,
+        0.9757968172398663
+      ],
+      "standard_errors": [
+        0.1606479752892379,
+        0.02593634611187121,
+        0.05209279687768353
+      ],
+      "policy_tv": 0.007959155718879252,
+      "value_rmse": 0.22354738307720445,
+      "regret": {
+        "baseline": 0.002681487502702549,
+        "type_a": 0.0017856706116309803,
+        "type_b": 0.004005361992943313,
+        "type_c": 0.002011395441940108,
+        "transferred": true
+      },
+      "runtime": 0.7995290756225586,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 11,
+      "params": [
+        1.003062129020691,
+        0.4750915467739105,
+        0.975805938243866
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.007959681722342703,
+      "value_rmse": 0.22341880675409714,
+      "regret": {
+        "baseline": 0.002682386820770212,
+        "type_a": 0.0017860491910361212,
+        "type_b": 0.004005093283124564,
+        "type_c": 0.002010804914172111,
+        "transferred": true
+      },
+      "runtime": 3.1335718631744385,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 11,
+      "params": [
+        1.0030708312988281,
+        0.4750913977622986,
+        0.9758052229881287
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00795961211403478,
+      "value_rmse": 0.22341798541469113,
+      "regret": {
+        "baseline": 0.002682337796304266,
+        "type_a": 0.0017860358598997016,
+        "type_b": 0.004005101258663635,
+        "type_c": 0.002010917798497611,
+        "transferred": true
+      },
+      "runtime": 3.82407808303833,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 12,
+      "params": [
+        0.8703799970715569,
+        0.489628108161388,
+        0.9791235234299502
+      ],
+      "standard_errors": [
+        0.16074881861505053,
+        0.02489621695882874,
+        0.04976905320930482
+      ],
+      "policy_tv": 0.00371576070945265,
+      "value_rmse": 0.5251419592998305,
+      "regret": {
+        "baseline": 0.0013175036813268001,
+        "type_a": 0.0012614825878925187,
+        "type_b": 0.002749217480742874,
+        "type_c": 0.0012199915438886274,
+        "transferred": true
+      },
+      "runtime": 0.8219027519226074,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 12,
+      "params": [
+        0.8703886866569519,
+        0.4896228611469269,
+        0.9791198968887329
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0037165350426495974,
+      "value_rmse": 0.5251429555692461,
+      "regret": {
+        "baseline": 0.0013176367077965573,
+        "type_a": 0.0012615443248493094,
+        "type_b": 0.00274992388016244,
+        "type_c": 0.001219996394147731,
+        "transferred": true
+      },
+      "runtime": 3.431725025177002,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 12,
+      "params": [
+        0.8703810572624207,
+        0.48962852358818054,
+        0.9791224002838135
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.003715694272337811,
+      "value_rmse": 0.5251693719962173,
+      "regret": {
+        "baseline": 0.001317482818294201,
+        "type_a": 0.0012614836272503726,
+        "type_b": 0.002749229246512286,
+        "type_c": 0.0012200624611449016,
+        "transferred": true
+      },
+      "runtime": 2.916898727416992,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 13,
+      "params": [
+        1.110405348167906,
+        0.4926519012075666,
+        0.9559495318038628
+      ],
+      "standard_errors": [
+        0.1574452855225814,
+        0.02498492236850952,
+        0.04924285839373363
+      ],
+      "policy_tv": 0.009623094209697938,
+      "value_rmse": 0.7262704875157127,
+      "regret": {
+        "baseline": 0.004164655623987913,
+        "type_a": 0.0028145423353237256,
+        "type_b": 0.005511984685854882,
+        "type_c": 0.006694154467602836,
+        "transferred": true
+      },
+      "runtime": 0.8339841365814209,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 13,
+      "params": [
+        1.1104011535644531,
+        0.49266403913497925,
+        0.9559770822525024
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.009619477909995832,
+      "value_rmse": 0.7258254712935868,
+      "regret": {
+        "baseline": 0.004162949124549281,
+        "type_a": 0.002813060927315856,
+        "type_b": 0.005506737362588574,
+        "type_c": 0.00668773587492392,
+        "transferred": true
+      },
+      "runtime": 3.2508649826049805,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 13,
+      "params": [
+        1.1103540658950806,
+        0.4926614463329315,
+        0.9559691548347473
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.009619701806868138,
+      "value_rmse": 0.7260305912087155,
+      "regret": {
+        "baseline": 0.004163085912506555,
+        "type_a": 0.0028131295883799074,
+        "type_b": 0.005507694974046706,
+        "type_c": 0.00668890838896661,
+        "transferred": true
+      },
+      "runtime": 3.519183874130249,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 14,
+      "params": [
+        0.940444660499783,
+        0.4848198736299216,
+        0.9795981625374077
+      ],
+      "standard_errors": [
+        0.1633543755853144,
+        0.025657854976568816,
+        0.051762442995109015
+      ],
+      "policy_tv": 0.004698345444090734,
+      "value_rmse": 0.35032829587648884,
+      "regret": {
+        "baseline": 0.000978660657107169,
+        "type_a": 0.0007667008270715097,
+        "type_b": 0.0022302784742423603,
+        "type_c": 0.0008011716957290981,
+        "transferred": true
+      },
+      "runtime": 0.8256881237030029,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 14,
+      "params": [
+        0.9404569864273071,
+        0.48483848571777344,
+        0.9796314835548401
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004693584863195901,
+      "value_rmse": 0.34980973434213386,
+      "regret": {
+        "baseline": 0.0009770963035789844,
+        "type_a": 0.0007653412542952177,
+        "type_b": 0.0022251041320255987,
+        "type_c": 0.0007989428170114544,
+        "transferred": true
+      },
+      "runtime": 3.2308249473571777,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 14,
+      "params": [
+        0.9404546022415161,
+        0.4848363399505615,
+        0.9796270132064819
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004693855783136432,
+      "value_rmse": 0.34988733419021034,
+      "regret": {
+        "baseline": 0.000977259572662776,
+        "type_a": 0.0007654982831429426,
+        "type_b": 0.0022257474997527185,
+        "type_c": 0.0007992271512971124,
+        "transferred": true
+      },
+      "runtime": 3.640918016433716,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 15,
+      "params": [
+        0.9434304592987901,
+        0.5258988455790069,
+        1.024529227625808
+      ],
+      "standard_errors": [
+        0.1644081659499571,
+        0.02605575539553354,
+        0.0535382461489335
+      ],
+      "policy_tv": 0.008303245161285161,
+      "value_rmse": 0.13441367281855654,
+      "regret": {
+        "baseline": 0.0032574300865253797,
+        "type_a": 0.0021879094330991607,
+        "type_b": 0.003994227600292772,
+        "type_c": 0.0026962247516365274,
+        "transferred": true
+      },
+      "runtime": 1.0441362857818604,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 15,
+      "params": [
+        0.9434478878974915,
+        0.5258991718292236,
+        1.0245230197906494
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008303712478242855,
+      "value_rmse": 0.13430618007228332,
+      "regret": {
+        "baseline": 0.0032584288463042036,
+        "type_a": 0.0021883639429595638,
+        "type_b": 0.0039941037087999525,
+        "type_c": 0.002695853301985135,
+        "transferred": true
+      },
+      "runtime": 3.224189043045044,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 15,
+      "params": [
+        0.9432602524757385,
+        0.5258753299713135,
+        1.0244696140289307
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008298876987450562,
+      "value_rmse": 0.13318788329280637,
+      "regret": {
+        "baseline": 0.0032574162230832515,
+        "type_a": 0.0021876273422079505,
+        "type_b": 0.003985708801211072,
+        "type_c": 0.002693574882941633,
+        "transferred": true
+      },
+      "runtime": 3.3153090476989746,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 16,
+      "params": [
+        1.1115583438895054,
+        0.48212449640228816,
+        0.9480023895104452
+      ],
+      "standard_errors": [
+        0.16579542798043947,
+        0.025077249735238713,
+        0.051034972355842936
+      ],
+      "policy_tv": 0.009748714210235385,
+      "value_rmse": 0.7635650731403181,
+      "regret": {
+        "baseline": 0.002777654169593344,
+        "type_a": 0.0023273084544287734,
+        "type_b": 0.006947473276789827,
+        "type_c": 0.007557596807140911,
+        "transferred": true
+      },
+      "runtime": 0.7886168956756592,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 16,
+      "params": [
+        1.1115738153457642,
+        0.48212096095085144,
+        0.9479967951774597
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.009749801985581308,
+      "value_rmse": 0.7636251147138889,
+      "regret": {
+        "baseline": 0.0027780433103467934,
+        "type_a": 0.0023277387909720567,
+        "type_b": 0.006949055264994287,
+        "type_c": 0.0075591852438343906,
+        "transferred": true
+      },
+      "runtime": 3.669443130493164,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 16,
+      "params": [
+        1.1115635633468628,
+        0.48212212324142456,
+        0.9479982852935791
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00974934611146185,
+      "value_rmse": 0.7636181002328912,
+      "regret": {
+        "baseline": 0.0027779007101006213,
+        "type_a": 0.0023275749263298147,
+        "type_b": 0.0069485604998812235,
+        "type_c": 0.0075586600187565935,
+        "transferred": true
+      },
+      "runtime": 4.063992023468018,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 17,
+      "params": [
+        0.9517610350940846,
+        0.5174246913110914,
+        1.0137293980370077
+      ],
+      "standard_errors": [
+        0.15732358929591247,
+        0.025465684251171974,
+        0.051481783857873026
+      ],
+      "policy_tv": 0.005847122390326322,
+      "value_rmse": 0.02804051174862676,
+      "regret": {
+        "baseline": 0.001770327282390664,
+        "type_a": 0.001168058084678553,
+        "type_b": 0.0017780973587653414,
+        "type_c": 0.0013008799107879659,
+        "transferred": true
+      },
+      "runtime": 0.9418299198150635,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 17,
+      "params": [
+        0.9517799615859985,
+        0.5174192190170288,
+        1.0137168169021606
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0058459716315309015,
+      "value_rmse": 0.027969869476948073,
+      "regret": {
+        "baseline": 0.0017701316949205752,
+        "type_a": 0.001167788591972314,
+        "type_b": 0.0017769179814459634,
+        "type_c": 0.0012999912819031702,
+        "transferred": true
+      },
+      "runtime": 3.6179628372192383,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 17,
+      "params": [
+        0.9517733454704285,
+        0.5174183249473572,
+        1.0137170553207397
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005845639687820258,
+      "value_rmse": 0.027967174545175846,
+      "regret": {
+        "baseline": 0.0017698637161540996,
+        "type_a": 0.001167652349835086,
+        "type_b": 0.0017767541156540447,
+        "type_c": 0.0012999658288891695,
+        "transferred": true
+      },
+      "runtime": 3.364668130874634,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 18,
+      "params": [
+        1.0724079463325429,
+        0.48710213575192424,
+        0.9511400477913496
+      ],
+      "standard_errors": [
+        0.1560438793043074,
+        0.024956495238510505,
+        0.04964729665861362
+      ],
+      "policy_tv": 0.009039351445267723,
+      "value_rmse": 0.8127480939026142,
+      "regret": {
+        "baseline": 0.0029334416429772346,
+        "type_a": 0.0021808875437676935,
+        "type_b": 0.005880611281039439,
+        "type_c": 0.006599249434694685,
+        "transferred": true
+      },
+      "runtime": 0.9900758266448975,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 18,
+      "params": [
+        1.0724066495895386,
+        0.487086683511734,
+        0.9511157274246216
+      ],
+      "standard_errors": [
+        0.010242187418271115,
+        0.005738693827726009,
+        0.002626655513442586
+      ],
+      "policy_tv": 0.009042619681543851,
+      "value_rmse": 0.8130904227670221,
+      "regret": {
+        "baseline": 0.0029337688867482796,
+        "type_a": 0.0021816822866524608,
+        "type_b": 0.0058859765405452165,
+        "type_c": 0.006604316276104528,
+        "transferred": true
+      },
+      "runtime": 3.833387851715088,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 18,
+      "params": [
+        1.07240629196167,
+        0.4870857000350952,
+        0.9511141180992126
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.009042238064128367,
+      "value_rmse": 0.8131124429732528,
+      "regret": {
+        "baseline": 0.002933798763689981,
+        "type_a": 0.0021817374107869062,
+        "type_b": 0.005886331769277955,
+        "type_c": 0.006604639536034334,
+        "transferred": true
+      },
+      "runtime": 3.0876150131225586,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 19,
+      "params": [
+        0.7742172105388881,
+        0.46381415965835116,
+        0.9294520362321183
+      ],
+      "standard_errors": [
+        0.15998435960175686,
+        0.025053666101858645,
+        0.0501992318746432
+      ],
+      "policy_tv": 0.011244636318806726,
+      "value_rmse": 1.4396791125569732,
+      "regret": {
+        "baseline": 0.007042832740040807,
+        "type_a": 0.00674869450770546,
+        "type_b": 0.020214820126764614,
+        "type_c": 0.01003520009202177,
+        "transferred": true
+      },
+      "runtime": 0.9203789234161377,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 19,
+      "params": [
+        0.7742392420768738,
+        0.46381980180740356,
+        0.9294503927230835
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01124344792574066,
+      "value_rmse": 1.4397458587828578,
+      "regret": {
+        "baseline": 0.007041521786504615,
+        "type_a": 0.006747742928287457,
+        "type_b": 0.020212315599367116,
+        "type_c": 0.010036063356373148,
+        "transferred": true
+      },
+      "runtime": 3.714761972427368,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 19,
+      "params": [
+        0.774243175983429,
+        0.46381697058677673,
+        0.9294511079788208
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01124393263062101,
+      "value_rmse": 1.4396932254208366,
+      "regret": {
+        "baseline": 0.00704174356116287,
+        "type_a": 0.006747810440056907,
+        "type_b": 0.020212967795298853,
+        "type_c": 0.010035475548458841,
+        "transferred": true
+      },
+      "runtime": 3.5765151977539062,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 20,
+      "params": [
+        0.9173383437304241,
+        0.46459604954341893,
+        0.9366211419773589
+      ],
+      "standard_errors": [
+        0.1611659417220237,
+        0.025723586766155326,
+        0.05119335379221206
+      ],
+      "policy_tv": 0.010208430443452156,
+      "value_rmse": 1.0758620182239889,
+      "regret": {
+        "baseline": 0.003760789672574357,
+        "type_a": 0.003501592183392037,
+        "type_b": 0.013631081416920965,
+        "type_c": 0.007332949049583121,
+        "transferred": true
+      },
+      "runtime": 0.9534680843353271,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 20,
+      "params": [
+        0.9173107147216797,
+        0.4645971953868866,
+        0.9366232752799988
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.010208210358263949,
+      "value_rmse": 1.0758678463478604,
+      "regret": {
+        "baseline": 0.00376091882189246,
+        "type_a": 0.0035017033521618232,
+        "type_b": 0.013630830808926167,
+        "type_c": 0.007332323268557979,
+        "transferred": true
+      },
+      "runtime": 3.6812551021575928,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 20,
+      "params": [
+        0.9173228144645691,
+        0.46459707617759705,
+        0.9366225600242615
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0102081773766235,
+      "value_rmse": 1.0758669598365078,
+      "regret": {
+        "baseline": 0.003760792765788413,
+        "type_a": 0.003501602678944088,
+        "type_b": 0.013630767773472784,
+        "type_c": 0.007332548236922363,
+        "transferred": true
+      },
+      "runtime": 4.149322032928467,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 21,
+      "params": [
+        1.1832834021943186,
+        0.5256205289626034,
+        1.0741290379495785
+      ],
+      "standard_errors": [
+        0.16634636821496565,
+        0.026679361555685482,
+        0.055142879858468184
+      ],
+      "policy_tv": 0.010031105575209445,
+      "value_rmse": 1.5751820049237262,
+      "regret": {
+        "baseline": 0.005582552086079658,
+        "type_a": 0.0052366233054238825,
+        "type_b": 0.01651107091237782,
+        "type_c": 0.007192423278531227,
+        "transferred": true
+      },
+      "runtime": 1.0991718769073486,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 21,
+      "params": [
+        1.1832867860794067,
+        0.5256235599517822,
+        1.0741373300552368
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01003219580761089,
+      "value_rmse": 1.5753312932465888,
+      "regret": {
+        "baseline": 0.005583399763232213,
+        "type_a": 0.005237396831881711,
+        "type_b": 0.016514209569221113,
+        "type_c": 0.0071937807634956325,
+        "transferred": true
+      },
+      "runtime": 3.8426921367645264,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 21,
+      "params": [
+        1.1832836866378784,
+        0.5256218910217285,
+        1.0741345882415771
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.01003191162417565,
+      "value_rmse": 1.5752865979811284,
+      "regret": {
+        "baseline": 0.0055831740127417285,
+        "type_a": 0.00523714782043446,
+        "type_b": 0.016513026464950377,
+        "type_c": 0.007193340559415807,
+        "transferred": true
+      },
+      "runtime": 3.3214101791381836,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 22,
+      "params": [
+        1.1508680742534914,
+        0.47795123562341957,
+        0.933048824598589
+      ],
+      "standard_errors": [
+        0.15937388907235236,
+        0.024872535436459575,
+        0.048967137342491335
+      ],
+      "policy_tv": 0.012849730734352922,
+      "value_rmse": 0.9868389299383891,
+      "regret": {
+        "baseline": 0.005055144033589316,
+        "type_a": 0.004134663799154888,
+        "type_b": 0.011668898678778811,
+        "type_c": 0.013262881584089664,
+        "transferred": true
+      },
+      "runtime": 0.9330158233642578,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 22,
+      "params": [
+        1.150881290435791,
+        0.477952778339386,
+        0.9330531358718872
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.012849332265668803,
+      "value_rmse": 0.9867450761012169,
+      "regret": {
+        "baseline": 0.005054892847173872,
+        "type_a": 0.00413445716212164,
+        "type_b": 0.011667715412661846,
+        "type_c": 0.013261650543176134,
+        "transferred": true
+      },
+      "runtime": 5.0657958984375,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 22,
+      "params": [
+        1.1506493091583252,
+        0.4779816269874573,
+        0.9331228137016296
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.012834779075194213,
+      "value_rmse": 0.9858922849793879,
+      "regret": {
+        "baseline": 0.00504411428299076,
+        "type_a": 0.004125143462862687,
+        "type_b": 0.011641969210207168,
+        "type_c": 0.013231438244029168,
+        "transferred": true
+      },
+      "runtime": 4.852286100387573,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 23,
+      "params": [
+        1.0725337628085838,
+        0.492248848575689,
+        0.9665534878772424
+      ],
+      "standard_errors": [
+        0.16013669861362775,
+        0.025562036969020367,
+        0.051548187221852663
+      ],
+      "policy_tv": 0.006718578238947455,
+      "value_rmse": 0.5379606042688087,
+      "regret": {
+        "baseline": 0.0017150911953897473,
+        "type_a": 0.0012340420796677501,
+        "type_b": 0.002920180710921748,
+        "type_c": 0.003319709512914966,
+        "transferred": true
+      },
+      "runtime": 1.2407879829406738,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 23,
+      "params": [
+        1.0725103616714478,
+        0.4922493100166321,
+        0.9665576219558716
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006717618961655284,
+      "value_rmse": 0.5379042098870163,
+      "regret": {
+        "baseline": 0.0017144248243426716,
+        "type_a": 0.0012335767800229812,
+        "type_b": 0.002919318044308787,
+        "type_c": 0.003318615897283991,
+        "transferred": true
+      },
+      "runtime": 4.392782211303711,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 23,
+      "params": [
+        1.0723614692687988,
+        0.49223455786705017,
+        0.9665184020996094
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006719891630439405,
+      "value_rmse": 0.5387870027691294,
+      "regret": {
+        "baseline": 0.0017153431897003416,
+        "type_a": 0.0012343244318500674,
+        "type_b": 0.0029240824834544494,
+        "type_c": 0.00332312637926164,
+        "transferred": true
+      },
+      "runtime": 5.074436187744141,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 24,
+      "params": [
+        0.9844964368177653,
+        0.5087861364822246,
+        1.0272516322206644
+      ],
+      "standard_errors": [
+        0.1641515719591814,
+        0.026040821097444863,
+        0.051882734629770465
+      ],
+      "policy_tv": 0.004315438890473069,
+      "value_rmse": 0.46645013073192826,
+      "regret": {
+        "baseline": 0.0005832674100123466,
+        "type_a": 0.0004814611665988795,
+        "type_b": 0.0017354426027197218,
+        "type_c": 0.0013811957981021581,
+        "transferred": true
+      },
+      "runtime": 1.0722858905792236,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 24,
+      "params": [
+        0.984501838684082,
+        0.5087867975234985,
+        1.0272536277770996
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0043155268753658285,
+      "value_rmse": 0.4664915199427169,
+      "regret": {
+        "baseline": 0.0005833426766115673,
+        "type_a": 0.0004815253026655607,
+        "type_b": 0.0017356988420732901,
+        "type_c": 0.0013813462746008003,
+        "transferred": true
+      },
+      "runtime": 3.5910329818725586,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 24,
+      "params": [
+        0.9844961762428284,
+        0.5087873935699463,
+        1.0272544622421265
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004315830272173079,
+      "value_rmse": 0.4664961039062395,
+      "regret": {
+        "baseline": 0.0005833577837058361,
+        "type_a": 0.0004815453187894798,
+        "type_b": 0.0017358077684155105,
+        "type_c": 0.0013814576923632863,
+        "transferred": true
+      },
+      "runtime": 4.024920225143433,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 25,
+      "params": [
+        0.7007316461304541,
+        0.4940908633670704,
+        0.9753042153681915
+      ],
+      "standard_errors": [
+        0.16558653833908826,
+        0.02593694220878669,
+        0.05217805267875709
+      ],
+      "policy_tv": 0.0059932116105147395,
+      "value_rmse": 0.9236839476240677,
+      "regret": {
+        "baseline": 0.005785779663264473,
+        "type_a": 0.005612745189673173,
+        "type_b": 0.008090548079947595,
+        "type_c": 0.005544686117594123,
+        "transferred": true
+      },
+      "runtime": 0.9371368885040283,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 25,
+      "params": [
+        0.7007351517677307,
+        0.4940894544124603,
+        0.9753021001815796
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005992934762138933,
+      "value_rmse": 0.9237058709214878,
+      "regret": {
+        "baseline": 0.0057857185006737625,
+        "type_a": 0.005612693638295892,
+        "type_b": 0.008090770515045226,
+        "type_c": 0.005544610071427595,
+        "transferred": true
+      },
+      "runtime": 3.612362861633301,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 25,
+      "params": [
+        0.70074862241745,
+        0.4940893054008484,
+        0.9753027558326721
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005992829816310047,
+      "value_rmse": 0.9236702386837675,
+      "regret": {
+        "baseline": 0.005785187606681847,
+        "type_a": 0.005612181414677064,
+        "type_b": 0.008090121476309362,
+        "type_c": 0.00554408173781245,
+        "transferred": true
+      },
+      "runtime": 2.4433600902557373,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 26,
+      "params": [
+        1.1910161730053095,
+        0.46656075419566045,
+        0.9583202724388503
+      ],
+      "standard_errors": [
+        0.16407117340298277,
+        0.026162749566740254,
+        0.05308967688693973
+      ],
+      "policy_tv": 0.011824149484745092,
+      "value_rmse": 0.23235407540836242,
+      "regret": {
+        "baseline": 0.005108032594413758,
+        "type_a": 0.004377581616646066,
+        "type_b": 0.008586535907600638,
+        "type_c": 0.008244104755256346,
+        "transferred": true
+      },
+      "runtime": 0.8638088703155518,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 26,
+      "params": [
+        1.1910254955291748,
+        0.4665603041648865,
+        0.9583241939544678
+      ],
+      "standard_errors": [
+        0.0023925583614973034,
+        0.006296792547938611,
+        0.004131729006165696
+      ],
+      "policy_tv": 0.011824026677141768,
+      "value_rmse": 0.23225381274941467,
+      "regret": {
+        "baseline": 0.0051087176882778015,
+        "type_a": 0.004378025463912807,
+        "type_b": 0.00858637893445102,
+        "type_c": 0.008244081510932836,
+        "transferred": true
+      },
+      "runtime": 3.371311902999878,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 26,
+      "params": [
+        1.191016674041748,
+        0.4665617346763611,
+        0.9583278894424438
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.011823695927590359,
+      "value_rmse": 0.23220375067216573,
+      "regret": {
+        "baseline": 0.005108454561699939,
+        "type_a": 0.004377721670577058,
+        "type_b": 0.008585414149477102,
+        "type_c": 0.008243167692777564,
+        "transferred": true
+      },
+      "runtime": 3.2809760570526123,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 27,
+      "params": [
+        1.0485413709058922,
+        0.4848557645597867,
+        0.9800218514868785
+      ],
+      "standard_errors": [
+        0.16991220450598538,
+        0.02589329135598543,
+        0.05280315488995696
+      ],
+      "policy_tv": 0.004765435144065941,
+      "value_rmse": 0.17976244631718044,
+      "regret": {
+        "baseline": 0.0007738620583638262,
+        "type_a": 0.0006300054543110371,
+        "type_b": 0.0016266180847320786,
+        "type_c": 0.001282116126436184,
+        "transferred": true
+      },
+      "runtime": 0.9338700771331787,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 27,
+      "params": [
+        1.0484637022018433,
+        0.4848621189594269,
+        0.9800477623939514
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004762095470742482,
+      "value_rmse": 0.17938304095499782,
+      "regret": {
+        "baseline": 0.0007737002987009046,
+        "type_a": 0.0006295116117747029,
+        "type_b": 0.0016241565036205705,
+        "type_c": 0.0012795106138248193,
+        "transferred": true
+      },
+      "runtime": 3.8894340991973877,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 27,
+      "params": [
+        1.0484695434570312,
+        0.48486417531967163,
+        0.9800504446029663
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004762112354506869,
+      "value_rmse": 0.17934308817314762,
+      "regret": {
+        "baseline": 0.0007735379262290468,
+        "type_a": 0.0006293937846154824,
+        "type_b": 0.0016237432552354057,
+        "type_c": 0.0012793026311726109,
+        "transferred": true
+      },
+      "runtime": 3.967299222946167,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 28,
+      "params": [
+        1.2275401686834222,
+        0.5182911676036601,
+        1.0638607407065728
+      ],
+      "standard_errors": [
+        0.16453190427470837,
+        0.026527916776947574,
+        0.05343181439883969
+      ],
+      "policy_tv": 0.008545481605780942,
+      "value_rmse": 1.5071745696028909,
+      "regret": {
+        "baseline": 0.0061682508174769005,
+        "type_a": 0.005664797487833646,
+        "type_b": 0.014079429658396455,
+        "type_c": 0.006259722098022766,
+        "transferred": true
+      },
+      "runtime": 0.8729910850524902,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 28,
+      "params": [
+        1.2275545597076416,
+        0.5182895064353943,
+        1.0638619661331177
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008545557929617767,
+      "value_rmse": 1.5072457015361156,
+      "regret": {
+        "baseline": 0.006169112320745162,
+        "type_a": 0.005665467354786438,
+        "type_b": 0.01408015504256698,
+        "type_c": 0.0062601843620167285,
+        "transferred": true
+      },
+      "runtime": 4.514716863632202,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 28,
+      "params": [
+        1.227544903755188,
+        0.5182901620864868,
+        1.0638604164123535
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.008545449728771302,
+      "value_rmse": 1.5071870057257684,
+      "regret": {
+        "baseline": 0.0061685111559161504,
+        "type_a": 0.005664980350659861,
+        "type_b": 0.01407942009600108,
+        "type_c": 0.006259797929784844,
+        "transferred": true
+      },
+      "runtime": 3.8729448318481445,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 29,
+      "params": [
+        1.0785035277750392,
+        0.4824136761901222,
+        0.9731089611850221
+      ],
+      "standard_errors": [
+        0.16379299362273125,
+        0.02574147894133919,
+        0.05206421687062519
+      ],
+      "policy_tv": 0.005968796495404882,
+      "value_rmse": 0.2587925946071541,
+      "regret": {
+        "baseline": 0.001041644294772752,
+        "type_a": 0.000942410952651693,
+        "type_b": 0.002564536511853429,
+        "type_c": 0.0023082798223835054,
+        "transferred": true
+      },
+      "runtime": 0.7835438251495361,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice",
+      "rep": 29,
+      "params": [
+        1.0785123109817505,
+        0.48241251707077026,
+        0.9731121063232422
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.005968889231474736,
+      "value_rmse": 0.258696917193955,
+      "regret": {
+        "baseline": 0.0010419273073813875,
+        "type_a": 0.0009425922952263237,
+        "type_b": 0.002564467062335104,
+        "type_c": 0.0023082152510874973,
+        "transferred": true
+      },
+      "runtime": 3.2292520999908447,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice",
+      "rep": 29,
+      "params": [
+        1.078514814376831,
+        0.482413649559021,
+        0.9731106162071228
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.00596893208659203,
+      "value_rmse": 0.2587403484353604,
+      "regret": {
+        "baseline": 0.00104176876631505,
+        "type_a": 0.0009425063171684338,
+        "type_b": 0.002564459278213682,
+        "type_c": 0.002308315457807786,
+        "transferred": true
+      },
+      "runtime": 3.645146131515503,
+      "converged": false,
       "error": null
     },
     {
@@ -510,25 +2735,25 @@
       "cell": "route_choice_15",
       "rep": 0,
       "params": [
-        1.0338225047845997,
-        0.455508949107448,
-        1.0236986013384948
+        1.0338721316335964,
+        0.45549623146938045,
+        1.0237137206265519
       ],
       "standard_errors": [
-        0.19249975681304932,
-        0.0394100584089756,
-        0.05277293547987938
+        0.19276834347332772,
+        0.039773411829769595,
+        0.05294324172384308
       ],
-      "policy_tv": 0.007277260642652417,
-      "value_rmse": 0.7195961953326987,
+      "policy_tv": 0.007279691829353234,
+      "value_rmse": 0.7198854972201696,
       "regret": {
-        "baseline": 0.002787927580406635,
-        "type_a": 0.003842260460519118,
-        "type_b": 0.01155110365641173,
-        "type_c": 0.013929719605654044,
+        "baseline": 0.002789468976466176,
+        "type_a": 0.003844213092455786,
+        "type_b": 0.011560038997946751,
+        "type_c": 0.013940444555684757,
         "transferred": true
       },
-      "runtime": 1.929069995880127,
+      "runtime": 1.750006914138794,
       "converged": true,
       "error": null
     },
@@ -538,53 +2763,25 @@
       "cell": "route_choice_15",
       "rep": 0,
       "params": [
-        1.0699982643127441,
-        0.4509489834308624,
-        1.0012404918670654
+        1.0338194370269775,
+        0.4555070102214813,
+        1.0237003564834595
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.008612464350365452,
-      "value_rmse": 0.739131037111286,
+      "policy_tv": 0.007277581825637349,
+      "value_rmse": 0.719601518327555,
       "regret": {
-        "baseline": 0.00290424035140605,
-        "type_a": 0.004217403797241634,
-        "type_b": 0.013705734772349916,
-        "type_c": 0.014861917339582231,
+        "baseline": 0.002788218189874028,
+        "type_a": 0.0038426613381569944,
+        "type_b": 0.011552003966987984,
+        "type_c": 0.013930844707582523,
         "transferred": true
       },
-      "runtime": 2.0084829330444336,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "route_choice_15",
-      "rep": 0,
-      "params": [
-        1.0338222980499268,
-        0.45550909638404846,
-        1.0236985683441162
-      ],
-      "standard_errors": [
-        0.19249975681304932,
-        0.0394100584089756,
-        0.05277293175458908
-      ],
-      "policy_tv": 0.007277235280507336,
-      "value_rmse": 0.7195936795559655,
-      "regret": {
-        "baseline": 0.002787911260026425,
-        "type_a": 0.0038422370746895133,
-        "type_b": 0.011551033100493636,
-        "type_c": 0.013929639876846738,
-        "transferred": true
-      },
-      "runtime": 0.2901608943939209,
+      "runtime": 4.212706804275513,
       "converged": true,
       "error": null
     },
@@ -603,37 +2800,17 @@
         NaN,
         NaN
       ],
-      "policy_tv": 0.00727734198485031,
-      "value_rmse": 0.7196023884230638,
+      "policy_tv": 0.007277342025259005,
+      "value_rmse": 0.7196023971035452,
       "regret": {
-        "baseline": 0.002788032300401814,
-        "type_a": 0.003842332332639421,
-        "type_b": 0.011551141484703658,
-        "type_c": 0.01393020359644648,
+        "baseline": 0.002788032300405603,
+        "type_a": 0.003842332332638947,
+        "type_b": 0.011551141484704014,
+        "type_c": 0.013930203596446747,
         "transferred": true
       },
-      "runtime": 5.855152130126953,
+      "runtime": 5.032271146774292,
       "converged": false,
-      "error": null
-    },
-    {
-      "estimator": "NeuralGLADIUS",
-      "family": "behavioral",
-      "cell": "route_choice_15",
-      "rep": 0,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.3361570865664401,
-      "value_rmse": 22.964953152229956,
-      "regret": {
-        "baseline": 13.774088648576303,
-        "type_a": 13.2282831363399,
-        "type_b": 7.928251418564213,
-        "type_c": 60.398686111741206,
-        "transferred": false
-      },
-      "runtime": 5.868987083435059,
-      "converged": true,
       "error": null
     },
     {
@@ -642,25 +2819,25 @@
       "cell": "route_choice_15",
       "rep": 1,
       "params": [
-        0.811215535414173,
-        0.5425460304745975,
-        1.0518322454047901
+        0.811198148272492,
+        0.5425525073672454,
+        1.051829270409504
       ],
       "standard_errors": [
-        0.1992323100566864,
-        0.04336760565638542,
-        0.05092990770936012
+        0.19445787737609618,
+        0.04085022993702056,
+        0.05044644467005816
       ],
-      "policy_tv": 0.013871406225554413,
-      "value_rmse": 0.6095087817960211,
+      "policy_tv": 0.013871401428654593,
+      "value_rmse": 0.6096266627310515,
       "regret": {
-        "baseline": 0.003915903269275516,
-        "type_a": 0.005278100378135333,
-        "type_b": 0.017977206105459668,
-        "type_c": 0.01990904138422299,
+        "baseline": 0.003916226647747773,
+        "type_a": 0.005278606728491111,
+        "type_b": 0.017980952014245277,
+        "type_c": 0.019913358933800723,
         "transferred": true
       },
-      "runtime": 1.5234858989715576,
+      "runtime": 0.9190802574157715,
       "converged": true,
       "error": null
     },
@@ -670,54 +2847,26 @@
       "cell": "route_choice_15",
       "rep": 1,
       "params": [
-        0.8400238156318665,
-        0.5365028381347656,
-        1.0273090600967407
+        0.8111919164657593,
+        0.5425498485565186,
+        1.0518304109573364
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.01793963398254891,
-      "value_rmse": 0.5815392206916511,
+      "policy_tv": 0.013871919540049932,
+      "value_rmse": 0.6095738072674014,
       "regret": {
-        "baseline": 0.002055744125891533,
-        "type_a": 0.0028127083115908483,
-        "type_b": 0.01228381482653072,
-        "type_c": 0.014172719048799803,
+        "baseline": 0.003916121540638944,
+        "type_a": 0.005278417580731931,
+        "type_b": 0.017980270948991198,
+        "type_c": 0.019912801591496398,
         "transferred": true
       },
-      "runtime": 1.3492481708526611,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "route_choice_15",
-      "rep": 1,
-      "params": [
-        0.8112154603004456,
-        0.5425460934638977,
-        1.0518323183059692
-      ],
-      "standard_errors": [
-        0.1992323100566864,
-        0.04336760565638542,
-        0.05092990770936012
-      ],
-      "policy_tv": 0.01387141380860885,
-      "value_rmse": 0.6095096943596914,
-      "regret": {
-        "baseline": 0.003915914926791966,
-        "type_a": 0.0052781164902146,
-        "type_b": 0.01797724872975259,
-        "type_c": 0.019909072951574142,
-        "transferred": true
-      },
-      "runtime": 0.23143887519836426,
-      "converged": true,
+      "runtime": 3.2419309616088867,
+      "converged": false,
       "error": null
     },
     {
@@ -735,37 +2884,269 @@
         NaN,
         NaN
       ],
-      "policy_tv": 0.013871413934049844,
-      "value_rmse": 0.6095068211539886,
+      "policy_tv": 0.013871413934050024,
+      "value_rmse": 0.6095068211540086,
       "regret": {
-        "baseline": 0.003915904980679839,
+        "baseline": 0.003915904980679365,
         "type_a": 0.005278102868521788,
-        "type_b": 0.01797712541027834,
-        "type_c": 0.019908940331182685,
+        "type_b": 0.01797712541027431,
+        "type_c": 0.01990894033117973,
         "transferred": true
       },
-      "runtime": 4.37360405921936,
+      "runtime": 2.794713020324707,
       "converged": false,
       "error": null
     },
     {
-      "estimator": "NeuralGLADIUS",
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 2,
+      "params": [
+        1.1261856872678617,
+        0.499426228801162,
+        0.9963760271034934
+      ],
+      "standard_errors": [
+        0.1960008152586317,
+        0.040255419799842665,
+        0.04972974775611375
+      ],
+      "policy_tv": 0.0024352911019122486,
+      "value_rmse": 0.15796896518779982,
+      "regret": {
+        "baseline": 0.0009242972049347794,
+        "type_a": 0.0012196296446105267,
+        "type_b": 0.0018807489372127384,
+        "type_c": 0.002670134838325116,
+        "transferred": true
+      },
+      "runtime": 0.777324914932251,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 2,
+      "params": [
+        1.1262120008468628,
+        0.4994192123413086,
+        0.9963873028755188
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0024347578424888383,
+      "value_rmse": 0.15813973480759974,
+      "regret": {
+        "baseline": 0.0009246007126025675,
+        "type_a": 0.0012199829206310626,
+        "type_b": 0.001882152926314229,
+        "type_c": 0.0026717562477356523,
+        "transferred": true
+      },
+      "runtime": 3.5969510078430176,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
       "family": "behavioral",
       "cell": "route_choice_15",
-      "rep": 1,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.26704025520789837,
-      "value_rmse": 22.353840006947614,
+      "rep": 2,
+      "params": [
+        1.1262271404266357,
+        0.49941596388816833,
+        0.9963833689689636
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.002435630268541785,
+      "value_rmse": 0.15818428245511362,
       "regret": {
-        "baseline": 4.892427916470922,
-        "type_a": 4.5595638041593,
-        "type_b": 11.248307083808973,
-        "type_c": 42.70699332547697,
-        "transferred": false
+        "baseline": 0.0009246595540386955,
+        "type_a": 0.0012200473892826815,
+        "type_b": 0.0018828314778787756,
+        "type_c": 0.0026726232013281888,
+        "transferred": true
       },
-      "runtime": 12.295525789260864,
+      "runtime": 2.900541067123413,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 3,
+      "params": [
+        1.0153051002877425,
+        0.5351634262221693,
+        0.9749326931652802
+      ],
+      "standard_errors": [
+        0.19306059661883787,
+        0.03987777587768409,
+        0.04735387834527377
+      ],
+      "policy_tv": 0.006358945286210324,
+      "value_rmse": 0.5442059817370107,
+      "regret": {
+        "baseline": 0.0022778991976057632,
+        "type_a": 0.003100648489362057,
+        "type_b": 0.00663984271076481,
+        "type_c": 0.010336725241108671,
+        "transferred": true
+      },
+      "runtime": 1.0907559394836426,
       "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 3,
+      "params": [
+        1.0151723623275757,
+        0.5351938605308533,
+        0.9749248027801514
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006362821096583578,
+      "value_rmse": 0.5448135055381206,
+      "regret": {
+        "baseline": 0.002280212001826206,
+        "type_a": 0.0031036822016472982,
+        "type_b": 0.006653128452724909,
+        "type_c": 0.010356071509052003,
+        "transferred": true
+      },
+      "runtime": 3.29465913772583,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_15",
+      "rep": 3,
+      "params": [
+        1.015169620513916,
+        0.5351954698562622,
+        0.9749262928962708
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.006362942136749235,
+      "value_rmse": 0.544829730813456,
+      "regret": {
+        "baseline": 0.002280291703724277,
+        "type_a": 0.0031038162701319733,
+        "type_b": 0.006653575360906104,
+        "type_c": 0.010356584085328777,
+        "transferred": true
+      },
+      "runtime": 3.177854061126709,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 4,
+      "params": [
+        0.531957365092507,
+        0.5407042746735684,
+        1.0219250324030267
+      ],
+      "standard_errors": [
+        0.18650174209014508,
+        0.039173103592215805,
+        0.048622684052681615
+      ],
+      "policy_tv": 0.013236789997292974,
+      "value_rmse": 1.063782644875938,
+      "regret": {
+        "baseline": 0.010353317888694,
+        "type_a": 0.013067608007061837,
+        "type_b": 0.04453733181781527,
+        "type_c": 0.06269787606990729,
+        "transferred": true
+      },
+      "runtime": 1.1838738918304443,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_15",
+      "rep": 4,
+      "params": [
+        0.5319256782531738,
+        0.540713369846344,
+        1.0219215154647827
+      ],
+      "standard_errors": [
+        0.024008276632020674,
+        0.03367197530438008,
+        0.052420885258532286
+      ],
+      "policy_tv": 0.01323805685464864,
+      "value_rmse": 1.0639693105944323,
+      "regret": {
+        "baseline": 0.010354811349260085,
+        "type_a": 0.013069413867015298,
+        "type_b": 0.04454754127789195,
+        "type_c": 0.06271289705776088,
+        "transferred": true
+      },
+      "runtime": 3.6892752647399902,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_15",
+      "rep": 4,
+      "params": [
+        0.5319271087646484,
+        0.5407108068466187,
+        1.0219218730926514
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.013237629976509941,
+      "value_rmse": 1.0639214985079954,
+      "regret": {
+        "baseline": 0.01035479191997008,
+        "type_a": 0.013069402079655564,
+        "type_b": 0.04454572848777939,
+        "type_c": 0.06271040901600305,
+        "transferred": true
+      },
+      "runtime": 3.673250675201416,
+      "converged": false,
       "error": null
     },
     {
@@ -774,25 +3155,25 @@
       "cell": "route_choice_40",
       "rep": 0,
       "params": [
-        1.1529490454495774,
-        0.48483056228579413,
-        0.8922340220263111
+        1.1529403083872707,
+        0.4848390778257009,
+        0.8922020817309807
       ],
       "standard_errors": [
-        0.21078374981880188,
-        0.023926664143800735,
-        0.08807075023651123
+        0.21129062817680486,
+        0.023089971064807067,
+        0.08487232199773742
       ],
-      "policy_tv": 0.014422778306183206,
-      "value_rmse": 1.590584243351825,
+      "policy_tv": 0.014425177465627737,
+      "value_rmse": 1.5911462526690288,
       "regret": {
-        "baseline": 0.004153413129077895,
-        "type_a": 0.004043776603119221,
-        "type_b": 0.016893317057624403,
-        "type_c": 0.010889536163720303,
+        "baseline": 0.004154699223125095,
+        "type_a": 0.0040449025344509275,
+        "type_b": 0.016898665896629528,
+        "type_c": 0.0108915252600316,
         "transferred": true
       },
-      "runtime": 1.6958389282226562,
+      "runtime": 2.7769062519073486,
       "converged": true,
       "error": null
     },
@@ -802,54 +3183,26 @@
       "cell": "route_choice_40",
       "rep": 0,
       "params": [
-        1.1747846603393555,
-        0.4758692979812622,
-        0.7830116748809814
+        1.1529626846313477,
+        0.48482996225357056,
+        0.8922361731529236
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.01677100655921007,
-      "value_rmse": 3.3342884539363706,
+      "policy_tv": 0.014422655019925918,
+      "value_rmse": 1.5905405195371645,
       "regret": {
-        "baseline": 0.017335335210675505,
-        "type_a": 0.016815363416255218,
-        "type_b": 0.06525676068652407,
-        "type_c": 0.05452490190524566,
+        "baseline": 0.004153363210114882,
+        "type_a": 0.004043735803191241,
+        "type_b": 0.016893063634639847,
+        "type_c": 0.010889166304063957,
         "transferred": true
       },
-      "runtime": 2.2439019680023193,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "route_choice_40",
-      "rep": 0,
-      "params": [
-        1.1529488563537598,
-        0.4848305583000183,
-        0.8922340869903564
-      ],
-      "standard_errors": [
-        0.21078376471996307,
-        0.023926664143800735,
-        0.08807075023651123
-      ],
-      "policy_tv": 0.014422771496365786,
-      "value_rmse": 1.5905833622590837,
-      "regret": {
-        "baseline": 0.004153409301160312,
-        "type_a": 0.0040437738255981424,
-        "type_b": 0.016893304162594457,
-        "type_c": 0.010889529282849352,
-        "transferred": true
-      },
-      "runtime": 0.3000209331512451,
-      "converged": true,
+      "runtime": 4.96710991859436,
+      "converged": false,
       "error": null
     },
     {
@@ -867,37 +3220,17 @@
         NaN,
         NaN
       ],
-      "policy_tv": 0.014422938449229723,
-      "value_rmse": 1.5908645620343667,
+      "policy_tv": 0.014422938449228217,
+      "value_rmse": 1.5908645620343593,
       "regret": {
-        "baseline": 0.004153044546541888,
-        "type_a": 0.00404333697691591,
-        "type_b": 0.016892321726932627,
-        "type_c": 0.010890097053306019,
+        "baseline": 0.004153044546542442,
+        "type_a": 0.004043336976914724,
+        "type_b": 0.016892321726931156,
+        "type_c": 0.010890097053303988,
         "transferred": true
       },
-      "runtime": 7.071191072463989,
+      "runtime": 5.776775121688843,
       "converged": false,
-      "error": null
-    },
-    {
-      "estimator": "NeuralGLADIUS",
-      "family": "behavioral",
-      "cell": "route_choice_40",
-      "rep": 0,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.42717480816850983,
-      "value_rmse": 23.119085545584948,
-      "regret": {
-        "baseline": 14.11145415597687,
-        "type_a": 14.21181795088239,
-        "type_b": 5.1838332516470675,
-        "type_c": 46.083610714883086,
-        "transferred": false
-      },
-      "runtime": 4.659267902374268,
-      "converged": true,
       "error": null
     },
     {
@@ -906,25 +3239,25 @@
       "cell": "route_choice_40",
       "rep": 1,
       "params": [
-        0.8903824279573,
-        0.5419009757041792,
-        0.9909625447455886
+        0.890355657530562,
+        0.5419048810573984,
+        0.9909558617380673
       ],
       "standard_errors": [
-        0.21819618344306946,
-        0.02533685602247715,
-        0.09024795889854431
+        0.2139565323534158,
+        0.025806348827975622,
+        0.09311975026076438
       ],
-      "policy_tv": 0.009577646142563793,
-      "value_rmse": 1.1576259619240963,
+      "policy_tv": 0.00957826379742584,
+      "value_rmse": 1.1578057858727897,
       "regret": {
-        "baseline": 0.004946250001605442,
-        "type_a": 0.004504736161463019,
-        "type_b": 0.012718142069023589,
-        "type_c": 0.008583499770965525,
+        "baseline": 0.004946950067510355,
+        "type_a": 0.004505366426289948,
+        "type_b": 0.012719912025636724,
+        "type_c": 0.008584622939582735,
         "transferred": true
       },
-      "runtime": 1.6426341533660889,
+      "runtime": 0.795773983001709,
       "converged": true,
       "error": null
     },
@@ -934,54 +3267,26 @@
       "cell": "route_choice_40",
       "rep": 1,
       "params": [
-        0.9013574719429016,
-        0.5344962477684021,
-        0.8996222019195557
+        0.8903898596763611,
+        0.5419000387191772,
+        0.9909619688987732
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.020945233053603185,
-      "value_rmse": 2.2600019948863177,
+      "policy_tv": 0.009577448005752729,
+      "value_rmse": 1.1576217116953849,
       "regret": {
-        "baseline": 0.005201218057274744,
-        "type_a": 0.004550791176340133,
-        "type_b": 0.014255473688556956,
-        "type_c": 0.0069545887478312,
+        "baseline": 0.004946076478552527,
+        "type_a": 0.0045045712216641165,
+        "type_b": 0.012717639671057619,
+        "type_c": 0.008583108571834714,
         "transferred": true
       },
-      "runtime": 1.5337669849395752,
-      "converged": true,
-      "error": null
-    },
-    {
-      "estimator": "MPEC",
-      "family": "structural",
-      "cell": "route_choice_40",
-      "rep": 1,
-      "params": [
-        0.8903818726539612,
-        0.5419007539749146,
-        0.9909628629684448
-      ],
-      "standard_errors": [
-        0.21819613873958588,
-        0.025336846709251404,
-        0.09024795889854431
-      ],
-      "policy_tv": 0.009577612461312302,
-      "value_rmse": 1.1576191454460443,
-      "regret": {
-        "baseline": 0.004946190617219529,
-        "type_a": 0.0045046817970146235,
-        "type_b": 0.012717998719496668,
-        "type_c": 0.008583408924669732,
-        "transferred": true
-      },
-      "runtime": 0.24379920959472656,
-      "converged": true,
+      "runtime": 3.791501045227051,
+      "converged": false,
       "error": null
     },
     {
@@ -990,46 +3295,278 @@
       "cell": "route_choice_40",
       "rep": 1,
       "params": [
-        0.8903864026069641,
-        0.5419008731842041,
-        0.990955650806427
+        0.8903822302818298,
+        0.5419010519981384,
+        0.990962564945221
       ],
       "standard_errors": [
         NaN,
         NaN,
         NaN
       ],
-      "policy_tv": 0.009577372038574696,
-      "value_rmse": 1.1576866027108539,
+      "policy_tv": 0.009577664606617135,
+      "value_rmse": 1.1576275837903485,
       "regret": {
-        "baseline": 0.00494622791583497,
-        "type_a": 0.00450469003452154,
-        "type_b": 0.012717847888135951,
-        "type_c": 0.008583124065407835,
+        "baseline": 0.004946268012925505,
+        "type_a": 0.0045047526581699845,
+        "type_b": 0.012718191946994351,
+        "type_c": 0.00858353063715473,
         "transferred": true
       },
-      "runtime": 6.462944984436035,
+      "runtime": 4.142796039581299,
       "converged": false,
       "error": null
     },
     {
-      "estimator": "NeuralGLADIUS",
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 2,
+      "params": [
+        0.9628914124281316,
+        0.5448697229915509,
+        0.9522533357265826
+      ],
+      "standard_errors": [
+        0.21973989047491327,
+        0.02745959448021992,
+        0.09164197742226456
+      ],
+      "policy_tv": 0.010617031295142462,
+      "value_rmse": 1.6120788941107145,
+      "regret": {
+        "baseline": 0.006578731103326532,
+        "type_a": 0.005896396982865903,
+        "type_b": 0.016392805251237104,
+        "type_c": 0.008847877258076727,
+        "transferred": true
+      },
+      "runtime": 0.8764100074768066,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 2,
+      "params": [
+        0.9627552032470703,
+        0.5448867678642273,
+        0.9522916674613953
+      ],
+      "standard_errors": [
+        0.009094172312407754,
+        0.011776857758223869,
+        0.0023717003057225606
+      ],
+      "policy_tv": 0.010618533586836603,
+      "value_rmse": 1.6120726823120242,
+      "regret": {
+        "baseline": 0.006581115159524282,
+        "type_a": 0.005898720247482893,
+        "type_b": 0.01639978569782263,
+        "type_c": 0.008854883980927451,
+        "transferred": true
+      },
+      "runtime": 3.6887028217315674,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
       "family": "behavioral",
       "cell": "route_choice_40",
-      "rep": 1,
-      "params": null,
-      "standard_errors": null,
-      "policy_tv": 0.42141761284454893,
-      "value_rmse": 22.967364914803444,
+      "rep": 2,
+      "params": [
+        0.9627653956413269,
+        0.5448848009109497,
+        0.952299952507019
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.0106176193267267,
+      "value_rmse": 1.6118936126829153,
       "regret": {
-        "baseline": 14.114997070066789,
-        "type_a": 14.158126035884719,
-        "type_b": 5.5166263835948985,
-        "type_c": 39.18778042782458,
-        "transferred": false
+        "baseline": 0.006580653811413044,
+        "type_a": 0.0058983195035350044,
+        "type_b": 0.01639844974838385,
+        "type_c": 0.008854392406554508,
+        "transferred": true
       },
-      "runtime": 6.602828025817871,
+      "runtime": 4.684109926223755,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 3,
+      "params": [
+        1.1479766567638492,
+        0.4923831012941939,
+        0.8066752226121673
+      ],
+      "standard_errors": [
+        0.21201926035281657,
+        0.024657676196034498,
+        0.08753621178509124
+      ],
+      "policy_tv": 0.024603487265909253,
+      "value_rmse": 3.0727188950286344,
+      "regret": {
+        "baseline": 0.011462906379143455,
+        "type_a": 0.01087882218153041,
+        "type_b": 0.044562559537965625,
+        "type_c": 0.029348002078368463,
+        "transferred": true
+      },
+      "runtime": 0.9601831436157227,
       "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 3,
+      "params": [
+        1.1479003429412842,
+        0.4923838973045349,
+        0.8066737651824951
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.02460380564546314,
+      "value_rmse": 3.072813258683567,
+      "regret": {
+        "baseline": 0.011462944113210676,
+        "type_a": 0.010878886830652738,
+        "type_b": 0.04456215224886771,
+        "type_c": 0.02935148020918721,
+        "transferred": true
+      },
+      "runtime": 3.574061155319214,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_40",
+      "rep": 3,
+      "params": [
+        1.1479021310806274,
+        0.492383748292923,
+        0.8066738247871399
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.024603844759724387,
+      "value_rmse": 3.0728097528224376,
+      "regret": {
+        "baseline": 0.011462952659841824,
+        "type_a": 0.010878897019513358,
+        "type_b": 0.044562195340012746,
+        "type_c": 0.029351498723670953,
+        "transferred": true
+      },
+      "runtime": 5.605162858963013,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "NFXP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 4,
+      "params": [
+        0.854697202609752,
+        0.5138090645550748,
+        1.012785927813305
+      ],
+      "standard_errors": [
+        0.20534171193240164,
+        0.02278554375782125,
+        0.08992142464531139
+      ],
+      "policy_tv": 0.0042780245129490505,
+      "value_rmse": 0.37738587072149915,
+      "regret": {
+        "baseline": 0.0008304281745389911,
+        "type_a": 0.0008220969141176445,
+        "type_b": 0.002004105779113376,
+        "type_c": 0.0014799580692575116,
+        "transferred": true
+      },
+      "runtime": 1.0772819519042969,
+      "converged": true,
+      "error": null
+    },
+    {
+      "estimator": "CCP",
+      "family": "structural",
+      "cell": "route_choice_40",
+      "rep": 4,
+      "params": [
+        0.8547009229660034,
+        0.5138044357299805,
+        1.0128121376037598
+      ],
+      "standard_errors": [
+        0.02451721161843973,
+        0.03273603805440297,
+        0.0574467806154925
+      ],
+      "policy_tv": 0.0042789159124568595,
+      "value_rmse": 0.3772229463785638,
+      "regret": {
+        "baseline": 0.0008302963368014378,
+        "type_a": 0.0008220154007316107,
+        "type_b": 0.0020045196309551446,
+        "type_c": 0.0014798301078404763,
+        "transferred": true
+      },
+      "runtime": 3.8193001747131348,
+      "converged": false,
+      "error": null
+    },
+    {
+      "estimator": "MCE-IRL",
+      "family": "behavioral",
+      "cell": "route_choice_40",
+      "rep": 4,
+      "params": [
+        0.8547025322914124,
+        0.5138047933578491,
+        1.0128121376037598
+      ],
+      "standard_errors": [
+        NaN,
+        NaN,
+        NaN
+      ],
+      "policy_tv": 0.004278970875273057,
+      "value_rmse": 0.3772325646236622,
+      "regret": {
+        "baseline": 0.00083030293455809,
+        "type_a": 0.0008220194160748395,
+        "type_b": 0.0020045605339761912,
+        "type_c": 0.0014798654791780413,
+        "transferred": true
+      },
+      "runtime": 3.754747152328491,
+      "converged": false,
       "error": null
     }
   ]

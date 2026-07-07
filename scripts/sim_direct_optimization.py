@@ -29,10 +29,11 @@ Metrics (no standard errors):
   - a data-scaling sweep (reward RMSE vs N) that shows consistency (Cell 1) and the
     misspecification bias floor (Cell 2).
 
-GLADIUS is run at the repo-standard net size (128 wide, 3 layers, 500 epochs) WITH the
-same action-2 anchor the MPEC methods receive, so it is a fair, not a strawman, baseline.
-Its reward is still model-free (it never uses the known P) and so sits in a different
-identification gauge; that is the point of including it.
+Both neural methods (neural MPEC and GLADIUS) are run at the repo-standard net size
+(128 wide, 3 layers) WITH the same action-2 anchor the tabular MPEC receives, so the
+comparison is fair, not a strawman. GLADIUS's reward is still model-free (it never uses
+the known P) and so sits in a different identification regime; that is the point of
+including it.
 
 Run:  python scripts/sim_direct_optimization.py
       python scripts/sim_direct_optimization.py --multistart 10   # + local-optima probe
@@ -181,7 +182,7 @@ class NeuralMPEC(eqx.Module):
     value: ValueNet
 
 
-def run_neural_mpec(env, obs_states, obs_actions, *, width=32, depth=2, rho=1.0,
+def run_neural_mpec(env, obs_states, obs_actions, *, width=128, depth=3, rho=1.0,
                     epochs=4000, lr=5e-3, seed=0) -> dict:
     """Co-train (u_theta, V_phi) with NLL + exact (known-P) Bellman-residual penalty."""
     S, A = env.num_states, env.num_actions
@@ -411,7 +412,7 @@ def main(multistart=None) -> None:
 
     results = {"meta": {"beta": BETA, "sigma": SIGMA, "num_states": N_STATES,
                         "reference_action": REF_ACTION,
-                        "neural_config": "width 32, depth 2, rho 1.0, 4000 epochs",
+                        "neural_config": "width 128, depth 3, rho 1.0, 4000 epochs",
                         "gladius_config": "128 wide, 3 layers, 500 epochs, anchored at action 2"},
                "cells": []}
 

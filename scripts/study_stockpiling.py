@@ -23,8 +23,6 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-import numpy as np  # noqa: E402
-
 from econirl.environments.storable_goods import storable_goods  # noqa: E402
 from validation.benchmark.harness import Cell, RosterEntry, main_cli  # noqa: E402
 from validation.benchmark.runner import _action_reward, _linear_utility  # noqa: E402
@@ -70,7 +68,7 @@ def _run_nfxp(env, panel):
 def _run_ccp(env, panel):
     from econirl.estimation import CCPEstimator
 
-    est = CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
+    est = CCPEstimator(num_policy_iterations=5, compute_hessian=True, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -96,38 +94,10 @@ def _run_mce_irl(env, panel):
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
-def _run_neural_gladius(env, panel):
-    from types import SimpleNamespace
-
-    from econirl.estimators import NeuralGLADIUS
-
-    ps = env.problem_spec
-    m = NeuralGLADIUS(
-        n_actions=int(env.num_actions),
-        discount=float(ps.discount_factor),
-        max_epochs=200,
-        verbose=False,
-    )
-    m.fit(
-        panel,
-        features=np.asarray(env.feature_matrix),
-        transitions=np.asarray(env.transition_matrices),
-    )
-    return SimpleNamespace(
-        parameters=None,
-        standard_errors=None,
-        policy=m.policy_,
-        value_function=getattr(m, "value_", None),
-        converged=bool(getattr(m, "converged_", True)),
-    )
-
-
 ROSTER = (
     RosterEntry("NFXP",         "structural", _run_nfxp, uses_transitions=True),
     RosterEntry("CCP",          "structural", _run_ccp, uses_transitions=True),
     RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl, uses_transitions=True),
-    RosterEntry("NeuralGLADIUS","behavioral", _run_neural_gladius,
-                uses_transitions=False),
 )
 
 # ---------------------------------------------------------------------------
@@ -157,11 +127,6 @@ DIAGNOSES = {
         "Its convergence indicator mirrors the inner optimizer's success "
         "status. The optimizer can stop short while the recovered policy is "
         "already accurate, so it can read False on an accurate fit."
-    ),
-    "NeuralGLADIUS": (
-        "Model-free neural policy learner. Uses only the feature matrix and "
-        "the observed panel; it does not use transition matrices. "
-        "Capped at 200 epochs here for short compute."
     ),
 }
 
@@ -195,6 +160,17 @@ EXCLUDED = [
             "compute without new information here"
         ),
     },
+    {
+        "name": "NeuralGLADIUS",
+        "reason": (
+            "a model-free neural policy learner; on a 20-state tabular problem "
+            "it reduces to behavioral cloning on the choice likelihood with no "
+            "structural edge, and it trailed every method shown. Its arena is "
+            "scalability and predictive likelihood on large state spaces where "
+            "full-solution methods become intractable, a regime outside these "
+            "policy-recovery studies"
+        ),
+    },
 ]
 
 CELLS = (
@@ -220,7 +196,7 @@ CELLS = (
         n_individuals=200,
         n_periods=35,
         seed=42,
-        n_replications=2,
+        n_replications=30,
         fit_timeout=240,
         param_block=True,
         figure=FIGURE_PNG,
@@ -276,14 +252,12 @@ NARRATIVE = {
     "cells": {
         "stockpiling": {
             "after": (
-                "The structural family (NFXP, CCP, MPEC) recovers all three "
+                "The structural family (NFXP, CCP) recovers all three "
                 "parameters on the same scale as the truth, so Param RMSE applies "
                 "to them alone. MCE-IRL here uses the same linear features and "
                 "recovers the same values, but its weights stay out of the "
                 "recovery table because an IRL reward is only partially identified "
-                "in general. NeuralGLADIUS learns a model-free policy with no "
-                "reward weights to compare. Policy TV and regret are the right "
-                "scorecards for the behavioral family."
+                "in general. Policy TV and regret are the behavioral scorecards."
             ),
         },
     },
