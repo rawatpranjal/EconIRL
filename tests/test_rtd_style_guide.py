@@ -181,7 +181,6 @@ def test_estimator_navigation_is_owned_by_section_pages() -> None:
     expected_core = [
         "nfxp",
         "ccp",
-        "tdccp",
         "mce_irl",
         "deep_mce_irl",
         "airl",
@@ -189,6 +188,7 @@ def test_estimator_navigation_is_owned_by_section_pages() -> None:
         "gladius",
     ]
     expected_other = [
+        "tdccp",
         "nnes",
         "mpec",
         "ufxp",
