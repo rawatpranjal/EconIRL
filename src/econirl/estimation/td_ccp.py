@@ -922,7 +922,6 @@ class TDCCPEstimator(BaseEstimator):
         feat_ax_next = self._build_action_state_features(next_actions, next_states, problem)
         input_dim = feat_ax.shape[1]
 
-        n_samples = len(states)
         loss_histories = {}
 
         # -----------------------------------------------------------------
@@ -1196,9 +1195,8 @@ class TDCCPEstimator(BaseEstimator):
             )
 
         for j in range(num_features):
-            self._log(
-                f"Training h component {j} via {('custom' if self._config.avi_regressor else 'GBM')} AVI"
-            )
+            avi_kind = "custom" if self._config.avi_regressor else "GBM"
+            self._log(f"Training h component {j} via {avi_kind} AVI")
             init_value = float(np.mean(z_values[:, j])) / (1.0 - gamma)
             reg, losses = self._train_single_avi_gbm(
                 X,
@@ -1932,7 +1930,6 @@ class TDCCPEstimator(BaseEstimator):
         # Numerical Jacobian G = d/d_theta E_n[zeta]
         eps = 1e-5
         G = np.zeros((num_params, num_params), dtype=np.float64)
-        zeta_mean = zeta.mean(axis=0)  # (K,)
 
         # For the score-based moment, G is approximately the negative Hessian
         # divided by n_samples. We approximate it numerically.
@@ -2117,7 +2114,6 @@ class TDCCPEstimator(BaseEstimator):
         # -----------------------------------------------------------------
         self._log("Step 2: Extracting transition tuples")
         actions, states, next_actions, next_states = self._extract_transitions(panel)
-        individual_ids = self._extract_individual_ids(panel)
         n_transitions = len(states)
         self._log(f"  {n_transitions} transition tuples extracted")
 
@@ -2482,7 +2478,6 @@ class TDCCPEstimator(BaseEstimator):
             key, perm_key = jax.random.split(key)
             row_perm = np.array(jax.random.permutation(perm_key, n_rows))
             fold1_rows = row_perm[:half_rows]
-            fold2_rows = row_perm[half_rows:]
 
             fold1_trans_mask = np.zeros(n_rows, dtype=bool)
             fold1_trans_mask[fold1_rows] = True
