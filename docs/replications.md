@@ -6,6 +6,10 @@ the reported quantities are directly comparable. Each section sets the package
 value against the paper's published value, side by side, and ends with a command
 to reproduce the run.
 
+Read this page as the paper-number ledger. If a method has simulation evidence
+but no directly comparable published table, that distinction is stated rather
+than hidden.
+
 ## Rust (1987), Table IX, Group 4 (NFXP)
 
 The nested fixed point recovers the bus-engine maintenance and replacement costs
@@ -364,6 +368,82 @@ Reproduce:
 PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py --traj 250 --reps 2
 ```
 
+## RHIP (Barnes et al., 2024)
+
+RHIP, Receding Horizon Inverse Planning, generalizes classic IRL through a
+planning horizon H. The policy plans with a stochastic soft-Bellman rule for H
+steps, then follows a cheap deterministic planner. The paper's Figure 5 finding on
+real Google Maps routing is that an interior horizon (H = 10) gives the best route
+accuracy, beating both the myopic endpoint and the full MaxEnt endpoint (H
+infinite). The paper reads this as better behavioral specification: people plan
+over a finite horizon and approximate beyond it.
+
+The package reproduces the mechanism on a controlled graph. Demonstrations come
+from a finite-lookahead planner with a known lookahead h. The reward and the shock
+scale are held fixed, and only the planning horizon differs from the estimator.
+RHIP is then fit across a sweep of horizons H, and the fit is the policy distance
+to the demonstrations.
+
+### Recovering the demonstrator's lookahead (25-node graph, 300 trajectories, 3 seeds)
+
+| Demonstrator lookahead h | H = 0 (myopic) | H = h (interior) | H infinite (MaxEnt) | Best H |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 0.035 | 0.011 | 0.060 | 1 |
+| 2 | 0.057 | 0.016 | 0.042 | 2 |
+| 3 | 0.068 | 0.012 | 0.031 | 3 |
+
+The numbers are policy distance to the demonstrations, lower is better. For every
+demonstrator, the best-fitting horizon is interior and lands on the demonstrator's
+lookahead. Both endpoints fit worse. As the demonstrator's lookahead changes, the
+recovery-optimal horizon shifts with it, so the horizon is an identifiable
+behavioral parameter. This reproduces the Figure 5 mechanism. It is a controlled
+recovery reproduction, not a match of the paper's real-world routing numbers, which
+need proprietary data.
+
+Reproduce:
+
+```bash
+python scripts/study_rhip_lookahead.py
+```
+
+## AIRL-Het (Lee, Sudhir, and Wang, 2026)
+
+Lee, Sudhir, and Wang extend AIRL to consumers who differ in unobserved ways and
+to action-dependent utilities. Their setting is sequential content: a reader of
+serialized fiction decides each period whether to continue, paying an access cost,
+or to exit. The paper proves (its Theorems 1 to 3) that fixing the exit-action
+reward to zero and assuming an absorbing state makes the adversarial discriminator
+recover the true reward and value, even under stochastic transitions. An
+expectation-maximization layer then infers latent segments and segment-specific
+rewards. The empirical study uses proprietary readership data, so this is an
+identification reproduction on a controlled problem, not a match of the published
+estimates.
+
+The package reproduces the identification on a 61-state, two-segment problem with
+an exit-action anchor and an absorbing state, a reward over 20 content features,
+and discount 0.92.
+
+### Anchored segment recovery (two segments, priors 0.48 / 0.52)
+
+| Quantity | Value |
+| --- | ---: |
+| Segment assignment accuracy | 0.895 |
+| Segment prior error (L1) | 0.043 |
+| Segment policy distance | 0.059 |
+| Segment reward error (normalized RMSE) | 0.24, 0.27 |
+
+The estimator recovers which segment each user belongs to with about 90 percent
+accuracy, the segment sizes to an L1 of 0.04, and each segment's policy to a
+distance of 0.06. The exit anchor and the absorbing state pin the action-dependent
+utilities and the latent segments, which is the paper's identification claim. The
+published consumption estimates use proprietary data and are not reproduced here.
+
+Reproduce:
+
+```bash
+python validation/estimators/aairl/run.py
+```
+
 ## Pending
 
 These estimators have a paper target but no completed replication yet. Each is held
@@ -372,6 +452,4 @@ both the estimates and the standard errors.
 
 | Estimator | Paper | Status |
 | --- | --- | --- |
-| RHIP | Barnes et al. (2024) | Not yet evaluated. |
-| AIRL-Het | Lee-Sudhir-Wang (2026) | Not yet evaluated. |
 | UFXP | Oguz and Bray (2026) | Not yet evaluated. |

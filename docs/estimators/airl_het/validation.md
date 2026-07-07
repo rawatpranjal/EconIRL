@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for anchored latent heterogeneity. The
+simulation checks both reward recovery within segment and assignment of
+trajectories to segments.
+
 AIRL-Het runs on a synthetic serialized-content heterogeneous cell with two
 latent segments, repeated books per user, and three actions (read/wait/exit).
 The cell has known segment-level rewards, transitions, policies, values, Q

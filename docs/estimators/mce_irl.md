@@ -8,6 +8,10 @@ implied feature moments, and updates the parameters until the model moments
 equal the expert moments. Counterfactuals are meaningful only through the
 fitted MDP primitives.
 
+Read this page when demonstrations, not a structural likelihood, define the
+problem. The estimated object is a reward inside the supplied feature basis and
+normalization.
+
 ## Source Papers
 
 The estimator follows {ref}`Ziebart et al. (2008) <ziebart-2008>`, which
@@ -22,6 +26,17 @@ uncertain outcomes. The two coincide under deterministic dynamics and separate
 under stochastic ones. The causal form matches the logit dynamic-discrete-choice
 structure, which is why MCE-IRL is the reference entropy IRL route for these
 comparisons.
+
+## Theory Connections
+
+For the proof route behind this page, start with
+[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
+for the maximum-causal-entropy and logit-DDC equivalence,
+[Identification and Anchors](../theory/identification.md) for reward
+normalization, and [IRL Identification Boundaries](../theory/irl_boundaries.md)
+for what feature matching can and cannot identify. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+feature-rank condition behind finite reward parameters.
 
 ## Notation
 
@@ -79,6 +94,9 @@ MCE-IRL estimates the reward through feature moments rather than through a
 conditional likelihood alone.
 
 ## Identification
+
+This is the section that says when matching feature moments is enough to recover
+the intended reward representation, rather than only reproducing behavior.
 
 MCE-IRL identifies a reward representation under the following assumptions.
 
@@ -257,6 +275,36 @@ $\mu_E - \mu_\theta = 0$ without maximizing the log likelihood. A gradient-desce
 path (`optimizer="gradient"`) is also available, using Adam or plain SGD as
 the outer update.
 
+## System View
+
+MCE-IRL starts from demonstrations rather than a structural likelihood. It asks
+which reward makes a soft-optimal agent visit the same state-action features as
+the expert.
+
+```text
+Expert demonstrations
+Known transition model, reward features, discount factor
+        |
+        v
+Compute expert feature moments from observed behavior
+        |
+        v
+Try one candidate reward parameter theta
+        |
+        v
+Solve the soft dynamic program under that reward
+        |
+        v
+Compute the model's feature moments
+        |
+        v
+Update theta until model moments match expert moments
+```
+
+The reward is identified only inside the supplied feature span and
+normalization. If the features omit the real action contrast, the estimator can
+fit behavior without recovering the intended reward.
+
 ## Applicability
 
 | Applicable when | Prefer an alternative when |
@@ -357,13 +405,13 @@ action-specific payoffs are not identified even with correct transitions. See
 Counterfactual analysis requires re-solving the dynamic program under changed
 primitives. The fitted primitives available for this are `model.reward_matrix_`,
 `model.policy_`, and `model.value_function_`. For controlled payoff, transition,
-or action-set interventions, use the lower-level simulation and evaluation
-utilities with an explicit problem and transition environment. The
+or action-set interventions, use the simulation and evaluation utilities with
+an explicit problem and transition environment. The
 [Counterfactuals](mce_irl/counterfactuals.md) page documents the three
 counterfactual families and the reported regret figures.
 
 The [Quick Start](mce_irl/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `MCEIRLEstimator` interface.
+attributes and the full `MCEIRLEstimator` API.
 
 ## Evidence
 

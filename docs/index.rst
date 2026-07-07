@@ -5,6 +5,10 @@ EconIRL is a Python package for structural dynamic discrete choice and inverse
 reinforcement learning. Use it to estimate forward-looking choice models,
 recover rewards, and evaluate counterfactual policies.
 
+If you are new to these models, read this page as a map: first install the
+package, then choose an estimator, then use the estimator-specific pages for the
+math, assumptions, evidence, and examples.
+
 Install
 -------
 
@@ -15,8 +19,12 @@ Install
 Estimators
 ----------
 
-Start with `Choosing an Estimator <estimators/landscape.html>`__, then open the
-estimator that matches your decision problem.
+Start with `Choosing and Comparing Estimators <comparing_estimators.html>`__ for
+the estimator chooser, the canonical NFXP case, side-by-side tables, reward
+targets, transitions, and identification strategies.
+
+The links below are method pages. Open one after you know the decision problem,
+the data you have, and the reward object you want to recover.
 
 `NFXP <estimators/nfxp.html>`__ ·
 `CCP <estimators/ccp.html>`__ ·
@@ -33,10 +41,19 @@ estimator that matches your decision problem.
 `GLADIUS <estimators/gladius.html>`__ ·
 `IQ-Learn <estimators/iq_learn.html>`__
 
+Theory
+------
+
+See `Theory <theory/index.html>`__ for the proof map behind the core estimators:
+soft Bellman equivalence, reward identification, classical DDC inversion, IRL
+identification boundaries, and the GLADIUS empirical-risk objective.
+
 Replications
 ------------
 
 See `Replications <replications.html>`__ for the terse paper-number ledger.
+That page is about direct paper-number comparisons; broader synthetic evidence
+lives in the simulation studies.
 
 Example
 -------
@@ -71,7 +88,9 @@ Output
    user_guide/your_own_data
    estimators/core
    estimators/other
+   comparing_estimators
    user_guide/post_estimation
+   theory/index
    replications
    simulation_studies/index
    api/index

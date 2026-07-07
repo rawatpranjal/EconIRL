@@ -3,6 +3,10 @@
 Install the package, fit the reference estimator on the Rust bus data, and read
 the structural parameters.
 
+This is a mechanical first run. It shows the package shape on a known example;
+do the data and estimator checks before treating a result as evidence for a new
+problem.
+
 ## Install
 
 ```bash
@@ -10,6 +14,9 @@ pip install econirl
 ```
 
 ## Fit NFXP
+
+NFXP is used here because the bundled bus example is the canonical small
+tabular dynamic discrete-choice problem.
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -39,6 +46,8 @@ print(model.se_)
 ## Run a counterfactual
 
 Change a structural primitive and read the new policy.
+This only makes sense for estimators that recover a reward object the model can
+re-solve under the changed primitive.
 
 ```python
 cf = model.counterfactual(RC=4.0)

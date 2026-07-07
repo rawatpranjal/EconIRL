@@ -10,6 +10,10 @@ place of the transition integral. Cross-fitted, locally robust standard errors
 correct for first-stage estimation error in those objects and deliver valid
 inference at parametric rates.
 
+Read this page when the transition density is the obstacle. TD-CCP still targets
+finite structural reward parameters; it changes how recursive continuation terms
+are estimated.
+
 ## Source Papers
 
 The estimator follows {ref}`Adusumilli and Eckardt (2025)
@@ -20,6 +24,15 @@ procedure for valid inference. The CCP foundation is
 {ref}`Hotz and Miller (1993) <hotz-miller-1993>`, which first expresses the
 dynamic programming problem in terms of conditional choice probabilities and
 inverts the CCP mapping to recover structural parameters.
+
+## Theory Connections
+
+For the proof route behind this page, start with
+[Identification and Anchors](../theory/identification.md) for the normalization
+problem and [Classical DDC Estimators](../theory/classical_ddc.md) for how the
+CCP route replaces repeated Bellman solves with recursive continuation objects.
+Use [Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+rank condition behind the projected parameter recovery step.
 
 ## Notation
 
@@ -103,6 +116,9 @@ of two encoded state coordinates; action 0 serves as the reward-normalized
 baseline.
 
 ## Identification
+
+This is the section that says when successor tuples and CCPs are enough to
+recover the reward parameters without modeling the transition density.
 
 TD-CCP point-identifies the reward parameters $\theta$ under the following
 assumptions.
@@ -274,6 +290,35 @@ parameter stage models no transition kernel. The method is designed for continuo
 or high-dimensional state spaces, where it avoids discretization. The package
 applies it on discrete-state problems, the regime of the paper's bus-engine check.
 
+## System View
+
+TD-CCP keeps the finite reward-parameter target but avoids estimating a full
+transition density during parameter estimation. It does this by learning the
+recursive continuation terms directly from observed successor state-action
+pairs.
+
+```text
+Observed tuples: current action/state and next action/state
+Reward features, first-stage choice probabilities, discount factor
+        |
+        v
+Estimate continuation accumulators from successor pairs
+        |
+        v
+Build a CCP pseudo-likelihood using those accumulators
+        |
+        v
+Estimate finite reward parameters theta
+        |
+        v
+Use a post-fit transition environment for policy, value,
+and counterfactual evaluation
+```
+
+"Transition-density-free" describes the estimation step. It does not remove the
+economics of transitions, and it does not make counterfactuals possible without
+an environment to re-solve.
+
 ## Applicability
 
 | Applicable when | Prefer an alternative when |
@@ -331,7 +376,7 @@ tensor. See the [Counterfactuals](tdccp/counterfactuals.md) subpage for the
 counterfactual taxonomy and reported regret values.
 
 The [Quick Start](tdccp/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `TDCCPEstimator` interface.
+attributes and the full `TDCCPEstimator` API.
 
 ## Evidence
 

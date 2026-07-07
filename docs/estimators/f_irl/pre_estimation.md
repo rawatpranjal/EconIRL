@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting f-IRL. The primary question is whether the expert
+state marginal is well covered enough for behavioral matching to be meaningful.
+
 f-IRL estimates a tabular reward by gradient ascent on a divergence objective,
 so its failure modes differ from structural estimators. Check these before fitting:
 
@@ -14,7 +17,7 @@ so its failure modes differ from structural estimators. Check these before fitti
 
 ## Canonical Simulation Checks
 
-Values from the paper-faithful primary cell (see [Simulation Study](validation.md)):
+Values from the primary source-paper benchmark (see [Simulation Study](validation.md)):
 
 | Check | Value | Status |
 | --- | --- | --- |

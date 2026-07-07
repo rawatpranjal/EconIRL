@@ -4,6 +4,22 @@ This page lists the papers that the public estimator pages draw from. The
 estimator pages link here so the methodological source is visible before the
 usage examples.
 
+Use this page to trace a method back to its source paper. It is a bibliography,
+not a claim that every source paper has a full numerical replication in the
+package.
+
+## Theory Surveys and Lecture Notes
+
+(kang-2026-lecture)=
+- Kang, E. H. (2026). "A Lecture Note on Offline RL and IRL: Part II:
+  Foundations of Inverse Reinforcement Learning and Dynamic Discrete Choice
+  Models." arXiv preprint arXiv:2605.30843.
+
+(rawat-rust-2026)=
+- Rawat, P., and Rust, J. (2026). "Dynamic Discrete Choice and Inverse
+  Reinforcement Learning: Inferring Preferences and Beliefs from Human
+  Behavior." Manuscript.
+
 ## Dynamic Discrete Choice
 
 (rust-1987)=

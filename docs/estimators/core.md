@@ -7,8 +7,12 @@ replication, matched to Rust (1987) Table IX. The rest of the core spans the
 structural and inverse-reinforcement-learning methods that carry the main
 identification stories and method lineages.
 
+Read this page as the short menu for the main methods. If a method name is
+unfamiliar, open the combined chooser first, then return here for the specific
+method page.
+
 For how to choose among them, including the side-by-side table, see
-[Choosing an Estimator](landscape.md).
+[Choosing and Comparing Estimators](../comparing_estimators.md).
 
 | Estimator | Family | Best for |
 | --- | --- | --- |
@@ -17,17 +21,15 @@ For how to choose among them, including the side-by-side table, see
 | [TD-CCP](tdccp.md) | Structural | Reward parameters without modeling the transition density. |
 | [MCE-IRL](mce_irl.md) | IRL | Maximum causal entropy reward-feature matching. |
 | [Neural MCE-IRL](deep_mce_irl.md) | IRL | Unrestricted neural reward map under the MCE objective. |
-| [AIRL](airl.md) | IRL | AIRL-1: adversarial transferable state-only reward. |
-| [AIRL-Het](airl_het.md) | IRL | AIRL-2: segment-specific rewards under an anchor. |
+| [AIRL](airl.md) | IRL | Adversarial state-only reward recovery under the original AIRL transfer assumptions. |
+| [AIRL-Het](airl_het.md) | IRL | Segment-specific action-dependent rewards under exit and absorbing-state anchors. |
 | [GLADIUS](gladius.md) | IRL | Neural Q and continuation reward recovery at scale. |
 
-GLADIUS is the package's neural estimator. The `GLADIUS` class is the
-`NeuralGLADIUS` implementation, so the two names refer to the same estimator.
+GLADIUS is the core neural Q and continuation estimator.
 
 ```{toctree}
 :maxdepth: 1
 
-landscape
 nfxp
 ccp
 tdccp

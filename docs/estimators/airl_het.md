@@ -10,6 +10,10 @@ reward equals the structural reward rather than a potential-based perturbation
 of it. The result is a segment-level reward object that supports structural
 counterfactual analysis on heterogeneous populations.
 
+Read this page when one pooled reward is not credible. The anchors and the
+latent-segment separation are the main reasons the recovered rewards can be
+interpreted segment by segment.
+
 ## Source Papers
 
 The estimator builds on {ref}`Fu, Luo, and Levine (2018) <fu-2018>`, which
@@ -19,6 +23,16 @@ develop the anchored heterogeneous extension: the two-constraint
 normalization that uniquely identifies action-dependent rewards in dynamic
 discrete choice environments with absorbing exits, and the EM algorithm that
 discovers latent segments from pooled trajectory data.
+
+## Theory Connections
+
+For the proof route behind this page, start with
+[Identification and Anchors](../theory/identification.md) for potential-based
+reward ambiguity and [IRL Identification Boundaries](../theory/irl_boundaries.md)
+for why action-dependent AIRL needs stronger anchors than the original
+state-only AIRL theorem. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+feature-rank condition behind segment-specific parameter recovery.
 
 ## Notation
 
@@ -82,6 +96,9 @@ Two latent segments differ in their dynamic preferences, and the exit action
 absorbs each individual into a terminal state.
 
 ## Identification
+
+This is the section that says when the segment rewards are structurally pinned,
+not just clustered policies with different labels.
 
 AIRL-Het recovers segment-level structural rewards under the following
 assumptions. Absent the anchor normalizations, the discriminator score
@@ -214,6 +231,36 @@ Initialization defaults to `initialization="random"`; the
 `"behavioral_anchor"` scheme clusters trajectories by observed action shares,
 inverts the anchored soft policy into a starting reward, and typically reduces
 the number of EM iterations required.
+
+## System View
+
+AIRL-Het adds a segment layer to anchored adversarial reward recovery. Each
+person or trajectory receives a persistent segment probability, and each
+segment gets its own reward and policy.
+
+```text
+Trajectories grouped by person
+Exit action, absorbing state, transition model, discount factor
+        |
+        v
+Initialize segment shares and trajectory memberships
+        |
+        v
+For each segment, run anchored AIRL with the two reward anchors
+        |
+        v
+Update which segment each trajectory most likely belongs to
+        |
+        v
+Repeat until memberships and segment policies stabilize
+        |
+        v
+Segment-specific rewards, policies, shares, and assignments
+```
+
+The latent segment is a person-level or trajectory-level type. It is not a new
+random draw at each decision. That distinction matters for reading the recovered
+segments and their counterfactual policies.
 
 ## Applicability
 

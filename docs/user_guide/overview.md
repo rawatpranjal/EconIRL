@@ -8,6 +8,9 @@ Use EconIRL when the question is structural rather than only predictive. The
 outputs include reward objects, policies, value functions, and counterfactual
 policy calculations where the estimator supports them.
 
+Read this overview first if the menu names are unfamiliar. It gives the basic
+problem shape before the estimator pages start using method-specific notation.
+
 ## What are DDC/IRL models even about?
 
 Dynamic discrete choice models study repeated decisions. A user, firm, driver,
@@ -29,6 +32,10 @@ pip install econirl
 ```
 
 ## Quick Start
+
+This example uses NFXP because it is the reference tabular structural estimator.
+The code is meant to show the workflow, not to decide that NFXP is right for
+every dataset.
 
 ```python
 from econirl.datasets import load_rust_bus
@@ -56,7 +63,7 @@ Output
 | --- | --- |
 | I have my own panel of decisions. | Read [using your own data](your_own_data.md). |
 | I need a tabular DDC baseline. | Use [NFXP](../estimators/nfxp.md). |
-| I need to compare methods. | Use the [estimator map](../estimators.md). |
+| I need to compare methods. | Use [Choosing and Comparing Estimators](../comparing_estimators.md). |
 | I need the signature of a class. | Read the [API reference](../api/index.rst). |
 | I need to understand simulation-study evidence. | Read [simulation studies](../simulation_studies/index.md). |
 

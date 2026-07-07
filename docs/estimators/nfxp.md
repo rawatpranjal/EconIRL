@@ -7,6 +7,10 @@ evaluation. The inner loop solves the Bellman fixed point for a candidate
 reward parameter. The outer loop maximizes the conditional choice log
 likelihood over that parameter.
 
+Read this page as the benchmark case. Later structural estimators either keep
+this target and change the numerical route, or relax one bottleneck at a cost
+stated on their own pages.
+
 ## Source Papers
 
 The estimator follows {ref}`Rust (1987) <rust-1987>`, which introduces the
@@ -14,6 +18,17 @@ bus-engine replacement model and the nested fixed-point algorithm.
 {ref}`Iskhakov et al. (2016) <iskhakov-2016>` compare the nested fixed point to
 constrained-optimization alternatives and motivate the polyalgorithm inner
 solver used in the package.
+
+## Theory Connections
+
+For the proof route behind this page, start with
+[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
+for the contraction and logit-choice identities,
+[Identification and Anchors](../theory/identification.md) for why action
+contrasts need a reward anchor, and
+[Classical DDC Estimators](../theory/classical_ddc.md) for the NFXP likelihood
+argument. Use [Reward Projection and Feature Rank](../theory/reward_projection.md)
+for the final step from recovered reward contrasts to finite parameters.
 
 ## Notation
 
@@ -68,6 +83,9 @@ replace it. The dynamic program links today's choices to tomorrow's states, so
 observed choices carry information about the structural costs.
 
 ## Identification
+
+This is the section that says when the estimated parameters can be read as the
+primitive reward parameters, not just as a good in-sample choice fit.
 
 NFXP point-identifies the reward parameters $\theta$ under the following
 assumptions.
@@ -173,6 +191,36 @@ where $P_\pi = \sum_a \operatorname{diag}_s(\pi_\theta(a \mid s))\, P_a \in \mat
 is the policy-weighted transition matrix, with $\operatorname{diag}_s(\pi_\theta(a \mid s))$
 denoting the $S \times S$ diagonal matrix whose $(s,s)$ entry is $\pi_\theta(a \mid s)$.
 
+## System View
+
+NFXP is easiest to read as two nested questions. The outside question asks which
+reward parameters make the observed choices most likely. The inside question
+asks how a forward-looking agent would behave if those parameters were true.
+
+```text
+Observed panel: state, action, next state
+Reward features, transition model, discount factor
+        |
+        v
+Try one candidate reward parameter theta
+        |
+        v
+Solve the agent's dynamic program
+        |
+        v
+Convert values into logit choice probabilities
+        |
+        v
+Score the observed actions under those probabilities
+        |
+        v
+Update theta and repeat until the likelihood is maximized
+```
+
+Use NFXP when that inside solve is affordable. Its advantage is clarity: the
+estimated reward, value function, policy, and counterfactuals all come from the
+same fully specified dynamic choice model.
+
 ## Algorithm
 
 ```text
@@ -266,7 +314,7 @@ print(model.predict_proba([0, 10, 50, 89]))
 ```
 
 The [Quick Start](nfxp/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `NFXPEstimator` interface.
+attributes and the full `NFXPEstimator` API.
 
 ## Evidence
 

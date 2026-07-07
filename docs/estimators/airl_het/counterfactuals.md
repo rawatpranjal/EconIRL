@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as anchored segment-level re-solving. Counterfactuals are
+interpretable only when the exit-action and absorbing-state normalizations are
+kept fixed under the intervention.
+
 AIRL-Het recovers a segment-level reward with the same parameterization as the
 structural truth, provided the anchor normalization is correctly specified. Counterfactual
 analysis reruns each segment's dynamic program under a controlled change and
@@ -39,7 +43,7 @@ for k, rw in enumerate(seg_rewards):
 ## Reported Results
 
 On the primary synthetic cell, welfare regret is reported per segment and the
-maximum across segments is used for the gate. Results from
+maximum across segments is the conservative summary. Results from
 [aairl.json](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/aairl.json):
 
 | Counterfactual | Max regret across segments | Threshold | Status |

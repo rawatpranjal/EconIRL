@@ -7,6 +7,9 @@ raw data to a fitted model and one counterfactual.
 The examples use the bundled bus-engine dataset as a stand-in for your own panel.
 Replace it with your DataFrame and the rest stays the same.
 
+Read this page in order. The checks before fitting are part of the workflow, not
+optional cleanup after an estimator has already produced numbers.
+
 ## What your data needs
 
 One row per observed decision. Three columns name the pieces.
@@ -77,6 +80,10 @@ field to the one that fits your problem.
 
 Three checks tell you whether the data can support a fit. Each one says what it
 means and what to do if it fails.
+
+Passing these diagnostics does not prove the model is true. It means the data
+format, action variation, and reward features are not obviously blocking the
+estimation target.
 
 ### Is the panel well formed?
 
@@ -191,7 +198,8 @@ When the reward is state-only and the dynamics are deterministic, MCE-IRL and AI
 the reward up to an additive constant, with linear features or a neural reward. An anchor
 that pins one reward value fixes the constant too, so the recovered reward equals the true
 reward. See the [estimator map](../estimators.md) for the full set and
-[Choosing an Estimator](../estimators/landscape.md) for the side-by-side comparison.
+[Choosing and Comparing Estimators](../comparing_estimators.md) for the
+side-by-side comparison.
 
 ## A full run, start to finish
 
@@ -233,6 +241,9 @@ replace probability at state 50: 0.055196291500871957
 ## Read the outputs
 
 A fitted estimator exposes a common set of attributes.
+Interpret these objects through the estimator page: the same attribute name can
+refer to a structural reward parameter, an IRL reward object, or a diagnostic
+quantity depending on the method.
 
 | Attribute | What it holds |
 | --- | --- |

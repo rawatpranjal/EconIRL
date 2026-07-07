@@ -1,5 +1,9 @@
 # Rust Bus Engine Example
 
+Read this page as a runnable MPEC smoke test on a Rust-style environment. The
+important extra output is the Bellman constraint violation, because it tells you
+whether the constrained program actually enforced the model equations.
+
 The Rust bus-engine replacement problem is the canonical dynamic discrete
 choice example. A bus operator observes mileage and chooses whether to keep
 the current engine or replace it.
@@ -48,7 +52,7 @@ print(summary.policy[states, 1])
 
 ## Counterfactual Replacement Cost
 
-MPEC's lower-level estimator does not currently provide the one-call
+MPEC's estimator API does not currently provide the one-call
 dataframe-wrapper `counterfactual` method used by NFXP and CCP. For simulation
 evidence, counterfactual replacement-cost and transition interventions are
 tested through the simulation harness and reported on the

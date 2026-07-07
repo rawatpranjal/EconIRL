@@ -1,5 +1,9 @@
 # Quick Start
 
+This is the smallest NFXP path: fit the reference structural estimator, then
+inspect parameters, standard errors, policy, and value objects. It is a usage
+example, not a substitute for the pre-estimation checks.
+
 ```python
 from econirl.datasets import load_rust_bus
 from econirl import NFXP
@@ -30,8 +34,8 @@ Fitted attributes follow the same convention as CCP and UFXP:
 
 The `utility="linear_cost"` default builds the Rust bus features for you. To use
 your own features, pass a `RewardSpec` to `fit`. The feature array has shape
-`(n_states, n_actions, n_features)`, and `reward=` overrides the constructor
-default.
+`(n_states, n_actions, n_features)`, and `reward=` takes priority over the
+default reward features.
 
 ```python
 import numpy as np
@@ -70,7 +74,7 @@ print(cf.policy[50, 1])
 This solves the fitted model again with a higher replacement cost and returns
 the new value function and policy.
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.nfxp.NFXPEstimator` when you need direct control over
 panel objects, utility objects, transition tensors, optimizer options, or

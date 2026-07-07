@@ -9,6 +9,10 @@ the Bellman equation. The Aguirregabiria-Mira nested pseudo-likelihood extension
 iterates the inversion and the pseudo-likelihood to refine the structural estimate
 toward full maximum likelihood efficiency.
 
+Read this page as the speed route for the same finite structural target as NFXP.
+The key tradeoff is that CCP avoids repeated solves only when first-stage choice
+probabilities have enough support to carry the inversion.
+
 ## Source Papers
 
 The estimator follows {ref}`Hotz and Miller (1993) <hotz-miller-1993>`, which
@@ -16,6 +20,15 @@ introduces the conditional-choice-probability inversion theorem for dynamic disc
 choice models. {ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>`
 introduce the nested pseudo-likelihood algorithm that iterates the Hotz-Miller step
 to approach full maximum likelihood efficiency.
+
+## Theory Connections
+
+For the proof route behind this page, start with
+[Identification and Anchors](../theory/identification.md) for the normalization
+problem and [Classical DDC Estimators](../theory/classical_ddc.md) for the
+Hotz-Miller inversion and nested pseudo-likelihood argument. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+rank condition that turns recovered reward contrasts into parameters.
 
 ## Notation
 
@@ -60,7 +73,7 @@ $E[\varepsilon_a \mid a = \operatorname{argmax}_b] = \sigma(\gamma - \log \hat\p
 This is $\sigma \cdot e_{\hat\pi}(s,a)$ in scaled units. The implementation
 stores $e_{\hat\pi}$ in utility units and applies the $\sigma$ factor only when
 computing the logit probabilities via $\exp(\tilde Q / \sigma)$. The two
-conventions coincide at $\sigma = 1$, the scale used in the validation cell.
+conventions coincide at $\sigma = 1$, the scale used in the reported study.
 See Rust (1994) or Hotz and Miller (1993) Lemma 1.
 
 The integrated Bellman equation under $\hat\pi$ is:
@@ -146,6 +159,9 @@ See Aguirregabiria and Mira (2002) eqs. (4)-(5).
 
 ## Identification
 
+This is the section that says when the CCP shortcut still recovers the same
+reward object as the full nested likelihood.
+
 CCP point-identifies the reward parameters $\theta$ under the following assumptions
 and support requirements.
 
@@ -223,6 +239,38 @@ pseudo-likelihood. It is not the score used for standard errors. Those come from
 Hessian of the full structural log-likelihood, re-solving the Bellman equation at each
 perturbation. That matches the NFXP convention and avoids the rank deficiency of the
 pseudo-likelihood Hessian.
+
+## System View
+
+CCP keeps the structural target from NFXP but changes where the computation
+happens. Instead of solving a new dynamic program for every trial parameter, it
+first reads the policy from observed choice frequencies and uses that policy to
+build a one-shot continuation-value correction.
+
+```text
+Observed panel: state, action, next state
+Reward features, transition model, discount factor
+        |
+        v
+Estimate first-stage choice probabilities by state
+        |
+        v
+Invert the policy into continuation-value terms
+        |
+        v
+Fit a logit pseudo-likelihood for theta
+        |
+        +---- stop after one Hotz-Miller step
+        |
+        +---- or update the policy and iterate as NPL
+        |
+        v
+Recovered reward parameters and implied policy
+```
+
+The key tradeoff is support. CCP is fast when every relevant state-action cell
+is observed often enough. Thin cells make the first-stage policy noisy, and the
+inversion turns that noise into reward noise.
 
 ## Algorithm
 
@@ -316,7 +364,7 @@ print(model.predict_proba([0, 10, 50, 89]))
 ```
 
 The [Quick Start](ccp/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `CCPEstimator` interface.
+attributes and the full `CCPEstimator` API.
 
 ## Evidence
 

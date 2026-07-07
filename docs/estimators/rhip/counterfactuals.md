@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as horizon-specific reward transfer. The same recovered reward is
+re-solved under interventions, but the behavioral interpretation still depends
+on the planning horizon.
+
 The public `RHIP` wrapper exposes the recovered policy, reward matrix, and
 value function. It does not yet provide a one-call `counterfactual` method like
 the structural likelihood wrappers.
@@ -52,6 +56,5 @@ choice.
 
 For package users, the stable public objects are the fitted reward, policy, and
 value arrays (`model.reward_matrix_`, `model.policy_`, `model.value_`). For
-controlled payoff, transition, or action-set interventions, use the lower-level
-simulation and evaluation utilities with an explicit problem and transition
-environment.
+controlled payoff, transition, or action-set interventions, use the simulation
+and evaluation utilities with an explicit problem and transition environment.

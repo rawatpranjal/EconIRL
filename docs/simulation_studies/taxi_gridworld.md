@@ -1,5 +1,9 @@
 # Gridworld navigation
 
+Read this page as the thin-support IRL stress test. The goal is not just to see
+who fits the visited path, but who behaves sensibly where demonstrations are
+sparse or absent.
+
 Gridworld navigation is the home turf of the maximum-entropy IRL tradition of Ziebart's MaxEnt and its descendants, so this page weights the roster toward IRL methods. NFXP, CCP, MPEC, and UFXP run as the structural contrast. The environment also supplies a stress the bus engine does not. Every trajectory starts at the same corner and walks toward the goal, so states off that path are visited rarely or never. Methods that invert state-by-state choice frequencies feel that thinness. Methods that share strength through features or networks do not.
 
 ## The data-generating process
@@ -21,7 +25,11 @@ $$
 
 and every trajectory starts at the top-left corner (state 0). The figure shows the resulting paths climbing the state index toward the absorbing goal and the value function rising with proximity to it. The horizon is deliberately short (20 periods) because the goal is absorbing: once there, an agent generates no further information.
 
-`GridworldEnvironment(grid_size=8, step_penalty=-0.1, terminal_reward=10.0, distance_weight=0.1, discount_factor=0.95)`. Transitions are deterministic; 64 states, 5 actions (left, right, up, down, stay). 500 x 20 observations, 3 replications, seed 7. True theta `[-0.1, 10.0, 0.1]`. Design rank 3/3, condition number 7.45e+00, action-contrast rank 1/3 (the rank that identification from choices actually uses). Generated 2026-06-12 with econirl 0.0.4.
+The study uses an 8 by 8 grid, 5 actions, 500 agents, 20 periods, and 3
+replications. The true reward weights are $[-0.1,\;10.0,\;0.1]$. Only one
+action-contrast direction is identified from choices, because the distance and
+step terms are mostly state-level features. That weak support is the point of
+the study.
 
 ![Simulated trajectories and the optimal value function for Gridworld 8x8](../_static/simulation_studies/taxi_gridworld_dgp.png)
 
@@ -30,7 +38,7 @@ and every trajectory starts at the top-left corner (state 0). The figure shows t
 | Estimator | Family | Uses transitions $P(s'\mid s,a)$ | Transferable reward | Standard errors |
 |---|---|---|---|---|
 | MCE-IRL | behavioral | yes | yes | no |
-| Deep-MCE-IRL | behavioral | yes | yes | no |
+| Neural MCE-IRL | behavioral | yes | yes | no |
 | AIRL | behavioral | yes | yes | no |
 | GLADIUS | behavioral | yes | yes | no |
 | NFXP | structural | yes | yes | yes |
@@ -43,7 +51,7 @@ Uses transitions is whether the estimator reads the transition kernel; model-fre
 | Estimator | Family | Ran | Conv | Policy TV | Time (s) |
 |---|---|---|---|---|---|
 | MCE-IRL | behavioral | 3/3 | 0/3 | 0.3632 | 251.1 |
-| Deep-MCE-IRL | behavioral | 3/3 | 3/3 | 0.3986 | 11.1 |
+| Neural MCE-IRL | behavioral | 3/3 | 3/3 | 0.3986 | 11.1 |
 | AIRL | behavioral | 3/3 | 0/3 | 0.6152 | 113.7 |
 | GLADIUS | behavioral | 3/3 | 3/3 | 0.2208 | 25.6 |
 | NFXP | structural | 3/3 | 3/3 | 0.0004 | 12.0 |
@@ -79,6 +87,6 @@ python scripts/sim_taxi_gridworld.py --page          # regenerate this page
 python scripts/sim_taxi_gridworld.py --verify        # re-derive the table from JSON
 ```
 
-Raw facts: `validation/results/sim_taxi_gridworld.json`.
+Results file: `validation/results/sim_taxi_gridworld.json`.
 
 Not shown on this page: SEES (its spline value basis is built for an ordered 1-D state index. A 2-D grid breaks that geometry, so running it here would be misspecification by construction); MPEC, UFXP, NNES (Other-tier structural estimators; NFXP and CCP carry the structural contrast here, and the full structural roster runs on the bus engine and fleet pages); TD-CCP (core, but shown on the bus engine study; the deterministic grid does not exercise its transition-free estimation); MaxEnt-IRL, IQ-Learn, f-IRL, BC (trajectory MaxEnt, inverse soft-Q, state-marginal, and behavioral-cloning baselines; not part of the core roster); MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL (research code or too slow; not benchmarked in this study).

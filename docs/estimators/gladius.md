@@ -10,6 +10,10 @@ known rewards pins the absolute level of the learned Q-function; without
 the anchor, the network identifies the policy but not the reward in the
 full Bellman sense.
 
+Read this page as the high-dimensional offline route. The safest structural
+object is the anchored action contrast; raw neural Q levels need the anchor
+before they carry reward meaning.
+
 ## Source Papers
 
 The estimator follows {ref}`Kang, Yoganarasimhan, and Jain (2025) <kang-2025>`,
@@ -19,6 +23,16 @@ continuation-value-network architecture, and establishes an anchor-action
 identification strategy. The package implementation adapts the paper's
 Algorithm 1 to a latent-reward IRL setting where the anchor reward is
 supplied by the researcher rather than observed directly.
+
+## Theory Connections
+
+For the proof route behind this page, start with
+[Identification and Anchors](../theory/identification.md) for the state-shift
+non-identification problem and [GLADIUS and ERM](../theory/gladius_erm.md) for
+the empirical-risk objective, the sampled squared-TD bias, and the anchor-action
+identification argument. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+final projection from anchored reward contrasts to structural parameters.
 
 ## Notation
 
@@ -79,6 +93,10 @@ allowing implied rewards and projected parameters to be compared against
 the data-generating truth.
 
 ## Identification
+
+This is the section that separates policy identification from reward
+interpretation. The anchor and action-difference rank are what let the learned
+Q objects support projected reward recovery.
 
 GLADIUS identifies the imitation policy and projected structural reward
 contrasts under the following assumptions.
@@ -213,15 +231,13 @@ the same form). Setting `anchor_bellman_mode="paper_minimax"` retains the
 literal Eq. 12 objective. The two modes differ in sign and structure: the
 paper_minimax mode subtracts the variance correction $\beta^2(V_Q(s')-\zeta)^2$
 from the squared TD error, whereas the anchor_moment mode treats
-$Q - r_{\text{anch}} - \beta\zeta$ as a direct residual
-(see Kang et al. 2025, Eq. 12 vs. package implementation notes).
+$Q - r_{\text{anch}} - \beta\zeta$ as a direct residual.
 
 In the paper, $\zeta(s, a) = \mathbb{E}[V_Q(s') \mid s, a]$ is the
 closed-form conditional expectation that solves the inner maximisation in
 Theorem 5. It is an analytic object, not a separate network. The package
 approximates this conditional expectation with a neural network $\zeta_\xi$
-trained by MSE regression (the bi-conjugate EV representation of the internal
-docs):
+trained by MSE regression:
 
 $$
 L_\zeta = \mathbb{E}\!\left[
@@ -307,11 +323,41 @@ continuation-moment residual above. Two alternative modes are available.
 `mode="q_only"` drops the zeta network and replaces $\mathbb{E}[V(s') \mid s, a]$
 with $\sigma \log \sum_b \exp(Q_\eta(s', b) / \sigma)$; the anchor Bellman
 loss is not available in this mode and $Q_\eta$ is trained on $L_{\text{NLL}}$
-alone. `anchor_bellman_mode="paper_minimax"` uses the literal bi-conjugate
-minimax term from the paper rather than the continuation-moment anchor. It is
+alone. `anchor_bellman_mode="paper_minimax"` uses the paper's bi-conjugate
+minimax objective rather than the continuation-moment anchor. It is
 available for comparison and is not the default.
 Setting `alternating_updates=False` updates both networks jointly in each
 step, which is the legacy behavior.
+
+## System View
+
+GLADIUS replaces repeated tabular dynamic-programming solves with learned Q and
+continuation objects. After those objects are trained, it reads reward
+information from action differences.
+
+```text
+Offline panel: state, action, next state
+State/action features, discount factor, anchor action
+        |
+        v
+Train Q network to fit observed choices
+        |
+        v
+Train continuation network to predict next-state soft value
+        |
+        v
+Use the anchor action to pin the Q level
+        |
+        v
+Compute implied reward from Q minus discounted continuation
+        |
+        v
+Project action contrasts onto structural reward features
+```
+
+The most defensible structural object is the projected action contrast. Raw
+Bellman reward levels are weaker unless the paper-style anchor conditions are
+met well in the data.
 
 ## Applicability
 
@@ -378,7 +424,7 @@ and value can then be compared against the original. The
 [Counterfactuals](gladius/counterfactuals.md) page describes the regret
 evaluation protocol and the current scope of counterfactual results. The
 [Quick Start](gladius/quick_start.md) page documents the full fitted-attribute
-table and the lower-level `GLADIUSEstimator` interface.
+table and the full `GLADIUSEstimator` API.
 
 ## Evidence
 
@@ -413,8 +459,8 @@ GLADIUS recovers the imitation policy and the action-contrast reward well, but n
 the absolute reward and value that counterfactual re-solving needs. The small
 regret figures alone do not establish structural counterfactual validity.
 
-For cross-estimator behavioral comparisons, including NeuralGLADIUS alongside
-the structural and IRL rosters, see the
+For cross-estimator behavioral comparisons, including GLADIUS alongside the
+structural and IRL rosters, see the
 [fleet maintenance simulation study](../simulation_studies/fleet_maintenance.md).
 
 ## References

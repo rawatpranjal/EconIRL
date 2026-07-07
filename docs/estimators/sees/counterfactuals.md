@@ -27,7 +27,7 @@ These rows are the high-dimensional primary-cell results from
 | Type B | 0.002421 | 3.67e-5 | 0.000309 | 0.000183 |
 | Type C | 0.001231 | 6.91e-6 | 0.000027 | 0.000014 |
 
-All three regrets are below the 0.01 reported gate. The table compares
+All three regrets are below 0.01. The table compares
 intervened policies from the recovered SEES object with oracle counterfactual
 policies.
 

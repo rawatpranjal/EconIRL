@@ -1,5 +1,8 @@
 # Bus Engine Example
 
+Read this page as a runnable smoke test on bundled data. For recovery evidence,
+use the simulation study; for paper-number evidence, use the replications page.
+
 The bundled bus engine replacement dataset gives a quick end-to-end smoke
 test: load the panel, fit, inspect, and run a counterfactual.
 

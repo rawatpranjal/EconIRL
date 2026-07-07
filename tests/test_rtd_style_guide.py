@@ -378,6 +378,8 @@ def test_references_page_is_in_public_navigation() -> None:
         "ni-2020",
         "garg-2021",
         "kang-2025",
+        "kang-2026-lecture",
+        "rawat-rust-2026",
         "kim-2021",
         "cao-2021",
     ]
@@ -390,7 +392,46 @@ def test_references_page_is_in_public_navigation() -> None:
 
     assert "   references\n" in index
     assert references.startswith("# References\n")
+    assert "A Lecture Note on Offline RL and IRL" in references
     assert missing_ids == []
+
+
+def test_theory_section_is_public_and_sourced() -> None:
+    """Keep the public Theory section visible, ordered, and source-backed."""
+
+    index = (DOCS / "index.rst").read_text(encoding="utf-8")
+    expected_pages = [
+        "index.md",
+        "soft_bellman_equivalence.md",
+        "identification.md",
+        "classical_ddc.md",
+        "irl_boundaries.md",
+        "gladius_erm.md",
+        "reward_projection.md",
+    ]
+    pages = [DOCS / "theory" / name for name in expected_pages]
+
+    assert "Theory\n------" in index
+    assert "See `Theory <theory/index.html>`__" in index
+    assert "   theory/index\n" in index
+    assert index.index("   theory/index\n") < index.index("   replications\n")
+    assert all(page.exists() for page in pages)
+
+    offenders = []
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        if not re.search(
+            r"\{ref\}`Kang \(2026\)\s*<kang-2026-lecture>`", text
+        ):
+            offenders.append(f"{page.relative_to(ROOT)}: missing Kang source note")
+        if not re.search(
+            r"\{ref\}`Rawat and Rust \(2026\)\s*<rawat-rust-2026>`", text
+        ):
+            offenders.append(
+                f"{page.relative_to(ROOT)}: missing Rawat-Rust source note"
+            )
+
+    assert offenders == []
 
 
 def _public_doc_sources() -> list[Path]:
@@ -400,6 +441,7 @@ def _public_doc_sources() -> list[Path]:
         DOCS / "references.md",
         DOCS / "api" / "index.rst",
         DOCS / "estimators",
+        DOCS / "theory",
         DOCS / "user_guide",
         DOCS / "simulation_studies",
     ]

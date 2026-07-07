@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as a boundary check. The primary cell matches AIRL's state-only
+identification conditions; the action-dependent cell is included to show the
+failure mode, not to validate that use case.
+
 AIRL runs on two synthetic cells. The primary cell is `airl_paper_identification`,
 a state-only reward DGP designed to match the original identification conditions
 of Fu et al. (2018). The second cell is `airl_anchor_action_dependent`, an

@@ -1,5 +1,9 @@
 # Serialized-Content Example
 
+Read this page as the concrete AIRL-Het environment behind the validation
+claim. The example shows why exit and absorbing-state anchors are part of the
+model, not just implementation details.
+
 The primary validation environment for AIRL-Het is a synthetic
 serialized-content dynamic choice problem. Individuals decide each period
 whether to read (pay and advance), wait (hold position at no cost), or exit

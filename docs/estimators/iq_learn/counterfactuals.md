@@ -1,5 +1,8 @@
 # Counterfactuals
 
+Read this page as a diagnostic boundary page. IQ-Learn can produce low regret
+while still failing reward, value, or Q recovery checks.
+
 IQ-Learn recovers a Bellman-implied reward as a diagnostic alongside the
 imitation policy. Using that reward for counterfactual analysis requires
 understanding what is and is not grounded by the current evidence.
@@ -33,7 +36,7 @@ stored in `summary.metadata["projected_reward_matrix"]` and
 These are diagnostic objects. They may be useful for qualitative comparison
 or for initializing a structural estimator, but they should not be reported as
 structurally recovered parameters without first verifying that the structural
-gates pass.
+checks are satisfied.
 
 ## Structural Counterfactual Use
 

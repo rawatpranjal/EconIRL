@@ -46,7 +46,7 @@ import pandas as pd
 from scipy.stats import norm as scipy_norm
 
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
+from econirl.core.types import DDCProblem, Panel, TrajectoryPanel
 from econirl.estimation.td_ccp import TDCCPConfig, TDCCPEstimator
 from econirl.preferences.linear import LinearUtility
 from econirl.transitions import TransitionEstimator
@@ -78,7 +78,13 @@ class TDCCP:
         bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
         ``RewardSpec`` for custom features.
     se_method : str, default="asymptotic"
-        Method for computing standard errors. Options: "robust", "asymptotic".
+        Method for computing standard errors. Options: "robust", "asymptotic",
+        "bootstrap".
+    n_bootstrap : int, default=400
+        Number of pairs-cluster bootstrap replications when
+        ``se_method="bootstrap"``.
+    se_seed : int, optional
+        Random seed for bootstrap standard errors.
     hidden_dim : int, default=64
         Number of hidden units per layer in the EV component networks.
     num_hidden_layers : int, default=2
@@ -145,7 +151,9 @@ class TDCCP:
         n_actions: int = 2,
         discount: float = 0.9999,
         utility: str | RewardSpec = "linear_cost",
-        se_method: Literal["robust", "asymptotic"] = "asymptotic",
+        se_method: Literal["robust", "asymptotic", "bootstrap"] = "asymptotic",
+        n_bootstrap: int = 400,
+        se_seed: int | None = None,
         # Method selection (new: Adusumilli-Eckardt 2025)
         method: Literal["semigradient", "neural"] = "semigradient",
         cross_fitting: bool = True,
@@ -183,6 +191,11 @@ class TDCCP:
             Utility specification to use.
         se_method : str, default="asymptotic"
             Method for computing standard errors.
+        n_bootstrap : int, default=400
+            Number of pairs-cluster bootstrap replications when
+            ``se_method="bootstrap"``.
+        se_seed : int, optional
+            Random seed for bootstrap standard errors.
         method : str, default="semigradient"
             TD method: "semigradient" (fast closed-form, eq 3.5) or
             "neural" (AVI with neural networks, Algorithm 1).
@@ -224,6 +237,8 @@ class TDCCP:
         self.discount = discount
         self.utility = utility
         self.se_method = se_method
+        self.n_bootstrap = n_bootstrap
+        self.se_seed = se_seed
         self.method = method
         self.cross_fitting = cross_fitting
         self.robust_se = robust_se
@@ -304,18 +319,14 @@ class TDCCP:
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
         # --- Handle reward: RewardSpec or string ---
@@ -353,7 +364,9 @@ class TDCCP:
             discount_factor=self.discount,
             scale_parameter=1.0,
             state_dim=1,
-            state_encoder=lambda s: jnp.expand_dims(jnp.asarray(s, dtype=jnp.float32) / max(self.n_states - 1, 1), axis=-1),
+            state_encoder=lambda s: jnp.expand_dims(
+                jnp.asarray(s, dtype=jnp.float32) / max(self.n_states - 1, 1), axis=-1
+            ),
         )
 
         # Create the underlying TD-CCP estimator with all config options
@@ -385,6 +398,8 @@ class TDCCP:
             utility=self._utility_fn,
             problem=self._problem,
             transitions=transition_tensor,
+            n_bootstrap=self.n_bootstrap,
+            se_seed=self.se_seed,
         )
 
         # Extract results
@@ -414,8 +429,7 @@ class TDCCP:
             expected_shape = (self.n_actions, self.n_states, self.n_states)
             if keep_transitions.shape != expected_shape:
                 raise ValueError(
-                    "3D transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
             return jnp.array(keep_transitions)
 
@@ -476,9 +490,7 @@ class TDCCP:
                 se_val = self.se_[name]
                 if se_val and se_val > 0:
                     t_stat = self.params_[name] / se_val
-                    pvalues[name] = float(
-                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
-                    )
+                    pvalues[name] = float(2 * (1 - scipy_norm.cdf(abs(t_stat))))
                 else:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues

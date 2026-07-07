@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting MPEC. The same structural checks as NFXP matter,
+plus the constrained optimizer must be able to enforce the Bellman equations.
+
 MPEC can show estimation risk for reasons that are visible before optimization
 starts. Run these checks before treating a result as structural evidence.
 
@@ -12,7 +15,7 @@ starts. Run these checks before treating a result as structural evidence.
 | Action support | Rare actions make their payoff weakly identified. |
 | Reward normalization | Reward level and scale need a valid anchor. |
 | Bellman constraint size | Too many value variables can make the constrained problem impractical. |
-| Transition orientation | MPEC expects action, state, next-state transition tensors internally. |
+| Transition orientation | MPEC expects transition tensors in action, state, next-state order. |
 
 ## Canonical Simulation Checks
 

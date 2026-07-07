@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as reward-transfer evidence inside the supplied MDP. MCE-IRL
+does not expose the same one-call wrapper as NFXP, but the recovered reward can
+be re-solved in the simulation environment.
+
 The public `MCEIRL` wrapper exposes the recovered policy, reward matrix, and
 value function. It does not yet provide a one-call `counterfactual` method like
 the structural likelihood wrappers.
@@ -35,5 +39,5 @@ oracle counterfactual policy.
 
 For package users, the stable public objects are the fitted reward, policy, and
 value arrays. For controlled payoff, transition, or action-set interventions,
-use the lower-level simulation and evaluation utilities with an explicit
-problem and transition environment.
+use the simulation and evaluation utilities with an explicit problem and
+transition environment.

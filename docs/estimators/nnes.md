@@ -10,6 +10,10 @@ the pseudo-likelihood Hessian is the correct variance estimator despite the
 neural nuisance object. The structural estimate supports counterfactual policy
 analysis; the neural network approximates the continuation value, not the reward.
 
+Read this page carefully because the word "neural" does not mean the reward is
+neural. NNES keeps a finite structural reward target and uses the network as a
+continuation-value nuisance approximation.
+
 ## Source Papers
 
 The estimator follows {ref}`Nguyen (2025) <nguyen-2025>`, which introduces
@@ -130,6 +134,9 @@ the NPL-profiled neural value path recovers a finite-dimensional structural
 reward when the state representation is richer than a small tabular reference.
 
 ## Identification
+
+This is the section that says when the finite reward parameters remain
+interpretable even though a neural network enters the continuation value.
 
 NNES point-identifies the reward parameters $\theta$ under the following
 assumptions.
@@ -351,13 +358,13 @@ print(model.predict_proba([0, 20, 40, 60, 80]))   # shape (5, n_actions)
 
 Counterfactual policy analysis re-solves the structural model under changed
 primitives using the simulation harness. The public wrapper does not expose a
-`counterfactual()` method; the lower-level `NNESEstimator` interface is the
-route for counterfactual re-solves in research workflows. The
+`counterfactual()` method; the full `NNESEstimator` API is the route for
+counterfactual re-solves in research workflows. The
 [Counterfactuals](nnes/counterfactuals.md) subpage documents the three
 counterfactual types and the harness-level results.
 
 The [Quick Start](nnes/quick_start.md) page documents the full set of fitted
-attributes and the lower-level `NNESEstimator` interface.
+attributes and the full `NNESEstimator` API.
 
 ## Evidence
 

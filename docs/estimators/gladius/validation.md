@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the anchored projected-reward
+route. Small regret is reported, but the reward checks determine whether the
+learned objects support structural interpretation.
+
 GLADIUS is evaluated on two related high-dimensional-state synthetic cells.
 Each cell has 21 discrete states paired with a high-dimensional encoded
 state-feature vector, a low-dimensional action-dependent reward basis, and an
@@ -32,7 +36,7 @@ GLADIUS is compared against the full structural and IRL rosters on the
 [bus engine](../../simulation_studies/rust_bus.md),
 [taxi gridworld](../../simulation_studies/taxi_gridworld.md), and
 [direct optimization](../../simulation_studies/direct_optimization.md) pages.
-The NeuralGLADIUS variant also appears on the
+GLADIUS also appears on the
 [route choice](../../simulation_studies/route_choice.md),
 [stockpiling](../../simulation_studies/stockpiling.md), and
 [fleet maintenance](../../simulation_studies/fleet_maintenance.md) pages. See

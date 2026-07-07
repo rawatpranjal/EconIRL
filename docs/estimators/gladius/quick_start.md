@@ -1,9 +1,12 @@
 # Quick Start
 
+This page shows the public GLADIUS wrapper. Use the projected parameters and
+projection diagnostics for structural reading; the neural Q objects alone are
+not enough to claim reward recovery.
+
 ## Sklearn-Style API
 
-`GLADIUS` is the public alias for `NeuralGLADIUS`, which accepts a pandas
-DataFrame directly.
+`GLADIUS` accepts a pandas DataFrame directly.
 
 ```python
 from econirl import GLADIUS
@@ -50,10 +53,10 @@ Fitted attributes:
 | `converged_` | Whether early stopping triggered before `max_epochs`. |
 | `n_epochs_` | Number of training epochs completed. |
 
-## Lower-Level API
+## Full Estimator API
 
 `GLADIUSEstimator` accepts a `Panel` and an explicit utility, problem, and
-transition tensor, mirroring the other lower-level estimators.
+transition tensor, mirroring the other full estimator APIs.
 
 ```python
 from econirl.estimation import GLADIUSConfig, GLADIUSEstimator
@@ -85,9 +88,10 @@ print(summary.value_function)  # soft value function
 # Default: anchor moment pins Q to the continuation-value estimate
 config = GLADIUSConfig(anchor_bellman_mode="anchor_moment")
 
-# Paper's literal bi-conjugate minimax term (retained for method research)
+# Paper's bi-conjugate minimax objective
 config = GLADIUSConfig(anchor_bellman_mode="paper_minimax")
 ```
 
 Use `anchor_moment` for normal estimation. The `paper_minimax` mode is kept for
-diagnosing the original paper objective and is not recommended for production.
+comparing against the original paper objective and is not recommended for
+production.

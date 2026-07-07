@@ -8,6 +8,10 @@ than structural utility parameters. The primary validated scope is
 state-marginal matching with a state-only reward; action-dependent structural
 DDC recovery remains a diagnostic exercise under current evidence.
 
+Read this page as a behavioral state-marginal method. It is useful for matching
+where the expert goes, but that is weaker than identifying structural utility
+parameters.
+
 ## Source Papers
 
 The estimator follows {ref}`Ni et al. (2020) <ni-2020>`, which introduces
@@ -68,12 +72,15 @@ $$
 
 normalized to sum to one over $s$. Here $\mu_0$ is treated as a row vector
 and $\mu_0^\top P_\pi^t$ denotes right-multiplication, matching the
-implementation's `mu @ P_pi` convention. The canonical instance is a
-paper-faithful synthetic benchmark with eight states, three actions, a state-only
-reward, and deterministic transitions that fully specify the data-generating
-process.
+implementation's `mu @ P_pi` convention. The canonical instance is a synthetic
+benchmark that matches the source-paper setting: eight states, three actions, a
+state-only reward, and deterministic transitions that fully specify the
+data-generating process.
 
 ## Identification
+
+This is the section that says why the primary validated claim is behavioral
+state-marginal recovery, not structural counterfactual recovery.
 
 f-IRL identifies a behavioral reward under the following assumptions.
 
@@ -314,10 +321,10 @@ attributes and divergence options.
 
 ## Evidence
 
-Behavioral recovery is measured on a paper-faithful synthetic benchmark with
-eight states, three actions, a state-only reward, deterministic transitions, and
-fully specified oracle objects for policy, value, and three counterfactual
-families. All results use the forward
+Behavioral recovery is measured on a synthetic benchmark that matches the
+source-paper setting, with eight states, three actions, a state-only reward,
+deterministic transitions, and fully specified oracle objects for policy, value,
+and three counterfactual families. All results use the forward
 KL divergence with `marginal_space="state"` and `reward_scope="state"`.
 
 | Metric | Value |

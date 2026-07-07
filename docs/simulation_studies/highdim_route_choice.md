@@ -4,6 +4,10 @@ orphan: true
 
 # High-dimensional route choice on a synthetic road network
 
+Read this page as the scale version of the route-choice benchmark. The point is
+to see whether shorter-horizon planning and high-dimensional representations
+remain useful when the graph gets larger.
+
 A traveller moves through a road network one step at a time. Each period, the agent chooses among the nearest neighbours of the current node. The utility depends on the edge: how long it is, how attractive the destination is, and how close the destination sits to a fixed goal node. This is the same route-choice problem as the small study, run on a much larger graph.
 
 ## Why this study
@@ -30,7 +34,10 @@ where $d_{ss'}$ is the Euclidean edge length, $\mathrm{am}(s')$ is a node-level 
 
 Agents discount future payoffs at $\beta$ and face i.i.d. logit taste shocks (scale $\sigma = 1$). Their behaviour solves the soft Bellman equation. All three parameters are identified from observed route choices because the features vary across edges, not just states. The panel scales with the graph (400 agents at 150 nodes) so state coverage stays adequate. The figure shows simulated paths and the optimal value function (lower at nodes far from the goal).
 
-Synthetic route choice on a random geometric road network. ``road_network(num_nodes=150, num_actions=4, discount_factor=0.95, seed=0)``. 400 x 40 observations, 2 replications, seed 42. True theta `[1.0, 0.5, 1.0]`. Design rank 3/3, condition number 2.46e+01, action-contrast rank 3/3 (the rank that identification from choices actually uses). Generated 2026-06-23 with econirl 0.0.7.
+The study uses a 150-node random geometric road network, 4 actions per node,
+400 travellers, 40 periods, and 2 replications. The true reward weights are
+$[1.0,\;0.5,\;1.0]$. The action-contrast feature matrix has full rank, so the
+three edge-level reward weights are identifiable from choices.
 
 ![Simulated trajectories and the optimal value function for High-dimensional route choice (150 nodes, 4 actions)](../_static/simulation_studies/highdim_route_choice_dgp.png)
 
@@ -110,7 +117,10 @@ The horizon $H$ is the single knob that spans a family of methods. The figure tr
 
 **RHIP-H3.** Three soft Bellman backups. It recovers most of the accuracy of the full stochastic planner (H=inf), a middle point on the horizon spectrum between the deterministic and the fully stochastic ends.
 
-**RHIP-Hinf.** The infinite-horizon endpoint delegates to MCE-IRL with the same config, so RHIP-Hinf and MCE-IRL are the same computation here. Their rows match by construction. This anchors the spectrum at the Max Causal Entropy end.
+**RHIP-Hinf.** The infinite-horizon endpoint is MCE-IRL with the same estimator
+settings, so RHIP-Hinf and MCE-IRL are the same computation here.
+Their rows match by construction. This anchors the spectrum at the Max Causal
+Entropy end.
 
 **MCE-IRL.** Max Causal Entropy IRL with linear features. Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate. It is the H=inf endpoint of the RHIP spectrum.
 
@@ -130,6 +140,9 @@ python scripts/study_highdim_route_choice.py --page          # regenerate this p
 python scripts/study_highdim_route_choice.py --verify        # re-derive the table from JSON
 ```
 
-Raw facts: `validation/results/study_highdim_route_choice.json`.
+Results file: `validation/results/study_highdim_route_choice.json`.
 
-Not shown on this page: IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NeuralGLADIUS (model-free policy learner, coverage-fragile at this size; peripheral nodes go unvisited and its policy estimate degrades where the panel does not reach); NNES, SEES, TD-CCP, UFXP (correct structural estimators but slower at 150 states; NFXP and CCP already cover the structural family).
+Not shown on this page: IQ-Learn and f-IRL, because reward is only partially
+identified from behavior here; GLADIUS, because this page focuses on the RHIP
+horizon spectrum; NNES, SEES, TD-CCP, and UFXP, because NFXP and CCP already
+cover the structural family on this graph.

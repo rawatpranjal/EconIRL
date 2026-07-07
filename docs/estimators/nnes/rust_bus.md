@@ -1,5 +1,8 @@
 # Rust Bus Engine Example
 
+Read this page as a package smoke test. It is intentionally smaller than the
+paper simulations and does not replace the NNES validation page.
+
 The Rust bus-engine replacement problem is the canonical dynamic discrete
 choice example. A bus operator observes mileage and chooses whether to keep
 the current engine or replace it.
@@ -46,7 +49,7 @@ replacement-cost parameters. The fitted policy gives the replacement
 probability by mileage bin. The fitted `v_network_` vector stores neural
 value-network predictions for the discrete states used by the wrapper.
 
-## Lower-Level Variant
+## Full API Variant
 
 Use `econirl.estimation.nnes.NNESEstimator` for package-native `Panel`
 objects, custom reward features, supplied transition tensors, or exact control
@@ -70,7 +73,7 @@ print(summary.parameters)
 print(summary.metadata["v_loss_per_outer"][-1])
 ```
 
-No fixed output is shown for the lower-level snippet because `panel`,
+No fixed output is shown for the estimator-API snippet because `panel`,
 `utility`, `problem`, and `transitions` are caller-supplied objects.
 
 ## Replication Boundary

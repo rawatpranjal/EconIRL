@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the anchored neural reward map.
+There is no unique parameter vector to compare, so the scorecard is the reward
+matrix and induced behavior.
+
 Deep MCE-IRL runs on a synthetic cell with a fixed nonlinear neural reward,
 known stochastic transitions, linear state features, and an anchor action that
 normalizes the reward. The cell has 32 states, 3 actions, and full

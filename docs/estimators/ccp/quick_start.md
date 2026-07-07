@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the public CCP wrapper. The snippet checks that the estimator
+runs and returns the structural objects; support and first-stage CCP quality are
+checked on the pre-estimation page.
+
 The public API follows the same sklearn convention as NFXP. Create an
 estimator, call `fit`, and read fitted attributes.
 
@@ -68,7 +72,7 @@ Output
 This solves the fitted model again with a higher replacement cost and returns
 the new value function and policy.
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.ccp.CCPEstimator` when you need direct control over
 panel objects, utility objects, transition tensors, CCP smoothing, NPL stopping

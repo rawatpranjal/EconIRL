@@ -1,5 +1,9 @@
 # Pre-Estimation Checks
 
+Read this page before fitting NFXP. These checks are gates for structural
+interpretation: passing them does not prove the model, but failing them makes
+the reward estimate hard to read.
+
 NFXP maximizes the conditional log likelihood over the reward parameters, so
 identification and numerical stability need to hold before optimization starts.
 Run these checks before treating a result as structural evidence.

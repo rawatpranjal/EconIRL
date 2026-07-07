@@ -1,5 +1,8 @@
 # Quick Start
 
+This page shows how to fit the neural reward-map estimator. Inspect the anchored
+reward matrix and induced policy, not the raw network weights.
+
 ```python
 from econirl.estimators import MCEIRLNeural
 import numpy as np
@@ -83,7 +86,7 @@ Do not interpret projected parameters as structural estimates unless the
 projection is well-identified. See the [Pre-Estimation Checks](pre_estimation.md)
 page for the conditions.
 
-## Lower-Level Access
+## Advanced Estimator API
 
 ```python
 # Predict choice probabilities at specific states

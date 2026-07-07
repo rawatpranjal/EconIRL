@@ -4,6 +4,10 @@ orphan: true
 
 # Optimal replacement: vehicle scrappage (RDW)
 
+Read this page as an optimal-stopping benchmark in the Rust family. The point is
+to test recovery when replacement depends on both age and inspection condition,
+not just one mileage state.
+
 A vehicle owner decides each year whether to keep running a car or scrap it and buy a new one. The decision depends on the car's age and how well it passed the mandatory Dutch APK roadworthiness inspection. The model is an optimal stopping problem in the spirit of Rust (1987), applied to vehicle scrappage.
 
 ## The data-generating process
@@ -25,11 +29,10 @@ where $\theta_{\text{age}}$ is the per-year operating cost, $\theta_{\text{minor
 
 Agents discount future payoffs at $\beta = 0.95$ and face i.i.d. logit taste shocks (scale $\sigma = 1$). Their behaviour solves the soft Bellman equation. The action-contrast feature vector is $[-a,\;-\mathbf{1}\{d=1\},\;-\mathbf{1}\{d=2\},\;1]$ for the keep-minus-scrap difference at each state. Because age $a$ and both defect indicators vary independently across the 75 states, the contrast feature matrix has rank 4 and all four parameters are identified from observed choices. The optimal policy scraps at high ages and after major defect findings: only part of the state space lies on the equilibrium path, because vehicles that reach old age with clean inspections are rare. The panel simulates $N$ agents for $T$ periods from the true optimal policy. The figure shows simulated age-defect paths and the optimal value function.
 
-Vehicle scrappage decision based on Dutch RDW inspection data. A vehicle owner observes the car's age bin $a \in \{0, \ldots, 24\}$ and the APK defect severity $d \in \{\text{pass}, \text{minor}, \text{major}\}$ from the annual inspection and decides whether to keep or scrap the vehicle. The flat state index is $s = 3a + d$, giving 75 states and 2 actions. Reward is linear in four features:
-
-$U(s, \text{keep}) = -\theta_{\text{age}}\,a - \theta_{\text{minor}}\,\mathbf{1}\{d=1\} - \theta_{\text{major}}\,\mathbf{1}\{d=2\}$; $U(s, \text{scrap}) = -\theta_{\text{rc}}$.
-
-True parameters: $\theta = [0.15,\;0.5,\;1.5,\;3.0]$. If keep: age increments by 1, defect level transitions stochastically with age-dependent probabilities. If scrap: state resets to $(a=0,\;d=0)$. ``RDWScrapageEnvironment(discount_factor=0.95, seed=0)``. 200 x 35 observations, 2 replications, seed 42. True theta `[0.15, 0.5, 1.5, 3.0]`. Design rank 4/4, condition number 3.40e+01, action-contrast rank 4/4 (the rank that identification from choices actually uses). Generated 2026-06-17 with econirl 0.0.6.
+The study uses 200 vehicles, 35 periods, and 2 replications. The true
+parameters are $[0.15,\;0.5,\;1.5,\;3.0]$. The action-contrast feature matrix
+has full rank, so the age, minor-defect, major-defect, and replacement-cost
+parameters are identifiable from choices.
 
 ![Simulated trajectories and the optimal value function for Vehicle scrappage (75 states, 2 actions)](../_static/simulation_studies/vehicle_scrappage_dgp.png)
 
@@ -122,6 +125,10 @@ python scripts/study_vehicle_scrappage.py --page          # regenerate this page
 python scripts/study_vehicle_scrappage.py --verify        # re-derive the table from JSON
 ```
 
-Raw facts: `validation/results/study_vehicle_scrappage.json`.
+Results file: `validation/results/study_vehicle_scrappage.json`.
 
-Not shown on this page: IQ-Learn, f-IRL (not separately identified from choices on this problem; reward is only partially identified from behavior); NeuralGLADIUS, SEES, TD-CCP (correct behavioral or structural estimators but slower on the 75-state space; the roster already covers the structural and behavioral families); MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL (trajectory-entropy and max-margin objectives are not the choice model that generated the data; neural AIRL adds compute without new information here).
+Not shown on this page: IQ-Learn and f-IRL, because reward is only partially
+identified from behavior here. GLADIUS, SEES, and TD-CCP are omitted because
+the page already covers the structural and reward-recovery families. Neural
+MCE-IRL, neural AIRL, and max-margin variants are better suited to other study
+settings.

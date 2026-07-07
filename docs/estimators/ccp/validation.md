@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the CCP route. The question is
+whether the inversion and NPL steps recover the same structural objects as the
+reference target when support is strong.
+
 We run CCP on the `canonical_low_action` synthetic cell, the same
 low-dimensional action-dependent structural benchmark used for NFXP. The
 simulation asks whether the CCP/NPL route can recover the same structural

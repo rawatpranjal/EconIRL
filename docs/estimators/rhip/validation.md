@@ -1,5 +1,9 @@
 # Simulation Study
 
+Read this page as an oracle-object simulation for the planning-horizon behavior.
+The study asks whether the chosen horizon matches the demonstrator's planning
+depth when the reward and transitions are known.
+
 RHIP runs on two synthetic studies. The primary study is the
 high-dimensional route-choice problem on a 150-node random geometric road
 network. The second study fixes a known demonstrator lookahead and sweeps
@@ -40,8 +44,8 @@ PYTHONPATH=src:. python scripts/study_rhip_lookahead.py
 The primary study sweeps $H \in \{0, 1, 3, \infty\}$ on a 150-node random
 geometric road network with true parameters $\theta = [1.0, 0.5, 1.0]$ over
 features `[edge_cost, amenity, goal]`. Policy total variation falls monotonically
-as the horizon grows. The $H = \infty$ endpoint delegates to MCE-IRL, so its
-row matches MCE-IRL by construction.
+as the horizon grows. The $H = \infty$ endpoint is MCE-IRL, so its row matches
+MCE-IRL by construction.
 
 | Horizon | Policy TV | Value RMSE | Note |
 | --- | ---: | ---: | --- |

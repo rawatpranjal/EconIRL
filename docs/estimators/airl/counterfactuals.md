@@ -1,5 +1,8 @@
 # Counterfactuals
 
+Read this page as policy-regret evidence, not structural re-solving. AIRL's
+state-only recovered reward is not used here like an NFXP-style parameter vector.
+
 AIRL does not recover a reward in the same parameterization as the
 data-generating process. The recovered reward component
 $g_\theta$ is identified only up to potential-based shaping, so raw parameter
@@ -40,7 +43,7 @@ because the oracle policy change is also small.
 ## API Boundary
 
 The stable public objects after fitting are `summary.policy`, `summary.parameters`,
-and the value function accessible from the lower-level result. For controlled
+and the value function on the result object. For controlled
 payoff, transition, or action-set interventions, use the package's simulation
 and evaluation utilities with an explicit problem and transition environment.
 The `AIRLEstimator` does not expose a `.counterfactual()` method; the

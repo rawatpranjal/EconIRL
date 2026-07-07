@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the tabular AIRL estimator path. Keep `reward_arg="state"` when
+you want the original AIRL reward-recovery guarantee; state-action variants need
+the identification-boundary caveat.
+
 The low-level `AIRLEstimator` accepts a `Panel`, a utility specification, a
 `DDCProblem`, and a transition tensor. The high-level `econirl.estimators.AIRL`
 alias points to the neural wrapper; use `AIRLEstimator` for tabular work.

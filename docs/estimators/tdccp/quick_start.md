@@ -1,5 +1,9 @@
 # Quick Start
 
+This page shows the public TD-CCP wrapper. The snippet is about using the API;
+the reason to choose TD-CCP is the transition-density-free estimation route
+described on the parent page.
+
 The public API follows the same convention as the other structural estimators:
 create an estimator, call `fit`, and inspect fitted attributes.
 
@@ -48,7 +52,7 @@ basis when states already have meaningful numeric encoders. The neural AVI path
 is available for flexible approximation, but it is not the current
 simulation-study target.
 
-## Lower-Level Control
+## Full Estimator API
 
 Use `econirl.estimation.td_ccp.TDCCPEstimator` when you need direct control
 over panels, utility objects, basis settings, cross-fitting, robust standard

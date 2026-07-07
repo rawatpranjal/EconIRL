@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as diagnostic counterfactual evidence. The regret numbers are
+useful, but structural validity requires the upstream reward, value, Q, and
+projection checks to pass.
+
 GLADIUS projects implied rewards onto structural features via action-difference
 regression. The projected parameters are only partially identified. The
 action-difference projection removes a state-dependent additive constant. It

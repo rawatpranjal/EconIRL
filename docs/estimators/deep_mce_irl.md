@@ -9,6 +9,9 @@ network rather than a dot product with fixed features. The validated object is
 the anchored reward matrix and the behavior it induces; raw network weights are
 not a structural estimand.
 
+Read this page as the neural-reward version of MCE-IRL. The reward matrix under
+the chosen anchor is the object to inspect; the raw network weights are not.
+
 ## Source Papers
 
 The estimator draws on {ref}`Ziebart (2010) <ziebart-2010>`, which establishes
@@ -18,6 +21,18 @@ and the occupancy-matching gradient. {ref}`Wulfmeier, Ondruska, and Posner
 this framework, noting that the occupancy-mismatch gradient flows through the
 reward matrix entry by entry and can be backpropagated through any
 differentiable reward network.
+
+## Theory Connections
+
+For the proof route behind this page, start with
+[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
+for the soft planning identity,
+[Identification and Anchors](../theory/identification.md) for why the reward
+matrix must be anchored, and
+[IRL Identification Boundaries](../theory/irl_boundaries.md) for why neural
+weights are not themselves the identified structural object. Use
+[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
+distinction between a neural reward map and a finite projected parameter.
 
 ## Notation
 
@@ -74,6 +89,9 @@ The soft value function uses log-sum-exp without an Euler-gamma constant,
 following the package convention throughout.
 
 ## Identification
+
+This is the section that says when an anchored neural reward map is interpretable,
+and when it is only a behavior-fitting object.
 
 Deep MCE-IRL identifies the anchored reward map $r_\eta$ under the following
 conditions.
@@ -246,6 +264,36 @@ robust from any start but converges more slowly near the solution. The outer
 optimizer is AdamW with a global gradient-norm clip of 1.0, implemented via
 Equinox and Optax.
 
+## System View
+
+Neural MCE-IRL keeps the MCE-IRL training logic but replaces the linear reward
+basis with a neural reward map. The policy is still produced by a soft dynamic
+program, so the transition model remains part of the estimator.
+
+```text
+Expert demonstrations
+Known transition model, state/action encodings, discount factor
+        |
+        v
+Neural network proposes a reward map
+        |
+        v
+Solve the soft dynamic program under that map
+        |
+        v
+Compare model occupancy to expert occupancy
+        |
+        v
+Backpropagate the occupancy mismatch into the reward network
+        |
+        v
+Anchored reward matrix and induced policy
+```
+
+The fitted object is the anchored reward matrix on the state-action grid. Many
+network weights can represent the same matrix, so the weights themselves are not
+the thing to interpret.
+
 ## Applicability
 
 | Applicable when | Prefer an alternative when |
@@ -352,7 +400,7 @@ Source papers:
 Implementation and reproduction:
 
 - Estimator source: [`econirl.estimators.mceirl_neural`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/mceirl_neural.py).
-- Lower-level MCE solver: [`econirl.estimation.mce_irl`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/mce_irl.py).
+- MCE solver: [`econirl.estimation.mce_irl`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/mce_irl.py).
 - Validation runner: [`validation/estimators/deep_mce_irl/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/deep_mce_irl/run.py).
 - Results file: [`deep_mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl.json).
 

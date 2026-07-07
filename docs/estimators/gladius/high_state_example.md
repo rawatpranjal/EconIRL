@@ -1,5 +1,9 @@
 # High-State Example
 
+Read this page as the concrete GLADIUS setup: high-dimensional state features,
+low-dimensional reward projection, and an anchor action. The anchor is what
+turns the learned Q objects into reward evidence.
+
 The primary evaluation cell for GLADIUS uses 21 discrete states encoded into
 64-dimensional feature vectors, a 4-parameter linear reward, and an anchor
 action with known rewards. This setup follows the motivating design from

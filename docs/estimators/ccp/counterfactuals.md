@@ -1,5 +1,9 @@
 # Counterfactuals
 
+Read this page as structural re-solving for parameter changes. CCP shares the
+finite reward target with NFXP, but the public wrapper currently exposes fewer
+one-call intervention types.
+
 The public `counterfactual` method handles structural parameter changes. It
 solves the fitted model again after changing one or more fitted parameters.
 

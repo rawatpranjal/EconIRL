@@ -1,5 +1,9 @@
 # Route Choice Example
 
+Read this page as a wrapper example for RHIP's natural problem class. The larger
+simulation pages are where horizon recovery and cross-estimator evidence are
+reported.
+
 The route-choice problem is the canonical setting for RHIP. A traveller moves
 through a road network one step at a time, choosing among the nearest neighbours
 of the current node. The utility of an edge depends on its length, the amenity

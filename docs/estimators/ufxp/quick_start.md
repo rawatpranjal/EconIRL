@@ -1,5 +1,9 @@
 # Quick Start
 
+This is the smallest UFXP path: fit the unnested structural estimator and read
+the same kind of reward, policy, and value objects as NFXP or CCP. The shortcut
+depends on empirical choice-probability support.
+
 ```python
 from econirl.datasets import load_rust_bus
 from econirl import UFXP
@@ -37,7 +41,7 @@ model = UFXP(n_states=90, weights="random",    # plain random projections
 The default optimal weighting is the one to use; the random-projection mode is
 the paper's baseline construction and is kept for comparison.
 
-## Lower-Level Control
+## Full Estimator API
 
 The underlying `UFXPEstimator` accepts a `Panel` and an explicit utility
 specification, problem definition, and transition tensor, mirroring the other

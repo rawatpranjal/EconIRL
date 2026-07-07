@@ -1,5 +1,8 @@
 # Pre-Estimation Checks
 
+Read this page before fitting GLADIUS. The anchor and action-difference
+projection are what turn learned Q objects into reward evidence.
+
 GLADIUS uses neural networks and an action-difference projection, so it carries
 the usual high-dimensional estimation risks plus a few specific to the anchor
 Bellman strategy.
