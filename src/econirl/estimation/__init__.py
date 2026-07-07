@@ -52,6 +52,7 @@ GLADIUS = GLADIUSEstimator
 
 # Adversarial IRL
 from econirl.estimation.adversarial import (
+    AIRL,
     AIRLEstimator,
     AIRLConfig,
     AIRLHetEstimator,
@@ -59,7 +60,6 @@ from econirl.estimation.adversarial import (
     TabularDiscriminator,
     LinearDiscriminator,
 )
-AIRL = AIRLEstimator
 AIRLHet = AIRLHetEstimator
 
 # Distribution-matching IRL

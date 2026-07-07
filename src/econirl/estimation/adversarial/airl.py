@@ -20,8 +20,8 @@ Reference:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
-from typing import Literal
+from dataclasses import dataclass, replace
+from typing import Any, Literal
 
 import jax
 import jax.numpy as jnp
@@ -59,9 +59,25 @@ class AIRLConfig:
         shaping_coef: Coefficient for shaping term (typically gamma)
         shaping_l2_penalty: Small L2 penalty on shaping/reward parameters to
             remove gauge drift during adversarial training.
+        shaping_bellman_penalty: Optional penalty tying the shaping potential to
+            the soft Bellman value of the recovered reward. Default 0 preserves
+            the original unconstrained AIRL discriminator.
         generator_reward: Reward used by the policy update. "recovered" solves
             the current recovered reward g. "log_odds" uses AIRL's discriminator
             log-odds reward f - log pi. "f" uses the shaped discriminator score.
+        discriminator_data_mode: Source for discriminator negatives. "sampled"
+            uses sampled policy transitions. "occupancy" uses exact finite-horizon
+            tabular policy transition occupancy. "conditional_occupancy" uses
+            exact tabular action/next-state conditionals given each observed
+            state, removing state-marginal occupancy differences.
+        policy_sample_mode: How to draw policy negatives for the discriminator.
+            "chain" preserves the historical single-chain sampler; "rollout"
+            draws one rollout per expert trajectory from the empirical initial
+            distribution, matching tabular demonstrations with fixed starts.
+        negative_history_size: Number of previous policy-sample batches to mix
+            into the discriminator's negative class. Fu et al. use the previous
+            20 iterations in their experiment details; default 0 preserves the
+            historical econirl training path.
         min_rounds: Minimum adversarial rounds before policy-change convergence
             can stop training.
         convergence_tol: Tolerance for policy convergence
@@ -95,13 +111,37 @@ class AIRLConfig:
     use_shaping: bool = True
     shaping_coef: float | None = None  # If None, uses discount_factor
     shaping_l2_penalty: float = 1e-8
+    shaping_bellman_penalty: float = 0.0
     generator_reward: Literal["recovered", "log_odds", "f"] = "recovered"
+    discriminator_data_mode: Literal["sampled", "occupancy", "conditional_occupancy"] = "sampled"
+    policy_sample_mode: Literal["chain", "rollout"] = "chain"
+    negative_history_size: int = 0
     min_rounds: int = 20
     convergence_tol: float = 1e-4
     compute_se: bool = True
     se_method: Literal["bootstrap", "asymptotic"] = "bootstrap"
     n_bootstrap: int = 100
     verbose: bool = False
+
+    # Unified public AIRL facade. These fields are ignored by the legacy
+    # AIRLEstimator concrete class and consumed by the AIRL facade below.
+    version: Literal["state_only", "anchored", "heterogeneous"] = "state_only"
+    num_segments: int = 1
+    exit_action: int | None = None
+    max_em_iterations: int = 50
+    em_convergence_tol: float = 1e-3
+    consistency_weight: float = 0.1
+    prior_smoothing: float = 0.01
+    prior_min: float = 0.0
+    prior_damping: float = 0.0
+    normalize_reward: bool = False
+    unit_normalize_reward: bool = False
+    gradient_clip_norm: float = 0.0
+    antisymmetric_init: bool = False
+    initialization: Literal["random", "behavioral_anchor"] = "random"
+    initialization_smoothing: float = 1.0
+    initialization_l2_penalty: float = 0.0
+    seed: int = 42
 
 
 class AIRLEstimator(AdversarialEstimatorBase):
@@ -202,9 +242,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
         else:
             # Tabular reward: one parameter per (state, action) pair
             param_names = [
-                f"R({s},{a})"
-                for s in range(problem.num_states)
-                for a in range(problem.num_actions)
+                f"R({s},{a})" for s in range(problem.num_states) for a in range(problem.num_actions)
             ]
 
         # Create standard errors (NaN for adversarial methods)
@@ -221,12 +259,26 @@ class AIRLEstimator(AdversarialEstimatorBase):
             num_observations=n_obs,
             aic=-2 * ll + 2 * n_params,
             bic=-2 * ll + n_params * jnp.log(jnp.array(n_obs)).item(),
-            prediction_accuracy=self._compute_prediction_accuracy(
-                panel, result.policy
-            ),
+            prediction_accuracy=self._compute_prediction_accuracy(panel, result.policy),
         )
 
         total_time = time_module.time() - start_time
+
+        # Expanded diagnostics: data / pre-estimation / first-stage transition.
+        # Auxiliary reporting only -- never let it break a real fit.
+        from econirl.inference.results import compute_fit_diagnostics
+
+        dataset = pre_estimation = transition_first_stage = None
+        try:
+            feature_matrix = getattr(utility, "feature_matrix", None)
+            dataset, pre_estimation, transition_first_stage = compute_fit_diagnostics(
+                panel,
+                problem.num_states,
+                problem.num_actions,
+                feature_matrix=feature_matrix,
+            )
+        except Exception:  # noqa: BLE001 - diagnostics are non-critical
+            pass
 
         return EstimationSummary(
             parameters=result.parameters,
@@ -249,6 +301,11 @@ class AIRLEstimator(AdversarialEstimatorBase):
             value_function=result.value_function,
             policy=result.policy,
             estimation_time=total_time,
+            num_states=problem.num_states,
+            num_actions=problem.num_actions,
+            dataset=dataset,
+            pre_estimation=pre_estimation,
+            transition_first_stage=transition_first_stage,
             metadata=result.metadata,
         )
 
@@ -266,6 +323,79 @@ class AIRLEstimator(AdversarialEstimatorBase):
             panel.get_all_actions(),
             panel.get_all_next_states(),
         )
+
+    def _sample_policy_rollouts_like_panel(
+        self,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
+        trajectory_lengths: jnp.ndarray,
+        initial_dist: jnp.ndarray,
+        key: jax.Array,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+        """Sample policy transitions with one rollout per expert trajectory."""
+        n_trajectories = int(trajectory_lengths.shape[0])
+        max_periods = int(jnp.max(trajectory_lengths))
+
+        rollout_keys = jax.random.split(key, n_trajectories)
+
+        def one_rollout(rollout_key):
+            init_key, scan_key = jax.random.split(rollout_key)
+            init_state = jax.random.categorical(init_key, jnp.log(initial_dist + 1e-10)).astype(
+                jnp.int32
+            )
+            step_keys = jax.random.split(scan_key, max_periods)
+
+            def step_fn(carry, step_key):
+                state = carry
+                k1, k2 = jax.random.split(step_key)
+                action = jax.random.categorical(k1, jnp.log(policy[state] + 1e-10))
+                next_state = jax.random.categorical(k2, jnp.log(transitions[action, state] + 1e-10))
+                return next_state.astype(jnp.int32), (
+                    state,
+                    action.astype(jnp.int32),
+                    next_state.astype(jnp.int32),
+                )
+
+            _, rollout = jax.lax.scan(step_fn, init_state, step_keys)
+            return rollout
+
+        states, actions, next_states = jax.vmap(one_rollout)(rollout_keys)
+        mask = jnp.arange(max_periods)[None, :] < trajectory_lengths[:, None]
+        return states[mask], actions[mask], next_states[mask]
+
+    def _panel_transition_weights(
+        self,
+        panel: Panel,
+        n_states: int,
+        n_actions: int,
+    ) -> jnp.ndarray:
+        """Empirical transition distribution as weights over (s, a, s')."""
+        states, actions, next_states = self._sample_transitions_from_panel(panel)
+        weights = jnp.zeros((n_states, n_actions, n_states), dtype=jnp.float32)
+        weights = weights.at[states, actions, next_states].add(1.0)
+        return weights / jnp.maximum(weights.sum(), 1.0)
+
+    def _policy_transition_occupancy(
+        self,
+        policy: jnp.ndarray,
+        transitions: jnp.ndarray,
+        initial_dist: jnp.ndarray,
+        trajectory_lengths: jnp.ndarray,
+    ) -> jnp.ndarray:
+        """Exact finite-horizon policy transition occupancy over (s, a, s')."""
+        max_periods = int(jnp.max(trajectory_lengths))
+        total_steps = jnp.maximum(jnp.sum(trajectory_lengths), 1)
+        trans_sas = jnp.transpose(transitions, (1, 0, 2))
+
+        weights = jnp.zeros_like(trans_sas)
+        state_dist = initial_dist
+        for period in range(max_periods):
+            active = jnp.sum(trajectory_lengths > period)
+            step_mass = active / total_steps
+            state_action = state_dist[:, None] * policy
+            weights = weights + step_mass * state_action[:, :, None] * trans_sas
+            state_dist = jnp.einsum("sa,ast->t", policy * state_dist[:, None], transitions)
+        return weights / jnp.maximum(weights.sum(), 1e-12)
 
     # Uses _sample_transitions_from_policy from AdversarialEstimatorBase (lax.scan)
 
@@ -295,9 +425,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
         else:
             r_sa = reward_matrix[states, actions]
         if self.config.use_shaping:
-            shaping_coef = (
-                self.config.shaping_coef if self.config.shaping_coef else gamma
-            )
+            shaping_coef = self.config.shaping_coef if self.config.shaping_coef else gamma
             f = r_sa + shaping_coef * V[next_states] - V[states]
         else:
             f = r_sa
@@ -369,17 +497,11 @@ class AIRLEstimator(AdversarialEstimatorBase):
             shaped_score = reward_matrix
         else:
             shaping_coef = (
-                self.config.shaping_coef
-                if self.config.shaping_coef is not None
-                else gamma
+                self.config.shaping_coef if self.config.shaping_coef is not None else gamma
             )
-            expected_next_potential = jnp.einsum(
-                "ast,t->sa", transitions, shaping_potential
-            )
+            expected_next_potential = jnp.einsum("ast,t->sa", transitions, shaping_potential)
             shaped_score = (
-                reward_matrix
-                + shaping_coef * expected_next_potential
-                - shaping_potential[:, None]
+                reward_matrix + shaping_coef * expected_next_potential - shaping_potential[:, None]
             )
 
         if self.config.generator_reward == "recovered":
@@ -393,7 +515,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
     def _enforce_anchor_reward(self, reward_matrix: jnp.ndarray) -> jnp.ndarray:
         """Apply AIRL anchor normalization for state-action rewards.
 
-        This mirrors the AIRL-Het gauge: one action is pinned to zero reward,
+        This mirrors the anchored AIRL gauge: one action is pinned to zero reward,
         and the absorbing state's reward row is pinned to zero when available.
         The anchor is deliberately not applied to state-only AIRL because doing
         so would turn a state reward into an action-dependent object.
@@ -405,16 +527,12 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
         anchor_action = int(self.config.anchor_action)
         if not 0 <= anchor_action < reward_matrix.shape[1]:
-            raise ValueError(
-                f"anchor_action={anchor_action} is outside the action space"
-            )
+            raise ValueError(f"anchor_action={anchor_action} is outside the action space")
         anchored = reward_matrix.at[:, anchor_action].set(0.0)
         if self.config.absorbing_state is not None:
             absorbing = int(self.config.absorbing_state)
             if not 0 <= absorbing < reward_matrix.shape[0]:
-                raise ValueError(
-                    f"absorbing_state={absorbing} is outside the state space"
-                )
+                raise ValueError(f"absorbing_state={absorbing} is outside the state space")
             anchored = anchored.at[absorbing, :].set(0.0)
         return anchored
 
@@ -480,7 +598,22 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
         else:
             # Tabular reward
-            reward_params = jnp.zeros((n_states, n_actions))
+            if initial_params is None:
+                reward_params = jnp.zeros((n_states, n_actions))
+            else:
+                initial = jnp.asarray(initial_params, dtype=jnp.float32)
+                if initial.shape == (n_states, n_actions):
+                    reward_params = initial
+                elif initial.shape == (n_states,):
+                    reward_params = jnp.broadcast_to(initial[:, None], (n_states, n_actions)).copy()
+                elif initial.size == n_states * n_actions:
+                    reward_params = initial.reshape((n_states, n_actions))
+                else:
+                    raise ValueError(
+                        "tabular AIRL initial_params must have shape "
+                        f"({n_states}, {n_actions}), ({n_states},), or "
+                        f"flat length {n_states * n_actions}; got {initial.shape}"
+                    )
             feature_matrix = None
 
             if self.config.reward_weight_decay > 0:
@@ -504,10 +637,14 @@ class AIRLEstimator(AdversarialEstimatorBase):
         initial_dist = self._compute_initial_distribution(panel, n_states)
 
         # Sample expert transitions once
-        expert_states, expert_actions, expert_next_states = (
-            self._sample_transitions_from_panel(panel)
+        expert_states, expert_actions, expert_next_states = self._sample_transitions_from_panel(
+            panel
         )
         n_expert = len(expert_states)
+        trajectory_lengths = jnp.asarray(
+            [len(traj) for traj in panel.trajectories if len(traj) > 0],
+            dtype=jnp.int32,
+        )
 
         # Initialize policy
         policy = jnp.ones((n_states, n_actions)) / n_actions
@@ -516,8 +653,17 @@ class AIRLEstimator(AdversarialEstimatorBase):
         use_shaping = self.config.use_shaping
         shaping_coef = self.config.shaping_coef
         shaping_l2_penalty = self.config.shaping_l2_penalty
+        shaping_bellman_penalty = self.config.shaping_bellman_penalty
 
         reward_arg_state = self.config.reward_arg == "state"
+        negative_history_size = max(0, int(self.config.negative_history_size))
+        negative_history: list[tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]] = []
+        occupancy_history: list[jnp.ndarray] = []
+        expert_transition_weights = self._panel_transition_weights(panel, n_states, n_actions)
+        expert_state_weights = expert_transition_weights.sum(axis=(1, 2))
+        expert_conditional_transition_weights = (
+            expert_transition_weights / jnp.maximum(expert_state_weights[:, None, None], 1e-12)
+        ) * expert_state_weights[:, None, None]
 
         def disc_loss_fn(
             params,
@@ -528,6 +674,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
             pol_s,
             pol_a,
             pol_ns,
+            pol_log_pi,
         ):
             reward_matrix = get_reward_matrix(params["reward"])
             if reward_arg_state:
@@ -539,31 +686,95 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 reward_matrix = self._enforce_anchor_reward(reward_matrix)
             shaping_potential = params["shaping"]
 
-            def logits(states, actions, next_states):
+            def expert_logits(states, actions, next_states):
                 r_sa = reward_matrix[states, actions]
                 if use_shaping:
                     sc = shaping_coef if shaping_coef is not None else gamma
-                    f = (
-                        r_sa
-                        + sc * shaping_potential[next_states]
-                        - shaping_potential[states]
-                    )
+                    f = r_sa + sc * shaping_potential[next_states] - shaping_potential[states]
                 else:
                     f = r_sa
                 log_pi = jnp.log(policy_fixed[states, actions] + 1e-10)
                 return f - log_pi
 
-            e_logits = logits(exp_s, exp_a, exp_ns)
-            p_logits = logits(pol_s, pol_a, pol_ns)
+            def policy_logits(states, actions, next_states, log_pi):
+                r_sa = reward_matrix[states, actions]
+                if use_shaping:
+                    sc = shaping_coef if shaping_coef is not None else gamma
+                    f = r_sa + sc * shaping_potential[next_states] - shaping_potential[states]
+                else:
+                    f = r_sa
+                return f - log_pi
+
+            e_logits = expert_logits(exp_s, exp_a, exp_ns)
+            p_logits = policy_logits(pol_s, pol_a, pol_ns, pol_log_pi)
 
             e_loss = jnp.mean(jnp.logaddexp(0.0, -e_logits))
             p_loss = jnp.mean(jnp.logaddexp(0.0, p_logits))
             l2_penalty = shaping_l2_penalty * (
                 jnp.mean(reward_matrix**2) + jnp.mean(shaping_potential**2)
             )
-            return e_loss + p_loss + l2_penalty
+            bellman_penalty = 0.0
+            if use_shaping and shaping_bellman_penalty > 0:
+                sc = shaping_coef if shaping_coef is not None else gamma
+                expected_next = jnp.einsum("ast,t->sa", transitions, shaping_potential)
+                bellman_target = jax.nn.logsumexp(reward_matrix + sc * expected_next, axis=1)
+                bellman_penalty = shaping_bellman_penalty * jnp.mean(
+                    (shaping_potential - bellman_target) ** 2
+                )
+            return e_loss + p_loss + l2_penalty + bellman_penalty
 
         disc_loss_and_grad = jax.value_and_grad(disc_loss_fn)
+
+        def occupancy_disc_loss_fn(
+            params,
+            policy_fixed,
+            expert_weights,
+            policy_weight_batches,
+            policy_log_prob_batches,
+        ):
+            reward_matrix = get_reward_matrix(params["reward"])
+            if reward_arg_state:
+                reward_matrix = jnp.broadcast_to(
+                    reward_matrix.mean(axis=1, keepdims=True),
+                    reward_matrix.shape,
+                )
+            else:
+                reward_matrix = self._enforce_anchor_reward(reward_matrix)
+            shaping_potential = params["shaping"]
+
+            if use_shaping:
+                sc = shaping_coef if shaping_coef is not None else gamma
+                f = (
+                    reward_matrix[:, :, None]
+                    + sc * shaping_potential[None, None, :]
+                    - shaping_potential[:, None, None]
+                )
+            else:
+                f = reward_matrix[:, :, None]
+
+            expert_log_pi = jnp.log(policy_fixed + 1e-10)[:, :, None]
+            e_logits = f - expert_log_pi
+            p_logits = f[None, :, :, :] - policy_log_prob_batches[:, :, :, None]
+
+            e_loss = jnp.sum(expert_weights * jnp.logaddexp(0.0, -e_logits))
+            p_loss = (
+                jnp.sum(policy_weight_batches * jnp.logaddexp(0.0, p_logits))
+                / policy_weight_batches.shape[0]
+            )
+            l2_penalty = shaping_l2_penalty * (
+                jnp.mean(reward_matrix**2) + jnp.mean(shaping_potential**2)
+            )
+            bellman_penalty = 0.0
+            if use_shaping and shaping_bellman_penalty > 0:
+                sc = shaping_coef if shaping_coef is not None else gamma
+                expected_next = jnp.einsum("ast,t->sa", transitions, shaping_potential)
+                bellman_target = jax.nn.logsumexp(reward_matrix + sc * expected_next, axis=1)
+                bellman_penalty = shaping_bellman_penalty * jnp.mean(
+                    (shaping_potential - bellman_target) ** 2
+                )
+            return e_loss + p_loss + l2_penalty + bellman_penalty
+
+        occupancy_disc_loss_and_grad = jax.value_and_grad(occupancy_disc_loss_fn)
 
         # Training metrics
         disc_losses = []
@@ -581,27 +792,110 @@ class AIRLEstimator(AdversarialEstimatorBase):
         for round_idx in pbar:
             old_policy = jnp.array(policy)
 
-            # Sample from current policy using lax.scan
-            key, subkey = jax.random.split(key)
-            policy_states, policy_actions, policy_next_states = (
-                self._sample_transitions_from_policy(
-                    policy, transitions, n_expert, initial_dist, subkey
-                )
-            )
-
             # Update reward and shaping potential via optax Adam.
             disc_loss = 0.0
-            for _ in range(self.config.discriminator_steps):
-                loss, grads = disc_loss_and_grad(
-                    disc_params, policy,
-                    expert_states, expert_actions, expert_next_states,
-                    policy_states, policy_actions, policy_next_states,
+            if self.config.discriminator_data_mode in (
+                "occupancy",
+                "conditional_occupancy",
+            ):
+                if self.config.discriminator_data_mode == "conditional_occupancy":
+                    trans_sas = jnp.transpose(transitions, (1, 0, 2))
+                    expert_weights_for_loss = expert_conditional_transition_weights
+                    policy_weights = (
+                        expert_state_weights[:, None, None] * policy[:, :, None] * trans_sas
+                    )
+                else:
+                    expert_weights_for_loss = expert_transition_weights
+                    policy_weights = self._policy_transition_occupancy(
+                        policy, transitions, initial_dist, trajectory_lengths
+                    )
+                policy_log_prob_matrix = jnp.log(policy + 1e-10)
+                if occupancy_history:
+                    history = occupancy_history[-negative_history_size:]
+                    policy_weight_batches = jnp.stack([policy_weights, *history])
+                else:
+                    policy_weight_batches = policy_weights[None, :, :, :]
+                policy_log_prob_batches = jnp.broadcast_to(
+                    policy_log_prob_matrix,
+                    (
+                        policy_weight_batches.shape[0],
+                        policy_log_prob_matrix.shape[0],
+                        policy_log_prob_matrix.shape[1],
+                    ),
                 )
-                updates, opt_state = optimizer.update(
-                    grads, opt_state, params=disc_params
+
+                for _ in range(self.config.discriminator_steps):
+                    loss, grads = occupancy_disc_loss_and_grad(
+                        disc_params,
+                        policy,
+                        expert_weights_for_loss,
+                        policy_weight_batches,
+                        policy_log_prob_batches,
+                    )
+                    updates, opt_state = optimizer.update(grads, opt_state, params=disc_params)
+                    disc_params = optax.apply_updates(disc_params, updates)
+                    disc_loss = float(loss)
+                if negative_history_size:
+                    occupancy_history.append(policy_weights)
+                    if len(occupancy_history) > negative_history_size:
+                        occupancy_history = occupancy_history[-negative_history_size:]
+            else:
+                # Sample from current policy using lax.scan
+                key, subkey = jax.random.split(key)
+                if self.config.policy_sample_mode == "rollout":
+                    policy_states, policy_actions, policy_next_states = (
+                        self._sample_policy_rollouts_like_panel(
+                            policy,
+                            transitions,
+                            trajectory_lengths,
+                            initial_dist,
+                            subkey,
+                        )
+                    )
+                else:
+                    policy_states, policy_actions, policy_next_states = (
+                        self._sample_transitions_from_policy(
+                            policy, transitions, n_expert, initial_dist, subkey
+                        )
+                    )
+                if negative_history:
+                    history = negative_history[-negative_history_size:]
+                    disc_policy_states = jnp.concatenate(
+                        [policy_states, *(batch[0] for batch in history)]
+                    )
+                    disc_policy_actions = jnp.concatenate(
+                        [policy_actions, *(batch[1] for batch in history)]
+                    )
+                    disc_policy_next_states = jnp.concatenate(
+                        [policy_next_states, *(batch[2] for batch in history)]
+                    )
+                else:
+                    disc_policy_states = policy_states
+                    disc_policy_actions = policy_actions
+                    disc_policy_next_states = policy_next_states
+                disc_policy_log_probs = jnp.log(
+                    policy[disc_policy_states, disc_policy_actions] + 1e-10
                 )
-                disc_params = optax.apply_updates(disc_params, updates)
-                disc_loss = float(loss)
+
+                for _ in range(self.config.discriminator_steps):
+                    loss, grads = disc_loss_and_grad(
+                        disc_params,
+                        policy,
+                        expert_states,
+                        expert_actions,
+                        expert_next_states,
+                        disc_policy_states,
+                        disc_policy_actions,
+                        disc_policy_next_states,
+                        disc_policy_log_probs,
+                    )
+                    updates, opt_state = optimizer.update(grads, opt_state, params=disc_params)
+                    disc_params = optax.apply_updates(disc_params, updates)
+                    disc_loss = float(loss)
+                if negative_history_size:
+                    negative_history.append((policy_states, policy_actions, policy_next_states))
+                    if len(negative_history) > negative_history_size:
+                        negative_history = negative_history[-negative_history_size:]
 
             disc_losses.append(disc_loss)
 
@@ -644,12 +938,14 @@ class AIRLEstimator(AdversarialEstimatorBase):
             policy_changes.append(policy_change)
 
             r_range = float(jnp.max(current_reward) - jnp.min(current_reward))
-            pbar.set_postfix({
-                "d_loss": f"{disc_loss:.4f}",
-                "d_pol": f"{policy_change:.4f}",
-                "R_rng": f"{r_range:.2f}",
-                "P(R|hi)": f"{float(policy[-10:, 1].mean()):.3f}",
-            })
+            pbar.set_postfix(
+                {
+                    "d_loss": f"{disc_loss:.4f}",
+                    "d_pol": f"{policy_change:.4f}",
+                    "R_rng": f"{r_range:.2f}",
+                    "P(R|hi)": f"{float(policy[-10:, 1].mean()):.3f}",
+                }
+            )
 
             if (
                 round_idx + 1 >= self.config.min_rounds
@@ -706,7 +1002,11 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 "absorbing_state": self.config.absorbing_state,
                 "use_shaping": self.config.use_shaping,
                 "learned_shaping": True,
+                "shaping_bellman_penalty": self.config.shaping_bellman_penalty,
                 "generator_reward": self.config.generator_reward,
+                "discriminator_data_mode": self.config.discriminator_data_mode,
+                "policy_sample_mode": self.config.policy_sample_mode,
+                "negative_history_size": negative_history_size,
                 "min_rounds": self.config.min_rounds,
                 "final_disc_loss": disc_losses[-1] if disc_losses else None,
                 "disc_losses": disc_losses,
@@ -715,3 +1015,195 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 "reward_matrix": jnp.array(final_reward).tolist(),
             },
         )
+
+
+class AIRL:
+    """Unified public AIRL entry point for identified AIRL variants.
+
+    The facade exposes only the variants with a paper-backed identification
+    claim:
+
+    - ``version="state_only"``: Fu, Luo, and Levine (2018) state-only AIRL.
+    - ``version="anchored"``: Lee, Sudhir, and Wang (2026) anchored
+      action-dependent AIRL with one segment.
+    - ``version="heterogeneous"``: Lee, Sudhir, and Wang (2026) anchored
+      action-dependent AIRL with latent segments.
+
+    The unanchored state-action AIRL diagnostic remains available through the
+    legacy ``AIRLEstimator`` concrete class, but it is deliberately rejected by
+    this public facade because it recovers a shaped advantage, not an identified
+    structural reward.
+    """
+
+    def __init__(
+        self,
+        config: AIRLConfig | Any | None = None,
+        **kwargs: Any,
+    ):
+        if config is None:
+            config = AIRLConfig(**kwargs)
+        else:
+            for key, value in kwargs.items():
+                if hasattr(config, key):
+                    setattr(config, key, value)
+
+        self.config = config
+        self.version = self._infer_version(config)
+        self.delegate = self._build_delegate(config)
+
+    @property
+    def name(self) -> str:
+        if self.version == "state_only":
+            return "AIRL (Fu et al. 2018, state-only)"
+        if self.version == "anchored":
+            return "AIRL (Lee, Sudhir & Wang 2026, anchored)"
+        return "AIRL (Lee, Sudhir & Wang 2026, heterogeneous)"
+
+    def estimate(
+        self,
+        panel: Panel,
+        utility: BaseUtilityFunction,
+        problem: DDCProblem,
+        transitions: jnp.ndarray,
+        initial_params: jnp.ndarray | None = None,
+        **kwargs: Any,
+    ) -> EstimationSummary:
+        result = self.delegate.estimate(
+            panel=panel,
+            utility=utility,
+            problem=problem,
+            transitions=transitions,
+            initial_params=initial_params,
+            **kwargs,
+        )
+        result.method = self.name
+        result.metadata = {
+            **(result.metadata or {}),
+            "airl_version": self.version,
+            "airl_delegate": type(self.delegate).__name__,
+        }
+        return result
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.delegate, name)
+
+    @staticmethod
+    def _infer_version(config: Any) -> str:
+        if isinstance(config, AIRLConfig):
+            return config.version
+        if getattr(config, "num_segments", 1) == 1:
+            return "anchored"
+        return "heterogeneous"
+
+    def _build_delegate(self, config: Any) -> AIRLEstimator | Any:
+        from econirl.estimation.adversarial.airl_het import (
+            AIRLHetConfig,
+            AIRLHetEstimator,
+        )
+
+        if isinstance(config, AIRLHetConfig):
+            self._validate_anchored_config(
+                version=self.version,
+                exit_action=config.exit_action,
+                absorbing_state=config.absorbing_state,
+                num_segments=config.num_segments,
+            )
+            return AIRLHetEstimator(config)
+
+        if not isinstance(config, AIRLConfig):
+            raise TypeError(
+                f"AIRL expects an AIRLConfig or AIRLHetConfig; got {type(config).__name__}"
+            )
+
+        if config.version == "state_only":
+            if config.reward_arg != "state":
+                raise ValueError(
+                    "Unanchored state-action AIRL is not identified as a "
+                    "structural reward. Use version='anchored' or "
+                    "version='heterogeneous' with exit_action and "
+                    "absorbing_state, or use AIRLEstimator directly for the "
+                    "diagnostic shaped-advantage experiment."
+                )
+            if (
+                config.exit_action is not None
+                or config.anchor_action is not None
+                or config.absorbing_state is not None
+            ):
+                raise ValueError(
+                    "State-only AIRL does not use exit_action, anchor_action, "
+                    "or absorbing_state. Use version='anchored' for the "
+                    "identified action-dependent model."
+                )
+            return AIRLEstimator(replace(config, reward_arg="state"))
+
+        if config.version in {"anchored", "heterogeneous"}:
+            exit_action = (
+                config.exit_action if config.exit_action is not None else config.anchor_action
+            )
+            num_segments = 1 if config.version == "anchored" else config.num_segments
+            self._validate_anchored_config(
+                version=config.version,
+                exit_action=exit_action,
+                absorbing_state=config.absorbing_state,
+                num_segments=num_segments,
+            )
+            het_config = AIRLHetConfig(
+                num_segments=num_segments,
+                exit_action=int(exit_action),
+                absorbing_state=int(config.absorbing_state),
+                reward_type=config.reward_type,
+                reward_lr=config.reward_lr,
+                discriminator_steps=config.discriminator_steps,
+                generator_solver=config.generator_solver,
+                generator_tol=config.generator_tol,
+                generator_max_iter=config.generator_max_iter,
+                max_airl_rounds=config.max_rounds,
+                airl_convergence_tol=config.convergence_tol,
+                max_em_iterations=config.max_em_iterations,
+                em_convergence_tol=config.em_convergence_tol,
+                consistency_weight=config.consistency_weight,
+                prior_smoothing=config.prior_smoothing,
+                prior_min=config.prior_min,
+                prior_damping=config.prior_damping,
+                reward_weight_decay=config.reward_weight_decay,
+                normalize_reward=config.normalize_reward,
+                unit_normalize_reward=config.unit_normalize_reward,
+                gradient_clip_norm=config.gradient_clip_norm,
+                antisymmetric_init=config.antisymmetric_init,
+                initialization=config.initialization,
+                initialization_smoothing=config.initialization_smoothing,
+                initialization_l2_penalty=config.initialization_l2_penalty,
+                use_shaping=config.use_shaping,
+                shaping_coef=config.shaping_coef,
+                shaping_l2_penalty=config.shaping_l2_penalty,
+                generator_reward=config.generator_reward,
+                policy_step_size=config.policy_step_size,
+                min_airl_rounds=config.min_rounds,
+                verbose=config.verbose,
+                seed=config.seed,
+            )
+            return AIRLHetEstimator(het_config)
+
+        raise ValueError(f"unknown AIRL version={config.version!r}")
+
+    @staticmethod
+    def _validate_anchored_config(
+        *,
+        version: str,
+        exit_action: int | object | None,
+        absorbing_state: int | object | None,
+        num_segments: int,
+    ) -> None:
+        if exit_action is None:
+            raise ValueError(
+                f"version={version!r} requires exit_action for anchored AIRL anchor identification"
+            )
+        if absorbing_state is None:
+            raise ValueError(
+                f"version={version!r} requires absorbing_state for anchored AIRL "
+                "anchor identification"
+            )
+        if version == "anchored" and num_segments != 1:
+            raise ValueError("version='anchored' is the one-segment anchored AIRL case")
+        if version == "heterogeneous" and num_segments < 2:
+            raise ValueError("version='heterogeneous' requires num_segments >= 2")
