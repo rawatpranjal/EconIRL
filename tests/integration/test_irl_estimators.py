@@ -17,6 +17,7 @@ References:
 import pytest
 import numpy as np
 import pandas as pd
+from econirl.datasets import rust_bus_reward_spec
 
 
 # ============================================================================
@@ -589,7 +590,7 @@ class TestIRLvsDDCComparison:
         from econirl.estimators import MaxEntIRL, NFXP
 
         # Fit NFXP
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         nfxp.fit(
             data=rust_data_small,
             state="mileage_bin",
@@ -637,7 +638,7 @@ class TestIRLvsDDCComparison:
         from econirl.estimators import MaxMarginIRL, NFXP
 
         # Fit NFXP
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False, utility=rust_bus_reward_spec(90, names=("theta_c", "RC")))
         nfxp.fit(
             data=rust_data_small,
             state="mileage_bin",

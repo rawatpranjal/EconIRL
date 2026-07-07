@@ -13,6 +13,7 @@ import numpy as np
 from econirl.environments import RustBusEnvironment, random_mdp
 from econirl.estimation import NFXPEstimator, UFXPEstimator
 from econirl.simulation.synthetic import simulate_panel
+from econirl.datasets import rust_bus_reward_spec
 from validation.benchmark.runner import _linear_utility
 
 
@@ -114,7 +115,7 @@ def test_ufxp_sklearn_wrapper() -> None:
             rows.append({"bus_id": i, "mileage": int(s), "replaced": int(a)})
     df = pd.DataFrame(rows)
 
-    model = UFXP(n_states=10, discount=0.9)
+    model = UFXP(n_states=10, discount=0.9, utility=rust_bus_reward_spec(10))
     model.fit(df, state="mileage", action="replaced", id="bus_id")
 
     assert model.converged_

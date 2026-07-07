@@ -10,7 +10,7 @@ This is the Phase 2 acceptance test. All estimators:
 import numpy as np
 import pytest
 from econirl import NFXP, NNES, CCP, TDCCP
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl.estimators.protocol import EstimatorProtocol
 
 
@@ -27,18 +27,19 @@ FAST_KWARGS = dict(n_states=90, discount=0.9999)
 def all_fitted(rust_bus_df):
     """Fit all 4 estimators on the same data. Module-scoped for speed."""
     models = {}
+    spec = rust_bus_reward_spec(90, names=("theta_c", "RC"))
 
-    models["nfxp"] = NFXP(**FAST_KWARGS).fit(
+    models["nfxp"] = NFXP(**FAST_KWARGS, utility=spec).fit(
         rust_bus_df, state="mileage_bin", action="replaced", id="bus_id"
     )
-    models["ccp"] = CCP(**FAST_KWARGS, num_policy_iterations=3).fit(
+    models["ccp"] = CCP(**FAST_KWARGS, num_policy_iterations=3, utility=spec).fit(
         rust_bus_df, state="mileage_bin", action="replaced", id="bus_id"
     )
-    models["nnes"] = NNES(**FAST_KWARGS, v_epochs=200, n_outer_iterations=2).fit(
+    models["nnes"] = NNES(**FAST_KWARGS, v_epochs=200, n_outer_iterations=2, utility=spec).fit(
         rust_bus_df, state="mileage_bin", action="replaced", id="bus_id"
     )
     models["tdccp"] = TDCCP(
-        **FAST_KWARGS, avi_iterations=10, epochs_per_avi=15, n_policy_iterations=2
+        **FAST_KWARGS, avi_iterations=10, epochs_per_avi=15, n_policy_iterations=2, utility=spec
     ).fit(rust_bus_df, state="mileage_bin", action="replaced", id="bus_id")
 
     return models
