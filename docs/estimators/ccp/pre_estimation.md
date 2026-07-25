@@ -15,7 +15,7 @@ checks before treating a result as structural evidence.
 
 | Check | Why it matters |
 | --- | --- |
-| Feature rank | Reward parameters are not identified when action-dependent features are collinear. |
+| Feature rank | Collinear reward features cannot identify separate parameters. |
 | Feature condition number | Near-collinearity inflates standard errors. |
 | Transition row sums | Each transition row must be a valid probability distribution. |
 | State coverage | Unvisited states require extrapolated CCPs. |
@@ -23,6 +23,16 @@ checks before treating a result as structural evidence.
 | Minimum positive CCP | Very small probabilities make the log correction unstable. |
 | Reward normalization | Additive reward shifts do not change choice probabilities, and the shock scale must be normalized. |
 | Transition orientation | CCP expects transition tensors in action, state, next-state order. |
+
+The direct action-contrast rank is a conservative check used by the wrapper.
+It is sufficient for the supported examples. It is not a general necessity.
+A state-only feature can affect dynamic choices when actions induce different
+future state distributions.
+
+Support checks answer a different question from identification. Population
+full support permits the logit inversion. Observed zeros and thin cells make
+the empirical inverse unstable. Smoothing prevents a numerical zero, but it
+does not create information that was absent from the panel.
 
 ## Simulation Checks
 
@@ -51,5 +61,10 @@ Data with many unvisited states force CCP to extrapolate the first-stage
 policy. States with only one observed action make counterfactual action values
 weakly supported. Too little smoothing can make log corrections unstable,
 while too much smoothing biases the empirical policy toward uniform choice.
-Transition matrices with wrong orientation can produce plausible arrays and
-wrong economics.
+A transition tensor with the wrong orientation can have valid dimensions while
+representing the wrong transition law.
+
+Before interpreting the estimates structurally, specify the discount factor,
+shock distribution and scale, reward location normalization, and utility form.
+The wrapper can estimate transitions from the panel, but its reward standard
+errors do not propagate uncertainty from that transition stage.

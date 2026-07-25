@@ -51,8 +51,9 @@ class CCP(NFXP):
     faster than NFXP because it avoids the nested fixed-point computation.
 
     With num_policy_iterations=1, this is the classic Hotz-Miller estimator.
-    With num_policy_iterations>1, this becomes the NPL (Nested Pseudo Likelihood)
-    algorithm that iterates to the MLE.
+    With num_policy_iterations>1, this becomes the NPL (Nested Pseudo
+    Likelihood) algorithm. A positive value is the maximum number of stages.
+    Set it to -1 to require joint parameter and policy fixed-point convergence.
 
     Parameters
     ----------
@@ -109,9 +110,13 @@ class CCP(NFXP):
     converged_ : bool
         Whether the requested CCP run completed successfully.
     npl_converged_ : bool
-        Whether the policy sequence met the NPL stopping tolerance.
+        Whether both the parameter and policy residuals met the NPL tolerance.
     termination_reason_ : str
         Why the CCP run stopped.
+    npl_parameter_residual_ : float
+        Final L2 change in the parameter vector.
+    npl_policy_residual_ : float
+        Final maximum absolute policy fixed-point residual.
     reward_spec_ : RewardSpec
         The reward specification used for estimation.
 
@@ -130,7 +135,7 @@ class CCP(NFXP):
     >>> model = CCP(n_states=90)
     >>> model.fit(df, state="mileage", action="replaced", id="bus_id")
     >>>
-    >>> # NPL (iterates towards MLE)
+    >>> # Fixed-stage NPL
     >>> model_npl = CCP(n_states=90, num_policy_iterations=10)
     >>> model_npl.fit(df, state="mileage", action="replaced", id="bus_id")
 
@@ -178,7 +183,7 @@ class CCP(NFXP):
         verbose : bool, default=False
             Whether to print progress messages.
         num_policy_iterations : int, default=1
-            Number of NPL iterations (K=1 is Hotz-Miller).
+            Maximum number of NPL stages (K=1 is Hotz-Miller).
         """
         # Initialize parent with shared parameters
         super().__init__(
@@ -195,6 +200,8 @@ class CCP(NFXP):
         self.num_policy_iterations = num_policy_iterations
         self.npl_converged_: bool | None = None
         self.termination_reason_: str | None = None
+        self.npl_parameter_residual_: float | None = None
+        self.npl_policy_residual_: float | None = None
 
     def fit(
         self,
@@ -332,6 +339,12 @@ class CCP(NFXP):
         self._extract_results()
         self.npl_converged_ = bool(self._result.metadata["npl_converged"])
         self.termination_reason_ = str(self._result.metadata["termination_reason"])
+        parameter_residual = self._result.metadata["npl_parameter_residual"]
+        policy_residual = self._result.metadata["npl_policy_residual"]
+        self.npl_parameter_residual_ = (
+            None if parameter_residual is None else float(parameter_residual)
+        )
+        self.npl_policy_residual_ = None if policy_residual is None else float(policy_residual)
 
         return self
 

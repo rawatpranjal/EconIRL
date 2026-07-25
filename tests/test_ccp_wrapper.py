@@ -395,6 +395,9 @@ class TestNPLIterations:
         assert model.params_ is not None
         assert model.converged_ is True
         assert model.npl_converged_ is not None
+        assert model.npl_parameter_residual_ is not None
+        assert model.npl_policy_residual_ is not None
+        assert "NPL residuals:" in model.summary()
         assert model.termination_reason_ in {
             "fixed_k_complete",
             "fixed_point_converged",

@@ -9,8 +9,9 @@
 - [Simulation Studies](../../simulation_studies/index.md)
 
 The study separates estimation, inference, and counterfactual analysis. Each
-experiment simulates a new panel from a fully specified reward and transition
-process.
+experiment simulates a new panel from a specified reward and transition
+process. Every fit receives the data-generating transition tensor, so the
+results do not include uncertainty from transition estimation.
 
 ## Estimation
 
@@ -34,6 +35,9 @@ The inference experiment uses 1,000 independent panels. Each panel has 10,000
 choices over 20 states. The empirical standard deviation measures variation
 across panels. The mean standard error averages the robust uncertainty estimate
 reported for each panel.
+These robust standard errors come from the fixed-CCP pseudo-likelihood. They
+treat the empirical CCPs and supplied transition tensor as fixed. They do not
+propagate uncertainty from estimating CCPs or transitions.
 
 | Parameter | True value | Mean estimate | Empirical SD | Mean SE | Coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -55,21 +59,25 @@ All four standard-error methods were applied to one 40-state panel:
 | Pairs-cluster bootstrap | 0.0375 | 0.0508 | 0.0546 |
 
 The clustered estimates are between 0.99 and 1.05 times their bootstrap
-counterparts.
+counterparts in this panel. The pairs-cluster bootstrap resamples individuals
+and re-estimates empirical CCPs. It keeps the true transition tensor fixed.
+This comparison does not test the full Hotz-Miller two-step covariance or the
+Kasahara-Shimotsu parametric bootstrap.
 
 ## Counterfactuals
 
 The fitted model is solved again after changing either the first reward
 parameter or the deterioration process.
 
-| Change | Mean policy error | Mean value loss |
+| Change | Mean policy TV | Mean value loss |
 | --- | ---: | ---: |
 | Increase the first reward parameter by 1.0 | 0.0022 | 0.000184 |
 | Slow deterioration | 0.0019 | 0.000083 |
 
-Policy error compares the fitted counterfactual policy with the policy from
-the true parameters. Value loss measures the cost of using the fitted policy
-instead of the true-parameter policy.
+Policy TV is the state-averaged total-variation distance between the fitted
+counterfactual policy and the policy from the true parameters. Value loss
+measures the cost of using the fitted policy instead of the true-parameter
+policy.
 
 ## Reproduce the Study
 

@@ -176,7 +176,7 @@ motivated it.
 
 | Reward target | Core estimators | Main caution |
 | --- | --- | --- |
-| Finite linear structural reward | NFXP, CCP, TD-CCP | Needs action-contrast feature rank and a fixed normalization. |
+| Finite linear structural reward | NFXP, CCP, TD-CCP | Needs dynamic feature rank and a fixed normalization. Direct action-contrast rank is a conservative sufficient check. |
 | Linear IRL reward basis | MCE-IRL | Identified only inside the supplied feature basis. |
 | Neural reward map | Neural MCE-IRL | The reward matrix is the object. The raw weights are not. |
 | State-only transferable reward | AIRL | Matches the original AIRL claim only under its state-only assumptions. |
@@ -206,7 +206,8 @@ the reward.
 | --- | --- | --- | --- |
 | NFXP | Finite linear $R(s,a)$ | Yes. | Correct DDC model, Markov state, exogenous transitions, fixed discount and logit scale, enough support, and global likelihood optimum. |
 | CCP one-step | Same finite target as NFXP. | Yes, in population. | Same structural conditions as NFXP, plus reliable first-stage CCPs and no zero-support cells. |
-| CCP NPL | Same finite target as NFXP. | Yes, in population. | Same as one-step CCP, plus convergence to the relevant NPL fixed point. |
+| CCP fixed-stage NPL | Same finite target as NFXP. | Yes, in population. | Same as one-step CCP. Every fixed positive stage is first-order equivalent to partial maximum likelihood under the Aguirregabiria-Mira assumptions. |
+| CCP fixed-point NPL | Same finite target as NFXP. | Yes, in population. | Same as fixed-stage CCP, plus joint parameter and policy convergence to the relevant NPL fixed point. |
 | TD-CCP semigradient | Finite reward parameters. | Yes, in population. | Successor tuples, consistent CCPs, recursive terms in the projection span, support, and correct normalization. |
 | TD-CCP neural | Same finite reward parameters. | Conditional. | Same target as semigradient TD-CCP, with enough data and capacity to learn the recursive terms. |
 | MCE-IRL | Reward coefficients in supplied features. | Yes, in population. | Known transitions, true reward in the feature span, full-rank moments, support, and fixed normalization. |

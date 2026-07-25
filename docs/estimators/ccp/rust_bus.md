@@ -16,8 +16,8 @@ The Rust bus-engine replacement problem is the canonical dynamic discrete
 choice example. A bus operator observes mileage and chooses whether to keep the
 current engine or replace it.
 
-EconIRL ships a bundled Rust-style dataset that is suitable for a quick public
-CCP smoke test.
+By default, `load_rust_bus()` returns a synthetic dataset with Rust-style
+states and choices. It does not load the historical Rust sample.
 
 ```python
 from econirl import CCP
@@ -37,6 +37,8 @@ for name in model.params_:
     print(f"{name}: estimate={model.params_[name]:.6f}, se={model.se_[name]:.6f}")
 print(f"termination={model.termination_reason_}")
 print(f"npl_converged={model.npl_converged_}")
+print(f"parameter_residual={model.npl_parameter_residual_:.6e}")
+print(f"policy_residual={model.npl_policy_residual_:.6e}")
 ```
 
 **Result**
@@ -46,10 +48,12 @@ operating_cost: estimate=0.000995, se=0.000421
 replacement_cost: estimate=3.072211, se=0.074237
 termination=fixed_k_complete
 npl_converged=False
+parameter_residual=1.452655e-02
+policy_residual=2.148578e-02
 ```
 
-The requested three policy iterations completed. The policy sequence did not
-meet the optional NPL stopping tolerance within those three iterations.
+The model completed all three requested NPL stages. The parameter and policy
+residuals did not both meet the fixed-point tolerance within those stages.
 
 ## Interpretation
 
@@ -94,6 +98,10 @@ probability at state 50 from 0.087221 to 0.054908.
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The reported simulation study uses a synthetic cell, where
-reward, policy, value, Q, and counterfactual oracle objects are available for
-comparison.
+replication. The printed robust standard errors are conditional
+pseudo-likelihood estimates. They hold the fitted transition model fixed. The
+reported simulation study is also synthetic and supplies the true transition
+tensor. The [replication ledger](../../replications.md) separates two results.
+Its CCP/NPL section checks fixed-point equivalence to NFXP on bundled Group 4
+data. Its Rust Table IX section uses NFXP and official data to reproduce the
+published estimates and standard errors.
