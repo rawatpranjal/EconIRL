@@ -186,6 +186,7 @@ class BaseEstimator(ABC):
 
         n_bootstrap = kwargs.pop("n_bootstrap", 400)
         se_seed = kwargs.pop("se_seed", None)
+        transition_source = kwargs.pop("transition_source", "supplied to estimator")
         start_time = time.time()
 
         # Run optimization
@@ -282,6 +283,8 @@ class BaseEstimator(ABC):
                 problem.num_actions,
                 feature_matrix=feature_matrix,
             )
+            if transition_source != "estimated from fitted panel":
+                transition_first_stage = None
         except Exception:  # noqa: BLE001 - diagnostics are non-critical
             pass
 
@@ -309,6 +312,7 @@ class BaseEstimator(ABC):
             num_states=problem.num_states,
             num_actions=problem.num_actions,
             optimizer=result.metadata.get("optimizer"),
+            transition_source=transition_source,
             dataset=dataset,
             pre_estimation=pre_estimation,
             transition_first_stage=transition_first_stage,

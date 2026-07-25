@@ -104,6 +104,18 @@ class CounterfactualResult:
     # Counterfactual kernel, when it differs (Type 2 environment change). The
     # counterfactual policy's long-run distribution is computed under this one.
     counterfactual_transitions: jnp.ndarray | None = None
+    # Compatibility aliases used by the public sklearn-style estimator wrappers.
+    params: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def policy(self) -> np.ndarray:
+        """Counterfactual policy under the compatibility wrapper API."""
+        return np.asarray(self.counterfactual_policy)
+
+    @property
+    def value_function(self) -> np.ndarray:
+        """Counterfactual value function under the compatibility wrapper API."""
+        return np.asarray(self.counterfactual_value)
 
     def summary(
         self,

@@ -1,0 +1,511 @@
+{
+  "alternate_standard_errors": {
+    "asymptotic": {
+      "converged": true,
+      "standard_errors": [
+        0.08362120303209283,
+        0.1160280231017278,
+        0.12629596192096243
+      ]
+    },
+    "bootstrap": {
+      "converged": true,
+      "standard_errors": [
+        0.08638584166311533,
+        0.11744229820581814,
+        0.13299623994710233
+      ]
+    },
+    "clustered": {
+      "converged": true,
+      "standard_errors": [
+        0.08494403332512591,
+        0.1251139032788625,
+        0.13211451229759158
+      ]
+    },
+    "clustered_to_bootstrap_ratio": [
+      0.9833096684568736,
+      1.0653223343739393,
+      0.9933702813714024
+    ],
+    "full_likelihood_bhhh": {
+      "converged": true,
+      "standard_errors": [
+        0.09832521584426705,
+        0.11759076344407955,
+        0.11215242960923397
+      ]
+    },
+    "passed": true,
+    "robust": {
+      "converged": true,
+      "standard_errors": [
+        0.08415153263945774,
+        0.1156067095195968,
+        0.12821130686292426
+      ]
+    }
+  },
+  "checkpoint": "/tmp/econirl_nfxp_ready_100.jsonl",
+  "configs": {
+    "hard_problem": {
+      "base_seed": 31000,
+      "fit_timeout_seconds": 60.0,
+      "n_individuals": 300,
+      "n_periods": 25,
+      "n_replications": 20,
+      "name": "sparse_200_state",
+      "num_states": 200,
+      "theta": [
+        1.0,
+        -0.8,
+        0.6
+      ]
+    },
+    "inference": {
+      "base_seed": 21000,
+      "fit_timeout_seconds": 60.0,
+      "n_individuals": 250,
+      "n_periods": 40,
+      "n_replications": 1000,
+      "name": "inference_40_state",
+      "num_states": 40,
+      "theta": [
+        0.35,
+        -0.25,
+        0.2
+      ]
+    }
+  },
+  "environment": {
+    "jax": "0.9.2",
+    "jax_enable_x64": true,
+    "pid": 78377,
+    "platform": "macOS-14.5-arm64-arm-64bit-Mach-O",
+    "python": "3.13.12"
+  },
+  "estimator": "NFXP",
+  "gates": [
+    {
+      "enforced": true,
+      "name": "inference_usable_rate",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.99,
+      "value": 1.0
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_standardized_bias",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.2,
+      "value": 0.03710956026224646
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_se_ratio_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.8,
+      "value": 0.9953743801848572
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_se_ratio_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1.2,
+      "value": 0.9953743801848572
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_coverage_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.91,
+      "value": 0.954
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_coverage_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.99,
+      "value": 0.954
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_left_tail_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.01,
+      "value": 0.02
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_left_tail_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.04,
+      "value": 0.02
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_right_tail_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.01,
+      "value": 0.026
+    },
+    {
+      "enforced": true,
+      "name": "theta_0_right_tail_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.04,
+      "value": 0.026
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_standardized_bias",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.2,
+      "value": 0.04353064747856343
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_se_ratio_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.8,
+      "value": 1.004474207415538
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_se_ratio_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1.2,
+      "value": 1.004474207415538
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_coverage_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.91,
+      "value": 0.948
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_coverage_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.99,
+      "value": 0.948
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_left_tail_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.01,
+      "value": 0.028
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_left_tail_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.04,
+      "value": 0.028
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_right_tail_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.01,
+      "value": 0.024
+    },
+    {
+      "enforced": true,
+      "name": "theta_1_right_tail_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.04,
+      "value": 0.024
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_standardized_bias",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.2,
+      "value": 0.05194865100870326
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_se_ratio_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.8,
+      "value": 1.009329373271664
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_se_ratio_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1.2,
+      "value": 1.009329373271664
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_coverage_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.91,
+      "value": 0.954
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_coverage_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.99,
+      "value": 0.954
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_left_tail_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.01,
+      "value": 0.016
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_left_tail_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.04,
+      "value": 0.016
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_right_tail_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.01,
+      "value": 0.03
+    },
+    {
+      "enforced": true,
+      "name": "theta_2_right_tail_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.04,
+      "value": 0.03
+    },
+    {
+      "enforced": true,
+      "name": "hard_usable_rate",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.95,
+      "value": 1.0
+    },
+    {
+      "enforced": true,
+      "name": "hard_theta_0_median_relative_error",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.06456660699225264
+    },
+    {
+      "enforced": true,
+      "name": "hard_theta_1_median_relative_error",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.032325001122569946
+    },
+    {
+      "enforced": true,
+      "name": "hard_theta_2_median_relative_error",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.03302745266503797
+    },
+    {
+      "enforced": true,
+      "name": "hard_theta_0_p90_relative_error",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.25,
+      "value": 0.1112829168910275
+    },
+    {
+      "enforced": true,
+      "name": "hard_theta_1_p90_relative_error",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.25,
+      "value": 0.06483808638163772
+    },
+    {
+      "enforced": true,
+      "name": "hard_theta_2_p90_relative_error",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.25,
+      "value": 0.08226812428051267
+    },
+    {
+      "enforced": true,
+      "name": "hard_policy_tv_mean",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.03,
+      "value": 0.008520342554395342
+    },
+    {
+      "enforced": true,
+      "name": "hard_runtime_seconds_max",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 60.0,
+      "value": 1.8270557500072755
+    },
+    {
+      "enforced": true,
+      "name": "hard_reward_counterfactual_policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.03,
+      "value": 0.006405048884399451
+    },
+    {
+      "enforced": true,
+      "name": "hard_reward_counterfactual_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.0030295700619181404
+    },
+    {
+      "enforced": true,
+      "name": "hard_transition_counterfactual_policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.03,
+      "value": 0.006665298269655633
+    },
+    {
+      "enforced": true,
+      "name": "hard_transition_counterfactual_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.0018354045189643152
+    },
+    {
+      "enforced": true,
+      "name": "alternate_se_methods",
+      "operator": "is",
+      "passed": true,
+      "threshold": true,
+      "value": true
+    }
+  ],
+  "hard_problem": {
+    "counterfactuals": {
+      "reward": {
+        "policy_tv_mean": 0.006405048884399451,
+        "regret_mean": 0.0030295700619181404
+      },
+      "transition": {
+        "policy_tv_mean": 0.006665298269655633,
+        "regret_mean": 0.0018354045189643152
+      }
+    },
+    "median_relative_error": {
+      "theta_0": 0.06456660699225264,
+      "theta_1": 0.032325001122569946,
+      "theta_2": 0.03302745266503797
+    },
+    "n_total": 20,
+    "n_usable": 20,
+    "p90_relative_error": {
+      "theta_0": 0.1112829168910275,
+      "theta_1": 0.06483808638163772,
+      "theta_2": 0.08226812428051267
+    },
+    "policy_tv_mean": 0.008520342554395342,
+    "runtime_seconds_max": 1.8270557500072755,
+    "usable_rate": 1.0
+  },
+  "implementation_target": "public summary, repeated-sample inference, and oracle-backed counterfactual recovery",
+  "inference": {
+    "n_total": 1000,
+    "n_usable": 1000,
+    "parameters": {
+      "theta_0": {
+        "bias": -0.0013098637462665708,
+        "coverage_95": 0.954,
+        "empirical_sd": 0.035297204736731015,
+        "left_miss": 0.02,
+        "mean_estimate": 0.3486901362537334,
+        "mean_reported_se": 0.03513393328708164,
+        "right_miss": 0.026,
+        "se_ratio": 0.9953743801848572,
+        "standardized_bias": 0.03710956026224646,
+        "true": 0.35
+      },
+      "theta_1": {
+        "bias": -0.002089581092185433,
+        "coverage_95": 0.948,
+        "empirical_sd": 0.04800252725885693,
+        "left_miss": 0.028,
+        "mean_estimate": -0.25208958109218543,
+        "mean_reported_se": 0.04821730052228307,
+        "right_miss": 0.024,
+        "se_ratio": 1.004474207415538,
+        "standardized_bias": 0.04353064747856343,
+        "true": -0.25
+      },
+      "theta_2": {
+        "bias": -0.0027138074948732382,
+        "coverage_95": 0.954,
+        "empirical_sd": 0.052240191846725306,
+        "left_miss": 0.016,
+        "mean_estimate": 0.19728619250512677,
+        "mean_reported_se": 0.052727560096246746,
+        "right_miss": 0.03,
+        "se_ratio": 1.009329373271664,
+        "standardized_bias": 0.05194865100870326,
+        "true": 0.2
+      }
+    },
+    "usable_rate": 1.0
+  },
+  "intervention_effects": {
+    "hard_problem": {
+      "reward_policy_tv": 0.08292355833677359,
+      "transition_policy_tv": 0.04543618968343278
+    },
+    "inference": {
+      "reward_policy_tv": 0.1303715124269705,
+      "transition_policy_tv": 0.023077401173772154
+    }
+  },
+  "paper_target": null,
+  "status": "ready",
+  "summary_report": "================================================================================\n                   Dynamic Discrete Choice Estimation Results                   \n================================================================================\nMethod:      NFXP (Nested Fixed Point)    Observations:  7,500\nOptimizer:   BHHH                         Individuals:   300\nFamily:      structural (linear utility)  Discount (\u03b2):  0.95\n                                          Scale (\u03c3):     1.0\n                                          Date:          2026-07-25\n\n[1] DATA\n  State space:          200 states x 2 actions\n  Periods per individual: ~25\n  Obs per state:        max 4,001 . p95 15 . p50 4 . p5 1 . min 1\n  State coverage:       186/200 visited (93%)\n  Single-action states: 76\n\n[2] PRE-ESTIMATION CHECKS\n  Reward features (K):  3\n  Design rank:          3/3         Condition:          1.0e+00\n  Contrast rank:        3/3       Contrast condition: 1.0e+00\n  Verdict:              identified -- every reward parameter varies across actions\n\n[3] TRANSITION MODEL\n  Transition source: supplied action-specific tensor\n--------------------------------------------------------------------------------\n[4] RESULTS\n  4a. Estimation\n                          coef   std err       t   P>|t|   [0.025   0.975]\n    theta_0             1.1238    0.0633   17.76   0.000   0.9997   1.2478\n    theta_1            -0.7481    0.0429  -17.42   0.000  -0.8322  -0.6639\n    theta_2             0.5976    0.0460   12.98   0.000   0.5074   0.6878\n  4b. Identification\n    Hessian condition:  4.1     Min eigenvalue: 199.63\n    Status:             Well-identified\n  4c. Inference & fit\n    Converged:   yes\n    Iterations:  5\n    Estimation time: 1.53 seconds\n    Message:     Converged\n    SE method:  robust (sandwich)\n    Log-lik:    -4,470.69\n    AIC/BIC:    8,947.4 / 8,968.2\n    accuracy 68.3%\n================================================================================"
+}

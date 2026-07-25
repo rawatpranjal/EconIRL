@@ -36,46 +36,21 @@ Example:
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 from scipy.stats import norm as scipy_norm
 
-from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.nfxp import NFXPEstimator
+from econirl.simulation.counterfactual import (
+    CounterfactualResult,
+    counterfactual_policy,
+    counterfactual_transitions,
+)
 from econirl.transitions import TransitionEstimator
-
-
-@dataclass
-class CounterfactualResult:
-    """Result of a counterfactual policy analysis.
-
-    Contains the value function and policy computed under alternative
-    parameter values, enabling "what if" analysis after estimation.
-
-    Attributes:
-        params: Dictionary of parameter values used in the counterfactual.
-                Contains both the modified parameters and the original
-                estimated values for unchanged parameters.
-        value_function: Value function V(s) under the counterfactual parameters,
-                       shape (n_states,).
-        policy: Choice probabilities P(a|s) under the counterfactual parameters,
-               shape (n_states, n_actions). Each row sums to 1.
-
-    Example:
-        >>> # After fitting NFXP estimator
-        >>> cf = estimator.counterfactual(RC=15.0)
-        >>> print(f"Under RC=15.0, P(replace|state=50) = {cf.policy[50, 1]:.3f}")
-    """
-
-    params: dict[str, float]
-    value_function: np.ndarray
-    policy: np.ndarray
 
 
 class NFXP:
@@ -128,7 +103,13 @@ class NFXP:
     value_function_ : numpy.ndarray
         Alias for ``value_`` (backward compatibility).
     transitions_ : numpy.ndarray
-        Transition probability matrix (n_states x n_states).
+        Original transition input. This is a two-dimensional keep matrix when
+        transitions are estimated by the wrapper, or the supplied array.
+    transition_tensor_ : numpy.ndarray
+        Canonical action-specific transition tensor with shape
+        ``(n_actions, n_states, n_states)``.
+    transition_source_ : str
+        Whether transitions were estimated from the fitted panel or supplied.
     converged_ : bool
         Whether the optimization converged.
     reward_spec_ : RewardSpec
@@ -217,6 +198,8 @@ class NFXP:
         self.policy_: np.ndarray | None = None
         self.value_: np.ndarray | None = None
         self.transitions_: np.ndarray | None = None
+        self.transition_tensor_: np.ndarray | None = None
+        self.transition_source_: str | None = None
         self.converged_: bool | None = None
         self.reward_spec_: RewardSpec | None = None
 
@@ -322,6 +305,7 @@ class NFXP:
             self.transitions_ = trans_estimator.matrix_
             self._transition_probabilities = trans_estimator.probs_
             self._transition_increments = trans_estimator.transition_increments_
+            self.transition_source_ = "estimated from fitted panel"
         else:
             if self.se_method == "full_likelihood_bhhh":
                 raise ValueError(
@@ -333,11 +317,17 @@ class NFXP:
             self.transitions_ = np.asarray(transitions)
             self._transition_probabilities = None
             self._transition_increments = None
+            self.transition_source_ = (
+                "supplied action-specific tensor"
+                if self.transitions_.ndim == 3
+                else "supplied keep-transition matrix"
+            )
 
         # Build full transition matrices (for both actions)
         # Action 0 (keep): use estimated transitions
         # Action 1 (replace): reset to state 0, then apply transition
         transition_tensor = self._build_transition_tensor(self.transitions_)
+        self.transition_tensor_ = transition_tensor
 
         # Create problem specification
         self._problem = DDCProblem(
@@ -357,6 +347,7 @@ class NFXP:
         estimate_kwargs = {
             "n_bootstrap": self.n_bootstrap,
             "se_seed": self.se_seed,
+            "transition_source": self.transition_source_,
         }
         if self.se_method == "full_likelihood_bhhh":
             estimate_kwargs.update(
@@ -532,7 +523,25 @@ class NFXP:
                 raise ValueError(
                     f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
+            self._validate_transition_rows(keep_transitions)
             return keep_transitions
+
+        if keep_transitions.ndim != 2:
+            raise ValueError(
+                "transitions must be a 2D keep matrix or a 3D action-specific tensor"
+            )
+        if self.n_actions != 2:
+            raise ValueError(
+                "a 2D keep-transition matrix is only defined for n_actions=2; "
+                "supply a full (n_actions, n_states, n_states) tensor"
+            )
+        expected_matrix_shape = (self.n_states, self.n_states)
+        if keep_transitions.shape != expected_matrix_shape:
+            raise ValueError(
+                f"2D transitions must have shape {expected_matrix_shape}, "
+                f"got {keep_transitions.shape}"
+            )
+        self._validate_transition_rows(keep_transitions)
 
         n = self.n_states
         transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
@@ -547,7 +556,23 @@ class NFXP:
             # After replacement from any state, we transition as if from state 0
             transitions[1, s, :] = transitions[0, 0, :]
 
+        self._validate_transition_rows(transitions)
         return transitions
+
+    @staticmethod
+    def _validate_transition_rows(transitions: np.ndarray) -> None:
+        """Validate finite, non-negative probability rows."""
+        if not np.isfinite(transitions).all():
+            raise ValueError("transitions must contain only finite probabilities")
+        if (transitions < 0).any():
+            raise ValueError("transitions must contain non-negative probabilities")
+        row_sums = transitions.sum(axis=-1)
+        if not np.allclose(row_sums, 1.0, atol=1e-6):
+            max_error = float(np.max(np.abs(row_sums - 1.0)))
+            raise ValueError(
+                "transition rows must sum to 1; "
+                f"maximum absolute row-sum error is {max_error:.3g}"
+            )
 
     def _extract_results(self) -> None:
         """Extract results from estimation into sklearn-style attributes."""
@@ -641,7 +666,7 @@ class NFXP:
         utility_matrix = self._utility_fn.compute(param_vector)
         return np.asarray(utility_matrix)
 
-    def summary(self) -> str:
+    def summary(self, alpha: float = 0.05) -> str:
         """Generate a formatted summary of estimation results.
 
         Returns
@@ -652,7 +677,7 @@ class NFXP:
         if self._result is None:
             return "NFXP: Not fitted yet. Call fit() first."
 
-        return self._result.summary()
+        return self._result.summary(alpha=alpha)
 
     def conf_int(self, alpha: float = 0.05) -> dict:
         """Compute confidence intervals for parameters.
@@ -760,9 +785,7 @@ class NFXP:
         if self._result is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
-        # Set random seed
-        if seed is not None:
-            np.random.seed(seed)
+        rng = np.random.default_rng(seed)
 
         # Resolve per-agent initial states. None keeps the historical behaviour
         # (everyone starts at state 0); a length-n_states vector is a start
@@ -772,7 +795,7 @@ class NFXP:
         else:
             init_states = np.asarray(init_states)
             if init_states.shape == (self.n_states,):
-                initial = np.random.choice(self.n_states, size=n_agents, p=init_states)
+                initial = rng.choice(self.n_states, size=n_agents, p=init_states)
             elif init_states.shape == (n_agents,):
                 initial = init_states.astype(int)
             else:
@@ -785,8 +808,9 @@ class NFXP:
         # Get the policy (choice probabilities)
         policy = np.asarray(self._result.policy)  # shape: (n_states, n_actions)
 
-        # Get transition probabilities (for action 0 = keep)
-        transitions = self.transitions_  # shape: (n_states, n_states)
+        transition_tensor = self.transition_tensor_
+        if transition_tensor is None:
+            transition_tensor = self._build_transition_tensor(self.transitions_)
 
         # Storage for results
         data = []
@@ -797,7 +821,7 @@ class NFXP:
             for period in range(n_periods):
                 # Sample action from policy
                 action_probs = policy[state]
-                action = np.random.choice(self.n_actions, p=action_probs)
+                action = rng.choice(self.n_actions, p=action_probs)
 
                 # Record observation
                 data.append(
@@ -809,18 +833,16 @@ class NFXP:
                     }
                 )
 
-                # Transition to next state
-                if action == 1:  # Replace: reset to state 0, then transition
-                    state = 0
-                    trans_probs = transitions[0]
-                else:  # Keep: use transition from current state
-                    trans_probs = transitions[state]
-
-                state = np.random.choice(self.n_states, p=trans_probs)
+                trans_probs = transition_tensor[action, state]
+                state = rng.choice(self.n_states, p=trans_probs)
 
         return pd.DataFrame(data)
 
-    def counterfactual(self, **param_changes) -> CounterfactualResult:
+    def counterfactual(
+        self,
+        transitions: np.ndarray | None = None,
+        **param_changes,
+    ) -> CounterfactualResult:
         """Compute outcomes under different parameter values.
 
         Performs counterfactual analysis by solving the dynamic programming
@@ -829,6 +851,9 @@ class NFXP:
 
         Parameters
         ----------
+        transitions : numpy.ndarray, optional
+            Alternative transition matrix or action-specific transition tensor.
+            When supplied, reward parameters remain fixed.
         **param_changes : float
             Keyword arguments specifying parameter changes.
             Keys must be valid parameter names (e.g., "theta_c", "RC").
@@ -868,6 +893,11 @@ class NFXP:
         if self._result is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
+        if transitions is not None and param_changes:
+            raise ValueError(
+                "change reward parameters or transitions in one counterfactual, not both"
+            )
+
         # Check for invalid parameter names
         valid_params = set(self.params_.keys())
         for param_name in param_changes:
@@ -881,33 +911,29 @@ class NFXP:
         cf_params = self.params_.copy()
         cf_params.update(param_changes)
 
-        # Build parameter vector in correct order
-        param_names = self._result.parameter_names
-        param_vector = np.array(
-            [cf_params[name] for name in param_names],
-            dtype=np.float32,
-        )
+        baseline_tensor = self.transition_tensor_
+        if baseline_tensor is None:
+            baseline_tensor = self._build_transition_tensor(self.transitions_)
 
-        # Compute utility matrix with new parameters
-        utility_matrix = self._utility_fn.compute(param_vector)
-
-        # Build transition tensor
-        transition_tensor = self._build_transition_tensor(self.transitions_)
-
-        # Create Bellman operator
-        operator = SoftBellmanOperator(
-            problem=self._problem,
-            transitions=transition_tensor,
-        )
-
-        # Solve for new value function and policy
-        result = value_iteration(operator, utility_matrix)
-
-        return CounterfactualResult(
-            params=cf_params,
-            value_function=np.asarray(result.V),
-            policy=np.asarray(result.policy),
-        )
+        if transitions is not None:
+            new_tensor = self._build_transition_tensor(transitions)
+            result = counterfactual_transitions(
+                result=self._result,
+                new_transitions=new_tensor,
+                utility=self._utility_fn,
+                problem=self._problem,
+                baseline_transitions=baseline_tensor,
+            )
+        else:
+            result = counterfactual_policy(
+                result=self._result,
+                new_parameters=cf_params,
+                utility=self._utility_fn,
+                problem=self._problem,
+                transitions=baseline_tensor,
+            )
+        result.params = cf_params
+        return result
 
     def __repr__(self) -> str:
         if self.params_ is not None:

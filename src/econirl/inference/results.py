@@ -360,6 +360,7 @@ class EstimationSummary:
     num_states: int | None = None
     num_actions: int | None = None
     optimizer: str | None = None
+    transition_source: str | None = None
     dataset: DatasetInfo | None = None
     pre_estimation: PreEstimationChecks | None = None
     transition_first_stage: TransitionFirstStage | None = None
@@ -559,12 +560,19 @@ class EstimationSummary:
             lines.append("[2] PRE-ESTIMATION CHECKS")
             lines.extend(self._render_pre_estimation(self.pre_estimation))
 
-        # --- [3] FIRST STAGE — STATE-TRANSITION ESTIMATION ---
+        # --- [3] TRANSITION MODEL ---
+        if self.transition_source is not None or self.transition_first_stage is not None:
+            lines.append("")
+            if self.transition_first_stage is None:
+                lines.append("[3] TRANSITION MODEL")
+            else:
+                lines.append("[3] FIRST-STAGE TRANSITION ESTIMATION")
+            if self.transition_source is not None:
+                lines.append(f"  Transition source: {self.transition_source}")
+
         if self.transition_first_stage is not None:
             t = self.transition_first_stage
             q = t.se_quantiles
-            lines.append("")
-            lines.append("[3] FIRST-STAGE TRANSITION ESTIMATION")
             lines.append(f"  Method:               {t.method}")
             lines.append(
                 f"  Transitions used:     N = {t.num_transitions:,}"
@@ -600,6 +608,11 @@ class EstimationSummary:
             lines.append(f"    Status:             {self.identification.status}")
 
         lines.append("  4c. Inference & fit")
+        lines.append(f"    Converged:   {'yes' if self.converged else 'no'}")
+        lines.append(f"    Iterations:  {self.num_iterations}")
+        lines.append(f"    Estimation time: {self.estimation_time:.2f} seconds")
+        if self.convergence_message:
+            lines.append(f"    Message:     {self.convergence_message}")
         se_label = self._se_method_label()
         if se_label:
             lines.append(f"    SE method:  {se_label}")
@@ -738,7 +751,10 @@ class EstimationSummary:
             f"\\label{{{label}}}",
             r"\begin{tabular}{lcccccc}",
             r"\hline\hline",
-            r"Parameter & Estimate & Std. Error & $t$-stat & $p$-value & \multicolumn{2}{c}{95\% CI} \\",
+            (
+                r"Parameter & Estimate & Std. Error & $t$-stat & $p$-value & "
+                r"\multicolumn{2}{c}{95\% CI} \\"
+            ),
             r"\hline",
         ]
 
