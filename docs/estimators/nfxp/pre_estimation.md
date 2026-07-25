@@ -18,20 +18,19 @@ Run these checks before treating a result as structural evidence.
 | Action support | Rare actions leave their payoff weakly identified. |
 | Reward normalization | Reward level and scale need a valid anchor. |
 
-## Canonical Simulation Checks
+## Example Diagnostics
 
-Values from the canonical synthetic run (see [Simulation Study](validation.md)):
+These values come from the 200-state example in the
+[Simulation Study](validation.md):
 
-| Check | Value | Status |
-| --- | ---: | --- |
-| Feature rank | 4 / 4 | pass |
-| Feature condition number | 4.512 | pass |
-| Transition row error | 2.42e-8 | pass |
-| Observed states | 21 / 21 | pass |
-| State-action coverage | 1.000 | pass |
-| Action shares | 0.345, 0.330, 0.325 | pass |
-| Minimum action share | 0.325 | pass |
-| Exit and absorbing anchor | true | pass |
+| Diagnostic | Value |
+| --- | ---: |
+| Reward features | 3 |
+| Design rank | 3 / 3 |
+| Action-contrast rank | 3 / 3 |
+| Observed states | 186 / 200 |
+| Actions | 2 |
+| Observations | 7,500 |
 
 ## Common Risk Patterns
 

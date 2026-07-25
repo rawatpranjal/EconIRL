@@ -104,6 +104,7 @@ def test_ufxp_sklearn_wrapper() -> None:
     import pandas as pd
 
     from econirl import UFXP
+    from econirl.datasets import rust_bus_reward_spec
 
     env = RustBusEnvironment(num_mileage_bins=10, operating_cost=0.01,
                              replacement_cost=2.0, discount_factor=0.9)
@@ -114,7 +115,11 @@ def test_ufxp_sklearn_wrapper() -> None:
             rows.append({"bus_id": i, "mileage": int(s), "replaced": int(a)})
     df = pd.DataFrame(rows)
 
-    model = UFXP(n_states=10, discount=0.9)
+    model = UFXP(
+        n_states=10,
+        discount=0.9,
+        utility=rust_bus_reward_spec(10),
+    )
     model.fit(df, state="mileage", action="replaced", id="bus_id")
 
     assert model.converged_

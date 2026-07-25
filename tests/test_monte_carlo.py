@@ -1,7 +1,6 @@
 """Tests for Monte Carlo parameter recovery."""
 
 import pytest
-import numpy as np
 
 from econirl.replication.rust1987.monte_carlo import run_monte_carlo, summarize_monte_carlo
 
@@ -37,7 +36,7 @@ class TestMonteCarlo:
         )
 
         # Filter to converged results
-        converged = results[results['converged'] == True]
+        converged = results[results['converged']]
 
         # Mean estimates should be close to true values
         mean_theta_c = converged['theta_c'].mean()
@@ -119,7 +118,7 @@ class TestMonteCarloSummarize:
         assert len(summary) == 2  # theta_c and RC
 
     def test_summarize_multiple_estimators(self):
-        """Summary should handle multiple estimators."""
+        """Summary should retain estimators even when every fit fails."""
         results = run_monte_carlo(
             n_simulations=3,
             n_individuals=50,
@@ -133,6 +132,10 @@ class TestMonteCarloSummarize:
         # Should have 2 params * 2 estimators = 4 rows
         assert len(summary) == 4
         assert set(summary['estimator'].unique()) == {"Hotz-Miller", "NPL"}
+
+        for estimator in {"Hotz-Miller", "NPL"}:
+            rows = summary[summary["estimator"] == estimator]
+            assert set(rows["parameter"]) == {"theta_c", "RC"}
 
 
 class TestMonteCarloEdgeCases:

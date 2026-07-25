@@ -9,8 +9,9 @@ This is the Phase 2 acceptance test. All estimators:
 
 import numpy as np
 import pytest
-from econirl import NFXP, NNES, CCP, TDCCP
-from econirl.datasets import load_rust_bus
+
+from econirl import CCP, NFXP, NNES, TDCCP
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl.estimators.protocol import EstimatorProtocol
 
 
@@ -20,7 +21,12 @@ def rust_bus_df():
 
 
 # Use small state space for fast tests
-FAST_KWARGS = dict(n_states=90, discount=0.9999)
+FAST_KWARGS = dict(
+    n_states=90,
+    discount=0.9999,
+    utility=rust_bus_reward_spec(90),
+)
+EXPECTED_PARAMS = {"operating_cost", "replacement_cost"}
 
 
 @pytest.fixture(scope="module")
@@ -59,7 +65,7 @@ class TestConsistentAttributes:
     def test_params_keys(self, all_fitted, name):
         model = all_fitted[name]
         assert model.params_ is not None
-        assert set(model.params_.keys()) == {"theta_c", "RC"}
+        assert set(model.params_.keys()) == EXPECTED_PARAMS
 
     @pytest.mark.parametrize("name", ["nfxp", "ccp", "nnes", "tdccp"])
     def test_policy_shape(self, all_fitted, name):
@@ -77,7 +83,7 @@ class TestConsistentAttributes:
     def test_pvalues_present(self, all_fitted, name):
         model = all_fitted[name]
         assert model.pvalues_ is not None
-        assert set(model.pvalues_.keys()) == {"theta_c", "RC"}
+        assert set(model.pvalues_.keys()) == EXPECTED_PARAMS
 
     @pytest.mark.parametrize("name", ["nfxp", "ccp", "nnes", "tdccp"])
     def test_summary_string(self, all_fitted, name):
@@ -99,8 +105,7 @@ class TestConsistentAttributes:
         # conf_int may fail if SEs are NaN; just check it doesn't crash
         try:
             ci = model.conf_int()
-            assert "theta_c" in ci
-            assert "RC" in ci
+            assert EXPECTED_PARAMS.issubset(ci)
         except (RuntimeError, ValueError):
             pass  # NaN SEs for neural methods is acceptable
 
@@ -110,20 +115,26 @@ class TestParameterRecovery:
     """Structural estimators should recover positive parameters."""
 
     def test_nfxp_positive_params(self, all_fitted):
-        assert all_fitted["nfxp"].params_["theta_c"] > 0
-        assert all_fitted["nfxp"].params_["RC"] > 0
+        assert all_fitted["nfxp"].params_["operating_cost"] > 0
+        assert all_fitted["nfxp"].params_["replacement_cost"] > 0
 
     def test_ccp_positive_params(self, all_fitted):
-        assert all_fitted["ccp"].params_["theta_c"] > 0
-        assert all_fitted["ccp"].params_["RC"] > 0
+        assert all_fitted["ccp"].params_["operating_cost"] > 0
+        assert all_fitted["ccp"].params_["replacement_cost"] > 0
 
     def test_nfxp_ccp_agreement(self, all_fitted):
         """NFXP and CCP should recover very similar parameters."""
         nfxp_vec = np.array(
-            [all_fitted["nfxp"].params_["theta_c"], all_fitted["nfxp"].params_["RC"]]
+            [
+                all_fitted["nfxp"].params_["operating_cost"],
+                all_fitted["nfxp"].params_["replacement_cost"],
+            ]
         )
         ccp_vec = np.array(
-            [all_fitted["ccp"].params_["theta_c"], all_fitted["ccp"].params_["RC"]]
+            [
+                all_fitted["ccp"].params_["operating_cost"],
+                all_fitted["ccp"].params_["replacement_cost"],
+            ]
         )
         cos_sim = np.dot(nfxp_vec, ccp_vec) / (
             np.linalg.norm(nfxp_vec) * np.linalg.norm(ccp_vec)
@@ -134,6 +145,7 @@ class TestParameterRecovery:
         """Print all parameters for manual inspection."""
         for name, model in all_fitted.items():
             print(
-                f"\n{name.upper()}: theta_c={model.params_['theta_c']:.6f}, "
-                f"RC={model.params_['RC']:.4f}"
+                f"\n{name.upper()}: operating_cost="
+                f"{model.params_['operating_cost']:.6f}, "
+                f"replacement_cost={model.params_['replacement_cost']:.4f}"
             )

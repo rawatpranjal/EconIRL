@@ -14,9 +14,12 @@ References:
     Abbeel & Ng (2004). "Apprenticeship Learning via Inverse Reinforcement Learning."
 """
 
-import pytest
 import numpy as np
-import pandas as pd
+import pytest
+
+from econirl.datasets import rust_bus_reward_spec
+
+RUST_BUS_REWARD = rust_bus_reward_spec(90)
 
 
 # ============================================================================
@@ -586,10 +589,15 @@ class TestIRLvsDDCComparison:
         Both should produce valid estimates. IRL recovers reward while
         NFXP recovers utility parameters, but both should fit the data.
         """
-        from econirl.estimators import MaxEntIRL, NFXP
+        from econirl.estimators import NFXP, MaxEntIRL
 
         # Fit NFXP
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         nfxp.fit(
             data=rust_data_small,
             state="mileage_bin",
@@ -616,8 +624,8 @@ class TestIRLvsDDCComparison:
         assert maxent.params_ is not None
 
         # Both should have finite parameters
-        assert np.isfinite(nfxp.params_["theta_c"])
-        assert np.isfinite(nfxp.params_["RC"])
+        assert np.isfinite(nfxp.params_["operating_cost"])
+        assert np.isfinite(nfxp.params_["replacement_cost"])
         assert np.all(np.isfinite(maxent.coef_))
 
         # Both should have negative log-likelihood
@@ -634,10 +642,15 @@ class TestIRLvsDDCComparison:
 
     def test_compare_maxmargin_to_nfxp(self, rust_data_small):
         """Compare MaxMarginIRL to NFXP on the same data."""
-        from econirl.estimators import MaxMarginIRL, NFXP
+        from econirl.estimators import NFXP, MaxMarginIRL
 
         # Fit NFXP
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         nfxp.fit(
             data=rust_data_small,
             state="mileage_bin",
@@ -666,8 +679,8 @@ class TestIRLvsDDCComparison:
         assert maxmargin.params_ is not None
 
         # Both should have finite parameters
-        assert np.isfinite(nfxp.params_["theta_c"])
-        assert np.isfinite(nfxp.params_["RC"])
+        assert np.isfinite(nfxp.params_["operating_cost"])
+        assert np.isfinite(nfxp.params_["replacement_cost"])
         assert np.all(np.isfinite(maxmargin.coef_))
 
         # Both should produce valid choice probabilities
@@ -688,8 +701,8 @@ class TestIRLRobustness:
 
     def test_maxent_with_small_sample(self):
         """Test MaxEntIRL with small sample size."""
-        from econirl.estimators import MaxEntIRL
         from econirl.datasets import load_equipment_replacement
+        from econirl.estimators import MaxEntIRL
 
         # Very small sample
         data = load_equipment_replacement(
@@ -719,8 +732,8 @@ class TestIRLRobustness:
 
     def test_maxmargin_with_small_sample(self):
         """Test MaxMarginIRL with small sample size."""
-        from econirl.estimators import MaxMarginIRL
         from econirl.datasets import load_equipment_replacement
+        from econirl.estimators import MaxMarginIRL
 
         # Very small sample
         data = load_equipment_replacement(
@@ -752,8 +765,8 @@ class TestIRLRobustness:
 
     def test_maxent_with_continuous_state_variant(self):
         """Test MaxEntIRL on equipment data with more states (200)."""
-        from econirl.estimators import MaxEntIRL
         from econirl.datasets import load_equipment_replacement
+        from econirl.estimators import MaxEntIRL
 
         data = load_equipment_replacement(
             variant="continuous_state",
@@ -782,8 +795,8 @@ class TestIRLRobustness:
 
     def test_maxmargin_with_continuous_state_variant(self):
         """Test MaxMarginIRL on equipment data with more states (200)."""
-        from econirl.estimators import MaxMarginIRL
         from econirl.datasets import load_equipment_replacement
+        from econirl.estimators import MaxMarginIRL
 
         data = load_equipment_replacement(
             variant="continuous_state",
@@ -814,8 +827,8 @@ class TestIRLRobustness:
 
     def test_repr_before_and_after_fit(self):
         """Test __repr__ works before and after fitting."""
-        from econirl.estimators import MaxEntIRL, MaxMarginIRL
         from econirl.datasets import load_equipment_replacement
+        from econirl.estimators import MaxEntIRL, MaxMarginIRL
 
         # Before fit
         maxent = MaxEntIRL(n_states=90, n_actions=2)

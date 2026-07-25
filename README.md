@@ -17,25 +17,25 @@ pip install econirl
 ## Quick Start
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import NFXP
 
 df = load_rust_bus()
 
-model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
 
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 print(cf.policy[50, 1])
 ```
 
 Example output:
 
 ```text
-{'theta_c': 0.0010028828858836278, 'RC': 3.0722093435989524}
-0.05519477716656161
+{'operating_cost': 0.001002924937407198, 'replacement_cost': 3.072263682263484}
+0.055196266692073837
 ```
 
 ## Public Estimator Guides

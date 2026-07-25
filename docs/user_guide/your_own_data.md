@@ -209,7 +209,7 @@ the outputs, run one counterfactual.
 ```python
 import numpy as np
 from econirl import NFXP
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl.preprocessing import check_panel_structure
 
 # 1. Load the panel. Swap in your own DataFrame here.
@@ -221,21 +221,21 @@ report = check_panel_structure(df, id_col="bus_id", period_col="period",
 print(report.valid)
 
 # 3. Choose. We want reward parameters and a counterfactual, so structural.
-model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 
 # 4. Fit.
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 print(model.params_)
 
 # 5. Counterfactual: raise the replacement cost, read the new policy.
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 print("replace probability at state 50:", float(np.asarray(cf.policy)[50, 1]))
 ```
 
 ```text
 True
-{'theta_c': 0.0010029257006533541, 'RC': 3.072263842893654}
-replace probability at state 50: 0.055196291500871957
+{'operating_cost': 0.001002924937407198, 'replacement_cost': 3.072263682263484}
+replace probability at state 50: 0.055196266692073837
 ```
 
 ## Read the outputs
@@ -257,14 +257,14 @@ quantity depending on the method.
 Change a parameter and read the new policy.
 
 ```python
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 print(cf.params)
 print("replace probability at state 50:", float(np.asarray(cf.policy)[50, 1]))
 ```
 
 ```text
-{'theta_c': 0.0010029257006533541, 'RC': 4.0}
-replace probability at state 50: 0.055196291500871957
+{'operating_cost': 0.001002924937407198, 'replacement_cost': 4.0}
+replace probability at state 50: 0.055196266692073837
 ```
 
 A higher replacement cost lowers the chance of replacing at a given mileage.

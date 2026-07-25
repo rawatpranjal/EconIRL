@@ -11,11 +11,15 @@ Reference:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-import numpy as np
-import jax
 import jax.numpy as jnp
+import numpy as np
+
+if TYPE_CHECKING:
+    import polars as pl
+
+    from econirl.core.types import Panel
 
 DEFAULT_DATA_PATH = "/Volumes/Expansion/datasets/trivago-2019/train.csv"
 
@@ -128,14 +132,14 @@ def load_trivago_sessions(
     pl.DataFrame
         DataFrame with all original columns.
     """
-    import polars as pl
-
     path = data_path or DEFAULT_DATA_PATH
     if not Path(path).exists():
         raise FileNotFoundError(
             f"Trivago data not found at {path}. "
             "Download from: https://recsys.trivago.cloud/"
         )
+
+    import polars as pl
 
     df = pl.read_csv(path, infer_schema_length=10000)
 
@@ -172,8 +176,6 @@ def build_trivago_mdp(
         Keys: all_states, all_actions, all_next_states, session_ids,
         n_states, n_actions, state_names, action_names.
     """
-    import polars as pl
-
     n_non_absorbing = n_step_buckets * n_viewed_buckets * N_DEVICES
     absorbing = n_non_absorbing  # terminal state index
 

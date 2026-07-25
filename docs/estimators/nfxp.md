@@ -285,25 +285,34 @@ price of being an asymptotic equivalent rather than the exact finite-sample MLE.
 ## Usage
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import NFXP
 
 df = load_rust_bus()
 
-model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
 print(model.summary())
+print(model.summary(alpha=0.10))        # 90 percent confidence intervals
 ```
 
 Counterfactual analysis re-solves the fitted dynamic program under a changed
 primitive:
 
 ```python
-cf = model.counterfactual(RC=4.0)      # raise the replacement cost
+cf = model.counterfactual(replacement_cost=4.0)   # raise the replacement cost
 print(cf.params)
 print(cf.policy)                       # new replacement probability by state
+print(cf.summary())
+```
+
+Transition counterfactuals use a complete action-specific transition model:
+
+```python
+cf_transition = model.counterfactual(transitions=alternative_transitions)
+print(cf_transition.summary())
 ```
 
 The fitted policy gives the replacement probability by state, which can be read
@@ -313,45 +322,26 @@ at specific states:
 print(model.predict_proba([0, 10, 50, 89]))
 ```
 
-The [Quick Start](nfxp/quick_start.md) page documents the full set of fitted
-attributes and the full `NFXPEstimator` API.
+The [Quick Start](nfxp/quick_start.md) page documents the fitted attributes and
+the advanced `NFXPEstimator` interface.
 
 ## Evidence
 
-Parameter recovery is measured on a synthetic benchmark with known rewards,
-transitions, policies, values, Q functions, and Type A, Type B, and Type C
-counterfactual oracles. The figure below is a Monte-Carlo
-study over 200 replications: the panel is resimulated and refit on a fresh seed
-each time, and each parameter is plotted as its recovered mean and 95% interval
-against the true value.
+Three experiments cover the questions NFXP is meant to answer.
 
-![NFXP parameter recovery, Monte Carlo](../_static/estimators/nfxp_recovery.png)
+- **Estimation.** Twenty independent panels have 200 states, two actions, three
+  reward parameters, and 7,500 observations each. The mean distance between
+  the estimated and true policies is 0.0085 on a scale from 0 to 1.
+- **Inference.** In one thousand independent 40-state panels, coverage of the
+  three nominal 95 percent intervals ranges from 94.8 to 95.4 percent.
+- **Counterfactuals.** After a reward change and slower engine deterioration,
+  the estimated policies are 0.0064 and 0.0067 away from the corresponding
+  true-parameter policies.
 
-Across the 200 replications the true value sits inside the 95% interval for every
-parameter, and the mean estimate is close to the truth.
-
-| Parameter | True | Recovered (mean) | 95% interval |
-| --- | ---: | ---: | --- |
-| `action_0_intercept` | 0.10 | 0.103 | [0.053, 0.159] |
-| `action_0_progress` | 0.50 | 0.495 | [0.422, 0.563] |
-| `action_1_intercept` | 0.00 | -0.003 | [-0.083, 0.077] |
-| `action_1_progress` | -0.20 | -0.195 | [-0.306, -0.089] |
-
-Behavioral fit and counterfactual regret on the same cell, against the known
-oracle objects:
-
-| Metric | Value |
-| --- | ---: |
-| Policy total variation | 0.0057 |
-| Value RMSE | 0.0194 |
-| Type A regret (reward shift) | 0.000213 |
-| Type B regret (transition change) | 0.000362 |
-| Type C regret (action removed) | 0.000086 |
-
-The regrets are small because the recovered reward is close enough to the truth
-that re-solving the intervened model reproduces almost the same policy as the
-oracle. For the full cross-estimator comparison on the bus-engine panel, see the
-[bus engine simulation study](../simulation_studies/rust_bus.md).
+The [Simulation Study](nfxp/validation.md) reports the estimation, inference,
+and counterfactual results in detail. The
+[bus engine simulation study](../simulation_studies/rust_bus.md) compares NFXP
+with other estimators on a shared problem.
 
 ## References
 
@@ -364,13 +354,12 @@ Source papers:
   "Constrained Optimization Approaches to Estimation of Structural Models."
   _Econometrica_, 84(1), 365-370. {ref}`reference entry <iskhakov-2016>`.
 
-Implementation and reproduction:
+Code and results:
 
 - Estimator source: [`econirl.estimation.nfxp`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/nfxp.py).
 - sklearn wrapper: [`econirl.NFXP`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/nfxp.py).
-- Validation runner: [`validation/estimators/nfxp/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/run.py).
-- Recovery study: [`validation/estimators/nfxp/recovery_mc.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/recovery_mc.py).
-- Results files: [`nfxp.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp.json), [`nfxp_recovery.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp_recovery.json).
+- Simulation code: [`validation/estimators/nfxp/ready.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/ready.py).
+- Simulation results: [`validation/results/nfxp_ready.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp_ready.json).
 
 Pages:
 

@@ -30,7 +30,7 @@ print(model.params_)
 ```
 
 ```text
-{'theta_c': 0.0010029257006533541, 'RC': 3.072263842893654}
+{'operating_cost': 0.001002924937407198, 'replacement_cost': 3.072263682263484}
 ```
 
 ## Read the results
@@ -55,7 +55,7 @@ print(cf.policy[50, 1])
 ```
 
 ```text
-0.055196291500871957
+0.055196266692073837
 ```
 
 Next, check the data and the design before trusting a fit. See

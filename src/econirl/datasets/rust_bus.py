@@ -173,8 +173,6 @@ def _generate_rust_bus_data() -> pd.DataFrame:
     theta_c = 0.001
     # Replacement cost (in utils)
     RC = 3.0
-    # Discount factor
-    beta = 0.9999
     # Mileage transition probabilities (stay, +1, +2 bins)
     p_mileage = np.array([0.3919, 0.5953, 0.0128])
 

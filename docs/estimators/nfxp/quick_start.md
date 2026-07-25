@@ -5,15 +5,15 @@ inspect parameters, standard errors, policy, and value objects. It is a usage
 example, not a substitute for the pre-estimation checks.
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import NFXP
 
 df = load_rust_bus()
 
-model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
-print(model.params_)   # {"theta_c": ..., "RC": ...}
+print(model.params_)   # {"operating_cost": ..., "replacement_cost": ...}
 print(model.se_)
 print(model.summary())
 ```
@@ -27,15 +27,17 @@ Fitted attributes follow the same convention as CCP and UFXP:
 | `coef_` | Coefficients as a numpy array. |
 | `policy_` | Estimated action probabilities by state. |
 | `value_` | Estimated value function by state. |
+| `transition_tensor_` | Transition probabilities used for each action. |
+| `transition_source_` | Whether those probabilities came from the panel or were supplied. |
 | `log_likelihood_` | Maximized conditional choice log likelihood. |
 | `converged_` | Whether the outer optimizer reported convergence. |
 
 ## Custom Reward Features
 
-The `utility="linear_cost"` default builds the Rust bus features for you. To use
-your own features, pass a `RewardSpec` to `fit`. The feature array has shape
-`(n_states, n_actions, n_features)`, and `reward=` takes priority over the
-default reward features.
+`rust_bus_reward_spec(n_states)` builds the Rust bus features for you. To use
+your own features, build a `RewardSpec` directly and pass it to `fit`. The
+feature array has shape `(n_states, n_actions, n_features)`, and `reward=`
+overrides the constructor default.
 
 ```python
 import numpy as np
@@ -65,20 +67,30 @@ later.
 ## Counterfactual Example
 
 ```python
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 
 print(cf.params)
 print(cf.policy[50, 1])
+print(cf.summary())
 ```
 
 This solves the fitted model again with a higher replacement cost and returns
-the new value function and policy.
+the new value function and policy. For an environment counterfactual, pass a
+complete action-specific tensor instead:
 
-## Full Estimator API
+```python
+cf_transition = model.counterfactual(transitions=alternative_transitions)
+print(cf_transition.summary())
+```
+
+`summary(alpha=0.10)` reports 90 percent confidence intervals. The report also
+shows whether estimation converged, how many iterations it took, elapsed time,
+and where the transition probabilities came from.
+
+## Advanced API
 
 Use `econirl.estimation.nfxp.NFXPEstimator` when you need direct control over
-panel objects, utility objects, transition tensors, optimizer options, or
-diagnostic metadata:
+the model inputs and optimizer:
 
 ```python
 from econirl.estimation import NFXPEstimator

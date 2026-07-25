@@ -87,7 +87,8 @@ class NFXP:
     ----------
     params_ : dict
         Estimated parameters after fitting. Keys are parameter names
-        (e.g., "theta_c", "RC") and values are point estimates.
+        (e.g., "operating_cost", "replacement_cost") and values are point
+        estimates.
     se_ : dict
         Standard errors for each parameter.
     coef_ : numpy.ndarray
@@ -847,7 +848,8 @@ class NFXP:
 
         Performs counterfactual analysis by solving the dynamic programming
         problem under alternative parameter values. This enables "what if"
-        questions like "what would the policy be if RC was 15 instead of 10?"
+        questions such as "what would the policy be if replacement cost were
+        15 instead of 10?"
 
         Parameters
         ----------
@@ -856,8 +858,9 @@ class NFXP:
             When supplied, reward parameters remain fixed.
         **param_changes : float
             Keyword arguments specifying parameter changes.
-            Keys must be valid parameter names (e.g., "theta_c", "RC").
-            Values are the counterfactual parameter values.
+            Keys must be valid parameter names, such as ``operating_cost`` or
+            ``replacement_cost`` for ``rust_bus_reward_spec``. Values are the
+            counterfactual parameter values.
 
         Returns
         -------
@@ -876,19 +879,25 @@ class NFXP:
 
         Examples
         --------
-        >>> model = NFXP(n_states=90)
+        >>> from econirl.datasets import rust_bus_reward_spec
+        >>> model = NFXP(n_states=90, utility=rust_bus_reward_spec(90))
         >>> model.fit(data, state="mileage", action="replaced", id="bus_id")
         >>>
         >>> # What if replacement cost was higher?
-        >>> cf = model.counterfactual(RC=15.0)
-        >>> print(f"Original RC: {model.params_['RC']:.2f}")
-        >>> print(f"Counterfactual RC: {cf.params['RC']:.2f}")
+        >>> cf = model.counterfactual(replacement_cost=15.0)
+        >>> print(f"Original replacement cost: "
+        ...       f"{model.params_['replacement_cost']:.2f}")
+        >>> print(f"Counterfactual replacement cost: "
+        ...       f"{cf.params['replacement_cost']:.2f}")
         >>> print(f"P(replace|state=50) changes from "
         ...       f"{model.predict_proba(np.array([50]))[0,1]:.3f} to "
         ...       f"{cf.policy[50,1]:.3f}")
         >>>
         >>> # Multiple parameter changes
-        >>> cf2 = model.counterfactual(RC=15.0, theta_c=0.05)
+        >>> cf2 = model.counterfactual(
+        ...     replacement_cost=15.0,
+        ...     operating_cost=0.05,
+        ... )
         """
         if self._result is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
