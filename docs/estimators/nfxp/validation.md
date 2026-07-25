@@ -110,7 +110,14 @@ policy.
 Run the study from the repository root:
 
 ```bash
-PYTHONPATH=src:. uv run python validation/estimators/nfxp/ready.py
+PYTHONPATH=src:. uv run python validation/estimators/nfxp/ready.py \
+  --quiet --output validation/results/nfxp_ready.json
+```
+
+**Result**
+
+```text
+wrote validation/results/nfxp_ready.json
 ```
 
 The [simulation code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/ready.py)

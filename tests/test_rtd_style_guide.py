@@ -7,9 +7,101 @@ import runpy
 from fnmatch import fnmatch
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
+NFXP_PAGES = [
+    DOCS / "estimators" / "nfxp.md",
+    DOCS / "estimators" / "nfxp" / "quick_start.md",
+    DOCS / "estimators" / "nfxp" / "pre_estimation.md",
+    DOCS / "estimators" / "nfxp" / "validation.md",
+    DOCS / "estimators" / "nfxp" / "counterfactuals.md",
+    DOCS / "estimators" / "nfxp" / "rust_bus.md",
+]
+
+
+def test_nfxp_pages_put_important_links_immediately_after_title() -> None:
+    """Keep the most useful NFXP destinations visible at the top."""
+
+    pattern = re.compile(
+        r"\A# [^\n]+\n\n"
+        r"## Important Links\n\n"
+        r"(?P<links>(?:- \[[^\]]+\]\([^)]+\)\n){3,5})"
+        r"\n"
+    )
+    offenders = [
+        str(page.relative_to(ROOT))
+        for page in NFXP_PAGES
+        if pattern.match(page.read_text(encoding="utf-8")) is None
+    ]
+
+    assert offenders == []
+
+
+def test_nfxp_executable_snippets_show_exact_results() -> None:
+    """Require a non-empty result block after every Python or shell example."""
+
+    offenders = []
+    executable_blocks = 0
+
+    for page in NFXP_PAGES:
+        lines = page.read_text(encoding="utf-8").splitlines()
+        index = 0
+        while index < len(lines):
+            if lines[index].strip() not in {"```python", "```bash"}:
+                index += 1
+                continue
+
+            executable_blocks += 1
+            snippet_line = index + 1
+            index += 1
+            while index < len(lines) and lines[index].strip() != "```":
+                index += 1
+            if index == len(lines):
+                offenders.append(
+                    f"{page.relative_to(ROOT)}:{snippet_line}: unclosed snippet"
+                )
+                break
+
+            index += 1
+            while index < len(lines) and not lines[index].strip():
+                index += 1
+            if index == len(lines) or lines[index].strip() != "**Result**":
+                offenders.append(
+                    f"{page.relative_to(ROOT)}:{snippet_line}: missing Result label"
+                )
+                continue
+
+            index += 1
+            while index < len(lines) and not lines[index].strip():
+                index += 1
+            if index == len(lines) or lines[index].strip() != "```text":
+                offenders.append(
+                    f"{page.relative_to(ROOT)}:{snippet_line}: missing text result"
+                )
+                continue
+
+            index += 1
+            result_lines = []
+            while index < len(lines) and lines[index].strip() != "```":
+                result_lines.append(lines[index])
+                index += 1
+            if index == len(lines):
+                offenders.append(
+                    f"{page.relative_to(ROOT)}:{snippet_line}: unclosed result"
+                )
+                break
+            result = "\n".join(result_lines).strip()
+            if not result:
+                offenders.append(
+                    f"{page.relative_to(ROOT)}:{snippet_line}: empty result"
+                )
+            if "..." in result or "…" in result:
+                offenders.append(
+                    f"{page.relative_to(ROOT)}:{snippet_line}: abbreviated result"
+                )
+
+    assert executable_blocks
+    assert offenders == []
 
 
 def test_estimator_validation_pages_render_as_simulation_studies() -> None:

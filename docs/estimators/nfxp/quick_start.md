@@ -21,9 +21,15 @@ df = load_rust_bus()
 model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
-print(model.params_)   # {"operating_cost": ..., "replacement_cost": ...}
-print(model.se_)
-print(model.summary())
+for name in model.params_:
+    print(f"{name}: estimate={model.params_[name]:.6f}, se={model.se_[name]:.6f}")
+```
+
+**Result**
+
+```text
+operating_cost: estimate=0.001003, se=0.000389
+replacement_cost: estimate=3.072264, se=0.073965
 ```
 
 Fitted attributes follow the same convention as CCP and UFXP:
@@ -65,7 +71,13 @@ spec = RewardSpec(features, names=["operating_cost", "replacement_cost"])
 model = NFXP(n_states=n_states, discount=0.9999)
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id", reward=spec)
 
-print(model.params_)   # {"operating_cost": ..., "replacement_cost": ...}
+print({name: round(value, 6) for name, value in model.params_.items()})
+```
+
+**Result**
+
+```text
+{'operating_cost': 0.090265, 'replacement_cost': 3.072221}
 ```
 
 A `RewardSpec` whose state or action dimension does not match `n_states` /
@@ -77,33 +89,30 @@ later.
 ```python
 cf = model.counterfactual(replacement_cost=4.0)
 
-print(cf.params)
-print(cf.policy[50, 1])
-print(cf.summary())
+print(f"replacement_cost = {cf.params['replacement_cost']:.6f}")
+print(f"P(replace | state=50) = {cf.policy[50, 1]:.6f}")
+```
+
+**Result**
+
+```text
+replacement_cost = 4.000000
+P(replace | state=50) = 0.055196
 ```
 
 This solves the fitted model again with a higher replacement cost and returns
-the new value function and policy. For an environment counterfactual, pass a
-complete action-specific tensor instead:
-
-```python
-cf_transition = model.counterfactual(transitions=alternative_transitions)
-print(cf_transition.summary())
-```
+the new value function and policy. The [Counterfactuals](counterfactuals.md)
+page shows how to change the transition model and reports the resulting policy
+change.
 
 `summary(alpha=0.10)` reports 90 percent confidence intervals. The report also
 shows whether estimation converged, how many iterations it took, elapsed time,
-and where the transition probabilities came from.
+and where the transition probabilities came from. The
+[Simulation Study](validation.md) shows the complete report.
 
 ## Advanced API
 
 Use `econirl.estimation.nfxp.NFXPEstimator` when you need direct control over
-the model inputs and optimizer:
-
-```python
-from econirl.estimation import NFXPEstimator
-
-result = NFXPEstimator(inner_solver="hybrid", inner_tol=1e-10).estimate(
-    panel, utility, problem, transitions
-)
-```
+the model inputs and optimizer. See the
+[`NFXPEstimator` source](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/nfxp.py)
+for the low-level interface.
