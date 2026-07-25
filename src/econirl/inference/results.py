@@ -12,11 +12,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
 from scipy import stats
 
 
@@ -62,6 +62,233 @@ class GoodnessOfFit:
     bic: float
     pseudo_r_squared: float | None = None
     prediction_accuracy: float | None = None
+
+
+@dataclass
+class DatasetInfo:
+    """Dataset cardinality and panel-coverage statistics.
+
+    ``obs_per_state`` holds the distribution of observation counts across the
+    states that were actually visited, as a dict with keys
+    ``max, p95, p50, p5, min``.
+    """
+
+    num_states: int
+    num_actions: int
+    num_observations: int
+    num_individuals: int
+    num_periods: int
+    obs_per_state: dict[str, float]
+    states_visited: int
+    single_action_states: int
+
+
+@dataclass
+class PreEstimationChecks:
+    """Identification-readiness checks.
+
+    ``kind="feature"`` (structural, linear utility) carries the reward-design
+    rank checks. ``kind="coverage"`` (IRL / neural, no linear feature matrix)
+    carries panel-coverage statistics. Only the fields for the active ``kind``
+    are populated.
+    """
+
+    kind: str
+    # structural feature block
+    num_features: int | None = None
+    feature_rank: int | None = None
+    condition_number: float | None = None
+    contrast_rank: int | None = None
+    contrast_condition_number: float | None = None
+    verdict: str | None = None
+    # IRL / neural coverage block (populated in a later pass)
+    state_action_coverage: float | None = None
+    state_coverage: float | None = None
+    demo_policy_entropy: float | None = None
+    effective_occupancy_support: float | None = None
+    initial_states: int | None = None
+    initial_state_entropy: float | None = None
+
+
+@dataclass
+class TransitionFirstStage:
+    """First-stage state-transition estimate and its multinomial sampling error.
+
+    The transition probabilities are estimated by empirical frequencies. Each
+    estimated cell P(s'|s,a) carries the multinomial standard error
+    ``sqrt(p_hat (1 - p_hat) / N_sa)`` where ``N_sa`` is the number of
+    transitions observed out of ``(s, a)``. ``se_quantiles`` summarizes those
+    standard errors across all estimated cells (keys ``max, p95, p50, p5, min``).
+    ``probs`` / ``probs_se`` are populated only when the caller supplies a
+    low-dimensional structured kernel worth listing.
+    """
+
+    method: str
+    num_transitions: int
+    num_free_parameters: int
+    rows_with_support: int
+    rows_total: int
+    se_quantiles: dict[str, float]
+    probs: list[float] | None = None
+    probs_se: list[float] | None = None
+    note: str = "Held fixed in stage two (block-diagonal information)."
+
+
+def _quantiles(values: Any) -> dict[str, float]:
+    """max, p95, p50, p5, min of a 1-D array; zeros for an empty input."""
+    v = np.asarray(values, dtype=np.float64)
+    if v.size == 0:
+        return {"max": 0.0, "p95": 0.0, "p50": 0.0, "p5": 0.0, "min": 0.0}
+    return {
+        "max": float(np.max(v)),
+        "p95": float(np.percentile(v, 95)),
+        "p50": float(np.percentile(v, 50)),
+        "p5": float(np.percentile(v, 5)),
+        "min": float(np.min(v)),
+    }
+
+
+def _coverage_checks(
+    sa_counts: np.ndarray,
+    panel: Any,
+    num_states: int,
+    num_actions: int,
+) -> PreEstimationChecks:
+    """Coverage-kind pre-estimation block for IRL / neural estimators.
+
+    Reuses the ``(S, A)`` counts already accumulated in
+    ``compute_fit_diagnostics`` -- no re-read of the panel's flat arrays.
+    ``effective_occupancy_support`` needs transitions plus a policy and is left
+    unset here.
+    """
+    obs_per_state = sa_counts.sum(axis=1)
+    visited = obs_per_state > 0
+    state_action_coverage = float((sa_counts > 0).sum()) / (num_states * num_actions)
+    state_coverage = float(visited.sum()) / num_states
+
+    total_obs = float(obs_per_state.sum())
+    entropies: list[float] = []
+    weights: list[float] = []
+    for s in range(num_states):
+        n_s = obs_per_state[s]
+        if n_s == 0:
+            continue
+        p = sa_counts[s] / n_s
+        p_nonzero = p[p > 0]
+        entropies.append(float(-(p_nonzero * np.log(p_nonzero)).sum()))
+        weights.append(float(n_s) / total_obs)
+    demo_policy_entropy = float(np.average(entropies, weights=weights)) if entropies else 0.0
+
+    first_states = np.array([int(traj.states[0]) for traj in panel.trajectories])
+    _, init_counts = np.unique(first_states, return_counts=True)
+    p_init = init_counts / init_counts.sum()
+    initial_state_entropy = float(-(p_init * np.log(p_init)).sum())
+
+    return PreEstimationChecks(
+        kind="coverage",
+        state_action_coverage=state_action_coverage,
+        state_coverage=state_coverage,
+        demo_policy_entropy=demo_policy_entropy,
+        initial_states=int(init_counts.size),
+        initial_state_entropy=initial_state_entropy,
+    )
+
+
+def compute_fit_diagnostics(
+    panel: Any,
+    num_states: int,
+    num_actions: int,
+    *,
+    feature_matrix: Any | None = None,
+) -> tuple[DatasetInfo, PreEstimationChecks | None, TransitionFirstStage | None]:
+    """Compute the DATA, PRE-ESTIMATION, and FIRST-STAGE TRANSITION blocks.
+
+    Reads the panel once. ``feature_matrix`` of shape ``(S, A, K)`` selects the
+    structural feature-rank pre-estimation block; when ``None`` a coverage-kind
+    block is returned instead (panel-coverage statistics, no linear reward
+    design to check).
+
+    Counts are accumulated sparsely (via ``np.unique`` over observed tuples), so
+    this scales to large state spaces without materializing an ``(A, S, S)``
+    tensor.
+    """
+    states = np.asarray(panel.get_all_states()).astype(np.int64)
+    actions = np.asarray(panel.get_all_actions()).astype(np.int64)
+    next_states = np.asarray(panel.get_all_next_states()).astype(np.int64)
+
+    # --- (S, A) counts -> dataset / coverage stats ---
+    sa_counts = np.zeros((num_states, num_actions), dtype=np.int64)
+    np.add.at(sa_counts, (states, actions), 1)
+    obs_per_state = sa_counts.sum(axis=1)
+    visited = obs_per_state > 0
+    actions_per_state = (sa_counts > 0).sum(axis=1)
+    single_action_states = int((actions_per_state == 1).sum())
+
+    dataset = DatasetInfo(
+        num_states=num_states,
+        num_actions=num_actions,
+        num_observations=int(panel.num_observations),
+        num_individuals=int(panel.num_individuals),
+        num_periods=int(max(panel.num_periods_per_individual)),
+        obs_per_state=_quantiles(obs_per_state[visited]),
+        states_visited=int(visited.sum()),
+        single_action_states=single_action_states,
+    )
+
+    # --- structural feature-rank block ---
+    pre_estimation: PreEstimationChecks | None = None
+    if feature_matrix is not None:
+        from econirl.preprocessing.diagnostics import feature_diagnostics
+
+        fd = feature_diagnostics(np.asarray(feature_matrix))
+        k = int(fd["num_features"])
+        contrast_rank = int(fd["contrast_rank"])
+        identified = contrast_rank >= k
+        verdict = (
+            "identified -- every reward parameter varies across actions"
+            if identified
+            else f"under-identified -- contrast rank {contrast_rank} < {k} features"
+        )
+        pre_estimation = PreEstimationChecks(
+            kind="feature",
+            num_features=k,
+            feature_rank=int(fd["feature_rank"]),
+            condition_number=float(fd["condition_number"]),
+            contrast_rank=contrast_rank,
+            contrast_condition_number=float(fd["contrast_condition_number"]),
+            verdict=verdict,
+        )
+    else:
+        pre_estimation = _coverage_checks(sa_counts, panel, num_states, num_actions)
+
+    # --- first-stage transition estimate + multinomial SE (sparse) ---
+    transition_first_stage: TransitionFirstStage | None = None
+    n_trans = int(states.shape[0])
+    if n_trans > 0:
+        triples = np.stack([actions, states, next_states], axis=1)
+        uniq_triples, tri_counts = np.unique(triples, axis=0, return_counts=True)
+        pairs = np.stack([actions, states], axis=1)
+        uniq_pairs, pair_counts = np.unique(pairs, axis=0, return_counts=True)
+        pair_to_n = {(int(a), int(s)): int(n) for (a, s), n in zip(uniq_pairs, pair_counts)}
+        ses: list[float] = []
+        support_per_pair: dict[tuple[int, int], int] = {}
+        for (a, s, _sp), c in zip(uniq_triples, tri_counts):
+            n_sa = pair_to_n[(int(a), int(s))]
+            p = float(c) / n_sa
+            ses.append(float(np.sqrt(p * (1.0 - p) / n_sa)))
+            key = (int(a), int(s))
+            support_per_pair[key] = support_per_pair.get(key, 0) + 1
+        free_params = sum(max(k - 1, 0) for k in support_per_pair.values())
+        transition_first_stage = TransitionFirstStage(
+            method="empirical frequencies (multinomial MLE)",
+            num_transitions=n_trans,
+            num_free_parameters=int(free_params),
+            rows_with_support=int(len(uniq_pairs)),
+            rows_total=int(num_states * num_actions),
+            se_quantiles=_quantiles(ses),
+        )
+
+    return dataset, pre_estimation, transition_first_stage
 
 
 @dataclass
@@ -129,6 +356,21 @@ class EstimationSummary:
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    # Expanded diagnostics (data / pre-estimation / first-stage transition)
+    num_states: int | None = None
+    num_actions: int | None = None
+    optimizer: str | None = None
+    transition_source: str | None = None
+    dataset: DatasetInfo | None = None
+    pre_estimation: PreEstimationChecks | None = None
+    transition_first_stage: TransitionFirstStage | None = None
+
+    # Oracle (known-truth; sim studies). When set, the parameter table gains
+    # true / bias / |err| columns. Monte-Carlo oracle uses MonteCarloResult.
+    true_parameters: dict[str, float] | None = None
+    oracle_policy: jnp.ndarray | None = None
+    oracle_value: jnp.ndarray | None = None
+
     def __post_init__(self) -> None:
         """Validate and compute derived quantities."""
         if len(self.parameters) != len(self.parameter_names):
@@ -162,9 +404,7 @@ class EstimationSummary:
         p_vals = 2 * (1 - stats.norm.cdf(np.abs(t_stats)))
         return jnp.array(p_vals, dtype=jnp.float32)
 
-    def confidence_interval(
-        self, alpha: float = 0.05
-    ) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def confidence_interval(self, alpha: float = 0.05) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Compute confidence intervals for parameters.
 
         Args:
@@ -244,14 +484,17 @@ class EstimationSummary:
         """
         lower, upper = self.confidence_interval()
 
-        return pd.DataFrame({
-            "estimate": np.asarray(self.parameters),
-            "std_error": np.asarray(self.standard_errors),
-            "t_statistic": np.asarray(self.t_statistics),
-            "p_value": np.asarray(self.p_values),
-            "ci_lower": np.asarray(lower),
-            "ci_upper": np.asarray(upper),
-        }, index=self.parameter_names)
+        return pd.DataFrame(
+            {
+                "estimate": np.asarray(self.parameters),
+                "std_error": np.asarray(self.standard_errors),
+                "t_statistic": np.asarray(self.t_statistics),
+                "p_value": np.asarray(self.p_values),
+                "ci_lower": np.asarray(lower),
+                "ci_upper": np.asarray(upper),
+            },
+            index=self.parameter_names,
+        )
 
     def summary(self, alpha: float = 0.05) -> str:
         """Generate a StatsModels-style summary table.
@@ -264,6 +507,7 @@ class EstimationSummary:
         """
         width = 80
         sep = "=" * width
+        dash = "-" * width
 
         lines = [
             sep,
@@ -271,74 +515,216 @@ class EstimationSummary:
             sep,
         ]
 
-        # Model info
-        info_left = [
-            f"Method:                    {self.method}",
-            f"No. Observations:          {self.num_observations:,}",
-            f"No. Individuals:           {self.num_individuals:,}",
-        ]
+        # --- header block ---
+        info_left = [f"Method:      {self.method}"]
+        if self.optimizer:
+            info_left.append(f"Optimizer:   {self.optimizer}")
+        family = self._family_label()
+        if family:
+            info_left.append(f"Family:      {family}")
         info_right = [
-            f"Discount Factor (β):       {self.discount_factor}",
-            f"Scale Parameter (σ):       {self.scale_parameter}",
-            f"Date:                      {self.timestamp[:10]}",
+            f"Observations:  {self.num_observations:,}",
+            f"Individuals:   {self.num_individuals:,}",
+            f"Discount (β):  {self.discount_factor}",
+            f"Scale (σ):     {self.scale_parameter}",
+            f"Date:          {self.timestamp[:10]}",
         ]
+        label_width = max(len(left) for left in info_left) + 2
+        for i in range(max(len(info_left), len(info_right))):
+            left = info_left[i] if i < len(info_left) else ""
+            right = info_right[i] if i < len(info_right) else ""
+            lines.append(f"{left:<{label_width}}{right}".rstrip())
 
-        for left, right in zip(info_left, info_right):
-            lines.append(f"{left:<40}{right}")
-
-        if self.log_likelihood is not None:
-            lines.append(f"Log-Likelihood:            {self.log_likelihood:,.2f}")
-
-        lines.append("-" * width)
-
-        # Parameter table header
-        ci_pct = int((1 - alpha) * 100)
-        header = f"{'':20} {'coef':>10} {'std err':>10} {'t':>8} {'P>|t|':>8} {'[' + str(alpha/2):>8} {str(1-alpha/2) + ']':>8}"
-        lines.append(header)
-        lines.append("-" * width)
-
-        # Parameter rows
-        lower, upper = self.confidence_interval(alpha)
-        for i, name in enumerate(self.parameter_names):
-            coef = float(self.parameters[i])
-            se = float(self.standard_errors[i])
-            t = float(self.t_statistics[i])
-            p = float(self.p_values[i])
-            lo = float(lower[i])
-            hi = float(upper[i])
-
-            # Format p-value
-            if p < 0.001:
-                p_str = "0.000"
-            else:
-                p_str = f"{p:.3f}"
-
-            row = f"{name:20} {coef:>10.4f} {se:>10.4f} {t:>8.2f} {p_str:>8} {lo:>8.4f} {hi:>8.4f}"
-            lines.append(row)
-
-        lines.append("-" * width)
-
-        # Identification diagnostics
-        if self.identification is not None:
-            lines.append("Identification Diagnostics:")
-            lines.append(f"  Hessian Condition Number:    {self.identification.hessian_condition_number:.1f}")
-            lines.append(f"  Min Eigenvalue:              {self.identification.min_eigenvalue:.4f}")
-            lines.append(f"  Status:                      {self.identification.status}")
+        # --- [1] DATA ---
+        if self.dataset is not None:
+            d = self.dataset
+            q = d.obs_per_state
             lines.append("")
+            lines.append("[1] DATA")
+            lines.append(f"  State space:          {d.num_states} states x {d.num_actions} actions")
+            lines.append(f"  Periods per individual: ~{d.num_periods}")
+            lines.append(
+                "  Obs per state:        "
+                f"max {q['max']:,.0f} . p95 {q['p95']:,.0f} . p50 {q['p50']:,.0f}"
+                f" . p5 {q['p5']:,.0f} . min {q['min']:,.0f}"
+            )
+            pct = 100.0 * d.states_visited / d.num_states if d.num_states else 0.0
+            lines.append(
+                f"  State coverage:       {d.states_visited}/{d.num_states} visited ({pct:.0f}%)"
+            )
+            lines.append(f"  Single-action states: {d.single_action_states}")
 
-        # Goodness of fit
+        # --- [2] PRE-ESTIMATION CHECKS ---
+        if self.pre_estimation is not None:
+            lines.append("")
+            lines.append("[2] PRE-ESTIMATION CHECKS")
+            lines.extend(self._render_pre_estimation(self.pre_estimation))
+
+        # --- [3] TRANSITION MODEL ---
+        if self.transition_source is not None or self.transition_first_stage is not None:
+            lines.append("")
+            if self.transition_first_stage is None:
+                lines.append("[3] TRANSITION MODEL")
+            else:
+                lines.append("[3] FIRST-STAGE TRANSITION ESTIMATION")
+            if self.transition_source is not None:
+                lines.append(f"  Transition source: {self.transition_source}")
+
+        if self.transition_first_stage is not None:
+            t = self.transition_first_stage
+            q = t.se_quantiles
+            lines.append(f"  Method:               {t.method}")
+            lines.append(
+                f"  Transitions used:     N = {t.num_transitions:,}"
+                f"        Free parameters: {t.num_free_parameters:,}"
+            )
+            lines.append(f"  Rows with full support: {t.rows_with_support}/{t.rows_total}")
+            lines.append(
+                "  Std err across cells: "
+                f"max {q['max']:.4f} . p50 {q['p50']:.4f} . min {q['min']:.4f}"
+            )
+            if t.probs is not None and t.probs_se is not None:
+                cells = "   ".join(
+                    f"p[{k}] {p:.4f} (se {s:.4f})"
+                    for k, (p, s) in enumerate(zip(t.probs, t.probs_se))
+                )
+                lines.append(f"    {cells}")
+            lines.append(f"  {t.note}")
+
+        lines.append(dash)
+
+        # --- [4] RESULTS ---
+        lines.append("[4] RESULTS")
+        lines.append("  4a. Estimation")
+        lines.extend(self._render_parameter_table(alpha))
+
+        if self.identification is not None:
+            lines.append("  4b. Identification")
+            lines.append(
+                "    Hessian condition:  "
+                f"{self.identification.hessian_condition_number:,.1f}"
+                f"     Min eigenvalue: {self.identification.min_eigenvalue:.2f}"
+            )
+            lines.append(f"    Status:             {self.identification.status}")
+
+        lines.append("  4c. Inference & fit")
+        lines.append(f"    Converged:   {'yes' if self.converged else 'no'}")
+        lines.append(f"    Iterations:  {self.num_iterations}")
+        lines.append(f"    Estimation time: {self.estimation_time:.2f} seconds")
+        if self.convergence_message:
+            lines.append(f"    Message:     {self.convergence_message}")
+        se_label = self._se_method_label()
+        if se_label:
+            lines.append(f"    SE method:  {se_label}")
+        if self.log_likelihood is not None:
+            lines.append(f"    Log-lik:    {self.log_likelihood:,.2f}")
         if self.goodness_of_fit is not None:
-            lines.append("Goodness of Fit:")
-            lines.append(f"  AIC:                         {self.goodness_of_fit.aic:.1f}")
-            lines.append(f"  BIC:                         {self.goodness_of_fit.bic:.1f}")
-            if self.goodness_of_fit.pseudo_r_squared is not None:
-                lines.append(f"  Pseudo R²:                   {self.goodness_of_fit.pseudo_r_squared:.3f}")
-            if self.goodness_of_fit.prediction_accuracy is not None:
-                lines.append(f"  Prediction Accuracy:         {self.goodness_of_fit.prediction_accuracy:.1%}")
+            gof = self.goodness_of_fit
+            lines.append(f"    AIC/BIC:    {gof.aic:,.1f} / {gof.bic:,.1f}")
+            extras = []
+            if gof.pseudo_r_squared is not None:
+                extras.append(f"pseudo R2 {gof.pseudo_r_squared:.3f}")
+            if gof.prediction_accuracy is not None:
+                extras.append(f"accuracy {gof.prediction_accuracy:.1%}")
+            if extras:
+                lines.append("    " + " / ".join(extras))
 
         lines.append(sep)
 
         return "\n".join(lines)
+
+    def _family_label(self) -> str | None:
+        """Estimator family, inferred from the pre-estimation block kind."""
+        if self.pre_estimation is None:
+            return None
+        if self.pre_estimation.kind == "feature":
+            return "structural (linear utility)"
+        if self.pre_estimation.kind == "coverage":
+            return "IRL / neural"
+        return None
+
+    def _se_method_label(self) -> str | None:
+        """Human-readable standard-error method from metadata."""
+        method = self.metadata.get("se_method")
+        if not isinstance(method, str):
+            return None
+        labels = {
+            "asymptotic": "asymptotic (observed information)",
+            "robust": "robust (sandwich)",
+            "bootstrap": "bootstrap (resampled individuals)",
+            "clustered": "clustered (by individual)",
+            "full_likelihood_bhhh": "BHHH (outer-product of gradients)",
+        }
+        return labels.get(method, method)
+
+    def _render_pre_estimation(self, pre: PreEstimationChecks) -> list[str]:
+        """Render the structural feature block or the coverage block."""
+        out: list[str] = []
+        if pre.kind == "feature":
+            out.append(f"  Reward features (K):  {pre.num_features}")
+            out.append(
+                f"  Design rank:          {pre.feature_rank}/{pre.num_features}"
+                f"         Condition:          {pre.condition_number:.1e}"
+            )
+            out.append(
+                f"  Contrast rank:        {pre.contrast_rank}/{pre.num_features}"
+                f"       Contrast condition: {pre.contrast_condition_number:.1e}"
+            )
+            out.append(f"  Verdict:              {pre.verdict}")
+        elif pre.kind == "coverage":
+            if pre.state_action_coverage is not None:
+                out.append(f"  State-action coverage: {pre.state_action_coverage:.1%}")
+            if pre.state_coverage is not None:
+                out.append(f"  State coverage:        {pre.state_coverage:.1%}")
+            if pre.demo_policy_entropy is not None:
+                out.append(f"  Demo policy entropy:   {pre.demo_policy_entropy:.2f} nats")
+            if pre.effective_occupancy_support is not None:
+                out.append(f"  Occupancy support:     eff. {pre.effective_occupancy_support:.1f}")
+            if pre.initial_states is not None:
+                ent = (
+                    f" (entropy {pre.initial_state_entropy:.2f} nats)"
+                    if pre.initial_state_entropy is not None
+                    else ""
+                )
+                out.append(f"  Initial-state coverage: {pre.initial_states} states{ent}")
+        return out
+
+    def _render_parameter_table(self, alpha: float) -> list[str]:
+        """Parameter rows, with true / bias / |err| columns when an oracle is set."""
+        out: list[str] = []
+        lower, upper = self.confidence_interval(alpha)
+        true_params = self.true_parameters
+        if true_params is not None:
+            header = f"    {'':16}{'coef':>10}{'std err':>10}{'true':>10}{'bias':>10}{'|err|':>9}"
+        else:
+            header = (
+                f"    {'':16}{'coef':>10}{'std err':>10}{'t':>8}"
+                f"{'P>|t|':>8}{'[0.025':>9}{'0.975]':>9}"
+            )
+        out.append(header)
+        for i, name in enumerate(self.parameter_names):
+            coef = float(self.parameters[i])
+            se = float(self.standard_errors[i])
+            if true_params is not None:
+                true_val = true_params.get(name)
+                if true_val is None:
+                    row = f"    {name:16}{coef:>10.4f}{se:>10.4f}{'--':>10}{'--':>10}{'--':>9}"
+                else:
+                    bias = coef - true_val
+                    row = (
+                        f"    {name:16}{coef:>10.4f}{se:>10.4f}{true_val:>10.4f}"
+                        f"{bias:>+10.4f}{abs(bias):>9.4f}"
+                    )
+            else:
+                t = float(self.t_statistics[i])
+                p = float(self.p_values[i])
+                p_str = "0.000" if p < 0.001 else f"{p:.3f}"
+                row = (
+                    f"    {name:16}{coef:>10.4f}{se:>10.4f}{t:>8.2f}"
+                    f"{p_str:>8}{float(lower[i]):>9.4f}{float(upper[i]):>9.4f}"
+                )
+            out.append(row)
+        return out
 
     def to_latex(
         self,
@@ -365,7 +751,10 @@ class EstimationSummary:
             f"\\label{{{label}}}",
             r"\begin{tabular}{lcccccc}",
             r"\hline\hline",
-            r"Parameter & Estimate & Std. Error & $t$-stat & $p$-value & \multicolumn{2}{c}{95\% CI} \\",
+            (
+                r"Parameter & Estimate & Std. Error & $t$-stat & $p$-value & "
+                r"\multicolumn{2}{c}{95\% CI} \\"
+            ),
             r"\hline",
         ]
 
@@ -377,11 +766,13 @@ class EstimationSummary:
                 f"[{row['ci_lower']:.4f}, & {row['ci_upper']:.4f}] \\\\"
             )
 
-        lines.extend([
-            r"\hline\hline",
-            r"\end{tabular}",
-            r"\end{table}",
-        ])
+        lines.extend(
+            [
+                r"\hline\hline",
+                r"\end{tabular}",
+                r"\end{table}",
+            ]
+        )
 
         latex = "\n".join(lines)
 
@@ -438,8 +829,7 @@ class EstimationSummary:
             eigenvalues = np.sort(np.real(np.linalg.eigvals(np.asarray(-self.hessian))))
             num_quality["hessian_eigenvalues"] = eigenvalues.tolist()
             num_quality["hessian_condition_number"] = (
-                float(eigenvalues[-1] / eigenvalues[0])
-                if eigenvalues[0] > 0 else float("inf")
+                float(eigenvalues[-1] / eigenvalues[0]) if eigenvalues[0] > 0 else float("inf")
             )
         num_quality["converged"] = self.converged
         num_quality["num_iterations"] = self.num_iterations

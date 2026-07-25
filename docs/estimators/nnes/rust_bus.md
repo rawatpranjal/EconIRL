@@ -13,7 +13,7 @@ uses multi-module continuous mileage states and compares NNES with an oracle
 NFXP benchmark.
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import NNES
 
 df = load_rust_bus()
@@ -22,7 +22,7 @@ model = NNES(
     n_states=90,
     n_actions=2,
     discount=0.9999,
-    utility="linear_cost",
+    utility=rust_bus_reward_spec(90),
     bellman="npl",
     hidden_dim=32,
     num_layers=2,

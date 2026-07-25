@@ -186,6 +186,7 @@ class BaseEstimator(ABC):
 
         n_bootstrap = kwargs.pop("n_bootstrap", 400)
         se_seed = kwargs.pop("se_seed", None)
+        transition_source = kwargs.pop("transition_source", "supplied to estimator")
         start_time = time.time()
 
         # Run optimization
@@ -269,6 +270,24 @@ class BaseEstimator(ABC):
 
         total_time = time.time() - start_time
 
+        # Expanded diagnostics: data / pre-estimation / first-stage transition.
+        # Auxiliary reporting only -- never let it break a real fit.
+        from econirl.inference.results import compute_fit_diagnostics
+
+        dataset = pre_estimation = transition_first_stage = None
+        try:
+            feature_matrix = getattr(utility, "feature_matrix", None)
+            dataset, pre_estimation, transition_first_stage = compute_fit_diagnostics(
+                panel,
+                problem.num_states,
+                problem.num_actions,
+                feature_matrix=feature_matrix,
+            )
+            if transition_source != "estimated from fitted panel":
+                transition_first_stage = None
+        except Exception:  # noqa: BLE001 - diagnostics are non-critical
+            pass
+
         return EstimationSummary(
             parameters=result.parameters,
             parameter_names=utility.parameter_names,
@@ -290,6 +309,13 @@ class BaseEstimator(ABC):
             value_function=result.value_function,
             policy=result.policy,
             estimation_time=total_time,
+            num_states=problem.num_states,
+            num_actions=problem.num_actions,
+            optimizer=result.metadata.get("optimizer"),
+            transition_source=transition_source,
+            dataset=dataset,
+            pre_estimation=pre_estimation,
+            transition_first_stage=transition_first_stage,
             metadata={
                 **result.metadata,
                 "se_method": self._se_method,

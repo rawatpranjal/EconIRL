@@ -19,18 +19,18 @@ NFXP is used here because the bundled bus example is the canonical small
 tabular dynamic discrete-choice problem.
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import NFXP
 
 df = load_rust_bus()
-model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
 ```
 
 ```text
-{'theta_c': 0.0010029257006533541, 'RC': 3.072263842893654}
+{'operating_cost': 0.001002924937407198, 'replacement_cost': 3.072263682263484}
 ```
 
 ## Read the results
@@ -50,12 +50,12 @@ This only makes sense for estimators that recover a reward object the model can
 re-solve under the changed primitive.
 
 ```python
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 print(cf.policy[50, 1])
 ```
 
 ```text
-0.055196291500871957
+0.055196266692073837
 ```
 
 Next, check the data and the design before trusting a fit. See

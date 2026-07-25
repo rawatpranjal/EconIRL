@@ -14,9 +14,13 @@ Reference:
     of Harold Zurcher." Econometrica, 55(5), 999-1033.
 """
 
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
+
+from econirl.datasets import rust_bus_reward_spec
+
+RUST_BUS_REWARD = rust_bus_reward_spec(90)
 
 
 @pytest.fixture
@@ -60,7 +64,12 @@ class TestNFXPIntegration:
         from econirl.estimators import NFXP
 
         # Create estimator with Rust's discount factor
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
 
         # Fit to original data
         model.fit(
@@ -75,30 +84,34 @@ class TestNFXPIntegration:
 
         # Check parameter estimates
         assert model.params_ is not None
-        assert "theta_c" in model.params_
-        assert "RC" in model.params_
+        assert "operating_cost" in model.params_
+        assert "replacement_cost" in model.params_
 
         # Parameters should be finite
-        assert np.isfinite(model.params_["theta_c"])
-        assert np.isfinite(model.params_["RC"])
+        assert np.isfinite(model.params_["operating_cost"])
+        assert np.isfinite(model.params_["replacement_cost"])
 
         # Operating cost should be positive (higher mileage = higher cost)
-        # Note: theta_c is often small but positive
-        assert model.params_["theta_c"] > 0 or np.isclose(model.params_["theta_c"], 0, atol=0.01)
+        # The operating-cost coefficient is often small but positive.
+        assert model.params_["operating_cost"] > 0 or np.isclose(
+            model.params_["operating_cost"],
+            0,
+            atol=0.01,
+        )
 
         # Replacement cost should be positive
-        assert model.params_["RC"] > 0
+        assert model.params_["replacement_cost"] > 0
 
         # Standard errors should exist and be non-negative
         assert model.se_ is not None
-        assert model.se_["theta_c"] >= 0
-        assert model.se_["RC"] >= 0
+        assert model.se_["operating_cost"] >= 0
+        assert model.se_["replacement_cost"] >= 0
 
         # Coefficients should match params
         assert model.coef_ is not None
         assert len(model.coef_) == 2
-        np.testing.assert_allclose(model.coef_[0], model.params_["theta_c"])
-        np.testing.assert_allclose(model.coef_[1], model.params_["RC"])
+        np.testing.assert_allclose(model.coef_[0], model.params_["operating_cost"])
+        np.testing.assert_allclose(model.coef_[1], model.params_["replacement_cost"])
 
         # Log-likelihood should be negative (log of probabilities < 1)
         assert model.log_likelihood_ is not None
@@ -133,7 +146,12 @@ class TestNFXPIntegration:
         from econirl.estimators import NFXP
 
         # Fit model to subset for speed
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -177,13 +195,18 @@ class TestNFXPIntegration:
 
         Verifies that:
         1. counterfactual() returns valid results
-        2. Changing RC affects the policy
-        3. Policy changes monotonically with RC
+        2. Changing replacement cost affects the policy
+        3. Policy changes monotonically with replacement cost
         """
         from econirl.estimators import NFXP
 
         # Fit model
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -191,22 +214,26 @@ class TestNFXPIntegration:
             id="bus_id",
         )
 
-        # Get baseline policy
-        baseline_policy = model.predict_proba(np.arange(90))
-
         # Counterfactual: double the replacement cost
-        original_RC = model.params_["RC"]
-        cf_result = model.counterfactual(RC=original_RC * 2)
+        original_replacement_cost = model.params_["replacement_cost"]
+        cf_result = model.counterfactual(
+            replacement_cost=original_replacement_cost * 2
+        )
 
         # Check structure
         assert cf_result.params is not None
         assert cf_result.value_function is not None
         assert cf_result.policy is not None
 
-        # Check that RC was changed
-        assert cf_result.params["RC"] == original_RC * 2
-        # theta_c should remain the same
-        np.testing.assert_allclose(cf_result.params["theta_c"], model.params_["theta_c"])
+        # Check that the replacement cost changed while operating cost stayed fixed.
+        assert (
+            cf_result.params["replacement_cost"]
+            == original_replacement_cost * 2
+        )
+        np.testing.assert_allclose(
+            cf_result.params["operating_cost"],
+            model.params_["operating_cost"],
+        )
 
         # Check policy validity
         assert cf_result.policy.shape == (90, 2)
@@ -214,21 +241,21 @@ class TestNFXPIntegration:
         assert (cf_result.policy >= 0).all()
         assert (cf_result.policy <= 1).all()
 
-        # Test that changing RC changes the policy
-        cf_high = model.counterfactual(RC=10.0)
-        cf_low = model.counterfactual(RC=1.0)
+        # Test that changing replacement cost changes the policy
+        cf_high = model.counterfactual(replacement_cost=10.0)
+        cf_low = model.counterfactual(replacement_cost=1.0)
 
-        # With very different RC values, policies should differ
+        # With very different replacement costs, policies should differ
         assert not np.allclose(cf_high.policy, cf_low.policy, atol=1e-3), \
-            "Policies should differ with very different RC values"
+            "Policies should differ with very different replacement costs"
 
-        # Test monotonicity: as RC increases, replacement should generally change
+        # Test monotonicity as replacement cost increases.
         # (direction depends on the utility parameterization)
         rc_values = [1.0, 5.0, 10.0, 20.0]
         avg_replace_probs = []
 
         for rc in rc_values:
-            cf = model.counterfactual(RC=rc)
+            cf = model.counterfactual(replacement_cost=rc)
             avg_replace_probs.append(cf.policy[:, 1].mean())
 
         # Replacement probability should change monotonically
@@ -239,8 +266,14 @@ class TestNFXPIntegration:
             np.all(diffs >= -1e-4) or  # Non-decreasing
             np.all(diffs <= 1e-4)  # Non-increasing
         )
-        assert is_monotonic or np.allclose(avg_replace_probs, avg_replace_probs[0], atol=0.01), \
-            f"Replacement probability should be monotonic in RC: {list(zip(rc_values, avg_replace_probs))}"
+        assert is_monotonic or np.allclose(
+            avg_replace_probs,
+            avg_replace_probs[0],
+            atol=0.01,
+        ), (
+            "Replacement probability should be monotonic in replacement cost: "
+            f"{list(zip(rc_values, avg_replace_probs))}"
+        )
 
 
 # ============================================================================
@@ -264,7 +297,12 @@ class TestCCPIntegration:
 
         # Create estimator with Rust's discount factor
         # Using Hotz-Miller (num_policy_iterations=1)
-        model = CCP(n_states=90, discount=0.9999, verbose=False)
+        model = CCP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
 
         # Fit to original data
         model.fit(
@@ -279,17 +317,17 @@ class TestCCPIntegration:
 
         # Check parameter estimates
         assert model.params_ is not None
-        assert "theta_c" in model.params_
-        assert "RC" in model.params_
+        assert "operating_cost" in model.params_
+        assert "replacement_cost" in model.params_
 
         # Parameters should be finite
-        assert np.isfinite(model.params_["theta_c"])
-        assert np.isfinite(model.params_["RC"])
+        assert np.isfinite(model.params_["operating_cost"])
+        assert np.isfinite(model.params_["replacement_cost"])
 
         # Standard errors should exist and be non-negative
         assert model.se_ is not None
-        assert model.se_["theta_c"] >= 0
-        assert model.se_["RC"] >= 0
+        assert model.se_["operating_cost"] >= 0
+        assert model.se_["replacement_cost"] >= 0
 
         # Coefficients should match params
         assert model.coef_ is not None
@@ -320,10 +358,15 @@ class TestCCPIntegration:
         parameter estimates. CCP is an approximate method, so estimates
         may differ from NFXP.
         """
-        from econirl.estimators import NFXP, CCP
+        from econirl.estimators import CCP, NFXP
 
         # Fit NFXP
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         nfxp.fit(
             data=rust_data,
             state="mileage_bin",
@@ -332,7 +375,12 @@ class TestCCPIntegration:
         )
 
         # Fit CCP (Hotz-Miller)
-        ccp = CCP(n_states=90, discount=0.9999, verbose=False)
+        ccp = CCP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         ccp.fit(
             data=rust_data,
             state="mileage_bin",
@@ -345,23 +393,29 @@ class TestCCPIntegration:
         assert ccp.converged_ is not None
 
         # Parameters should be finite for both
-        theta_c_nfxp = nfxp.params_["theta_c"]
-        theta_c_ccp = ccp.params_["theta_c"]
-        RC_nfxp = nfxp.params_["RC"]
-        RC_ccp = ccp.params_["RC"]
+        operating_cost_nfxp = nfxp.params_["operating_cost"]
+        operating_cost_ccp = ccp.params_["operating_cost"]
+        replacement_cost_nfxp = nfxp.params_["replacement_cost"]
+        replacement_cost_ccp = ccp.params_["replacement_cost"]
 
-        assert np.isfinite(theta_c_nfxp)
-        assert np.isfinite(theta_c_ccp)
-        assert np.isfinite(RC_nfxp)
-        assert np.isfinite(RC_ccp)
+        assert np.isfinite(operating_cost_nfxp)
+        assert np.isfinite(operating_cost_ccp)
+        assert np.isfinite(replacement_cost_nfxp)
+        assert np.isfinite(replacement_cost_ccp)
 
-        # NFXP should produce positive RC (it's the MLE)
-        assert RC_nfxp > 0, f"NFXP RC should be positive, got {RC_nfxp}"
+        assert replacement_cost_nfxp > 0, (
+            "NFXP replacement cost should be positive, "
+            f"got {replacement_cost_nfxp}"
+        )
 
         # CCP is an approximate method and may produce different estimates
         # Just check that it produces sensible values
-        assert abs(theta_c_ccp) < 10, f"CCP theta_c seems too large: {theta_c_ccp}"
-        assert abs(RC_ccp) < 100, f"CCP RC seems too large: {RC_ccp}"
+        assert abs(operating_cost_ccp) < 10, (
+            f"CCP operating cost seems too large: {operating_cost_ccp}"
+        )
+        assert abs(replacement_cost_ccp) < 100, (
+            f"CCP replacement cost seems too large: {replacement_cost_ccp}"
+        )
 
         # Log-likelihoods should both be negative
         assert nfxp.log_likelihood_ < 0
@@ -381,10 +435,15 @@ class TestCCPIntegration:
         NPL should produce estimates closer to NFXP as the number of
         policy iterations increases.
         """
-        from econirl.estimators import NFXP, CCP
+        from econirl.estimators import CCP, NFXP
 
         # Fit NFXP as the benchmark
-        nfxp = NFXP(n_states=90, discount=0.9999, verbose=False)
+        nfxp = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         nfxp.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -393,7 +452,13 @@ class TestCCPIntegration:
         )
 
         # Fit CCP with 1 iteration (Hotz-Miller)
-        ccp_1 = CCP(n_states=90, discount=0.9999, num_policy_iterations=1, verbose=False)
+        ccp_1 = CCP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            num_policy_iterations=1,
+            verbose=False,
+        )
         ccp_1.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -402,7 +467,13 @@ class TestCCPIntegration:
         )
 
         # Fit CCP with more iterations (NPL)
-        ccp_5 = CCP(n_states=90, discount=0.9999, num_policy_iterations=5, verbose=False)
+        ccp_5 = CCP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            num_policy_iterations=5,
+            verbose=False,
+        )
         ccp_5.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -418,8 +489,12 @@ class TestCCPIntegration:
         # Compute distance from NFXP estimates
         def param_distance(est):
             return np.sqrt(
-                (est.params_["theta_c"] - nfxp.params_["theta_c"])**2 +
-                (est.params_["RC"] - nfxp.params_["RC"])**2
+                (est.params_["operating_cost"] - nfxp.params_["operating_cost"])**2
+                + (
+                    est.params_["replacement_cost"]
+                    - nfxp.params_["replacement_cost"]
+                )
+                ** 2
             )
 
         dist_1 = param_distance(ccp_1)
@@ -447,8 +522,8 @@ class TestTransitionEstimatorIntegration:
         2. Estimated probabilities match expected patterns
         3. Transition matrix is valid (rows sum to 1)
         """
-        from econirl.transitions import TransitionEstimator
         from econirl.datasets import load_rust_bus
+        from econirl.transitions import TransitionEstimator
 
         # Load as Panel for TransitionEstimator
         panel = load_rust_bus(original=True, as_panel=True)
@@ -504,14 +579,13 @@ class TestTransitionEstimatorIntegration:
         Different bus groups may have different usage patterns, so
         transition probabilities might differ.
         """
-        from econirl.transitions import TransitionEstimator
         from econirl.datasets import load_rust_bus
+        from econirl.transitions import TransitionEstimator
 
         groups = rust_data["group"].unique()
 
         results = {}
         for group in groups:
-            group_data = rust_data[rust_data["group"] == group]
             panel = load_rust_bus(original=True, as_panel=True, group=group)
 
             estimator = TransitionEstimator(n_states=90, max_increase=2)
@@ -548,7 +622,12 @@ class TestEndToEndWorkflow:
         from econirl.estimators import NFXP
 
         # Step 1: Estimate from real data
-        model_real = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model_real = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         model_real.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -556,8 +635,7 @@ class TestEndToEndWorkflow:
             id="bus_id",
         )
 
-        original_theta_c = model_real.params_["theta_c"]
-        original_RC = model_real.params_["RC"]
+        original_replacement_cost = model_real.params_["replacement_cost"]
 
         # Step 2: Simulate from fitted model (large sample for accuracy)
         sim_data = model_real.simulate(n_agents=200, n_periods=100, seed=42)
@@ -569,7 +647,12 @@ class TestEndToEndWorkflow:
 
         # Step 3: Re-estimate from simulated data
         # Use the same transitions as the original model to focus on utility estimation
-        model_sim = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model_sim = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         model_sim.fit(
             data=sim_data,
             state="mileage_bin",
@@ -579,28 +662,40 @@ class TestEndToEndWorkflow:
         )
 
         # Step 4: Check parameter recovery
-        recovered_theta_c = model_sim.params_["theta_c"]
-        recovered_RC = model_sim.params_["RC"]
+        recovered_operating_cost = model_sim.params_["operating_cost"]
+        recovered_replacement_cost = model_sim.params_["replacement_cost"]
 
         # Parameters should be reasonably close (within estimation error)
         # Use loose tolerance since we're simulating and re-estimating
-        if abs(original_RC) > 0.1:
-            rc_error = abs(recovered_RC - original_RC) / abs(original_RC)
-            assert rc_error < 0.5, \
-                f"RC recovery error too large: {rc_error:.2%} " \
-                f"(original={original_RC:.4f}, recovered={recovered_RC:.4f})"
+        assert np.isfinite(recovered_operating_cost)
+        if abs(original_replacement_cost) > 0.1:
+            replacement_cost_error = (
+                abs(recovered_replacement_cost - original_replacement_cost)
+                / abs(original_replacement_cost)
+            )
+            assert replacement_cost_error < 0.5, (
+                "replacement-cost recovery error too large: "
+                f"{replacement_cost_error:.2%} "
+                f"(original={original_replacement_cost:.4f}, "
+                f"recovered={recovered_replacement_cost:.4f})"
+            )
 
     def test_counterfactual_consistency(self, rust_data_subset):
         """Test that counterfactual analysis is internally consistent.
 
         Verifies that:
         1. Counterfactual produces valid policies
-        2. Counterfactual changes are monotonic in RC
+        2. Counterfactual changes are monotonic in replacement cost
         """
         from econirl.estimators import NFXP
 
         # Fit model
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",
@@ -608,10 +703,12 @@ class TestEndToEndWorkflow:
             id="bus_id",
         )
 
-        original_RC = model.params_["RC"]
+        original_replacement_cost = model.params_["replacement_cost"]
 
         # Counterfactual with original parameters should produce valid policy
-        cf_baseline = model.counterfactual(RC=original_RC)
+        cf_baseline = model.counterfactual(
+            replacement_cost=original_replacement_cost
+        )
         assert cf_baseline.policy is not None
         assert cf_baseline.policy.shape == (90, 2)
         np.testing.assert_allclose(cf_baseline.policy.sum(axis=1), np.ones(90), atol=1e-6)
@@ -622,23 +719,29 @@ class TestEndToEndWorkflow:
         # policy due to value iteration convergence tolerance. This is expected
         # behavior - we just verify the result is valid.
 
-        # Test monotonicity: increasing RC should change replacement probability monotonically
+        # Increasing replacement cost should change replacement probability monotonically.
         rc_values = [1.0, 5.0, 10.0, 20.0]
         avg_replace_probs = []
 
         for rc in rc_values:
-            cf = model.counterfactual(RC=rc)
+            cf = model.counterfactual(replacement_cost=rc)
             avg_replace_probs.append(cf.policy[:, 1].mean())
 
-        # Check that replacement probability changes monotonically as RC increases
+        # Check monotonicity as replacement cost increases.
         diffs = np.diff(avg_replace_probs)
         # Either all increasing, all decreasing, or nearly constant
         is_monotonic = (
             np.all(diffs >= -1e-4) or  # Non-decreasing
             np.all(diffs <= 1e-4)  # Non-increasing
         )
-        assert is_monotonic or np.allclose(avg_replace_probs, avg_replace_probs[0], atol=0.01), \
-            f"Replacement probability should be monotonic in RC: {list(zip(rc_values, avg_replace_probs))}"
+        assert is_monotonic or np.allclose(
+            avg_replace_probs,
+            avg_replace_probs[0],
+            atol=0.01,
+        ), (
+            "Replacement probability should be monotonic in replacement cost: "
+            f"{list(zip(rc_values, avg_replace_probs))}"
+        )
 
     def test_predict_proba_consistency(self, rust_data_subset):
         """Test that predict_proba is consistent with simulation.
@@ -649,7 +752,12 @@ class TestEndToEndWorkflow:
         from econirl.estimators import NFXP
 
         # Fit model
-        model = NFXP(n_states=90, discount=0.9999, verbose=False)
+        model = NFXP(
+            n_states=90,
+            discount=0.9999,
+            utility=RUST_BUS_REWARD,
+            verbose=False,
+        )
         model.fit(
             data=rust_data_subset,
             state="mileage_bin",

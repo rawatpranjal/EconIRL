@@ -2,8 +2,9 @@
 
 import numpy as np
 import pytest
+
 from econirl import NFXP, NNES
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl.estimators.protocol import EstimatorProtocol
 
 
@@ -14,14 +15,24 @@ def rust_bus_df():
 
 @pytest.fixture(scope="module")
 def nfxp_fitted(rust_bus_df):
-    return NFXP(n_states=90, discount=0.9999).fit(
+    return NFXP(
+        n_states=90,
+        discount=0.9999,
+        utility=rust_bus_reward_spec(90),
+    ).fit(
         rust_bus_df, state="mileage_bin", action="replaced", id="bus_id"
     )
 
 
 @pytest.fixture(scope="module")
 def nnes_fitted(rust_bus_df):
-    return NNES(n_states=90, discount=0.9999, v_epochs=300, n_outer_iterations=2).fit(
+    return NNES(
+        n_states=90,
+        discount=0.9999,
+        utility=rust_bus_reward_spec(90),
+        v_epochs=300,
+        n_outer_iterations=2,
+    ).fit(
         rust_bus_df, state="mileage_bin", action="replaced", id="bus_id"
     )
 
@@ -29,10 +40,10 @@ def nnes_fitted(rust_bus_df):
 class TestNFXPBaseline:
     def test_params_recovered(self, nfxp_fitted):
         assert nfxp_fitted.params_ is not None
-        assert "theta_c" in nfxp_fitted.params_
-        assert "RC" in nfxp_fitted.params_
-        assert nfxp_fitted.params_["theta_c"] > 0
-        assert nfxp_fitted.params_["RC"] > 0
+        assert "operating_cost" in nfxp_fitted.params_
+        assert "replacement_cost" in nfxp_fitted.params_
+        assert nfxp_fitted.params_["operating_cost"] > 0
+        assert nfxp_fitted.params_["replacement_cost"] > 0
 
     def test_se_finite(self, nfxp_fitted):
         assert nfxp_fitted.se_ is not None
@@ -45,19 +56,19 @@ class TestNFXPBaseline:
 class TestNNESBaseline:
     def test_params_recovered(self, nnes_fitted):
         assert nnes_fitted.params_ is not None
-        assert "theta_c" in nnes_fitted.params_
-        assert "RC" in nnes_fitted.params_
-        # theta_c is constrained >= 0 by L-BFGS-B bounds; neural training can
+        assert "operating_cost" in nnes_fitted.params_
+        assert "replacement_cost" in nnes_fitted.params_
+        # operating_cost is constrained >= 0 by L-BFGS-B bounds; neural training can
         # pin it at the boundary and land marginally negative from numerical
         # noise (near-identification), so allow a small tolerance.
         # The slow TestParameterAgreement tests verify actual recovery.
-        assert nnes_fitted.params_["theta_c"] >= -1e-2
-        assert nnes_fitted.params_["RC"] > 0
+        assert nnes_fitted.params_["operating_cost"] >= -1e-2
+        assert nnes_fitted.params_["replacement_cost"] > 0
 
     def test_se_present(self, nnes_fitted):
         assert nnes_fitted.se_ is not None
-        assert "theta_c" in nnes_fitted.se_
-        assert "RC" in nnes_fitted.se_
+        assert "operating_cost" in nnes_fitted.se_
+        assert "replacement_cost" in nnes_fitted.se_
 
     def test_protocol(self, nnes_fitted):
         assert isinstance(nnes_fitted, EstimatorProtocol)
@@ -67,8 +78,18 @@ class TestNNESBaseline:
 class TestParameterAgreement:
     def test_cosine_similarity(self, nfxp_fitted, nnes_fitted):
         """Both estimators should recover similar parameters."""
-        nfxp_vec = np.array([nfxp_fitted.params_["theta_c"], nfxp_fitted.params_["RC"]])
-        nnes_vec = np.array([nnes_fitted.params_["theta_c"], nnes_fitted.params_["RC"]])
+        nfxp_vec = np.array(
+            [
+                nfxp_fitted.params_["operating_cost"],
+                nfxp_fitted.params_["replacement_cost"],
+            ]
+        )
+        nnes_vec = np.array(
+            [
+                nnes_fitted.params_["operating_cost"],
+                nnes_fitted.params_["replacement_cost"],
+            ]
+        )
         cos_sim = np.dot(nfxp_vec, nnes_vec) / (np.linalg.norm(nfxp_vec) * np.linalg.norm(nnes_vec))
         assert cos_sim > 0.85, f"Cosine similarity {cos_sim:.3f} < 0.85"
 

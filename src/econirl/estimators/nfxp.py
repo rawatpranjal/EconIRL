@@ -12,11 +12,12 @@ Example:
     >>> df = pd.read_csv("zurcher_bus.csv")
     >>>
     >>> # Create estimator and fit
-    >>> model = NFXP(n_states=90, discount=0.9999, utility="linear_cost")
+    >>> from econirl.datasets import rust_bus_reward_spec
+    >>> model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
     >>> model.fit(data=df, state="mileage_bin", action="replaced", id="bus_id")
     >>>
     >>> # Access results sklearn-style
-    >>> print(model.params_)        # {"theta_c": 0.001, "RC": 9.35}
+    >>> print(model.params_)        # {"operating_cost": 0.001, "replacement_cost": 9.35}
     >>> print(model.coef_)          # numpy array [0.001, 9.35]
     >>> print(model.log_likelihood_)
     >>> print(model.summary())
@@ -27,55 +28,29 @@ Example:
     >>> # Simulate new data under estimated policy
     >>> sim_df = model.simulate(n_agents=100, n_periods=50, seed=42)
     >>>
-    >>> # Counterfactual analysis: what if RC was higher?
-    >>> cf_result = model.counterfactual(RC=15.0)
+    >>> # Counterfactual analysis: what if the replacement cost was higher?
+    >>> cf_result = model.counterfactual(replacement_cost=15.0)
     >>> print(cf_result.policy)  # New policy under higher replacement cost
 """
 
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 from scipy.stats import norm as scipy_norm
 
-from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.nfxp import NFXPEstimator
-from econirl.preferences.linear import LinearUtility
+from econirl.simulation.counterfactual import (
+    CounterfactualResult,
+    counterfactual_policy,
+    counterfactual_transitions,
+)
 from econirl.transitions import TransitionEstimator
-
-
-@dataclass
-class CounterfactualResult:
-    """Result of a counterfactual policy analysis.
-
-    Contains the value function and policy computed under alternative
-    parameter values, enabling "what if" analysis after estimation.
-
-    Attributes:
-        params: Dictionary of parameter values used in the counterfactual.
-                Contains both the modified parameters and the original
-                estimated values for unchanged parameters.
-        value_function: Value function V(s) under the counterfactual parameters,
-                       shape (n_states,).
-        policy: Choice probabilities P(a|s) under the counterfactual parameters,
-               shape (n_states, n_actions). Each row sums to 1.
-
-    Example:
-        >>> # After fitting NFXP estimator
-        >>> cf = estimator.counterfactual(RC=15.0)
-        >>> print(f"Under RC=15.0, P(replace|state=50) = {cf.policy[50, 1]:.3f}")
-    """
-
-    params: dict[str, float]
-    value_function: np.ndarray
-    policy: np.ndarray
 
 
 class NFXP:
@@ -93,10 +68,10 @@ class NFXP:
         Number of discrete actions (e.g., keep/replace).
     discount : float, default=0.9999
         Time discount factor (beta).
-    utility : str or RewardSpec, default="linear_cost"
-        Utility specification.  Pass ``"linear_cost"`` for the classic Rust
-        bus model (``u = -theta_c * s * (1-a) - RC * a``), or a
-        ``RewardSpec`` for custom features.
+    utility : RewardSpec
+        Utility specification as a ``RewardSpec``.  For the classic Rust bus
+        model, use ``rust_bus_reward_spec(n_states)`` from
+        ``econirl.datasets``.
     se_method : str, default="robust"
         Method for computing standard errors. Options: "asymptotic", "robust",
         "clustered", "bootstrap", and "full_likelihood_bhhh".
@@ -112,7 +87,8 @@ class NFXP:
     ----------
     params_ : dict
         Estimated parameters after fitting. Keys are parameter names
-        (e.g., "theta_c", "RC") and values are point estimates.
+        (e.g., "operating_cost", "replacement_cost") and values are point
+        estimates.
     se_ : dict
         Standard errors for each parameter.
     coef_ : numpy.ndarray
@@ -128,7 +104,13 @@ class NFXP:
     value_function_ : numpy.ndarray
         Alias for ``value_`` (backward compatibility).
     transitions_ : numpy.ndarray
-        Transition probability matrix (n_states x n_states).
+        Original transition input. This is a two-dimensional keep matrix when
+        transitions are estimated by the wrapper, or the supplied array.
+    transition_tensor_ : numpy.ndarray
+        Canonical action-specific transition tensor with shape
+        ``(n_actions, n_states, n_states)``.
+    transition_source_ : str
+        Whether transitions were estimated from the fitted panel or supplied.
     converged_ : bool
         Whether the optimization converged.
     reward_spec_ : RewardSpec
@@ -155,7 +137,7 @@ class NFXP:
         n_states: int = 90,
         n_actions: int = 2,
         discount: float = 0.9999,
-        utility: str | RewardSpec = "linear_cost",
+        utility: RewardSpec | None = None,
         se_method: Literal[
             "asymptotic",
             "robust",
@@ -177,9 +159,10 @@ class NFXP:
             Number of discrete actions.
         discount : float, default=0.9999
             Time discount factor (beta).
-        utility : str or RewardSpec, default="linear_cost"
-            Utility specification to use.  Pass ``"linear_cost"`` for the
-            classic Rust bus model, or a ``RewardSpec`` for custom features.
+        utility : RewardSpec
+            Utility specification as a ``RewardSpec``.  For the classic Rust
+            bus model, use ``rust_bus_reward_spec(n_states)`` from
+            ``econirl.datasets``.
         se_method : str, default="robust"
             Method for computing standard errors.
         n_bootstrap : int, default=400
@@ -216,6 +199,8 @@ class NFXP:
         self.policy_: np.ndarray | None = None
         self.value_: np.ndarray | None = None
         self.transitions_: np.ndarray | None = None
+        self.transition_tensor_: np.ndarray | None = None
+        self.transition_source_: str | None = None
         self.converged_: bool | None = None
         self.reward_spec_: RewardSpec | None = None
 
@@ -275,34 +260,28 @@ class NFXP:
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
             self._validate_dataframe(data, state=state, action=action)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
-        # --- Handle reward: RewardSpec or string ---
+        # --- Handle reward: RewardSpec ---
         if isinstance(reward_spec, RewardSpec):
             self.reward_spec_ = reward_spec
             self._utility_fn = reward_spec.to_linear_utility()
-        elif reward_spec == "linear_cost":
-            self._utility_fn = self._create_utility()
-            # Also create RewardSpec from the utility for consistency
-            self.reward_spec_ = RewardSpec(
-                self._utility_fn.feature_matrix,
-                self._utility_fn.parameter_names,
-            )
         else:
-            raise ValueError(f"Unknown reward/utility specification: {reward_spec}")
+            raise ValueError(
+                "utility must be a RewardSpec; the 'linear_cost' preset was "
+                "removed. Build features explicitly, e.g. "
+                "rust_bus_reward_spec(n_states) from econirl.datasets for "
+                "the Rust bus."
+            )
 
         # Validate the feature matrix matches the declared state/action space so a
         # mismatch raises a clear error instead of a cryptic broadcasting TypeError.
@@ -327,6 +306,7 @@ class NFXP:
             self.transitions_ = trans_estimator.matrix_
             self._transition_probabilities = trans_estimator.probs_
             self._transition_increments = trans_estimator.transition_increments_
+            self.transition_source_ = "estimated from fitted panel"
         else:
             if self.se_method == "full_likelihood_bhhh":
                 raise ValueError(
@@ -338,11 +318,17 @@ class NFXP:
             self.transitions_ = np.asarray(transitions)
             self._transition_probabilities = None
             self._transition_increments = None
+            self.transition_source_ = (
+                "supplied action-specific tensor"
+                if self.transitions_.ndim == 3
+                else "supplied keep-transition matrix"
+            )
 
         # Build full transition matrices (for both actions)
         # Action 0 (keep): use estimated transitions
         # Action 1 (replace): reset to state 0, then apply transition
         transition_tensor = self._build_transition_tensor(self.transitions_)
+        self.transition_tensor_ = transition_tensor
 
         # Create problem specification
         self._problem = DDCProblem(
@@ -362,6 +348,7 @@ class NFXP:
         estimate_kwargs = {
             "n_bootstrap": self.n_bootstrap,
             "se_seed": self.se_seed,
+            "transition_source": self.transition_source_,
         }
         if self.se_method == "full_likelihood_bhhh":
             estimate_kwargs.update(
@@ -535,10 +522,27 @@ class NFXP:
             expected_shape = (self.n_actions, self.n_states, self.n_states)
             if keep_transitions.shape != expected_shape:
                 raise ValueError(
-                    "3D transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
+            self._validate_transition_rows(keep_transitions)
             return keep_transitions
+
+        if keep_transitions.ndim != 2:
+            raise ValueError(
+                "transitions must be a 2D keep matrix or a 3D action-specific tensor"
+            )
+        if self.n_actions != 2:
+            raise ValueError(
+                "a 2D keep-transition matrix is only defined for n_actions=2; "
+                "supply a full (n_actions, n_states, n_states) tensor"
+            )
+        expected_matrix_shape = (self.n_states, self.n_states)
+        if keep_transitions.shape != expected_matrix_shape:
+            raise ValueError(
+                f"2D transitions must have shape {expected_matrix_shape}, "
+                f"got {keep_transitions.shape}"
+            )
+        self._validate_transition_rows(keep_transitions)
 
         n = self.n_states
         transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
@@ -553,39 +557,23 @@ class NFXP:
             # After replacement from any state, we transition as if from state 0
             transitions[1, s, :] = transitions[0, 0, :]
 
+        self._validate_transition_rows(transitions)
         return transitions
 
-    def _create_utility(self) -> LinearUtility:
-        """Create utility function for estimation.
-
-        Returns
-        -------
-        LinearUtility
-            Utility function with appropriate features.
-        """
-        if self.utility != "linear_cost":
-            raise ValueError(f"Unknown utility specification: {self.utility}")
-
-        # Build feature matrix for linear cost utility
-        # U(s, keep) = -theta_c * s
-        # U(s, replace) = -RC
-        n = self.n_states
-        features = np.zeros((n, self.n_actions, 2), dtype=np.float32)
-
-        mileage = np.arange(n, dtype=np.float32)
-
-        # Keep action (a=0): feature = [-s, 0]
-        features[:, 0, 0] = -mileage
-        features[:, 0, 1] = 0.0
-
-        # Replace action (a=1): feature = [0, -1]
-        features[:, 1, 0] = 0.0
-        features[:, 1, 1] = -1.0
-
-        return LinearUtility(
-            feature_matrix=features,
-            parameter_names=["theta_c", "RC"],
-        )
+    @staticmethod
+    def _validate_transition_rows(transitions: np.ndarray) -> None:
+        """Validate finite, non-negative probability rows."""
+        if not np.isfinite(transitions).all():
+            raise ValueError("transitions must contain only finite probabilities")
+        if (transitions < 0).any():
+            raise ValueError("transitions must contain non-negative probabilities")
+        row_sums = transitions.sum(axis=-1)
+        if not np.allclose(row_sums, 1.0, atol=1e-6):
+            max_error = float(np.max(np.abs(row_sums - 1.0)))
+            raise ValueError(
+                "transition rows must sum to 1; "
+                f"maximum absolute row-sum error is {max_error:.3g}"
+            )
 
     def _extract_results(self) -> None:
         """Extract results from estimation into sklearn-style attributes."""
@@ -623,12 +611,9 @@ class NFXP:
                 joint_cov = np.array([])
             if joint_se.size == len(joint_names):
                 self.joint_parameter_names_ = joint_names
-                self.joint_se_ = {
-                    name: float(val) for name, val in zip(joint_names, joint_se)
-                }
+                self.joint_se_ = {name: float(val) for name, val in zip(joint_names, joint_se)}
                 self.transition_se_ = {
-                    name: self.joint_se_[name]
-                    for name in full_metadata["transition_score_columns"]
+                    name: self.joint_se_[name] for name in full_metadata["transition_score_columns"]
                 }
             if joint_cov.shape == (len(joint_names), len(joint_names)):
                 self.joint_covariance_ = joint_cov
@@ -660,9 +645,7 @@ class NFXP:
                 se_val = self.se_[name]
                 if se_val and se_val > 0:
                     t_stat = self.params_[name] / se_val
-                    pvalues[name] = float(
-                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
-                    )
+                    pvalues[name] = float(2 * (1 - scipy_norm.cdf(abs(t_stat))))
                 else:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues
@@ -684,7 +667,7 @@ class NFXP:
         utility_matrix = self._utility_fn.compute(param_vector)
         return np.asarray(utility_matrix)
 
-    def summary(self) -> str:
+    def summary(self, alpha: float = 0.05) -> str:
         """Generate a formatted summary of estimation results.
 
         Returns
@@ -695,7 +678,7 @@ class NFXP:
         if self._result is None:
             return "NFXP: Not fitted yet. Call fit() first."
 
-        return self._result.summary()
+        return self._result.summary(alpha=alpha)
 
     def conf_int(self, alpha: float = 0.05) -> dict:
         """Compute confidence intervals for parameters.
@@ -803,9 +786,7 @@ class NFXP:
         if self._result is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
-        # Set random seed
-        if seed is not None:
-            np.random.seed(seed)
+        rng = np.random.default_rng(seed)
 
         # Resolve per-agent initial states. None keeps the historical behaviour
         # (everyone starts at state 0); a length-n_states vector is a start
@@ -815,7 +796,7 @@ class NFXP:
         else:
             init_states = np.asarray(init_states)
             if init_states.shape == (self.n_states,):
-                initial = np.random.choice(self.n_states, size=n_agents, p=init_states)
+                initial = rng.choice(self.n_states, size=n_agents, p=init_states)
             elif init_states.shape == (n_agents,):
                 initial = init_states.astype(int)
             else:
@@ -828,8 +809,9 @@ class NFXP:
         # Get the policy (choice probabilities)
         policy = np.asarray(self._result.policy)  # shape: (n_states, n_actions)
 
-        # Get transition probabilities (for action 0 = keep)
-        transitions = self.transitions_  # shape: (n_states, n_states)
+        transition_tensor = self.transition_tensor_
+        if transition_tensor is None:
+            transition_tensor = self._build_transition_tensor(self.transitions_)
 
         # Storage for results
         data = []
@@ -840,40 +822,45 @@ class NFXP:
             for period in range(n_periods):
                 # Sample action from policy
                 action_probs = policy[state]
-                action = np.random.choice(self.n_actions, p=action_probs)
+                action = rng.choice(self.n_actions, p=action_probs)
 
                 # Record observation
-                data.append({
-                    "agent_id": agent_id,
-                    "period": period,
-                    "state": state,
-                    "action": action,
-                })
+                data.append(
+                    {
+                        "agent_id": agent_id,
+                        "period": period,
+                        "state": state,
+                        "action": action,
+                    }
+                )
 
-                # Transition to next state
-                if action == 1:  # Replace: reset to state 0, then transition
-                    state = 0
-                    trans_probs = transitions[0]
-                else:  # Keep: use transition from current state
-                    trans_probs = transitions[state]
-
-                state = np.random.choice(self.n_states, p=trans_probs)
+                trans_probs = transition_tensor[action, state]
+                state = rng.choice(self.n_states, p=trans_probs)
 
         return pd.DataFrame(data)
 
-    def counterfactual(self, **param_changes) -> CounterfactualResult:
+    def counterfactual(
+        self,
+        transitions: np.ndarray | None = None,
+        **param_changes,
+    ) -> CounterfactualResult:
         """Compute outcomes under different parameter values.
 
         Performs counterfactual analysis by solving the dynamic programming
         problem under alternative parameter values. This enables "what if"
-        questions like "what would the policy be if RC was 15 instead of 10?"
+        questions such as "what would the policy be if replacement cost were
+        15 instead of 10?"
 
         Parameters
         ----------
+        transitions : numpy.ndarray, optional
+            Alternative transition matrix or action-specific transition tensor.
+            When supplied, reward parameters remain fixed.
         **param_changes : float
             Keyword arguments specifying parameter changes.
-            Keys must be valid parameter names (e.g., "theta_c", "RC").
-            Values are the counterfactual parameter values.
+            Keys must be valid parameter names, such as ``operating_cost`` or
+            ``replacement_cost`` for ``rust_bus_reward_spec``. Values are the
+            counterfactual parameter values.
 
         Returns
         -------
@@ -892,22 +879,33 @@ class NFXP:
 
         Examples
         --------
-        >>> model = NFXP(n_states=90)
+        >>> from econirl.datasets import rust_bus_reward_spec
+        >>> model = NFXP(n_states=90, utility=rust_bus_reward_spec(90))
         >>> model.fit(data, state="mileage", action="replaced", id="bus_id")
         >>>
         >>> # What if replacement cost was higher?
-        >>> cf = model.counterfactual(RC=15.0)
-        >>> print(f"Original RC: {model.params_['RC']:.2f}")
-        >>> print(f"Counterfactual RC: {cf.params['RC']:.2f}")
+        >>> cf = model.counterfactual(replacement_cost=15.0)
+        >>> print(f"Original replacement cost: "
+        ...       f"{model.params_['replacement_cost']:.2f}")
+        >>> print(f"Counterfactual replacement cost: "
+        ...       f"{cf.params['replacement_cost']:.2f}")
         >>> print(f"P(replace|state=50) changes from "
         ...       f"{model.predict_proba(np.array([50]))[0,1]:.3f} to "
         ...       f"{cf.policy[50,1]:.3f}")
         >>>
         >>> # Multiple parameter changes
-        >>> cf2 = model.counterfactual(RC=15.0, theta_c=0.05)
+        >>> cf2 = model.counterfactual(
+        ...     replacement_cost=15.0,
+        ...     operating_cost=0.05,
+        ... )
         """
         if self._result is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
+
+        if transitions is not None and param_changes:
+            raise ValueError(
+                "change reward parameters or transitions in one counterfactual, not both"
+            )
 
         # Check for invalid parameter names
         valid_params = set(self.params_.keys())
@@ -922,33 +920,29 @@ class NFXP:
         cf_params = self.params_.copy()
         cf_params.update(param_changes)
 
-        # Build parameter vector in correct order
-        param_names = self._result.parameter_names
-        param_vector = np.array(
-            [cf_params[name] for name in param_names],
-            dtype=np.float32,
-        )
+        baseline_tensor = self.transition_tensor_
+        if baseline_tensor is None:
+            baseline_tensor = self._build_transition_tensor(self.transitions_)
 
-        # Compute utility matrix with new parameters
-        utility_matrix = self._utility_fn.compute(param_vector)
-
-        # Build transition tensor
-        transition_tensor = self._build_transition_tensor(self.transitions_)
-
-        # Create Bellman operator
-        operator = SoftBellmanOperator(
-            problem=self._problem,
-            transitions=transition_tensor,
-        )
-
-        # Solve for new value function and policy
-        result = value_iteration(operator, utility_matrix)
-
-        return CounterfactualResult(
-            params=cf_params,
-            value_function=np.asarray(result.V),
-            policy=np.asarray(result.policy),
-        )
+        if transitions is not None:
+            new_tensor = self._build_transition_tensor(transitions)
+            result = counterfactual_transitions(
+                result=self._result,
+                new_transitions=new_tensor,
+                utility=self._utility_fn,
+                problem=self._problem,
+                baseline_transitions=baseline_tensor,
+            )
+        else:
+            result = counterfactual_policy(
+                result=self._result,
+                new_parameters=cf_params,
+                utility=self._utility_fn,
+                problem=self._problem,
+                transitions=baseline_tensor,
+            )
+        result.params = cf_params
+        return result
 
     def __repr__(self) -> str:
         if self.params_ is not None:

@@ -1,8 +1,8 @@
 """Tests for SEES sklearn-style wrapper.
 
 Tests that the SEES estimator:
-1. Fits with DataFrame + "linear_cost" (basic functionality)
-2. Recovers positive parameters (theta_c > 0, RC > 0)
+1. Fits with DataFrame + a RewardSpec (basic functionality)
+2. Recovers positive parameters (operating_cost > 0, replacement_cost > 0)
 3. Exposes policy_, value_, pvalues_ attributes
 4. conf_int() returns valid intervals
 5. Accepts RewardSpec as reward specification
@@ -18,10 +18,10 @@ import pandas as pd
 import pytest
 
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.types import Panel, TrajectoryPanel
+from econirl.core.types import TrajectoryPanel
+from econirl.datasets import rust_bus_reward_spec
 from econirl.estimation.sees import SEESConfig, SEESEstimator
 from econirl.estimators.sees import SEES
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -43,9 +43,7 @@ def _generate_bus_dataframe(
     for i in range(n_individuals):
         state = 0
         for t in range(n_periods):
-            action = (
-                1 if state > n_states * 2 // 3 or np.random.random() < 0.05 else 0
-            )
+            action = 1 if state > n_states * 2 // 3 or np.random.random() < 0.05 else 0
             next_state = (
                 0
                 if action == 1
@@ -78,6 +76,7 @@ def fitted_model_fast(bus_df_fast):
     model = SEES(
         n_states=_N_STATES_FAST,
         discount=_DISCOUNT_FAST,
+        utility=rust_bus_reward_spec(_N_STATES_FAST),
         basis_type="fourier",
         basis_dim=4,
         penalty_weight=10.0,
@@ -94,24 +93,23 @@ def fitted_model_fast(bus_df_fast):
 
 
 class TestBasicFit:
-    """SEES fits with DataFrame + linear_cost."""
+    """SEES fits with DataFrame + a RewardSpec."""
 
     def test_fit_produces_params(self, fitted_model_fast):
         assert fitted_model_fast.params_ is not None
-        assert "theta_c" in fitted_model_fast.params_
-        assert "RC" in fitted_model_fast.params_
+        assert "operating_cost" in fitted_model_fast.params_
+        assert "replacement_cost" in fitted_model_fast.params_
 
     def test_fit_returns_self(self, bus_df_fast):
         model = SEES(
             n_states=_N_STATES_FAST,
             discount=_DISCOUNT_FAST,
+            utility=rust_bus_reward_spec(_N_STATES_FAST),
             basis_dim=4,
             max_iter=50,
             verbose=False,
         )
-        result = model.fit(
-            bus_df_fast, state="mileage_bin", action="replaced", id="bus_id"
-        )
+        result = model.fit(bus_df_fast, state="mileage_bin", action="replaced", id="bus_id")
         assert result is model
 
     def test_coef_array(self, fitted_model_fast):
@@ -149,6 +147,7 @@ class TestBasicFit:
         model = SEES(
             n_states=_N_STATES_FAST,
             discount=_DISCOUNT_FAST,
+            utility=rust_bus_reward_spec(_N_STATES_FAST),
             solution="q",
             basis_type="fourier",
             basis_dim=3,
@@ -167,18 +166,18 @@ class TestBasicFit:
 
 
 # ---------------------------------------------------------------------------
-# 2. Parameters recovered (positive theta_c and RC)
+# 2. Parameters recovered (positive operating_cost and replacement_cost)
 # ---------------------------------------------------------------------------
 
 
 class TestParametersRecovered:
     """Estimated parameters are positive (basic sanity)."""
 
-    def test_theta_c_positive(self, fitted_model_fast):
-        assert fitted_model_fast.params_["theta_c"] > 0
+    def test_operating_cost_positive(self, fitted_model_fast):
+        assert fitted_model_fast.params_["operating_cost"] > 0
 
-    def test_RC_positive(self, fitted_model_fast):
-        assert fitted_model_fast.params_["RC"] > 0
+    def test_replacement_cost_positive(self, fitted_model_fast):
+        assert fitted_model_fast.params_["replacement_cost"] > 0
 
 
 # ---------------------------------------------------------------------------
@@ -205,13 +204,13 @@ class TestAttributes:
 
     def test_pvalues_present(self, fitted_model_fast):
         assert fitted_model_fast.pvalues_ is not None
-        assert "theta_c" in fitted_model_fast.pvalues_
-        assert "RC" in fitted_model_fast.pvalues_
+        assert "operating_cost" in fitted_model_fast.pvalues_
+        assert "replacement_cost" in fitted_model_fast.pvalues_
 
     def test_se_present(self, fitted_model_fast):
         assert fitted_model_fast.se_ is not None
-        assert "theta_c" in fitted_model_fast.se_
-        assert "RC" in fitted_model_fast.se_
+        assert "operating_cost" in fitted_model_fast.se_
+        assert "replacement_cost" in fitted_model_fast.se_
 
     def test_transitions_estimated(self, fitted_model_fast):
         assert fitted_model_fast.transitions_ is not None
@@ -227,8 +226,8 @@ class TestConfInt:
 
     def test_conf_int_keys(self, fitted_model_fast):
         ci = fitted_model_fast.conf_int()
-        assert "theta_c" in ci
-        assert "RC" in ci
+        assert "operating_cost" in ci
+        assert "replacement_cost" in ci
 
     def test_conf_int_brackets_estimate(self, fitted_model_fast):
         ci = fitted_model_fast.conf_int()
@@ -238,8 +237,7 @@ class TestConfInt:
             if np.isnan(lower) or np.isnan(upper):
                 continue
             assert lower <= est <= upper, (
-                f"CI for {name}: ({lower}, {upper}) does not contain "
-                f"estimate {est}"
+                f"CI for {name}: ({lower}, {upper}) does not contain estimate {est}"
             )
 
     def test_conf_int_unfitted_raises(self):
@@ -362,6 +360,7 @@ class TestDataInputs:
         model = SEES(
             n_states=_N_STATES_FAST,
             discount=_DISCOUNT_FAST,
+            utility=rust_bus_reward_spec(_N_STATES_FAST),
             basis_dim=4,
             max_iter=50,
             verbose=False,

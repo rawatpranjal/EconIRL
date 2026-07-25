@@ -1,7 +1,7 @@
 """Tests for NFXP wrapper refactoring: RewardSpec, TrajectoryPanel, EstimatorProtocol.
 
 Tests that the NFXP sklearn wrapper:
-1. Still works with DataFrame + "linear_cost" (backward compat)
+1. Still works with DataFrame + a RewardSpec (backward compat)
 2. Accepts RewardSpec as reward specification
 3. Accepts TrajectoryPanel directly
 4. Exposes policy_, value_, pvalues_, conf_int()
@@ -11,16 +11,16 @@ Tests that the NFXP sklearn wrapper:
 
 from __future__ import annotations
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import pytest
-import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
-from econirl.core.types import Panel, Trajectory, TrajectoryPanel
+from econirl.core.types import Panel, TrajectoryPanel
+from econirl.datasets import rust_bus_reward_spec
 from econirl.estimators.nfxp import NFXP
 from econirl.estimators.protocol import EstimatorProtocol
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -45,9 +45,7 @@ def _generate_bus_dataframe(
     for i in range(n_individuals):
         state = 0
         for t in range(n_periods):
-            action = (
-                1 if state > n_states * 2 // 3 or np.random.random() < 0.05 else 0
-            )
+            action = 1 if state > n_states * 2 // 3 or np.random.random() < 0.05 else 0
             next_state = (
                 0
                 if action == 1
@@ -77,13 +75,18 @@ def bus_df():
 @pytest.fixture(scope="module")
 def fitted_model(bus_df):
     """Fitted NFXP model shared across test classes."""
-    model = NFXP(n_states=_N_STATES, discount=_DISCOUNT, verbose=False)
+    model = NFXP(
+        n_states=_N_STATES,
+        discount=_DISCOUNT,
+        utility=rust_bus_reward_spec(_N_STATES),
+        verbose=False,
+    )
     model.fit(bus_df, state="mileage_bin", action="replaced", id="bus_id")
     return model
 
 
 # ---------------------------------------------------------------------------
-# 1. Backward compatibility: DataFrame + "linear_cost"
+# 1. Backward compatibility: DataFrame + RewardSpec
 # ---------------------------------------------------------------------------
 
 
@@ -92,11 +95,16 @@ class TestBackwardCompat:
 
     def test_fit_dataframe_backward_compat(self, fitted_model):
         assert fitted_model.params_ is not None
-        assert "theta_c" in fitted_model.params_
-        assert "RC" in fitted_model.params_
+        assert "operating_cost" in fitted_model.params_
+        assert "replacement_cost" in fitted_model.params_
 
     def test_fit_returns_self(self, bus_df):
-        model = NFXP(n_states=_N_STATES, discount=_DISCOUNT, verbose=False)
+        model = NFXP(
+            n_states=_N_STATES,
+            discount=_DISCOUNT,
+            utility=rust_bus_reward_spec(_N_STATES),
+            verbose=False,
+        )
         result = model.fit(bus_df, state="mileage_bin", action="replaced", id="bus_id")
         assert result is model
 
@@ -152,11 +160,14 @@ class TestRewardSpec:
         assert model.params_ is not None
         assert model.reward_spec_ is spec
 
-    def test_reward_spec_auto_created_for_linear_cost(self, fitted_model):
-        """linear_cost mode should also populate reward_spec_."""
+    def test_reward_spec_auto_created_for_default_reward_spec(self, fitted_model):
+        """Fitting with a RewardSpec should also populate reward_spec_."""
         assert fitted_model.reward_spec_ is not None
         assert isinstance(fitted_model.reward_spec_, RewardSpec)
-        assert fitted_model.reward_spec_.parameter_names == ["theta_c", "RC"]
+        assert fitted_model.reward_spec_.parameter_names == [
+            "operating_cost",
+            "replacement_cost",
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -171,17 +182,25 @@ class TestTrajectoryPanelInput:
         panel = TrajectoryPanel.from_dataframe(
             bus_df, state="mileage_bin", action="replaced", id="bus_id"
         )
-        model = NFXP(n_states=_N_STATES, discount=_DISCOUNT, verbose=False)
+        model = NFXP(
+            n_states=_N_STATES,
+            discount=_DISCOUNT,
+            utility=rust_bus_reward_spec(_N_STATES),
+            verbose=False,
+        )
         model.fit(panel)
         assert model.params_ is not None
-        assert "theta_c" in model.params_
+        assert "operating_cost" in model.params_
 
     def test_fit_with_panel(self, bus_df):
         """Panel is an alias for TrajectoryPanel, should also work."""
-        panel = Panel.from_dataframe(
-            bus_df, state="mileage_bin", action="replaced", id="bus_id"
+        panel = Panel.from_dataframe(bus_df, state="mileage_bin", action="replaced", id="bus_id")
+        model = NFXP(
+            n_states=_N_STATES,
+            discount=_DISCOUNT,
+            utility=rust_bus_reward_spec(_N_STATES),
+            verbose=False,
         )
-        model = NFXP(n_states=_N_STATES, discount=_DISCOUNT, verbose=False)
         model.fit(panel)
         assert model.params_ is not None
 
@@ -224,8 +243,8 @@ class TestNewAttributes:
 
     def test_pvalues_present(self, fitted_model):
         assert fitted_model.pvalues_ is not None
-        assert "theta_c" in fitted_model.pvalues_
-        assert "RC" in fitted_model.pvalues_
+        assert "operating_cost" in fitted_model.pvalues_
+        assert "replacement_cost" in fitted_model.pvalues_
 
     def test_pvalues_in_range(self, fitted_model):
         for name, pv in fitted_model.pvalues_.items():
@@ -243,8 +262,8 @@ class TestConfInt:
 
     def test_conf_int_keys(self, fitted_model):
         ci = fitted_model.conf_int()
-        assert "theta_c" in ci
-        assert "RC" in ci
+        assert "operating_cost" in ci
+        assert "replacement_cost" in ci
 
     def test_conf_int_brackets_estimate(self, fitted_model):
         ci = fitted_model.conf_int()
@@ -252,8 +271,7 @@ class TestConfInt:
             lower, upper = ci[name]
             est = fitted_model.params_[name]
             assert lower <= est <= upper, (
-                f"CI for {name}: ({lower}, {upper}) does not contain "
-                f"estimate {est}"
+                f"CI for {name}: ({lower}, {upper}) does not contain estimate {est}"
             )
 
     def test_conf_int_custom_alpha(self, fitted_model):
@@ -329,9 +347,9 @@ class TestExistingMethodsStillWork:
     def test_counterfactual(self, fitted_model):
         from econirl.estimators.nfxp import CounterfactualResult
 
-        cf = fitted_model.counterfactual(RC=15.0)
+        cf = fitted_model.counterfactual(replacement_cost=15.0)
         assert isinstance(cf, CounterfactualResult)
-        assert cf.params["RC"] == 15.0
+        assert cf.params["replacement_cost"] == 15.0
         assert cf.policy.shape == (_N_STATES, 2)
         assert cf.value_function.shape == (_N_STATES,)
 

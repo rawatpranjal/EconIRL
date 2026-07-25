@@ -18,16 +18,15 @@ References:
 
 from __future__ import annotations
 
-import numpy as np
-import pandas as pd
-import jax
-import jax.numpy as jnp
 from typing import Optional
 
+import numpy as np
+import pandas as pd
+
 from econirl.environments.rust_bus import RustBusEnvironment
-from econirl.preferences.linear import LinearUtility
-from econirl.estimation.nfxp import NFXPEstimator
 from econirl.estimation.ccp import CCPEstimator
+from econirl.estimation.nfxp import NFXPEstimator
+from econirl.preferences.linear import LinearUtility
 from econirl.simulation.synthetic import simulate_panel
 
 
@@ -144,9 +143,17 @@ def run_monte_carlo(
                     'simulation': sim,
                     'estimator': est_name,
                     'theta_c': result.parameters[0].item(),
-                    'theta_c_se': result.standard_errors[0].item() if result.standard_errors is not None else np.nan,
+                    'theta_c_se': (
+                        result.standard_errors[0].item()
+                        if result.standard_errors is not None
+                        else np.nan
+                    ),
                     'RC': result.parameters[1].item(),
-                    'RC_se': result.standard_errors[1].item() if result.standard_errors is not None else np.nan,
+                    'RC_se': (
+                        result.standard_errors[1].item()
+                        if result.standard_errors is not None
+                        else np.nan
+                    ),
                     'log_likelihood': result.log_likelihood,
                     'converged': result.converged,
                     'true_theta_c': true_operating_cost,
@@ -196,30 +203,29 @@ def summarize_monte_carlo(results: pd.DataFrame) -> pd.DataFrame:
 
     for est_name in results['estimator'].unique():
         est_results = results[results['estimator'] == est_name]
-        converged = est_results[est_results['converged'] == True]
+        converged = est_results[est_results['converged']]
 
         for param in ['theta_c', 'RC']:
-            if len(converged) == 0:
-                continue
-
-            true_val = converged[f'true_{param}'].iloc[0]
+            true_val = est_results[f'true_{param}'].iloc[0]
             estimates = converged[param].dropna()
 
-            if len(estimates) == 0:
-                continue
-
-            bias = estimates.mean() - true_val
-            rmse = np.sqrt(((estimates - true_val) ** 2).mean())
-            std = estimates.std()
+            if len(estimates) > 0:
+                bias = estimates.mean() - true_val
+                rmse = np.sqrt(((estimates - true_val) ** 2).mean())
+                std = estimates.std()
+                mean_estimate = estimates.mean()
+            else:
+                bias = np.nan
+                rmse = np.nan
+                std = np.nan
+                mean_estimate = np.nan
 
             # Coverage: fraction of 95% CIs containing true value
             if f'{param}_se' in converged.columns:
-                ses = converged[f'{param}_se'].dropna()
-                valid_mask = ~estimates.isna() & ~ses.isna()
-                valid_estimates = estimates[valid_mask]
-                valid_ses = ses[valid_mask]
-
-                if len(valid_ses) > 0 and len(valid_ses) == len(valid_estimates):
+                paired = converged[[param, f'{param}_se']].dropna()
+                if len(paired) > 0:
+                    valid_estimates = paired[param]
+                    valid_ses = paired[f'{param}_se']
                     lower = valid_estimates - 1.96 * valid_ses
                     upper = valid_estimates + 1.96 * valid_ses
                     coverage = ((lower <= true_val) & (true_val <= upper)).mean()
@@ -232,7 +238,7 @@ def summarize_monte_carlo(results: pd.DataFrame) -> pd.DataFrame:
                 'estimator': est_name,
                 'parameter': param,
                 'true_value': true_val,
-                'mean_estimate': estimates.mean(),
+                'mean_estimate': mean_estimate,
                 'bias': bias,
                 'std': std,
                 'rmse': rmse,

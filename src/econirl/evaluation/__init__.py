@@ -6,7 +6,6 @@ This module provides metrics for three distinct evaluation dimensions:
 - Generalization: Cross-environment policy accuracy
 """
 
-from econirl.evaluation.inference import InferenceMetrics, inference_metrics
 from econirl.evaluation.adapters import build_utility_for_estimator, project_state_features
 from econirl.evaluation.benchmark import (
     BenchmarkDGP,
@@ -18,6 +17,8 @@ from econirl.evaluation.benchmark import (
     summarize_benchmark,
 )
 from econirl.evaluation.convergence import ConvergenceProfile, track_convergence
+from econirl.evaluation.inference import InferenceMetrics, inference_metrics
+from econirl.evaluation.selfcheck import assert_effect, check_coverage, check_se_ratio
 
 __all__ = [
     "InferenceMetrics",
@@ -36,4 +37,7 @@ __all__ = [
     # Convergence
     "ConvergenceProfile",
     "track_convergence",
+    "assert_effect",
+    "check_coverage",
+    "check_se_ratio",
 ]

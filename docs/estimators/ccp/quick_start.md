@@ -8,7 +8,7 @@ The public API follows the same sklearn convention as NFXP. Create an
 estimator, call `fit`, and read fitted attributes.
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import CCP
 
 df = load_rust_bus()
@@ -16,7 +16,7 @@ df = load_rust_bus()
 model = CCP(
     n_states=90,
     discount=0.9999,
-    utility="linear_cost",
+    utility=rust_bus_reward_spec(90),
     num_policy_iterations=10,
 )
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
@@ -56,7 +56,7 @@ policy after each pseudo-likelihood fit.
 ## Counterfactual Example
 
 ```python
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 
 print(cf.params)
 print(cf.policy[50, 1])

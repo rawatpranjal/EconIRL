@@ -23,7 +23,7 @@ not fix a misspecified reward, thin action support, or a missing normalization.
 | `bootstrap` | Pairs-cluster resampling over individuals. |
 
 ```python
-model = NFXP(n_states=90, discount=0.9999, se_method="clustered")
+model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90), se_method="clustered")
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 print(model.se_)
 ```
@@ -48,7 +48,7 @@ are only as credible as the identification behind the parameters, so confirm the
 pre-estimation checks first.
 
 ```python
-cf = model.counterfactual(RC=4.0)
+cf = model.counterfactual(replacement_cost=4.0)
 print(cf.policy[50, 1])
 ```
 
