@@ -528,9 +528,7 @@ class NFXP:
             return keep_transitions
 
         if keep_transitions.ndim != 2:
-            raise ValueError(
-                "transitions must be a 2D keep matrix or a 3D action-specific tensor"
-            )
+            raise ValueError("transitions must be a 2D keep matrix or a 3D action-specific tensor")
         if self.n_actions != 2:
             raise ValueError(
                 "a 2D keep-transition matrix is only defined for n_actions=2; "
@@ -571,8 +569,7 @@ class NFXP:
         if not np.allclose(row_sums, 1.0, atol=1e-6):
             max_error = float(np.max(np.abs(row_sums - 1.0)))
             raise ValueError(
-                "transition rows must sum to 1; "
-                f"maximum absolute row-sum error is {max_error:.3g}"
+                f"transition rows must sum to 1; maximum absolute row-sum error is {max_error:.3g}"
             )
 
     def _extract_results(self) -> None:
@@ -624,7 +621,7 @@ class NFXP:
 
         if not self.converged_:
             warnings.warn(
-                "NFXP optimization did not converge; parameter estimates and "
+                f"{type(self).__name__} optimization did not converge; parameter estimates and "
                 "standard errors may be unreliable.",
                 RuntimeWarning,
                 stacklevel=2,

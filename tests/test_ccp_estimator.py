@@ -9,11 +9,14 @@ Tests cover:
 """
 
 import warnings
+from dataclasses import replace
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from econirl.core.optimizer import OptimizeResult
 from econirl.estimation.ccp import EULER_GAMMA, CCPEstimator
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.preferences.linear import LinearUtility
@@ -117,6 +120,49 @@ class TestEmaxCorrection:
         expected = EULER_GAMMA - jnp.log(ccps)
         np.testing.assert_allclose(np.asarray(e), np.asarray(expected), atol=1e-6)
 
+    def test_choice_probabilities_are_scale_equivariant(
+        self,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """Scaling rewards and logit shocks together leaves choices unchanged."""
+        estimator = CCPEstimator(num_policy_iterations=1)
+        ccps = jnp.full(
+            (problem_spec_small.num_states, problem_spec_small.num_actions),
+            1.0 / problem_spec_small.num_actions,
+        )
+        parameters = jnp.array([0.25, 1.5])
+        scaled_problem = replace(problem_spec_small, scale_parameter=2.0)
+
+        values = estimator._compute_choice_specific_values(
+            ccps,
+            transitions_small,
+            utility_small,
+            parameters,
+            problem_spec_small,
+        )
+        scaled_values = estimator._compute_choice_specific_values(
+            ccps,
+            transitions_small,
+            utility_small,
+            2.0 * parameters,
+            scaled_problem,
+        )
+
+        np.testing.assert_allclose(
+            np.asarray(scaled_values),
+            2.0 * np.asarray(values),
+            rtol=1e-5,
+            atol=1e-5,
+        )
+        np.testing.assert_allclose(
+            np.asarray(jax.nn.softmax(scaled_values / 2.0, axis=1)),
+            np.asarray(jax.nn.softmax(values, axis=1)),
+            rtol=1e-5,
+            atol=1e-5,
+        )
+
     def test_emax_handles_small_probs(self):
         """Test that emax handles very small probabilities without overflow."""
         estimator = CCPEstimator(num_policy_iterations=1, ccp_smoothing=1e-10)
@@ -130,8 +176,9 @@ class TestEmaxCorrection:
 class TestHotzMillerEstimation:
     """Tests for Hotz-Miller (K=1) estimator."""
 
-    def test_hotz_miller_runs(self, rust_env_small, small_panel, utility_small,
-                              problem_spec_small, transitions_small):
+    def test_hotz_miller_runs(
+        self, rust_env_small, small_panel, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that Hotz-Miller estimator runs without error."""
         estimator = CCPEstimator(
             num_policy_iterations=1,
@@ -166,8 +213,9 @@ class TestHotzMillerEstimation:
 class TestNPLEstimation:
     """Tests for NPL (K>1) estimator."""
 
-    def test_npl_runs(self, rust_env_small, small_panel, utility_small,
-                      problem_spec_small, transitions_small):
+    def test_npl_runs(
+        self, rust_env_small, small_panel, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that NPL estimator runs without error."""
         estimator = CCPEstimator(
             num_policy_iterations=5,
@@ -180,6 +228,93 @@ class TestNPLEstimation:
 
         assert result is not None
         assert len(result.parameters) == utility_small.num_parameters
+        assert result.converged
+        assert result.metadata["termination_reason"] in {
+            "fixed_k_complete",
+            "fixed_point_converged",
+        }
+        assert result.metadata["inner_optimizer_succeeded"]
+
+    def test_inner_optimizer_failure_is_visible(
+        self,
+        monkeypatch,
+        small_panel,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """A failed pseudo-likelihood solve must not look like completion."""
+
+        def fail_optimizer(_fun, x0, **_kwargs):
+            return OptimizeResult(
+                x=x0,
+                fun=1.0,
+                success=False,
+                nit=1,
+                nfev=1,
+                message="Maximum iterations reached",
+                grad_norm=1.0,
+                projected_grad_norm=1.0,
+                convergence_reason="max_iterations",
+            )
+
+        monkeypatch.setattr("econirl.estimation.ccp.minimize_lbfgsb", fail_optimizer)
+        result = CCPEstimator(
+            num_policy_iterations=3,
+            compute_hessian=False,
+        ).estimate(
+            small_panel,
+            utility_small,
+            problem_spec_small,
+            transitions_small,
+        )
+
+        assert not result.converged
+        assert result.metadata["termination_reason"] == "inner_optimizer_failed"
+        assert not result.metadata["inner_optimizer_succeeded"]
+        assert result.metadata["inner_optimizer_history"][0]["accepted"] is False
+
+    def test_fixed_k_early_convergence_is_successful(
+        self,
+        monkeypatch,
+        small_panel,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """Meeting the NPL tolerance early is successful for a fixed-K run."""
+
+        def unchanged_optimizer(_fun, x0, **_kwargs):
+            return OptimizeResult(
+                x=x0,
+                fun=1.0,
+                success=True,
+                nit=1,
+                nfev=1,
+                message="Converged",
+                grad_norm=0.0,
+                projected_grad_norm=0.0,
+                convergence_reason="projected_gradient",
+            )
+
+        monkeypatch.setattr(
+            "econirl.estimation.ccp.minimize_lbfgsb",
+            unchanged_optimizer,
+        )
+        result = CCPEstimator(
+            num_policy_iterations=3,
+            compute_hessian=False,
+        ).estimate(
+            small_panel,
+            utility_small,
+            problem_spec_small,
+            transitions_small,
+        )
+
+        assert result.converged
+        assert result.metadata["npl_converged"]
+        assert result.metadata["termination_reason"] == "fixed_point_converged"
+        assert result.num_iterations == 1
 
     def test_npl_name(self):
         """Test that NPL has correct name."""
@@ -197,8 +332,9 @@ class TestNPLEstimation:
         assert one_step.name == "Hotz-Miller (CCP)"
         assert "convergence" in npl.name.lower()
 
-    def test_npl_improves_over_hotz_miller(self, rust_env_small, utility_small,
-                                           problem_spec_small, transitions_small):
+    def test_npl_improves_over_hotz_miller(
+        self, rust_env_small, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that NPL iterations improve log-likelihood over Hotz-Miller."""
         panel = simulate_panel(rust_env_small, n_individuals=200, n_periods=100, seed=42)
 
@@ -219,8 +355,9 @@ class TestNPLEstimation:
 class TestCCPvsNFXP:
     """Tests comparing CCP estimators to NFXP."""
 
-    def test_npl_converges_to_nfxp(self, rust_env_small, utility_small,
-                                    problem_spec_small, transitions_small):
+    def test_npl_converges_to_nfxp(
+        self, rust_env_small, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that NPL converges to same estimates as NFXP."""
         panel = simulate_panel(rust_env_small, n_individuals=300, n_periods=100, seed=42)
 
@@ -244,11 +381,13 @@ class TestCCPvsNFXP:
 
         # Parameters should be close
         param_diff = jnp.abs(npl_result.parameters - nfxp_result.parameters)
-        assert float(param_diff.max()) < 0.1, \
+        assert float(param_diff.max()) < 0.1, (
             f"NPL: {npl_result.parameters}, NFXP: {nfxp_result.parameters}"
+        )
 
-    def test_all_methods_recover_true_params(self, rust_env_small, utility_small,
-                                              problem_spec_small, transitions_small):
+    def test_all_methods_recover_true_params(
+        self, rust_env_small, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that all methods recover true parameters reasonably well."""
         panel = simulate_panel(rust_env_small, n_individuals=500, n_periods=100, seed=42)
         true_params = rust_env_small.get_true_parameter_vector()
@@ -260,9 +399,7 @@ class TestCCPvsNFXP:
         }
 
         for name, estimator in estimators.items():
-            result = estimator.estimate(
-                panel, utility_small, problem_spec_small, transitions_small
-            )
+            result = estimator.estimate(panel, utility_small, problem_spec_small, transitions_small)
 
             # Check parameter recovery (within 50% relative error)
             for i, param_name in enumerate(result.parameter_names):
@@ -270,16 +407,52 @@ class TestCCPvsNFXP:
                 true_val = float(true_params[i])
                 rel_error = abs(estimate - true_val) / (abs(true_val) + 1e-8)
 
-                assert rel_error < 0.5, \
-                    f"{name}: {param_name} has {rel_error:.1%} error " \
+                assert rel_error < 0.5, (
+                    f"{name}: {param_name} has {rel_error:.1%} error "
                     f"(est={estimate:.4f}, true={true_val:.4f})"
+                )
 
 
 class TestCCPInference:
     """Tests for CCP inference (standard errors, confidence intervals)."""
 
-    def test_standard_errors_computed(self, rust_env_small, small_panel, utility_small,
-                                       problem_spec_small, transitions_small):
+    def test_linear_inference_matches_fixed_ccp_pseudo_likelihood(
+        self,
+        rust_env_small,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """Linear CCP inference uses one internally consistent criterion."""
+        panel = simulate_panel(
+            rust_env_small,
+            n_individuals=300,
+            n_periods=50,
+            seed=2718,
+        )
+        estimator = CCPEstimator(
+            num_policy_iterations=1,
+            compute_hessian=True,
+            verbose=False,
+        )
+
+        result = estimator.estimate(
+            panel,
+            utility_small,
+            problem_spec_small,
+            transitions_small,
+        )
+
+        assert result.metadata["se_method_detail"] == "fixed_ccp_pseudo_likelihood"
+        assert result.hessian is not None
+        eigenvalues = np.linalg.eigvalsh(np.asarray(result.hessian))
+        assert np.all(eigenvalues < 0)
+        assert np.isfinite(np.asarray(result.standard_errors)).all()
+        assert (np.asarray(result.standard_errors) > 0).all()
+
+    def test_standard_errors_computed(
+        self, rust_env_small, small_panel, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that standard errors are computed."""
         estimator = CCPEstimator(
             num_policy_iterations=1,
@@ -296,8 +469,9 @@ class TestCCPInference:
         # SEs may be NaN if Hessian is singular (e.g., with small test data)
         assert result.standard_errors is not None
 
-    def test_confidence_intervals(self, rust_env_small, small_panel, utility_small,
-                                   problem_spec_small, transitions_small):
+    def test_confidence_intervals(
+        self, rust_env_small, small_panel, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that confidence intervals contain point estimates."""
         estimator = CCPEstimator(
             num_policy_iterations=1,
@@ -316,8 +490,9 @@ class TestCCPInference:
             if jnp.isfinite(lower[i]) and jnp.isfinite(upper[i]):
                 assert lower[i] <= result.parameters[i] <= upper[i]
 
-    def test_summary_output(self, rust_env_small, small_panel, utility_small,
-                            problem_spec_small, transitions_small):
+    def test_summary_output(
+        self, rust_env_small, small_panel, utility_small, problem_spec_small, transitions_small
+    ):
         """Test that summary output is generated correctly."""
         estimator = CCPEstimator(num_policy_iterations=1, verbose=False)
         result = estimator.estimate(
@@ -362,9 +537,7 @@ class TestCCPEdgeCases:
         )
 
         # Should run without error
-        result = estimator.estimate(
-            panel, utility, problem_spec_small, transitions_small
-        )
+        result = estimator.estimate(panel, utility, problem_spec_small, transitions_small)
 
         assert result is not None
         assert jnp.isfinite(result.parameters).all()
@@ -381,9 +554,7 @@ class TestCCPEdgeCases:
             verbose=False,
         )
 
-        estimator.estimate(
-            panel, utility, problem_spec_small, transitions_small
-        )
+        estimator.estimate(panel, utility, problem_spec_small, transitions_small)
 
         # CCPs for unvisited states should be uniform
         ccps = estimator._estimate_ccps_from_data(
@@ -403,5 +574,5 @@ class TestCCPEdgeCases:
             np.testing.assert_allclose(
                 np.asarray(ccps[unvisited_mask]),
                 np.asarray(jnp.full_like(ccps[unvisited_mask], uniform_prob)),
-                atol=1e-5
+                atol=1e-5,
             )

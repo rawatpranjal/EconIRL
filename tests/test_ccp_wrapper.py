@@ -172,6 +172,63 @@ class TestRewardSpec:
         ]
 
 
+class TestPreFitSupport:
+    """CCP rejects unidentified designs and globally missing actions."""
+
+    def test_rank_deficient_reward_stops_before_fit(self, bus_df):
+        features = np.ones((_N_STATES, 2, 2), dtype=np.float64)
+        reward = RewardSpec(features, names=["a", "b"])
+        model = CCP(
+            n_states=_N_STATES,
+            discount=_DISCOUNT,
+            utility=reward,
+        )
+
+        with pytest.raises(ValueError, match="rank deficient"):
+            model.fit(
+                bus_df,
+                state="mileage_bin",
+                action="replaced",
+                id="bus_id",
+            )
+
+    def test_action_contrast_rank_stops_before_fit(self, bus_df):
+        features = np.zeros((_N_STATES, 2, 2), dtype=np.float64)
+        features[:, 1, 0] = 1.0
+        features[:, :, 1] = np.arange(_N_STATES)[:, None]
+        reward = RewardSpec(features, names=["choice", "state_only"])
+        model = CCP(
+            n_states=_N_STATES,
+            discount=_DISCOUNT,
+            utility=reward,
+        )
+
+        with pytest.raises(ValueError, match="action-contrast rank"):
+            model.fit(
+                bus_df,
+                state="mileage_bin",
+                action="replaced",
+                id="bus_id",
+            )
+
+    def test_globally_missing_action_stops_before_fit(self, bus_df):
+        one_action = bus_df.copy()
+        one_action["replaced"] = 0
+        model = CCP(
+            n_states=_N_STATES,
+            discount=_DISCOUNT,
+            utility=rust_bus_reward_spec(_N_STATES),
+        )
+
+        with pytest.raises(ValueError, match="actions are absent"):
+            model.fit(
+                one_action,
+                state="mileage_bin",
+                action="replaced",
+                id="bus_id",
+            )
+
+
 # ---------------------------------------------------------------------------
 # 3. Fit with TrajectoryPanel
 # ---------------------------------------------------------------------------
@@ -336,7 +393,12 @@ class TestNPLIterations:
         )
         model.fit(bus_df, state="mileage_bin", action="replaced", id="bus_id")
         assert model.params_ is not None
-        assert model.converged_ is not None
+        assert model.converged_ is True
+        assert model.npl_converged_ is not None
+        assert model.termination_reason_ in {
+            "fixed_k_complete",
+            "fixed_point_converged",
+        }
 
     def test_npl_produces_different_params(self, bus_df):
         """NPL K>1 should generally differ from Hotz-Miller K=1."""
@@ -387,6 +449,11 @@ class TestExistingMethodsStillWork:
         summary = fitted_model.summary()
         assert isinstance(summary, str)
         assert len(summary) > 0
+        assert "[1] DATA" in summary
+        assert "[2] PRE-ESTIMATION CHECKS" in summary
+        assert "[3] FIRST-STAGE TRANSITION ESTIMATION" in summary
+        assert fitted_model.transition_source_ == "estimated from fitted panel"
+        assert fitted_model.transition_tensor_.shape == (2, _N_STATES, _N_STATES)
 
     def test_predict_proba(self, fitted_model):
         proba = fitted_model.predict_proba(np.array([0, 5, 10]))
