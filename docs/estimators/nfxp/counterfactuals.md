@@ -7,13 +7,12 @@
 - [Simulation Study](validation.md)
 - [Bus Engine Example](rust_bus.md)
 
-Read this page as structural re-solving. NFXP estimates reward parameters in a
-model that can be solved again after a primitive changes.
+Counterfactual analysis re-solves the structural model. NFXP estimates reward
+parameters in a model that can be solved again after a primitive changes.
 
-NFXP recovers the utility parameters in the same parameterization as the
-data-generating process, so counterfactual analysis is straightforward:
-change a parameter, re-solve the dynamic program once, and read off the new
-policy and value function.
+NFXP recovers the utility parameters using the same parameterization as the
+data-generating process. For a counterfactual, change a parameter, re-solve the
+dynamic program once, and read off the new policy and value function.
 
 ```python
 cf = model.counterfactual(replacement_cost=4.0)
@@ -71,8 +70,8 @@ The 200-state study evaluates both kinds of change:
 | Slow engine deterioration | 0.0454 | 0.0067 | 0.0018 |
 
 Policy distance ranges from zero to one. Zero means the two policies choose
-each action with the same probability in every state. The fitted model captures
-both changes while remaining within 0.0067 of the true-parameter policy.
+each action with the same probability in every state. For both changes, the
+fitted-model policy is within 0.0067 of the true-parameter policy.
 
 Expected-value loss compares the fitted counterfactual policy with the policy
 computed from the true parameters. It is 0.0030 for the reward change and

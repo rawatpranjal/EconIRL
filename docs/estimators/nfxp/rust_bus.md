@@ -8,8 +8,8 @@
 - [Counterfactuals](counterfactuals.md)
 - [Rust Replication](../../replications.md)
 
-The bundled bus engine replacement dataset shows the complete workflow: load
-the panel, estimate the costs, inspect uncertainty, and run a counterfactual.
+This example uses the bundled bus engine replacement dataset to load the panel,
+estimate the costs, inspect uncertainty, and run a counterfactual.
 
 ```python
 from econirl.datasets import load_rust_bus, rust_bus_reward_spec
@@ -33,9 +33,9 @@ replacement_cost: estimate=3.072264, se=0.073965
 
 ## Estimation
 
-The `rust_bus_reward_spec` specification estimates two parameters: the
-operating cost slope over mileage states (`operating_cost`) and the flat
-replacement cost (`replacement_cost`).
+`rust_bus_reward_spec` estimates two parameters: the operating cost slope over
+mileage states (`operating_cost`) and the flat replacement cost
+(`replacement_cost`).
 
 | Parameter | Estimate | Standard error | 95 percent interval |
 | --- | ---: | ---: | ---: |
@@ -76,8 +76,8 @@ panels.
 
 Increasing the fitted replacement cost by 50 percent lowers the long-run
 replacement rate from 5.3 percent to 2.2 percent. Mean long-run mileage rises
-from 10.5 to 20.6 states. The model therefore translates the estimated costs
-into a direct prediction about fleet behavior.
+from 10.5 to 20.6 states. Under this counterfactual, buses run longer before
+engine replacement.
 
 ```python
 cf = model.counterfactual(

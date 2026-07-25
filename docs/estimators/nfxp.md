@@ -15,9 +15,9 @@ evaluation. The inner loop solves the Bellman fixed point for a candidate
 reward parameter. The outer loop maximizes the conditional choice log
 likelihood over that parameter.
 
-Read this page as the benchmark case. Later structural estimators either keep
-this target and change the numerical route, or relax one bottleneck at a cost
-stated on their own pages.
+NFXP is the benchmark for later structural estimators. These estimators either
+retain its target with a different numerical method or relax one of its
+bottlenecks. Each estimator's page describes the resulting tradeoff.
 
 ## Source Papers
 
@@ -92,8 +92,8 @@ observed choices carry information about the structural costs.
 
 ## Identification
 
-This is the section that says when the estimated parameters can be read as the
-primitive reward parameters, not just as a good in-sample choice fit.
+This section states when the estimated parameters can be interpreted as
+primitive reward parameters rather than only as an in-sample choice fit.
 
 NFXP point-identifies the reward parameters $\theta$ under the following
 assumptions.
@@ -113,11 +113,11 @@ assumptions.
   features copied across actions collapse the action contrasts and leave $\theta$
   unidentified.
 
-These hold inside a finite discrete state space, a stationary environment with
-expected-utility maximization, and a known, fixed discount factor $\beta$. Given
-them, $\theta$ is point-identified. Identification weakens under thin action
-support, an invalid normalization, or a transition tensor supplied in the wrong
-orientation.
+These assumptions apply within a finite discrete state space and a stationary
+environment with expected-utility maximization and a known, fixed discount
+factor $\beta$. Under these conditions, $\theta$ is point-identified.
+Identification weakens under thin action support, an invalid normalization, or
+a transition tensor supplied in the wrong orientation.
 
 ## Estimator
 
@@ -166,8 +166,8 @@ $$
 \right].
 $$
 
-The MLE first-order condition is $\sum_{i,t} \psi_i(\theta) = 0$, which BHHH
-iterates to solve.
+The MLE first-order condition is $\sum_{i,t} \psi_i(\theta) = 0$. BHHH updates
+the parameters iteratively to solve this condition.
 
 The Q-gradient follows from the chain rule on
 $Q_\theta(s,a) = u_\theta(s,a) + \beta\sum_{s'} P_a(s,s') V_\theta(s')$:
@@ -250,12 +250,12 @@ Output  theta_hat, standard errors, policy pi, value V
 10  return theta_hat, standard errors from the information matrix, pi_theta, V_theta
 ```
 
-The inner solve in step 4 defaults to `inner_solver="polyalgorithm"`: safe
-successive approximation while far from the fixed point, then Newton-Kantorovich
-steps near the solution, following Iskhakov et al. (2016). With this
-polyalgorithm the nested fixed point is computationally competitive with the
-constrained-optimization alternative, narrowing the speed gap that earlier
-comparisons reported. Two pure variants are
+The inner solve in step 4 defaults to `inner_solver="polyalgorithm"`. Following
+Iskhakov et al. (2016), it uses successive approximation far from the fixed
+point and Newton-Kantorovich steps near the solution. This polyalgorithm makes
+the nested fixed-point method computationally competitive with the
+constrained-optimization alternative and narrows the speed gap reported in
+earlier comparisons. Two pure variants are
 also available. `sa` (successive approximation) is a contraction iteration that
 converges linearly and is robust from any start. `nk` (Newton-Kantorovich)
 converges quadratically near the solution but needs a good starting point. The
@@ -264,14 +264,14 @@ approximation from the outer products of the per-observation scores.
 
 The standard errors come from maximum-likelihood asymptotics. The `se_method`
 argument selects the covariance estimator. `asymptotic` inverts the
-observed-information matrix. `robust`, the default, returns the sandwich form, the
-inverse information with the outer product of the per-observation scores in the
-middle. `clustered` sums scores by individual before forming the sandwich meat, and
-`bootstrap` resamples whole trajectories. `full_likelihood_bhhh` is the Rust Table
-IX replication option: it forms the BHHH outer product for the joint structural and
-transition-probability likelihood and reports the structural covariance block. The
-conditional and robust SEs agree under correct specification and separate under
-misspecification.
+observed-information matrix. `robust`, the default, returns the sandwich
+covariance: the inverse information matrix with the outer product of the
+per-observation scores in the middle. `clustered` sums scores by individual
+before forming the middle matrix. `bootstrap` resamples whole trajectories. For
+the Rust Table IX replication, `full_likelihood_bhhh` forms the BHHH outer
+product for the joint structural and transition-probability likelihood and
+reports the structural covariance block. The conditional and robust SEs agree
+under correct specification and separate under misspecification.
 
 ## Applicability
 
@@ -286,9 +286,9 @@ misspecification.
 NFXP is the reference estimator for tabular structural estimation. CCP and MPEC
 target the same structural object with different computational strategies. NNES
 and TD-CCP become attractive when exact nested Bellman solves are too expensive.
-UFXP attains the same asymptotic efficiency at a fraction of the cost by
-eliminating the value-function dependence before the parameter search, at the
-price of being an asymptotic equivalent rather than the exact finite-sample MLE.
+UFXP eliminates value-function dependence before the parameter search and
+attains the same asymptotic efficiency at a fraction of the cost. It is
+asymptotically equivalent to NFXP, but it is not the exact finite-sample MLE.
 
 ## Usage
 
@@ -316,8 +316,8 @@ P(replace | state=50) = 0.086333
 The [Simulation Study](nfxp/validation.md) shows the complete `summary()`
 report from a 200-state fit.
 
-Counterfactual analysis re-solves the fitted dynamic program under a changed
-primitive:
+Counterfactual analysis re-solves the fitted dynamic program after changing a
+model parameter:
 
 ```python
 cf = model.counterfactual(replacement_cost=4.0)   # raise the replacement cost
@@ -347,7 +347,8 @@ the advanced `NFXPEstimator` interface.
 
 ## Evidence
 
-Three experiments cover the questions NFXP is meant to answer.
+Three experiments assess NFXP estimation, inference, and counterfactual
+performance.
 
 - **Estimation.** Twenty independent panels have 200 states, two actions, three
   reward parameters, and 7,500 observations each. The mean distance between

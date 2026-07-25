@@ -8,9 +8,9 @@
 - [Counterfactuals](counterfactuals.md)
 - [Bus Engine Example](rust_bus.md)
 
-This is the smallest NFXP path: fit the reference structural estimator, then
-inspect parameters, standard errors, policy, and value objects. It is a usage
-example, not a substitute for the pre-estimation checks.
+This quick start fits NFXP, then inspects its parameter estimates, standard
+errors, policy, and value function. It is a usage example, not a substitute for
+the pre-estimation checks.
 
 ```python
 from econirl.datasets import load_rust_bus, rust_bus_reward_spec
@@ -50,8 +50,8 @@ Fitted attributes follow the same convention as CCP and UFXP:
 
 `rust_bus_reward_spec(n_states)` builds the Rust bus features for you. To use
 your own features, build a `RewardSpec` directly and pass it to `fit`. The
-feature array has shape `(n_states, n_actions, n_features)`, and `reward=`
-overrides the constructor default.
+feature array has shape `(n_states, n_actions, n_features)`. Passing `reward=`
+to `fit` overrides the constructor default.
 
 ```python
 import numpy as np
@@ -80,9 +80,9 @@ print({name: round(value, 6) for name, value in model.params_.items()})
 {'operating_cost': 0.090265, 'replacement_cost': 3.072221}
 ```
 
-A `RewardSpec` whose state or action dimension does not match `n_states` /
-`n_actions` raises a clear `ValueError` at `fit` time, not a broadcasting error
-later.
+If a `RewardSpec` state dimension does not match `n_states`, or its action
+dimension does not match `n_actions`, `fit` raises a clear `ValueError` instead
+of a later broadcasting error.
 
 ## Counterfactual Example
 
