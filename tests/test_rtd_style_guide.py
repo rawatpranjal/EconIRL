@@ -17,10 +17,19 @@ NFXP_PAGES = [
     DOCS / "estimators" / "nfxp" / "counterfactuals.md",
     DOCS / "estimators" / "nfxp" / "rust_bus.md",
 ]
+CCP_PAGES = [
+    DOCS / "estimators" / "ccp.md",
+    DOCS / "estimators" / "ccp" / "quick_start.md",
+    DOCS / "estimators" / "ccp" / "pre_estimation.md",
+    DOCS / "estimators" / "ccp" / "validation.md",
+    DOCS / "estimators" / "ccp" / "counterfactuals.md",
+    DOCS / "estimators" / "ccp" / "rust_bus.md",
+]
+COMPLETED_ESTIMATOR_PAGES = NFXP_PAGES + CCP_PAGES
 
 
-def test_nfxp_pages_put_important_links_immediately_after_title() -> None:
-    """Keep the most useful NFXP destinations visible at the top."""
+def test_completed_estimator_pages_put_important_links_immediately_after_title() -> None:
+    """Keep the most useful destinations visible at the top."""
 
     pattern = re.compile(
         r"\A# [^\n]+\n\n"
@@ -30,20 +39,20 @@ def test_nfxp_pages_put_important_links_immediately_after_title() -> None:
     )
     offenders = [
         str(page.relative_to(ROOT))
-        for page in NFXP_PAGES
+        for page in COMPLETED_ESTIMATOR_PAGES
         if pattern.match(page.read_text(encoding="utf-8")) is None
     ]
 
     assert offenders == []
 
 
-def test_nfxp_executable_snippets_show_exact_results() -> None:
+def test_completed_estimator_executable_snippets_show_exact_results() -> None:
     """Require a non-empty result block after every Python or shell example."""
 
     offenders = []
     executable_blocks = 0
 
-    for page in NFXP_PAGES:
+    for page in COMPLETED_ESTIMATOR_PAGES:
         lines = page.read_text(encoding="utf-8").splitlines()
         index = 0
         while index < len(lines):
@@ -57,27 +66,21 @@ def test_nfxp_executable_snippets_show_exact_results() -> None:
             while index < len(lines) and lines[index].strip() != "```":
                 index += 1
             if index == len(lines):
-                offenders.append(
-                    f"{page.relative_to(ROOT)}:{snippet_line}: unclosed snippet"
-                )
+                offenders.append(f"{page.relative_to(ROOT)}:{snippet_line}: unclosed snippet")
                 break
 
             index += 1
             while index < len(lines) and not lines[index].strip():
                 index += 1
             if index == len(lines) or lines[index].strip() != "**Result**":
-                offenders.append(
-                    f"{page.relative_to(ROOT)}:{snippet_line}: missing Result label"
-                )
+                offenders.append(f"{page.relative_to(ROOT)}:{snippet_line}: missing Result label")
                 continue
 
             index += 1
             while index < len(lines) and not lines[index].strip():
                 index += 1
             if index == len(lines) or lines[index].strip() != "```text":
-                offenders.append(
-                    f"{page.relative_to(ROOT)}:{snippet_line}: missing text result"
-                )
+                offenders.append(f"{page.relative_to(ROOT)}:{snippet_line}: missing text result")
                 continue
 
             index += 1
@@ -86,19 +89,13 @@ def test_nfxp_executable_snippets_show_exact_results() -> None:
                 result_lines.append(lines[index])
                 index += 1
             if index == len(lines):
-                offenders.append(
-                    f"{page.relative_to(ROOT)}:{snippet_line}: unclosed result"
-                )
+                offenders.append(f"{page.relative_to(ROOT)}:{snippet_line}: unclosed result")
                 break
             result = "\n".join(result_lines).strip()
             if not result:
-                offenders.append(
-                    f"{page.relative_to(ROOT)}:{snippet_line}: empty result"
-                )
+                offenders.append(f"{page.relative_to(ROOT)}:{snippet_line}: empty result")
             if "..." in result or "…" in result:
-                offenders.append(
-                    f"{page.relative_to(ROOT)}:{snippet_line}: abbreviated result"
-                )
+                offenders.append(f"{page.relative_to(ROOT)}:{snippet_line}: abbreviated result")
 
     assert executable_blocks
     assert offenders == []
@@ -172,19 +169,13 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         "threshold check families": re.compile(
             r"\bthreshold check families\b", flags=re.IGNORECASE
         ),
-        "threshold checks": re.compile(
-            r"\bthreshold checks\b", flags=re.IGNORECASE
-        ),
+        "threshold checks": re.compile(r"\bthreshold checks\b", flags=re.IGNORECASE),
         "scope labels": re.compile(r"\bscope labels\b", flags=re.IGNORECASE),
         "artifact": re.compile(r"\bartifacts?\b", flags=re.IGNORECASE),
         "certified as": re.compile(r"\bcertified as\b", flags=re.IGNORECASE),
         "release claim": re.compile(r"\brelease claim\b", flags=re.IGNORECASE),
-        "validation target": re.compile(
-            r"\bvalidation target\b", flags=re.IGNORECASE
-        ),
-        "algorithm sketch": re.compile(
-            r"\balgorithm sketch\b", flags=re.IGNORECASE
-        ),
+        "validation target": re.compile(r"\bvalidation target\b", flags=re.IGNORECASE),
+        "algorithm sketch": re.compile(r"\balgorithm sketch\b", flags=re.IGNORECASE),
         # Register banned 2026-06-12 (docs/research/internal_docs/style.md, public prose
         # register): internal honesty-contract vocabulary that leaked onto
         # the live RTD pages.
@@ -197,21 +188,13 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         # Style-guide bans not previously enforced (roadmap D1, 2026-06-15).
         # \s+ (not a literal space) so a phrase split across a line break is
         # still caught — Markdown collapses the newline when rendering.
-        "machine-readable": re.compile(
-            r"\bmachine[-\s]readable\b", flags=re.IGNORECASE
-        ),
-        "convergence flag": re.compile(
-            r"\bconverg(?:ed|ence)\s+flag\b", flags=re.IGNORECASE
-        ),
-        "summary exposes": re.compile(
-            r"\bsummary\s+exposes\b", flags=re.IGNORECASE
-        ),
+        "machine-readable": re.compile(r"\bmachine[-\s]readable\b", flags=re.IGNORECASE),
+        "convergence flag": re.compile(r"\bconverg(?:ed|ence)\s+flag\b", flags=re.IGNORECASE),
+        "summary exposes": re.compile(r"\bsummary\s+exposes\b", flags=re.IGNORECASE),
         "fitted summary reports": re.compile(
             r"\bfitted\s+summary\s+reports\b", flags=re.IGNORECASE
         ),
-        "evidence scope": re.compile(
-            r"\bevidence\s+scope\b", flags=re.IGNORECASE
-        ),
+        "evidence scope": re.compile(r"\bevidence\s+scope\b", flags=re.IGNORECASE),
     }
 
     offenders = []
@@ -230,24 +213,12 @@ def test_estimator_docs_use_simulation_study_links_and_terms() -> None:
 
     patterns = {
         "Validation link label": re.compile(r"\[Validation\]\(validation\.md\)"),
-        "validation harness": re.compile(
-            r"\bvalidation harness\b", flags=re.IGNORECASE
-        ),
-        "validation evidence": re.compile(
-            r"\bvalidation evidence\b", flags=re.IGNORECASE
-        ),
-        "validation objects": re.compile(
-            r"\bvalidation objects\b", flags=re.IGNORECASE
-        ),
-        "validation page reports": re.compile(
-            r"\bvalidation page reports\b", flags=re.IGNORECASE
-        ),
-        "validation surface": re.compile(
-            r"\bvalidation surface\b", flags=re.IGNORECASE
-        ),
-        "known-truth validation": re.compile(
-            r"\bknown-truth validation\b", flags=re.IGNORECASE
-        ),
+        "validation harness": re.compile(r"\bvalidation harness\b", flags=re.IGNORECASE),
+        "validation evidence": re.compile(r"\bvalidation evidence\b", flags=re.IGNORECASE),
+        "validation objects": re.compile(r"\bvalidation objects\b", flags=re.IGNORECASE),
+        "validation page reports": re.compile(r"\bvalidation page reports\b", flags=re.IGNORECASE),
+        "validation surface": re.compile(r"\bvalidation surface\b", flags=re.IGNORECASE),
+        "known-truth validation": re.compile(r"\bknown-truth validation\b", flags=re.IGNORECASE),
     }
 
     offenders = []
@@ -295,9 +266,7 @@ def test_estimator_navigation_is_owned_by_section_pages() -> None:
 
     # Estimator pages are not hardcoded directly in the root toctree.
     root_entries = [
-        entry
-        for entry in (expected_core + expected_other)
-        if f"   estimators/{entry}\n" in index
+        entry for entry in (expected_core + expected_other) if f"   estimators/{entry}\n" in index
     ]
     assert root_entries == []
 
@@ -321,8 +290,7 @@ def test_estimator_landing_pages_do_not_expand_sidebar_guides() -> None:
     pages = [
         page
         for page in sorted((DOCS / "estimators").glob("*.md"))
-        if page.name not in {"core.md", "other.md"}
-        and not _is_excluded_from_rtd(page)
+        if page.name not in {"core.md", "other.md"} and not _is_excluded_from_rtd(page)
     ]
     assert pages
 
@@ -377,23 +345,15 @@ def test_estimator_pages_name_source_papers_up_front() -> None:
             continue
 
         first_marker_pos = min(
-            (
-                pos
-                for marker in first_content_markers
-                if (pos := text.find(marker)) != -1
-            ),
+            (pos for marker in first_content_markers if (pos := text.find(marker)) != -1),
             default=-1,
         )
         if first_marker_pos != -1 and source_pos > first_marker_pos:
-            offenders.append(
-                f"{page.relative_to(ROOT)}: Source Papers must be near the top"
-            )
+            offenders.append(f"{page.relative_to(ROOT)}: Source Papers must be near the top")
 
         source_section = _section_body(text, source_pos)
         if "{ref}`" not in source_section:
-            offenders.append(
-                f"{page.relative_to(ROOT)}: Source Papers must link to references"
-            )
+            offenders.append(f"{page.relative_to(ROOT)}: Source Papers must link to references")
 
     assert offenders == []
 
@@ -438,9 +398,7 @@ def test_estimator_pages_order_model_before_algorithm() -> None:
             offenders.append(f"{page.relative_to(ROOT)}: missing Algorithm")
             continue
         if not model_pos < algorithm_pos:
-            offenders.append(
-                f"{page.relative_to(ROOT)}: expected Model before Algorithm"
-            )
+            offenders.append(f"{page.relative_to(ROOT)}: expected Model before Algorithm")
             continue
         if text.find("```", algorithm_pos) == -1:
             offenders.append(f"{page.relative_to(ROOT)}: missing fenced code block in Algorithm")
@@ -477,9 +435,7 @@ def test_references_page_is_in_public_navigation() -> None:
     ]
 
     missing_ids = [
-        reference_id
-        for reference_id in expected_ids
-        if f"({reference_id})=" not in references
+        reference_id for reference_id in expected_ids if f"({reference_id})=" not in references
     ]
 
     assert "   references\n" in index
@@ -512,16 +468,10 @@ def test_theory_section_is_public_and_sourced() -> None:
     offenders = []
     for page in pages:
         text = page.read_text(encoding="utf-8")
-        if not re.search(
-            r"\{ref\}`Kang \(2026\)\s*<kang-2026-lecture>`", text
-        ):
+        if not re.search(r"\{ref\}`Kang \(2026\)\s*<kang-2026-lecture>`", text):
             offenders.append(f"{page.relative_to(ROOT)}: missing Kang source note")
-        if not re.search(
-            r"\{ref\}`Rawat and Rust \(2026\)\s*<rawat-rust-2026>`", text
-        ):
-            offenders.append(
-                f"{page.relative_to(ROOT)}: missing Rawat-Rust source note"
-            )
+        if not re.search(r"\{ref\}`Rawat and Rust \(2026\)\s*<rawat-rust-2026>`", text):
+            offenders.append(f"{page.relative_to(ROOT)}: missing Rawat-Rust source note")
 
     assert offenders == []
 
@@ -574,9 +524,7 @@ def _is_excluded_from_rtd(path: Path) -> bool:
             return True
         if fnmatch(rel, pattern):
             return True
-        if pattern.endswith("/**") and (
-            rel == pattern[:-3] or rel.startswith(pattern[:-2])
-        ):
+        if pattern.endswith("/**") and (rel == pattern[:-3] or rel.startswith(pattern[:-2])):
             return True
     return False
 

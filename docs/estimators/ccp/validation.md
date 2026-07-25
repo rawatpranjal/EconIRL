@@ -1,41 +1,100 @@
 # Simulation Study
 
-Read this page as an oracle-object simulation for the CCP route. The question is
-whether the inversion and NPL steps recover the same structural objects as the
-reference target when support is strong.
+## Important Links
 
-We run CCP on the `canonical_low_action` synthetic cell, the same
-low-dimensional action-dependent structural benchmark used for NFXP. The
-simulation asks whether the CCP/NPL route can recover the same structural
-objects from a finite panel when empirical choice support is strong. Real bus
-data cannot answer that question because the true reward, policy, value
-function, and counterfactual oracles are not observed.
+- [CCP Overview](../ccp.md)
+- [Quick Start](quick_start.md)
+- [Pre-Estimation Checks](pre_estimation.md)
+- [Counterfactuals](counterfactuals.md)
+- [Simulation Studies](../../simulation_studies/index.md)
 
-These results come from the simulation harness. The harness fixes the transition
-law, action-dependent reward features, and reward weights before generating the
-finite panel. Those objects define the true reward, policy, value function,
-Q function, and counterfactual oracles that are held back for evaluation. The
-estimator sees the generated panel, the transition law, and the action-dependent
-reward features, not the oracle dynamic objects.
+The study separates estimation, inference, and counterfactual analysis. Each
+experiment simulates a new panel from a fully specified reward and transition
+process.
 
-The full result generator is
-[`ccp_run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/ccp/run.py).
-It writes the results file
-[`ccp_results.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp.json).
-To rerun it from the repository root:
+## Estimation
+
+The estimation problem has 100 states and two actions. The reward has three
+parameters. Three-stage NPL is estimated from 160,000 choices in each of 20
+independent panels.
+
+| Parameter | True value | Median relative error | 90th percentile relative error |
+| --- | ---: | ---: | ---: |
+| Reward feature 1 | 0.35 | 0.029 | 0.063 |
+| Reward feature 2 | -0.25 | 0.019 | 0.064 |
+| Reward feature 3 | 0.20 | 0.052 | 0.095 |
+
+All 20 panels produced an estimate. The mean policy distance was 0.0028. The
+largest fit took 39.7 seconds. Policy distance is the average total variation
+between the fitted and true action probabilities across states.
+
+## Inference
+
+The inference experiment uses 1,000 independent panels. Each panel has 10,000
+choices over 20 states. The empirical standard deviation measures variation
+across panels. The mean standard error averages the robust uncertainty estimate
+reported for each panel.
+
+| Parameter | True value | Mean estimate | Empirical SD | Mean SE | Coverage |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Reward feature 1 | 0.35 | 0.354 | 0.0305 | 0.0296 | 94.2% |
+| Reward feature 2 | -0.25 | -0.248 | 0.0506 | 0.0499 | 95.4% |
+| Reward feature 3 | 0.20 | 0.203 | 0.0521 | 0.0543 | 96.3% |
+
+Mean standard errors are 0.97 to 1.04 times the empirical standard deviations.
+Lower-tail miss rates range from 2.4 to 3.6 percent. Upper-tail miss rates
+range from 1.2 to 2.2 percent.
+
+All four standard-error methods were applied to one 40-state panel:
+
+| Method | Feature 1 SE | Feature 2 SE | Feature 3 SE |
+| --- | ---: | ---: | ---: |
+| Asymptotic | 0.0386 | 0.0522 | 0.0536 |
+| Robust | 0.0387 | 0.0523 | 0.0533 |
+| Clustered | 0.0379 | 0.0532 | 0.0540 |
+| Pairs-cluster bootstrap | 0.0375 | 0.0508 | 0.0546 |
+
+The clustered estimates are between 0.99 and 1.05 times their bootstrap
+counterparts.
+
+## Counterfactuals
+
+The fitted model is solved again after changing either the first reward
+parameter or the deterioration process.
+
+| Change | Mean policy error | Mean value loss |
+| --- | ---: | ---: |
+| Increase the first reward parameter by 1.0 | 0.0022 | 0.000184 |
+| Slow deterioration | 0.0019 | 0.000083 |
+
+Policy error compares the fitted counterfactual policy with the policy from
+the true parameters. Value loss measures the cost of using the fitted policy
+instead of the true-parameter policy.
+
+## Reproduce the Study
+
+Run the study from the repository root:
 
 ```bash
-PYTHONPATH=src:. python validation/estimators/ccp/run.py
+PYTHONPATH=src:. uv run python validation/estimators/ccp/ready.py \
+  --quiet --output validation/results/ccp_ready.json
 ```
 
-The simulation DGP has action-dependent reward features and an exit action
-that anchors the reward level. The estimates are not exactly equal to truth
-because the panel is finite.
+**Result**
 
-## Evidence
+```text
+wrote validation/results/ccp_ready.json
+status: ready
+```
 
-CCP is compared against the full structural and IRL rosters in six simulation
-studies: [bus engine](../../simulation_studies/rust_bus.md),
+The [simulation code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/ccp/ready.py)
+and [reported results](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp_ready.json)
+contain the full experiment configuration.
+
+## Related Studies
+
+CCP is compared with the package's structural and IRL estimators in six
+simulation studies: [bus engine](../../simulation_studies/rust_bus.md),
 [taxi gridworld](../../simulation_studies/taxi_gridworld.md),
 [route choice](../../simulation_studies/route_choice.md),
 [stockpiling](../../simulation_studies/stockpiling.md),

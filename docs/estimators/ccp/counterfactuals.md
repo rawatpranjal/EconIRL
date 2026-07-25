@@ -1,45 +1,45 @@
 # Counterfactuals
 
-Read this page as structural re-solving for parameter changes. CCP shares the
-finite reward target with NFXP, but the public wrapper currently exposes fewer
-one-call intervention types.
+## Important Links
 
-The public `counterfactual` method handles structural parameter changes. It
-solves the fitted model again after changing one or more fitted parameters.
+- [CCP Overview](../ccp.md)
+- [Quick Start](quick_start.md)
+- [Simulation Study](validation.md)
+- [Bus Engine Example](rust_bus.md)
+
+Use the public `counterfactual` method to solve a fitted CCP model under new
+reward parameters or a replacement transition tensor.
 
 ```python
 cf = model.counterfactual(replacement_cost=4.0)
 
-print(cf.params)
-print(cf.value_function)
-print(cf.policy)
+print(f"replacement_cost={cf.params['replacement_cost']:.6f}")
+print(f"P(replace | state=50)={cf.policy[50, 1]:.6f}")
 ```
 
-The method returns a parameter dictionary, value function, and policy. It does
-not currently expose a one-call public interface for changing transitions or
-disabling actions.
+**Result**
 
-## Counterfactual Families
+```text
+replacement_cost=4.000000
+P(replace | state=50)=0.054908
+```
 
-The simulation harness evaluates three broader counterfactual
-families against oracle solutions.
+The method returns a parameter dictionary, value function, and policy. Pass
+`transitions=new_tensor` to change the transition law. The tensor orientation
+is `(n_actions, n_states, n_states)`. Removing an action requires a model with
+a reduced action space.
 
-| Type | Intervention | Purpose |
-| --- | --- | --- |
-| Type A | Shift rewards and hold transitions fixed. | Payoff counterfactual. |
-| Type B | Change transitions and hold rewards fixed. | State-dynamics counterfactual. |
-| Type C | Disable one non-anchor action. | Action-set or design counterfactual. |
+## Results
 
-## Reported Results
+The 100-state study evaluates reward and transition changes over 20
+independent panels:
 
-These rows come from the same simulation results file used on the
-[simulation study page](validation.md).
+| Change | Mean policy error | Mean value loss |
+| --- | ---: | ---: |
+| Increase the first reward parameter by 1.0 | 0.0022 | 0.000184 |
+| Slow deterioration | 0.0019 | 0.000083 |
 
-| Counterfactual | Policy TV | Policy KL | Value RMSE | Regret |
-| --- | ---: | ---: | ---: | ---: |
-| Type A | 0.005109 | 7.56e-5 | 0.000238 | 0.000213 |
-| Type B | 0.005457 | 8.20e-5 | 0.000363 | 0.000362 |
-| Type C | 0.003548 | 3.56e-5 | 0.000114 | 0.000086 |
-
-The regret values report how the policy from the recovered reward compares
-with the oracle counterfactual policy.
+Policy error compares the fitted counterfactual policy with the policy from
+the true parameters. Value loss measures the cost of using the fitted policy
+instead of the true-parameter policy. See the
+[Simulation Study](validation.md) for the estimation and inference results.
