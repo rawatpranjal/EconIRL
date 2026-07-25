@@ -1,10 +1,17 @@
 # Pre-Estimation Checks
 
+## Important Links
+
+- [CCP Overview](../ccp.md)
+- [Quick Start](quick_start.md)
+- [Simulation Study](validation.md)
+- [Counterfactuals](counterfactuals.md)
+
 Read this page before fitting CCP. These checks focus on support and
 conditioning because the estimator leans on first-stage choice probabilities.
 
-CCP can show estimation risk for reasons that are visible before optimization
-starts. Run these checks before treating a result as structural evidence.
+Some CCP estimation risks are visible before optimization starts. Run these
+checks before treating a result as structural evidence.
 
 | Check | Why it matters |
 | --- | --- |
@@ -14,29 +21,29 @@ starts. Run these checks before treating a result as structural evidence.
 | State coverage | Unvisited states require extrapolated CCPs. |
 | State-action coverage | One-action states make counterfactual action values weakly supported. |
 | Minimum positive CCP | Very small probabilities make the log correction unstable. |
-| Reward normalization | Reward level and scale need a valid anchor. |
+| Reward normalization | Additive reward shifts do not change choice probabilities, and the shock scale must be normalized. |
 | Transition orientation | CCP expects transition tensors in action, state, next-state order. |
 
-## Canonical Simulation Checks
+## Simulation Checks
 
-The CCP results file records these pre-estimation checks.
-See the [simulation study page](validation.md) for the generator script,
-JSON results file.
+The first 20-state inference panel in the
+[Simulation Study](validation.md) reports the following checks.
 
 | Check | Value | Status |
 | --- | ---: | --- |
-| Feature rank | 4 / 4 | pass |
-| Feature condition number | 4.512 | pass |
-| Transition row error | 2.42e-8 | pass |
-| Observed states | 21 / 21 | pass |
+| Reward features | 3 | pass |
+| Feature rank | 3 / 3 | pass |
+| Action-contrast rank | 3 / 3 | pass |
+| Feature condition number | 1.000 | pass |
+| Action-contrast condition number | 1.000 | pass |
+| Observed states | 20 / 20 | pass |
 | State-action coverage | 1.000 | pass |
-| Action shares | 0.345, 0.330, 0.325 | pass |
-| Minimum action share | 0.325 | pass |
-| Minimum positive CCP | 0.153 | pass |
-| Exit and absorbing anchor | true | pass |
+| Single-action states | 0 | pass |
+| States with fewer than five observations | 0 | pass |
+| Action counts | 5,605 and 4,395 | pass |
 
-The canonical cell has full support, so the CCP evidence is about the
-estimator rather than a sparse first-stage policy.
+The panel has full support, so the reported fit does not rely on uniform CCP
+fallbacks for unvisited states.
 
 ## Common Risk Patterns
 

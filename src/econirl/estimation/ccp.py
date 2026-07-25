@@ -50,6 +50,7 @@ EULER_GAMMA = 0.5772156649015329
 # closure instead, every NPL step would create a new Python function with a
 # new constant baked into the XLA program, forcing a full recompilation.
 
+
 def _ccp_logit_neg_ll(params, z_tilde, e_tilde, all_states, all_actions, inv_sigma):
     """CCP logit pseudo-LL with augmented features (value only).
 
@@ -57,7 +58,7 @@ def _ccp_logit_neg_ll(params, z_tilde, e_tilde, all_states, all_actions, inv_sig
     LL = sum_{i} log softmax(v / sigma)[s_i, a_i]
     """
     theta = params.astype(z_tilde.dtype)
-    v = jnp.einsum('sak,k->sa', z_tilde, theta) + e_tilde
+    v = jnp.einsum("sak,k->sa", z_tilde, theta) + e_tilde
     log_probs = jax.nn.log_softmax(v * inv_sigma, axis=1)
     return -(log_probs[all_states, all_actions].sum())
 
@@ -143,17 +144,13 @@ class CCPEstimator(BaseEstimator):
         if mode not in {None, "one_step", "npl"}:
             raise ValueError("mode must be one of None, 'one_step', or 'npl'.")
         if mode is not None and num_policy_iterations is not None:
-            raise ValueError(
-                "Pass either `mode` or `num_policy_iterations`, not both."
-            )
+            raise ValueError("Pass either `mode` or `num_policy_iterations`, not both.")
         if mode is not None:
             num_policy_iterations = 1 if mode == "one_step" else -1
         elif num_policy_iterations is None:
             num_policy_iterations = 1
         if num_policy_iterations != -1 and num_policy_iterations < 1:
-            raise ValueError(
-                "num_policy_iterations must be a positive integer or -1."
-            )
+            raise ValueError("num_policy_iterations must be a positive integer or -1.")
         if ccp_min_count < 1:
             raise ValueError("ccp_min_count must be at least 1.")
         if ccp_smoothing < 0:
@@ -205,9 +202,12 @@ class CCPEstimator(BaseEstimator):
         all_states = jnp.asarray(panel.get_all_states(), dtype=jnp.int32)
         all_actions = jnp.asarray(panel.get_all_actions(), dtype=jnp.int32)
         idx = all_states * num_actions + all_actions
-        counts = jnp.zeros(num_states * num_actions, dtype=dtype).at[idx].add(
-            jnp.ones(idx.shape[0], dtype=dtype)
-        ).reshape(num_states, num_actions)
+        counts = (
+            jnp.zeros(num_states * num_actions, dtype=dtype)
+            .at[idx]
+            .add(jnp.ones(idx.shape[0], dtype=dtype))
+            .reshape(num_states, num_actions)
+        )
 
         state_counts = counts.sum(axis=1, keepdims=True)
         smoothing = jnp.asarray(self._ccp_smoothing, dtype=dtype)
@@ -269,7 +269,7 @@ class CCPEstimator(BaseEstimator):
             # transitions[a] has shape (num_states, num_states)
             # ccps[:, a] has shape (num_states,)
             # We want F_pi[s, s'] += P(a|s) * P(s'|s,a)
-            F_pi = F_pi + ccps[:, a:a+1].astype(dtype) * transitions[a]
+            F_pi = F_pi + ccps[:, a : a + 1].astype(dtype) * transitions[a]
 
         return F_pi
 
@@ -313,22 +313,25 @@ class CCPEstimator(BaseEstimator):
         # Compute emax corrections
         e = self._compute_emax_correction(ccps)
 
-        # Compute Σ_a P(a) ⊙ e(a) for each state
-        # This gives expected emax correction under current policy
-        expected_e = (ccps * e).sum(axis=1).astype(inv_matrix.dtype)  # shape (num_states,)
+        # Compute Σ_a P(a) ⊙ σe(a) for each state. The normalized correction
+        # e(a) = γ - log P(a|s) must be returned to utility units before it
+        # enters the continuation value.
+        expected_e = (problem.scale_parameter * (ccps * e).sum(axis=1)).astype(
+            inv_matrix.dtype
+        )  # shape (num_states,)
 
         # W_e = (I - β·F_π)⁻¹ · expected_e
         W_e = inv_matrix @ expected_e
 
         # For utility contribution, we need the feature matrix
         # u(s,a) = θ · φ(s,a), so we compute expected features
-        if hasattr(utility, 'feature_matrix'):
+        if hasattr(utility, "feature_matrix"):
             features = utility.feature_matrix  # shape (num_states, num_actions, num_features)
 
             # Compute Σ_a P(a|s) · φ(s,a) for each state
             # expected_features[s, k] = Σ_a P(a|s) · φ(s,a,k)
             dtype = inv_matrix.dtype
-            expected_features = jnp.einsum('sa,sak->sk', ccps.astype(dtype), features.astype(dtype))
+            expected_features = jnp.einsum("sa,sak->sk", ccps.astype(dtype), features.astype(dtype))
 
             # W_z = (I - β·F_π)⁻¹ · expected_features
             W_z = inv_matrix @ expected_features
@@ -375,11 +378,9 @@ class CCPEstimator(BaseEstimator):
         num_actions = problem.num_actions
 
         # Compute valuation matrix components
-        W_z, W_e = self._compute_valuation_matrix(
-            ccps, transitions, utility, parameters, problem
-        )
+        W_z, W_e = self._compute_valuation_matrix(ccps, transitions, utility, parameters, problem)
 
-        if hasattr(utility, 'feature_matrix'):
+        if hasattr(utility, "feature_matrix"):
             features = utility.feature_matrix  # shape (num_states, num_actions, num_features)
             num_features = features.shape[2]
 
@@ -401,7 +402,7 @@ class CCPEstimator(BaseEstimator):
             e_tilde = beta * E_W_e  # (num_states, num_actions)
 
             # v(a,x) = z̃(a,x)'θ + ẽ(a,x)
-            v = jnp.einsum('sak,k->sa', z_tilde, parameters.astype(z_tilde.dtype)) + e_tilde
+            v = jnp.einsum("sak,k->sa", z_tilde, parameters.astype(z_tilde.dtype)) + e_tilde
         else:
             # Fallback for non-linear utility
             flow_utility = utility.compute(parameters)
@@ -440,9 +441,7 @@ class CCPEstimator(BaseEstimator):
         sigma = problem.scale_parameter
 
         # Compute choice-specific values
-        v = self._compute_choice_specific_values(
-            ccps, transitions, utility, parameters, problem
-        )
+        v = self._compute_choice_specific_values(ccps, transitions, utility, parameters, problem)
 
         # Compute log choice probabilities via softmax
         log_probs = jax.nn.log_softmax(v / sigma, axis=1)
@@ -533,28 +532,26 @@ class CCPEstimator(BaseEstimator):
         if initial_params is None:
             initial_params = utility.get_initial_parameters()
             if (initial_params == 0).all():
-                initial_params = self._estimate_initial_params(
-                    panel, utility, problem
-                )
+                initial_params = self._estimate_initial_params(panel, utility, problem)
 
         current_params = jnp.array(initial_params)
 
         # Step 1: Estimate initial CCPs from data
         self._log("Estimating CCPs from data")
-        ccps = self._estimate_ccps_from_data(
-            panel, problem.num_states, problem.num_actions
-        )
+        ccps = self._estimate_ccps_from_data(panel, problem.num_states, problem.num_actions)
 
         # Track iterations
         num_policy_iterations = 0
         converged = False
+        optimizer_failed = False
+        inner_optimizer_history: list[dict[str, object]] = []
+        total_function_evals = 0
+        total_optimizer_iterations = 0
         # NPL-until-convergence cap. The NPL CCP fixed point contracts at rate
         # ~beta, so high-discount problems need many policy iterations to reach it;
         # the old cap of 100 with a loose 1e-6 parameter tolerance stopped well
         # short of the fixed point and missed the MLE (Aguirregabiria-Mira Lemma 2).
-        max_iterations = (
-            self._num_policy_iterations if self._num_policy_iterations > 0 else 1000
-        )
+        max_iterations = self._num_policy_iterations if self._num_policy_iterations > 0 else 1000
 
         # ── One-time setup before NPL loop ─────────────────────────────────
         # These are fixed across all NPL iterations and are used to build the
@@ -578,7 +575,7 @@ class CCPEstimator(BaseEstimator):
         states_arr = jnp.asarray(panel.get_all_states())
         actions_arr = jnp.asarray(panel.get_all_actions())
         inv_sigma_f64 = jnp.float64(1.0 / sigma)
-        _is_linear = hasattr(utility, 'feature_matrix')
+        _is_linear = hasattr(utility, "feature_matrix")
         initial_ccps = ccps
 
         if _is_linear:
@@ -596,10 +593,16 @@ class CCPEstimator(BaseEstimator):
         else:
             # Fallback for non-linear utility: finite differences
             def neg_ll_base(params_x, z64, e64):
-                val = float(-self._compute_log_likelihood(
-                    jnp.array(params_x, dtype=jnp.float32),
-                    panel, utility, ccps, transitions, problem,
-                ))
+                val = float(
+                    -self._compute_log_likelihood(
+                        jnp.array(params_x, dtype=jnp.float32),
+                        panel,
+                        utility,
+                        ccps,
+                        transitions,
+                        problem,
+                    )
+                )
                 n = len(params_x)
                 grad = np.zeros(n)
                 for i in range(n):
@@ -627,6 +630,7 @@ class CCPEstimator(BaseEstimator):
 
         # Step 2: Policy iteration loop
         from tqdm import tqdm
+
         pbar = tqdm(
             range(max_iterations),
             desc="CCP NPL",
@@ -651,8 +655,8 @@ class CCPEstimator(BaseEstimator):
             if _is_linear:
                 E_W_z = jnp.stack([transitions[a] @ W_z for a in range(num_actions)], axis=1)
                 E_W_e = jnp.stack([transitions[a] @ W_e for a in range(num_actions)], axis=1)
-                z64 = (features_f64 + beta * E_W_z.astype(jnp.float64))  # (S, A, K)
-                e64 = (beta * E_W_e).astype(jnp.float64)                  # (S, A)
+                z64 = features_f64 + beta * E_W_z.astype(jnp.float64)  # (S, A, K)
+                e64 = (beta * E_W_e).astype(jnp.float64)  # (S, A)
                 fun_args = (z64, e64)
             else:
                 fun_args = (None, None)
@@ -672,6 +676,31 @@ class CCPEstimator(BaseEstimator):
 
             current_params = jnp.array(result.x, dtype=jnp.float32)
             current_ll = -result.fun
+            total_function_evals += int(result.nfev)
+            total_optimizer_iterations += int(result.nit)
+            inner_succeeded = bool(
+                result.success or result.convergence_reason == "objective_plateau"
+            )
+            inner_optimizer_history.append(
+                {
+                    "policy_iteration": num_policy_iterations,
+                    "success": bool(result.success),
+                    "accepted": inner_succeeded,
+                    "message": result.message,
+                    "iterations": int(result.nit),
+                    "function_evals": int(result.nfev),
+                    "gradient_norm": result.grad_norm,
+                    "projected_gradient_norm": result.projected_grad_norm,
+                    "convergence_reason": result.convergence_reason,
+                }
+            )
+            if not inner_succeeded:
+                optimizer_failed = True
+                self._log(
+                    f"CCP inner optimizer failed at policy iteration "
+                    f"{num_policy_iterations}: {result.message}"
+                )
+                break
 
             # Check convergence for NPL
             param_change = float(jnp.linalg.norm(current_params - prev_params))
@@ -733,29 +762,95 @@ class CCPEstimator(BaseEstimator):
         if self._compute_hessian:
             self._log("Computing Hessian for standard errors")
 
-            # Use the FULL log-likelihood (re-solve Bellman at each perturbation)
-            # rather than the CCP pseudo-likelihood with fixed CCPs. The pseudo-LL
-            # with fixed CCPs is locally flat in directions that primarily affect
-            # CCPs (like replacement_cost), causing the Hessian to be rank-deficient.
-            operator = SoftBellmanOperator(problem, transitions)
+            if _is_linear:
+                # Use the same fixed-CCP pseudo-likelihood for estimation and
+                # inference. Mixing its score with the full structural Hessian
+                # at a finite-stage estimate makes the sandwich inconsistent
+                # and can make the Hessian indefinite.
+                v_final = (
+                    jnp.einsum(
+                        "sak,k->sa",
+                        z64,
+                        current_params.astype(jnp.float64),
+                    )
+                    + e64
+                )
+                probs = jax.nn.softmax(v_final * inv_sigma_f64, axis=1)
+                mean_features = jnp.einsum("sa,sak->sk", probs, z64)
+                centered = z64 - mean_features[:, None, :]
+                covariance_by_state = jnp.einsum(
+                    "sa,sak,sal->skl",
+                    probs,
+                    centered,
+                    centered,
+                )
+                state_counts = jnp.bincount(
+                    states_arr,
+                    length=problem.num_states,
+                ).astype(jnp.float64)
+                hessian = -jnp.einsum(
+                    "s,skl->kl",
+                    state_counts,
+                    covariance_by_state,
+                ) * (inv_sigma_f64**2)
+                gradient_contributions = (
+                    z64[states_arr, actions_arr] - mean_features[states_arr]
+                ) * inv_sigma_f64
+            else:
+                operator = SoftBellmanOperator(problem, transitions)
 
-            def ll_fn(params):
-                flow_u = utility.compute(params).astype(transitions.dtype)
-                from econirl.core.solvers import value_iteration
-                sol = value_iteration(operator, flow_u, tol=1e-12, max_iter=100_000)
-                log_probs = operator.compute_log_choice_probabilities(flow_u, sol.V)
-                all_states = panel.get_all_states()
-                all_actions = panel.get_all_actions()
-                return log_probs[all_states, all_actions].sum()
+                def ll_fn(params):
+                    flow_u = utility.compute(params).astype(transitions.dtype)
+                    from econirl.core.solvers import value_iteration
 
-            hessian = compute_numerical_hessian(current_params, ll_fn)
+                    sol = value_iteration(
+                        operator,
+                        flow_u,
+                        tol=1e-12,
+                        max_iter=100_000,
+                    )
+                    log_probs = operator.compute_log_choice_probabilities(
+                        flow_u,
+                        sol.V,
+                    )
+                    return log_probs[states_arr, actions_arr].sum()
 
-            # Compute per-observation gradients for robust SEs
-            gradient_contributions = self._compute_gradient_contributions(
-                current_params, panel, utility, ccps, transitions, problem
-            )
+                hessian = compute_numerical_hessian(current_params, ll_fn)
+                gradient_contributions = self._compute_gradient_contributions(
+                    current_params,
+                    panel,
+                    utility,
+                    ccps,
+                    transitions,
+                    problem,
+                )
 
         optimization_time = time.time() - start_time
+
+        if optimizer_failed:
+            termination_reason = "inner_optimizer_failed"
+            run_succeeded = False
+            message = f"CCP inner optimizer failed after {num_policy_iterations} policy iterations"
+        elif self._num_policy_iterations == 1:
+            termination_reason = "one_step_complete"
+            run_succeeded = True
+            message = "Hotz-Miller one-step estimation completed"
+        elif self._num_policy_iterations > 1:
+            termination_reason = "fixed_point_converged" if converged else "fixed_k_complete"
+            run_succeeded = converged or num_policy_iterations == self._num_policy_iterations
+            message = (
+                f"NPL fixed point converged in {num_policy_iterations} policy iterations"
+                if converged
+                else f"NPL completed the requested {num_policy_iterations} policy iterations"
+            )
+        else:
+            termination_reason = "fixed_point_converged" if converged else "iteration_cap_reached"
+            run_succeeded = converged
+            message = (
+                f"NPL fixed point converged in {num_policy_iterations} policy iterations"
+                if converged
+                else f"NPL reached the {max_iterations}-iteration cap without convergence"
+            )
 
         return EstimationResult(
             parameters=current_params,
@@ -764,20 +859,19 @@ class CCPEstimator(BaseEstimator):
             policy=final_policy,
             hessian=hessian,
             gradient_contributions=gradient_contributions,
-            converged=converged or (self._num_policy_iterations == 1),
+            converged=run_succeeded,
             num_iterations=num_policy_iterations,
-            num_function_evals=0,  # Not tracked for CCP
-            num_inner_iterations=0,  # No inner loop in CCP
-            message=f"CCP estimation completed in {num_policy_iterations} policy iterations",
+            num_function_evals=total_function_evals,
+            num_inner_iterations=total_optimizer_iterations,
+            message=message,
             optimization_time=optimization_time,
             metadata={
-                "mode": (
-                    "one_step"
-                    if self._num_policy_iterations == 1
-                    else "npl"
-                ),
+                "mode": ("one_step" if self._num_policy_iterations == 1 else "npl"),
                 "num_policy_iterations": num_policy_iterations,
                 "npl_converged": converged,
+                "termination_reason": termination_reason,
+                "inner_optimizer_succeeded": not optimizer_failed,
+                "inner_optimizer_history": inner_optimizer_history,
                 "requested_policy_iterations": self._num_policy_iterations,
                 "ccp_min_count": self._ccp_min_count,
                 "ccp_smoothing": self._ccp_smoothing,
@@ -787,6 +881,12 @@ class CCPEstimator(BaseEstimator):
                 "min_final_ccp": float(jnp.min(final_policy)),
                 "outer_tol": self._outer_tol,
                 "outer_max_iter": self._outer_max_iter,
+                "optimizer": "L-BFGS-B",
+                "se_method_detail": (
+                    "fixed_ccp_pseudo_likelihood"
+                    if _is_linear
+                    else "full_structural_likelihood_fallback"
+                ),
             },
         )
 
