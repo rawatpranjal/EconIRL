@@ -301,34 +301,46 @@ df = load_rust_bus()
 model = NFXP(n_states=90, discount=0.9999, utility=rust_bus_reward_spec(90))
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
-print(model.params_)
-print(model.summary())
-print(model.summary(alpha=0.10))        # 90 percent confidence intervals
+params = {name: round(value, 6) for name, value in model.params_.items()}
+print(params)
+print(f"P(replace | state=50) = {model.predict_proba([50])[0, 1]:.6f}")
 ```
+
+**Result**
+
+```text
+{'operating_cost': 0.001003, 'replacement_cost': 3.072264}
+P(replace | state=50) = 0.086333
+```
+
+The [Simulation Study](nfxp/validation.md) shows the complete `summary()`
+report from a 200-state fit.
 
 Counterfactual analysis re-solves the fitted dynamic program under a changed
 primitive:
 
 ```python
 cf = model.counterfactual(replacement_cost=4.0)   # raise the replacement cost
-print(cf.params)
-print(cf.policy)                       # new replacement probability by state
-print(cf.summary())
+print(
+    f"replacement_cost: {model.params_['replacement_cost']:.6f}"
+    f" -> {cf.params['replacement_cost']:.6f}"
+)
+print(
+    f"P(replace | state=50): {model.predict_proba([50])[0, 1]:.6f}"
+    f" -> {cf.policy[50, 1]:.6f}"
+)
 ```
 
-Transition counterfactuals use a complete action-specific transition model:
+**Result**
 
-```python
-cf_transition = model.counterfactual(transitions=alternative_transitions)
-print(cf_transition.summary())
+```text
+replacement_cost: 3.072264 -> 4.000000
+P(replace | state=50): 0.086333 -> 0.055196
 ```
 
-The fitted policy gives the replacement probability by state, which can be read
-at specific states:
-
-```python
-print(model.predict_proba([0, 10, 50, 89]))
-```
+Transition counterfactuals use a complete action-specific transition model.
+The [Counterfactuals](nfxp/counterfactuals.md) page gives a runnable example
+and its result.
 
 The [Quick Start](nfxp/quick_start.md) page documents the fitted attributes and
 the advanced `NFXPEstimator` interface.

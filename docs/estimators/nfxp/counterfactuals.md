@@ -18,19 +18,47 @@ policy and value function.
 ```python
 cf = model.counterfactual(replacement_cost=4.0)
 
-print(cf.params)
-print(cf.value_function)
-print(cf.policy)
+print(
+    f"replacement_cost: {model.params_['replacement_cost']:.6f}"
+    f" -> {cf.params['replacement_cost']:.6f}"
+)
+print(
+    f"P(replace | state=50): {model.predict_proba([50])[0, 1]:.6f}"
+    f" -> {cf.policy[50, 1]:.6f}"
+)
+```
+
+**Result**
+
+```text
+replacement_cost: 3.072264 -> 4.000000
+P(replace | state=50): 0.086333 -> 0.055196
 ```
 
 The environment can change as well. For example, a new maintenance technology
 may alter how engines deteriorate:
 
 ```python
+alternative_transitions = model.transition_tensor_.copy()
+alternative_transitions[0] = 0.0
+
+for state in range(model.n_states):
+    for increment, probability in enumerate([0.80, 0.15, 0.05]):
+        next_state = min(state + increment, model.n_states - 1)
+        alternative_transitions[0, state, next_state] += probability
+
 cf_transition = model.counterfactual(transitions=alternative_transitions)
 
-print(cf_transition.value_function)
-print(cf_transition.policy)
+print(
+    f"P(replace | state=50): {model.predict_proba([50])[0, 1]:.6f}"
+    f" -> {cf_transition.policy[50, 1]:.6f}"
+)
+```
+
+**Result**
+
+```text
+P(replace | state=50): 0.086333 -> 0.088450
 ```
 
 ## Results
