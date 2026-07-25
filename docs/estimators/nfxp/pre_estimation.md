@@ -12,7 +12,7 @@ interpretation. A satisfactory result does not prove the model. A poor result
 makes the reward estimate hard to interpret.
 
 NFXP maximizes the conditional log likelihood over the reward parameters, so
-identification and numerical stability need to hold before optimization starts.
+the model must be identified and numerically stable before optimization starts.
 Run these checks before treating a result as structural evidence.
 
 | Check | Why it matters |
@@ -41,11 +41,11 @@ These values come from the 200-state example in the
 
 ## Common Risk Patterns
 
-Feature matrices with state-only features copied identically across actions
-collapse the action-specific payoff differences, leaving them unidentified.
+Feature matrices that copy state-only features identically across actions
+collapse action-specific payoff differences and leave those differences
+unidentified.
 Data with almost no replacement choices can fit in-sample behavior while
 leaving the replacement cost weakly identified. Transition matrices with the
 wrong orientation produce plausible arrays but wrong economics. When state
-coverage is thin, UFXP's optimal weighting handles missing states more
-gracefully; NFXP pools all observations through the likelihood and degrades
-more slowly in coverage.
+coverage is thin, UFXP uses optimal weighting for missing states. NFXP instead
+pools all observations through the likelihood.

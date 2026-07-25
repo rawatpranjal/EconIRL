@@ -76,8 +76,8 @@ Family:      structural (linear utility)  Discount (beta): 0.95
 
 The inference experiment uses 1,000 independent panels. Each panel has 10,000
 choices over 40 states. The empirical standard deviation measures how much the
-estimate actually varies across panels. The mean standard error is what NFXP
-reports from a single panel.
+estimates vary across panels. The mean standard error averages the uncertainty
+NFXP reports for the individual panels.
 
 | Parameter | Truth | Mean | Actual SD | Mean SE | Coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -99,11 +99,10 @@ deterioration process.
 | Increase the first reward parameter by 1.0 | 0.0829 | 0.0064 | 0.0030 |
 | Slow engine deterioration | 0.0454 | 0.0067 | 0.0018 |
 
-The first numeric column shows how much behavior truly changes after the
-intervention. The second shows the distance between the fitted counterfactual
-policy and the true-parameter counterfactual policy. Expected-value loss
-measures the cost of using the fitted policy instead of the true-parameter
-policy.
+`True shift` shows how much behavior truly changes after the intervention.
+`Policy error` is the distance between the fitted counterfactual policy and the
+true-parameter counterfactual policy. `Value loss` measures the cost of using
+the fitted policy instead of the true-parameter policy.
 
 ## Reproduce the Study
 
@@ -126,8 +125,8 @@ contain the full experiment configuration.
 
 ## Related Studies
 
-NFXP is compared against the full structural and IRL rosters in six simulation
-studies: [bus engine](../../simulation_studies/rust_bus.md),
+NFXP is compared with the package's structural and IRL estimators in six
+simulation studies: [bus engine](../../simulation_studies/rust_bus.md),
 [taxi gridworld](../../simulation_studies/taxi_gridworld.md),
 [route choice](../../simulation_studies/route_choice.md),
 [stockpiling](../../simulation_studies/stockpiling.md),
