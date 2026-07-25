@@ -1,5 +1,13 @@
 # Quick Start
 
+## Important Links
+
+- [NFXP Overview](../nfxp.md)
+- [Pre-Estimation Checks](pre_estimation.md)
+- [Simulation Study](validation.md)
+- [Counterfactuals](counterfactuals.md)
+- [Bus Engine Example](rust_bus.md)
+
 This is the smallest NFXP path: fit the reference structural estimator, then
 inspect parameters, standard errors, policy, and value objects. It is a usage
 example, not a substitute for the pre-estimation checks.

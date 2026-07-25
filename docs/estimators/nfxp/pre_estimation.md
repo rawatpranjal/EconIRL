@@ -1,8 +1,15 @@
 # Pre-Estimation Checks
 
-Read this page before fitting NFXP. These checks are gates for structural
-interpretation: passing them does not prove the model, but failing them makes
-the reward estimate hard to read.
+## Important Links
+
+- [NFXP Overview](../nfxp.md)
+- [Quick Start](quick_start.md)
+- [Simulation Study](validation.md)
+- [Bus Engine Example](rust_bus.md)
+
+Read this page before fitting NFXP. These checks support structural
+interpretation. A satisfactory result does not prove the model. A poor result
+makes the reward estimate hard to interpret.
 
 NFXP maximizes the conditional log likelihood over the reward parameters, so
 identification and numerical stability need to hold before optimization starts.

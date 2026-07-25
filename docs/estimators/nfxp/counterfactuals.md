@@ -1,5 +1,12 @@
 # Counterfactuals
 
+## Important Links
+
+- [NFXP Overview](../nfxp.md)
+- [Quick Start](quick_start.md)
+- [Simulation Study](validation.md)
+- [Bus Engine Example](rust_bus.md)
+
 Read this page as structural re-solving. NFXP estimates reward parameters in a
 model that can be solved again after a primitive changes.
 

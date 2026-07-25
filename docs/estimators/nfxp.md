@@ -1,5 +1,13 @@
 # NFXP
 
+## Important Links
+
+- [Quick Start](nfxp/quick_start.md)
+- [Pre-Estimation Checks](nfxp/pre_estimation.md)
+- [Simulation Study](nfxp/validation.md)
+- [Counterfactuals](nfxp/counterfactuals.md)
+- [Bus Engine Example](nfxp/rust_bus.md)
+
 Nested fixed point is the reference estimator for tabular structural dynamic
 discrete choice. It recovers primitive reward parameters by maximum likelihood,
 nesting the solution of the agent's dynamic program inside each likelihood

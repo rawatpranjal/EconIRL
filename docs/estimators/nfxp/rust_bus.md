@@ -1,5 +1,13 @@
 # Bus Engine Example
 
+## Important Links
+
+- [NFXP Overview](../nfxp.md)
+- [Quick Start](quick_start.md)
+- [Simulation Study](validation.md)
+- [Counterfactuals](counterfactuals.md)
+- [Rust Replication](../../replications.md)
+
 The bundled bus engine replacement dataset shows the complete workflow: load
 the panel, estimate the costs, inspect uncertainty, and run a counterfactual.
 

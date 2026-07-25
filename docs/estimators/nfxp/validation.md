@@ -1,5 +1,13 @@
 # Simulation Study
 
+## Important Links
+
+- [NFXP Overview](../nfxp.md)
+- [Pre-Estimation Checks](pre_estimation.md)
+- [Counterfactuals](counterfactuals.md)
+- [Bus Engine Example](rust_bus.md)
+- [Simulation Studies](../../simulation_studies/index.md)
+
 The study separates estimation, inference, and counterfactual analysis. Each
 experiment simulates a new panel from a model whose reward and transition
 process are fully specified.
