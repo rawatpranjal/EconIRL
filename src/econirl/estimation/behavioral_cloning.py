@@ -15,13 +15,11 @@ from __future__ import annotations
 import time
 import warnings
 
-import jax
 import jax.numpy as jnp
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
-from econirl.inference.standard_errors import SEMethod
 from econirl.preferences.base import BaseUtilityFunction
 
 
@@ -116,7 +114,7 @@ class BehavioralCloningEstimator(BaseEstimator):
 
         # Normalize to P(a|s)
         row_sums = counts.sum(axis=1, keepdims=True)
-        row_sums = jnp.clip(row_sums, a_min=1e-10)
+        row_sums = jnp.maximum(row_sums, 1e-10)
         policy = counts / row_sums
 
         # Log-likelihood of observed data under the empirical policy
@@ -179,18 +177,13 @@ class BehavioralCloningEstimator(BaseEstimator):
             num_parameters=n_params,
             num_observations=n_obs,
             aic=-2 * result.log_likelihood + 2 * n_params,
-            bic=-2 * result.log_likelihood
-            + n_params * float(jnp.log(jnp.array(n_obs))),
-            prediction_accuracy=self._compute_prediction_accuracy(
-                panel, result.policy
-            ),
+            bic=-2 * result.log_likelihood + n_params * float(jnp.log(jnp.array(n_obs))),
+            prediction_accuracy=self._compute_prediction_accuracy(panel, result.policy),
         )
 
         # Parameter names: one per (state, action) cell
         param_names = [
-            f"P(a={a}|s={s})"
-            for s in range(problem.num_states)
-            for a in range(problem.num_actions)
+            f"P(a={a}|s={s})" for s in range(problem.num_states) for a in range(problem.num_actions)
         ]
 
         return EstimationSummary(

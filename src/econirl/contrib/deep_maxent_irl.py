@@ -23,7 +23,6 @@ Reference:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 
 import equinox as eqx
 import jax
@@ -36,8 +35,7 @@ from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
-from econirl.inference.standard_errors import SEMethod
-from econirl.preferences.base import BaseUtilityFunction, UtilityFunction
+from econirl.preferences.base import UtilityFunction
 
 
 class _RewardNetwork(eqx.Module):
@@ -195,14 +193,14 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
             dtype=jnp.int32,
         )
         init_counts = jnp.zeros(n_states).at[init_states].add(1.0)
-        mu = init_counts / jnp.clip(init_counts.sum(), a_min=1)
+        mu = init_counts / jnp.maximum(init_counts.sum(), 1)
 
         visitation = mu
         P_pi = jnp.einsum("sa,ast->st", policy, transitions)
 
         for t in range(1, horizon):
             mu = mu @ P_pi
-            visitation = visitation + (beta ** t) * mu
+            visitation = visitation + (beta**t) * mu
 
         return visitation / visitation.sum()
 
@@ -233,7 +231,8 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
         # Build reward network
         key = jr.PRNGKey(self._seed)
         reward_net = _RewardNetwork(
-            n_states, n_actions,
+            n_states,
+            n_actions,
             embed_dim=self._embed_dim,
             hidden_dims=self._hidden_dims,
             key=key,
@@ -254,6 +253,7 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
         self._log(f"Training Deep MaxEnt IRL for {self._max_epochs} epochs")
 
         from tqdm import tqdm
+
         pbar = tqdm(
             range(self._max_epochs),
             desc="DeepMaxEnt",
@@ -266,7 +266,8 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
 
             # Solve MDP (no gradient through VI)
             solver_result = value_iteration(
-                operator, reward_matrix,
+                operator,
+                reward_matrix,
                 tol=self._inner_tol,
                 max_iter=self._inner_max_iter,
             )
@@ -274,7 +275,10 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
 
             # Compute expected state-action visitation under policy
             state_vis = self._compute_state_visitation(
-                policy, transitions, problem, panel,
+                policy,
+                transitions,
+                problem,
+                panel,
             )
             expected_sa = jnp.einsum("s,sa->sa", state_vis, policy)
 
@@ -296,7 +300,8 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
             # Track best policy by log-likelihood
             rm = reward_net.reward_matrix(n_states, n_actions)
             sr = value_iteration(
-                operator, rm,
+                operator,
+                rm,
                 tol=self._inner_tol,
                 max_iter=self._inner_max_iter,
             )
@@ -312,12 +317,14 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
                 best_reward = jnp.array(rm)
 
             r_range = float(jnp.max(rm) - jnp.min(rm))
-            pbar.set_postfix({
-                "LL": f"{ll:.2f}",
-                "best": f"{best_ll:.2f}",
-                "R_rng": f"{r_range:.2f}",
-                "P(R|hi)": f"{float(sr.policy[-10:, 1].mean()):.3f}",
-            })
+            pbar.set_postfix(
+                {
+                    "LL": f"{ll:.2f}",
+                    "best": f"{best_ll:.2f}",
+                    "R_rng": f"{r_range:.2f}",
+                    "P(R|hi)": f"{float(sr.policy[-10:, 1].mean()):.3f}",
+                }
+            )
 
         elapsed = time.time() - start_time
 
@@ -367,17 +374,12 @@ class DeepMaxEntIRLEstimator(BaseEstimator):
             num_parameters=n_params,
             num_observations=n_obs,
             aic=-2 * result.log_likelihood + 2 * n_params,
-            bic=-2 * result.log_likelihood
-            + n_params * float(jnp.log(n_obs)),
-            prediction_accuracy=self._compute_prediction_accuracy(
-                panel, result.policy
-            ),
+            bic=-2 * result.log_likelihood + n_params * float(jnp.log(n_obs)),
+            prediction_accuracy=self._compute_prediction_accuracy(panel, result.policy),
         )
 
         param_names = [
-            f"R(s={s},a={a})"
-            for s in range(problem.num_states)
-            for a in range(problem.num_actions)
+            f"R(s={s},a={a})" for s in range(problem.num_states) for a in range(problem.num_actions)
         ]
 
         return EstimationSummary(
