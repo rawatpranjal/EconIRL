@@ -119,7 +119,7 @@ def _validate_rust_score_inputs(
             "transition_increments must lie between zero and the residual transition category"
         )
 
-    features = np.asarray(utility.feature_matrix, dtype=np.float64)
+    features = np.asarray(getattr(utility, "feature_matrix"), dtype=np.float64)
     if features.ndim != 3 or features.shape[:2] != (n_states, 2):
         raise ValueError(
             "linear utility features must have shape (n_states, n_actions, n_parameters)"
@@ -181,7 +181,7 @@ def compute_rust_full_likelihood_bhhh_score(
     beta = problem.discount_factor
     sigma = problem.scale_parameter
     transitions = jnp.asarray(transitions, dtype=jnp.float64)
-    features = jnp.asarray(utility.feature_matrix, dtype=jnp.float64)
+    features = jnp.asarray(getattr(utility, "feature_matrix"), dtype=jnp.float64)
     value_function = jnp.asarray(value_function, dtype=jnp.float64)
     policy = jnp.asarray(policy, dtype=jnp.float64)
     n_states = problem.num_states

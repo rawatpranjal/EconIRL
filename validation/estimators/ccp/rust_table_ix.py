@@ -93,7 +93,11 @@ def run_profile(raw_path: Path) -> dict[str, Any]:
 
     dataframe, metadata = load_stordat_group4_panel(raw_path)
     panel = _df_to_panel(dataframe)
-    probabilities = tuple(float(metadata["transition_probabilities"][k]) for k in range(3))
+    probabilities = (
+        float(metadata["transition_probabilities"][0]),
+        float(metadata["transition_probabilities"][1]),
+        float(metadata["transition_probabilities"][2]),
+    )
     increments = dataframe.sort_values(["bus_id", "period"])["monthly_mileage_increment"].to_numpy(
         dtype=int
     )
@@ -142,6 +146,8 @@ def run_profile(raw_path: Path) -> dict[str, Any]:
     theta_1_se = standard_errors[0] * 1000.0
     replacement_cost = float(result.parameters[1])
     replacement_cost_se = standard_errors[1]
+    if result.log_likelihood is None:
+        raise ValueError("CCP profile did not return a log-likelihood")
     choice_log_likelihood = float(result.log_likelihood)
     transition_log_likelihood = float(metadata["transition_log_likelihood"])
     full_log_likelihood = choice_log_likelihood + transition_log_likelihood
