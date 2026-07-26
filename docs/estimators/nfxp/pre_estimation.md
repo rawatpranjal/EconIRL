@@ -41,9 +41,10 @@ These values come from the 200-state example in the
 
 ## Common Risk Patterns
 
-Feature matrices that copy state-only features identically across actions
-collapse action-specific payoff differences and leave those differences
-unidentified.
+Feature matrices that copy state-only features identically across actions have
+zero immediate reward contrasts. Those features can still affect dynamic
+choices when actions induce different future state distributions. Check the
+full dynamic design, not only the immediate contrast matrix.
 Data with almost no replacement choices can fit in-sample behavior while
 leaving the replacement cost weakly identified. Transition matrices with the
 wrong orientation produce plausible arrays but wrong economics. When state

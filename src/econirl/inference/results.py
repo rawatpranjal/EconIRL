@@ -613,6 +613,17 @@ class EstimationSummary:
         lines.append(f"    Estimation time: {self.estimation_time:.2f} seconds")
         if self.convergence_message:
             lines.append(f"    Message:     {self.convergence_message}")
+        parameter_residual = self.metadata.get("npl_parameter_residual")
+        policy_residual = self.metadata.get("npl_policy_residual")
+        tolerance = self.metadata.get("npl_convergence_tolerance")
+        if parameter_residual is not None and policy_residual is not None:
+            lines.append(
+                "    NPL residuals: "
+                f"parameter {float(parameter_residual):.3e}, "
+                f"policy {float(policy_residual):.3e}"
+            )
+            if tolerance is not None:
+                lines.append(f"    NPL tolerance: {float(tolerance):.3e}")
         se_label = self._se_method_label()
         if se_label:
             lines.append(f"    SE method:  {se_label}")

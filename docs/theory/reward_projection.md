@@ -70,10 +70,12 @@ The two parameter vectors produce exactly the same recovered reward contrasts
 on the covered support. No estimator using only those contrasts can distinguish
 them.
 
-**Estimator consequence.** The feature-rank condition in NFXP, CCP, TD-CCP,
-MCE-IRL, AIRL-Het, and GLADIUS is not a numerical preference. It is the
-identification condition that turns recovered rewards or reward contrasts into
-finite parameters.
+**Estimator consequence.** This theorem applies when an estimator has already
+reduced the problem to observed reward contrasts $y=X\theta$. MCE-IRL,
+AIRL-Het, and GLADIUS use versions of that route. In a structural dynamic
+choice likelihood such as NFXP or CCP, action-dependent transitions can add
+parameter variation through future states. Direct action-contrast rank remains
+a conservative sufficient diagnostic, not a general necessary condition.
 
 ## Why State-Only Features Fail for Action Rewards
 
@@ -102,10 +104,10 @@ actually zero.
 **Proof.** This is the rank theorem with rank$(X)=0$. If $\theta$ is feasible,
 then every $\theta+v$ is also feasible because $Xv=0$ for all $v$.
 
-**Estimator consequence.** State-only features can be useful when the model is
-explicitly a state-reward model, as in the original AIRL guarantee. They cannot
-identify action-dependent payoff differences unless the model supplies another
-source of action variation.
+**Estimator consequence.** State-only features do not produce immediate reward
+contrasts. They can still affect dynamic choices when actions induce different
+future state distributions. They remain useful in explicit state-reward
+models, including the original AIRL setting.
 
 ## Projection When the Feature Span Is Wrong
 
@@ -174,7 +176,7 @@ projected parameters. Raw neural weights are implementation details.
 | Question | Formal check | Why it matters |
 | --- | --- | --- |
 | Are action rewards identified? | $X$ has full column rank after anchoring. | Otherwise multiple $\theta$ values produce the same reward contrasts. |
-| Are state-only features being used for action rewards? | $\Delta\phi(s,a)$ is not identically zero. | State-only features cannot explain action payoff differences. |
+| Are state-only features being used? | Check both $\Delta\phi(s,a)$ and action-specific future state distributions. | Immediate contrasts may be zero while dynamic choice contrasts are not. |
 | Is the linear model exact? | $y$ lies in the column span of $X$. | If not, $\theta$ is a projection. |
 | Is a neural reward being reported? | Compare reward maps, not raw weights. | Network parameters are many-to-one. |
 

@@ -33,6 +33,9 @@ for name in model.params_:
     print(f"{name}: estimate={model.params_[name]:.6f}, se={model.se_[name]:.6f}")
 print(f"policy_shape={model.policy_.shape}")
 print(f"transition_source={model.transition_source_}")
+print(f"termination={model.termination_reason_}")
+print(f"parameter_residual={model.npl_parameter_residual_:.6e}")
+print(f"policy_residual={model.npl_policy_residual_:.6e}")
 ```
 
 **Result**
@@ -42,6 +45,9 @@ operating_cost: estimate=0.000995, se=0.000421
 replacement_cost: estimate=3.072211, se=0.074237
 policy_shape=(90, 2)
 transition_source=estimated from fitted panel
+termination=fixed_k_complete
+parameter_residual=1.452655e-02
+policy_residual=2.148578e-02
 ```
 
 The fitted estimator exposes structural parameters, standard errors, a policy,
@@ -58,12 +64,20 @@ a value function, and a likelihood.
 | `transition_source_` | Whether transitions came from the panel or were supplied. |
 | `log_likelihood_` | CCP pseudo-log-likelihood at the fitted parameters. |
 | `converged_` | Whether the requested CCP run completed successfully. |
-| `npl_converged_` | Whether the policy sequence met the NPL stopping tolerance. |
+| `npl_converged_` | Whether both NPL residuals met the stopping tolerance. |
 | `termination_reason_` | Why the CCP run stopped. |
+| `npl_parameter_residual_` | Final L2 change in reward parameters. |
+| `npl_policy_residual_` | Final maximum absolute policy change. |
 
 Set `num_policy_iterations=1` for a one-step Hotz-Miller estimate. Set it to a
-larger positive integer for an exact number of NPL updates. Set it to `-1` to
-iterate until the stopping tolerance or iteration cap.
+larger positive integer for a maximum number of NPL updates. The run can stop
+early only when both residuals meet the tolerance. Set it to `-1` to require
+that joint fixed point before the iteration cap.
+
+Model-based, robust, and clustered standard errors are conditional on the
+policy object used in the final pseudo-likelihood and on the transition tensor.
+The pairs-cluster bootstrap repeats empirical CCP estimation after resampling
+individuals, but it still holds the transition tensor fixed.
 
 ## Counterfactual Example
 

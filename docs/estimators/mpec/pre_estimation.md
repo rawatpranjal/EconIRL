@@ -40,8 +40,9 @@ value, Q, and counterfactual oracle objects.
 
 ## Common Risk Patterns
 
-Feature matrices with copied state-only features across actions can collapse
-the action-specific payoff differences. Data with almost no replacement
+Feature matrices with copied state-only features across actions have zero
+immediate payoff contrasts. Action-dependent transitions can still make them
+choice-relevant through continuation values. Data with almost no replacement
 choices can fit in-sample behavior while leaving replacement cost weakly
 identified. Very large state spaces create many value-function variables and
 can make the constrained optimizer unstable. Transition matrices with wrong

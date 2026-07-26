@@ -12,11 +12,11 @@ Conditional choice probability estimation recovers primitive reward parameters
 from tabular dynamic discrete choice data. It replaces repeated Bellman
 fixed-point computations with a matrix inversion at each NPL step. The first
 stage estimates conditional choice probabilities from state-action
-frequencies. The Hotz-Miller inversion maps those probabilities to continuation
-values without repeatedly solving the Bellman equation. The Aguirregabiria-Mira
-nested pseudo-likelihood extension alternates the inversion with
-pseudo-likelihood optimization. Its iterations can approach full maximum
-likelihood efficiency.
+frequencies. The Hotz-Miller inversion maps those probabilities to normalized
+differences in conditional values. A policy valuation step then combines the
+choice probabilities with rewards, shocks, and transitions. The
+Aguirregabiria-Mira nested pseudo-likelihood extension alternates policy
+valuation with pseudo-likelihood optimization.
 
 CCP and NFXP target the same finite structural model. CCP requires enough
 first-stage action support for the inversion.
@@ -24,10 +24,14 @@ first-stage action support for the inversion.
 ## Source Papers
 
 The estimator follows {ref}`Hotz and Miller (1993) <hotz-miller-1993>`, which
-introduces the conditional-choice-probability inversion theorem for dynamic discrete
-choice models. {ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>`
-introduce the nested pseudo-likelihood algorithm that iterates the Hotz-Miller step
-to approach full maximum likelihood efficiency.
+introduces the inversion theorem and its two-stage estimator.
+{ref}`Aguirregabiria and Mira (2002) <aguirregabiria-mira-2002>` introduces
+nested pseudo-likelihood. Under their assumptions, every fixed K-stage
+estimator is first-order equivalent to the partial maximum likelihood
+estimator. Additional stages can improve finite-sample precision.
+{ref}`Magnac and Thesmar (2002)
+<magnac-thesmar-2002>` gives the identification boundary for dynamic
+primitives.
 
 ## Theory Connections
 
@@ -79,7 +83,7 @@ The normalized emax correction $e_{\hat\pi}$ is dimensionless. It enters flow
 payoffs as $\sigma e_{\hat\pi}$ before the softmax divides by $\sigma$.
 For Type-I extreme value shocks with scale
 $\sigma$, the Williams-Daly-Zachary theorem gives
-$E[\varepsilon_a \mid a = \operatorname{argmax}_b] = \sigma(\gamma - \log \hat\pi(a \mid s))$.
+$E[\varepsilon_a \mid a\text{ is chosen in state }s] = \sigma(\gamma - \log \hat\pi(a \mid s))$.
 This is $\sigma \cdot e_{\hat\pi}(s,a)$ in utility units. The implementation
 stores the normalized correction $e_{\hat\pi}$, multiplies its contribution by
 $\sigma$, and computes choice probabilities from $\exp(\tilde Q / \sigma)$.
@@ -161,37 +165,38 @@ update. See Aguirregabiria and Mira (2002) eqs. (4)-(5).
 
 ## Identification
 
-This is the section that says when the CCP shortcut still recovers the same
-reward object as the full nested likelihood.
-
-CCP point-identifies the reward parameters $\theta$ under the following assumptions
-and support requirements.
+CCP identifies $\theta$ only within the stated parametric model and
+normalization. The following restrictions define that interpretation.
 
 - **Conditional Independence (CI).** The observed state transition is Markov in the
   current state and action and does not depend on the current logit shock.
 - **Additive Separability (AS).** The per-period payoff is the systematic reward plus
   an additive choice-specific shock drawn independently across choices as Type-I
   extreme value with fixed scale $\sigma$.
-- **Exogenous Transitions.** The transition kernel $P_a(s, s')$ is supplied or
-  estimated in a first stage, outside the payoff model.
-- **Reward Normalization.** The reward level and scale need an anchor. An exit or
-  absorbing action with payoff fixed to zero pins the level, and the logit scale
-  $\sigma$ is held fixed.
-- **Action-Dependent Feature Rank.** The reward features must vary across actions and
-  have full column rank. State-only features copied across actions collapse the action
-  contrasts and leave $\theta$ unidentified.
-- **Action Support.** Every action must have positive empirical mass in each state
-  where it is relevant. Near-zero conditional choice probabilities make the emax
-  correction $\gamma - \log \hat\pi(a \mid s)$ numerically unstable.
-- **State Coverage.** The first-stage policy is estimated nonparametrically by state.
-  Sparsely observed states introduce approximation error into the inversion and weaken
-  identification of the continuation-value terms.
+- **Transition Law.** The transition kernel $P_a(s, s')$ is supplied or
+  estimated before the payoff fit. The public wrapper does not estimate
+  transition uncertainty jointly with reward parameters.
+- **Fixed Dynamic Primitives.** The discount factor, Type-I extreme-value shock
+  family, and shock scale are fixed.
+- **Reward Normalization.** A reference payoff or another explicit restriction
+  fixes the reward location. Fixing $\sigma$ fixes the utility scale.
+- **Dynamic Feature Rank.** Reward parameters must change observed choice
+  values through current payoff contrasts or action-dependent future state
+  distributions. The public wrapper requires full direct action-contrast rank
+  and stops when this check fails. A richer identification analysis may
+  recover state-only features through action-dependent transitions, but that
+  case is outside the wrapper's accepted scope.
 
-These hold inside a finite discrete state space, a stationary environment with
-expected-utility maximization, and a known, fixed discount factor $\beta$. Given them,
-$\theta$ is point-identified. Identification weakens under thin action support, an
-invalid normalization, rank-deficient action-contrast features, or sparsely observed
-states.
+These are population restrictions. Empirical action support and state coverage
+are separate finite-sample requirements. Near-zero estimated CCPs make
+$\gamma-\log\hat\pi(a\mid s)$ unstable. Sparse states make the first-stage
+policy noisy. Smoothing prevents numerical zeros, but it does not add
+identifying information.
+
+The implemented scope is finite-state, stationary, linear-utility logit CCP.
+Continuous states, serially correlated private shocks, nonlogit shock
+distributions, and latent finite types require other estimators or additional
+machinery.
 
 ## Estimator
 
@@ -238,10 +243,15 @@ which the inner L-BFGS-B step solves numerically.
 
 The score $\psi_i$ above drives the inner L-BFGS-B step and the reported
 sandwich standard errors. The Hessian and observation scores come from the same
-fixed-CCP pseudo-likelihood. They describe uncertainty conditional on the
-estimated first-stage policy and supplied transition model. Pairs-cluster
-bootstrap standard errors resample individuals and repeat the CCP fit when the
-first-stage sampling variation must be carried through the full procedure.
+fixed-CCP pseudo-likelihood. The model-based, robust, and clustered standard
+errors condition on that policy object and the supplied transition model. They
+are not the full Hotz-Miller two-step covariance.
+
+Pairs-cluster bootstrap standard errors resample individuals and repeat the
+empirical CCP and reward fit. The supplied transition tensor remains fixed.
+This is not the parametric one-step NPL bootstrap of Kasahara and Shimotsu
+(2008). Clustered inference also relies on independent clusters and enough
+clusters for the across-cluster approximation.
 
 ## System View
 
@@ -295,24 +305,26 @@ Output  theta_hat, standard errors, policy pi^K, value V
               (z-tilde(s_it, *)' theta + e-tilde(s_it, *)) / sigma)[a_it]
 9       pi^k(a | s) := softmax(                               # update policy
               (z-tilde(s, *)' theta_k + e-tilde(s, *)) / sigma)[a]
-10      if ||theta_k - theta_{k-1}|| < tol: break             # NPL convergence
-11  return theta_hat = theta_K, standard errors, pi^K, V
+10      r_theta := ||theta_k - theta_{k-1}||_2
+11      r_policy := max |pi^k - pi^{k-1}|
+12      if r_theta <= tol and r_policy <= tol: break          # NPL fixed point
+13  return theta_hat = theta_K, standard errors, pi^K, V
 ```
 
 The inner optimizer in step 8 is L-BFGS-B. It fits the augmented-feature logit.
 Its gradient is the closed-form score $\psi_i$ from the Estimator section. The
-public `CCP` wrapper defaults to `num_policy_iterations=1`. The loop therefore
-runs once and returns the one-step Hotz-Miller estimator. Hotz and Miller
-(1993) show that this estimator is root-$N$ consistent but imprecise in finite
-samples. Aguirregabiria and Mira (2002, Proposition 1) show that the NPL
-iteration recovers full maximum-likelihood efficiency as $K$ grows. Their Monte
-Carlo simulations find that the second policy iteration recovers most of the
-finite-sample precision. Further iteration to the MLE adds little precision. A
-small number of NPL steps is usually enough. Setting
-`num_policy_iterations=K` for $K > 1$ runs
-the NPL iteration for exactly $K$ steps. A completed fixed-$K$ run reports
-whether the policy sequence also met the NPL stopping tolerance. Setting
-$K = -1$ continues until that tolerance is met or the iteration cap is reached.
+public `CCP` wrapper defaults to `num_policy_iterations=1`. The loop runs once
+and returns the one-step Hotz-Miller estimator. Under the assumptions in
+Aguirregabiria and Mira (2002), every fixed $K\geq1$ estimator is consistent,
+asymptotically normal, and first-order equivalent to partial maximum
+likelihood. Their simulations find the largest finite-sample gain between the
+first and second stages.
+
+For $K>1$, `num_policy_iterations=K` is a maximum. The run can stop early only
+when both residuals in steps 10 and 11 meet the tolerance. Reaching a positive
+stage maximum without that fixed point is a successful `fixed_k_complete`
+run. Setting $K=-1$ requires the joint fixed point. Reaching the safety cap in
+that mode is a failed `iteration_cap_reached` run.
 
 ## Applicability
 
@@ -352,6 +364,8 @@ for name in model.params_:
     print(f"{name}: estimate={model.params_[name]:.6f}, se={model.se_[name]:.6f}")
 print(f"termination={model.termination_reason_}")
 print(f"npl_converged={model.npl_converged_}")
+print(f"parameter_residual={model.npl_parameter_residual_:.6e}")
+print(f"policy_residual={model.npl_policy_residual_:.6e}")
 ```
 
 **Result**
@@ -361,12 +375,14 @@ operating_cost: estimate=0.000995, se=0.000421
 replacement_cost: estimate=3.072211, se=0.074237
 termination=fixed_k_complete
 npl_converged=False
+parameter_residual=1.452655e-02
+policy_residual=2.148578e-02
 ```
 
 A fixed three-step NPL run completed the requested work. The separate
-`npl_converged_` value says that three updates did not meet the fixed-point
-tolerance. This distinction prevents a completed fixed-$K$ run from being
-reported as an optimizer failure.
+`npl_converged_` value says whether both the parameter and policy residuals met
+the fixed-point tolerance. The residuals show how far the final stage is from
+that joint stopping rule.
 
 Counterfactual analysis re-solves the fitted dynamic program under a changed
 primitive:
@@ -410,7 +426,9 @@ attributes and the full `CCPEstimator` API.
 ## Evidence
 
 The inference experiment contains 1,000 independent 20-state panels. Every
-panel produced a finite estimate and robust standard errors.
+panel produced a finite estimate and robust standard errors. The study supplies
+the true transition tensor. It evaluates reward estimation and conditional
+pseudo-likelihood inference, not uncertainty from transition estimation.
 
 | Parameter | True value | Mean estimate | Empirical SD | Mean SE | Coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -422,10 +440,10 @@ The larger recovery experiment uses three-stage NPL on 20 independent
 100-state panels. Median relative parameter errors range from 1.9 to 5.2
 percent. The mean policy distance is 0.0028.
 
-Reward and transition counterfactuals have mean policy errors below 0.0023.
-Their mean value losses are below 0.0002. Asymptotic, robust, clustered, and
-pairs-cluster bootstrap standard errors are all finite. Clustered estimates
-are between 0.99 and 1.05 times their bootstrap counterparts.
+Reward and transition counterfactuals have mean policy TV below 0.0023. Their
+mean value losses are below 0.0002. The reported comparison also applies
+four conditional inference procedures to one panel. The transition tensor is
+held fixed in all four.
 
 See the [Simulation Study](ccp/validation.md) for the full design, results, and
 reproduction command. For the cross-estimator comparison, see the
@@ -442,6 +460,16 @@ Source papers:
   Algorithm: A Class of Estimators for Discrete Markov Decision Models."
   _Econometrica_, 70(4), 1519-1543.
   {ref}`reference entry <aguirregabiria-mira-2002>`.
+- Magnac, T., and Thesmar, D. (2002). "Identifying Dynamic Discrete Decision
+  Processes." _Econometrica_, 70(2), 801-816.
+  {ref}`reference entry <magnac-thesmar-2002>`.
+- Aguirregabiria, V., and Mira, P. (2010). "Dynamic Discrete Choice Structural
+  Models: A Survey." _Journal of Econometrics_, 156(1), 38-67.
+  {ref}`reference entry <aguirregabiria-mira-2010>`.
+- Kasahara, H., and Shimotsu, K. (2008). "Pseudo-Likelihood Estimation and
+  Bootstrap Inference for Structural Discrete Markov Decision Models."
+  _Journal of Econometrics_, 146(1), 92-106.
+  {ref}`reference entry <kasahara-shimotsu-2008>`.
 
 Implementation and reproduction:
 

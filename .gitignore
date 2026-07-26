@@ -50,6 +50,10 @@ CLAUDE.md
 AGENTS.md
 **/CLAUDE.md
 **/AGENTS.md
+
+# Root planning and decision records are maintainer-only.
+/roadmap.md
+/memory.md
 # Research archive (papers, literature, internal AI/maintainer docs). Lives under
 # docs/ so all documents sit in one tree, but it is local-only and Sphinx-excluded:
 # never built into the public site, never committed. See docs/research/README.md.
@@ -72,6 +76,29 @@ AGENTS.md
 .env.*
 *.pem
 *.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+auth*.json
+token*.json
+token*.txt
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+cookies*.txt
+*.session
+*.db
+*.sqlite
+*.sqlite3
+
+# Private drafts and browser/session artifacts. Publication files such as
+# LICENSE, CITATION.cff, CONTRIBUTING.md, and reviewed workflows remain visible.
+/.playwright-mcp/
+/docs/prds/
+/paper/
+/lets-work-on-*.md
 
 # Large data files
 data/raw/
@@ -92,6 +119,10 @@ experiments/jss_deep_run/results/
 # their ../src, ../docs, ../examples relative paths). papers/ now under docs/research/.
 /experiments/*
 !/experiments/README.md
+
+# Local paper-search assistant. Keep only its tracked public README.
+/assistant/*
+!/assistant/README.md
 
 # Cache
 cache/

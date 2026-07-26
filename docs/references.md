@@ -40,6 +40,38 @@ package.
   Algorithm: A Class of Estimators for Discrete Markov Decision Models."
   *Econometrica*, 70(4), 1519-1543.
 
+(magnac-thesmar-2002)=
+- Magnac, T., and Thesmar, D. (2002). "Identifying Dynamic Discrete Decision
+  Processes." *Econometrica*, 70(2), 801-816.
+
+(hotz-miller-sanders-smith-1994)=
+- Hotz, V. J., Miller, R. A., Sanders, S., and Smith, J. (1994). "A Simulation
+  Estimator for Dynamic Models of Discrete Choice." *Review of Economic
+  Studies*, 61(2), 265-289.
+
+(kasahara-shimotsu-2008)=
+- Kasahara, H., and Shimotsu, K. (2008). "Pseudo-Likelihood Estimation and
+  Bootstrap-Based Inference for Structural Discrete Markov Decision Models."
+  *Journal of Econometrics*, 146(1), 92-106.
+
+(kasahara-shimotsu-2009)=
+- Kasahara, H., and Shimotsu, K. (2009). "Nonparametric Identification of
+  Finite Mixture Models of Dynamic Discrete Choices." *Econometrica*, 77(1),
+  135-175.
+
+(aguirregabiria-mira-2010)=
+- Aguirregabiria, V., and Mira, P. (2010). "Dynamic Discrete Choice Structural
+  Models: A Survey." *Journal of Econometrics*, 156(1), 38-67.
+
+(arcidiacono-miller-2011)=
+- Arcidiacono, P., and Miller, R. A. (2011). "Conditional Choice Probability
+  Estimation of Dynamic Discrete Choice Models With Unobserved
+  Heterogeneity." *Econometrica*, 79(6), 1823-1867.
+
+(cameron-miller-2015)=
+- Cameron, A. C., and Miller, D. L. (2015). "A Practitioner's Guide to
+  Cluster-Robust Inference." *Journal of Human Resources*, 50(2), 317-372.
+
 (su-judd-2012)=
 - Su, C.-L., and Judd, K. L. (2012). "Constrained Optimization Approaches to
   Estimation of Structural Models." *Econometrica*, 80(5), 2213-2230.

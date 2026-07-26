@@ -274,7 +274,7 @@ class TestNPLEstimation:
         assert not result.metadata["inner_optimizer_succeeded"]
         assert result.metadata["inner_optimizer_history"][0]["accepted"] is False
 
-    def test_fixed_k_early_convergence_is_successful(
+    def test_parameter_stability_alone_does_not_claim_fixed_point(
         self,
         monkeypatch,
         small_panel,
@@ -282,7 +282,7 @@ class TestNPLEstimation:
         problem_spec_small,
         transitions_small,
     ):
-        """Meeting the NPL tolerance early is successful for a fixed-K run."""
+        """A stable parameter vector is insufficient when the policy still moves."""
 
         def unchanged_optimizer(_fun, x0, **_kwargs):
             return OptimizeResult(
@@ -301,10 +301,85 @@ class TestNPLEstimation:
             "econirl.estimation.ccp.minimize_lbfgsb",
             unchanged_optimizer,
         )
-        result = CCPEstimator(
+        estimator = CCPEstimator(
             num_policy_iterations=3,
             compute_hessian=False,
-        ).estimate(
+        )
+        policy_updates = 0
+
+        def moving_policy(_values, _scale):
+            nonlocal policy_updates
+            policy_updates += 1
+            first_action_probability = 0.8 if policy_updates % 2 else 0.2
+            return jnp.tile(
+                jnp.array(
+                    [first_action_probability, 1.0 - first_action_probability],
+                ),
+                (problem_spec_small.num_states, 1),
+            )
+
+        monkeypatch.setattr(estimator, "_update_ccps_from_values", moving_policy)
+        result = estimator.estimate(
+            small_panel,
+            utility_small,
+            problem_spec_small,
+            transitions_small,
+        )
+
+        assert result.converged
+        assert not result.metadata["npl_converged"]
+        assert result.metadata["termination_reason"] == "fixed_k_complete"
+        assert result.num_iterations == 3
+        assert result.metadata["npl_parameter_residual"] == pytest.approx(0.0)
+        assert result.metadata["npl_policy_residual"] > 0.0
+
+    def test_fixed_k_early_joint_convergence_is_successful(
+        self,
+        monkeypatch,
+        small_panel,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """A fixed-K run stops early only when both NPL residuals pass."""
+
+        def unchanged_optimizer(_fun, x0, **_kwargs):
+            return OptimizeResult(
+                x=x0,
+                fun=1.0,
+                success=True,
+                nit=1,
+                nfev=1,
+                message="Converged",
+                grad_norm=0.0,
+                projected_grad_norm=0.0,
+                convergence_reason="projected_gradient",
+            )
+
+        uniform_policy = jnp.full(
+            (problem_spec_small.num_states, problem_spec_small.num_actions),
+            1.0 / problem_spec_small.num_actions,
+        )
+        monkeypatch.setattr(
+            "econirl.estimation.ccp.minimize_lbfgsb",
+            unchanged_optimizer,
+        )
+        estimator = CCPEstimator(
+            num_policy_iterations=3,
+            compute_hessian=False,
+        )
+        monkeypatch.setattr(
+            estimator,
+            "_estimate_ccps_from_data",
+            lambda *_args: uniform_policy,
+        )
+        monkeypatch.setattr(
+            estimator,
+            "_update_ccps_from_values",
+            lambda _values, _scale: uniform_policy,
+        )
+
+        result = estimator.estimate(
             small_panel,
             utility_small,
             problem_spec_small,
@@ -315,6 +390,15 @@ class TestNPLEstimation:
         assert result.metadata["npl_converged"]
         assert result.metadata["termination_reason"] == "fixed_point_converged"
         assert result.num_iterations == 1
+        assert result.metadata["npl_parameter_residual"] == pytest.approx(0.0)
+        assert result.metadata["npl_policy_residual"] == pytest.approx(0.0)
+        assert result.metadata["npl_residual_history"] == [
+            {
+                "policy_iteration": 1,
+                "parameter_residual": 0.0,
+                "policy_residual": 0.0,
+            }
+        ]
 
     def test_npl_name(self):
         """Test that NPL has correct name."""

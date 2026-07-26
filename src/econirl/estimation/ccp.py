@@ -4,7 +4,7 @@ This module implements Conditional Choice Probability (CCP) estimators
 for dynamic discrete choice models:
 
 1. Hotz-Miller (1993): Two-step estimator using CCPs from data
-2. NPL (Aguirregabiria-Mira 2002): Iterated Hotz-Miller that converges to MLE
+2. NPL (Aguirregabiria-Mira 2002): Iterated Hotz-Miller policy updates
 
 Key insight: The value function can be recovered from CCPs without solving
 the full Bellman equation, via the Hotz-Miller inversion theorem.
@@ -89,14 +89,14 @@ class CCPEstimator(BaseEstimator):
     Attributes:
         num_policy_iterations: Number of NPL iterations (K=1 is Hotz-Miller)
         ccp_min_count: Minimum observations per state for CCP estimation
-        convergence_tol: Tolerance for NPL convergence check
+        convergence_tol: Joint tolerance for parameter and policy residuals
 
     Example:
         >>> # Hotz-Miller (fast, one-step)
         >>> hm = CCPEstimator(num_policy_iterations=1)
         >>> result = hm.estimate(panel, utility, problem, transitions)
         >>>
-        >>> # NPL (iterates to MLE)
+        >>> # Fixed-stage NPL
         >>> npl = CCPEstimator(num_policy_iterations=10)
         >>> result = npl.estimate(panel, utility, problem, transitions)
     """
@@ -123,13 +123,15 @@ class CCPEstimator(BaseEstimator):
                 If both `mode` and `num_policy_iterations` are None the default
                 is "one_step".
             num_policy_iterations: Legacy iteration-count selector. K=1 is the
-                one-step estimator, K>1 runs NPL for K iterations, K=-1 runs
-                NPL until parameter convergence. When `mode` is set the K
-                value is derived from it (one_step -> 1, npl -> -1).
+                one-step estimator, K>1 runs NPL for at most K iterations, and
+                K=-1 runs NPL until joint parameter and policy convergence.
+                When `mode` is set the K value is derived from it
+                (one_step -> 1, npl -> -1).
             ccp_min_count: Minimum observations per state for reliable CCP estimation.
                           States with fewer observations get uniform CCPs.
             ccp_smoothing: Small value added to CCPs to avoid log(0).
-            convergence_tol: Tolerance for NPL convergence (parameter change).
+            convergence_tol: Tolerance applied to both the parameter L2
+                residual and policy maximum residual.
             outer_tol: Tolerance for pseudo-likelihood maximization.
             outer_max_iter: Max iterations for pseudo-likelihood maximization.
             se_method: Method for computing standard errors.
@@ -545,6 +547,10 @@ class CCPEstimator(BaseEstimator):
         converged = False
         optimizer_failed = False
         inner_optimizer_history: list[dict[str, object]] = []
+        npl_residual_history: list[dict[str, float | int]] = []
+        final_parameter_residual: float | None = None
+        final_policy_residual: float | None = None
+        last_candidate_policy: jnp.ndarray | None = None
         total_function_evals = 0
         total_optimizer_iterations = 0
         # NPL-until-convergence cap. The NPL CCP fixed point contracts at rate
@@ -702,36 +708,73 @@ class CCPEstimator(BaseEstimator):
                 )
                 break
 
-            # Check convergence for NPL
-            param_change = float(jnp.linalg.norm(current_params - prev_params))
-            postfix = {"LL": f"{current_ll:.2f}", "d_param": f"{param_change:.1e}"}
+            # A&M's NPL fixed point is a CCP vector P satisfying
+            # P = Psi(P, theta). Parameter stability alone does not establish
+            # that fixed point, so every accepted stage records both residuals.
+            candidate_values = self._compute_choice_specific_values(
+                ccps,
+                transitions,
+                utility,
+                current_params,
+                problem,
+            )
+            candidate_policy = self._update_ccps_from_values(
+                candidate_values,
+                problem.scale_parameter,
+            )
+            parameter_residual = float(jnp.linalg.norm(current_params - prev_params))
+            policy_residual = float(jnp.max(jnp.abs(candidate_policy - ccps)))
+            final_parameter_residual = parameter_residual
+            final_policy_residual = policy_residual
+            last_candidate_policy = candidate_policy
+            residual_record: dict[str, float | int] = {
+                "policy_iteration": num_policy_iterations,
+                "parameter_residual": parameter_residual,
+                "policy_residual": policy_residual,
+            }
+            npl_residual_history.append(residual_record)
+            inner_optimizer_history[-1].update(residual_record)
+
+            postfix = {
+                "LL": f"{current_ll:.2f}",
+                "d_param": f"{parameter_residual:.1e}",
+                "d_policy": f"{policy_residual:.1e}",
+            }
             for j, nm in enumerate(utility.parameter_names[:3]):
                 postfix[nm] = f"{float(current_params[j]):.5f}"
             pbar.set_postfix(postfix)
 
-            if param_change < self._convergence_tol:
+            joint_fixed_point = (
+                parameter_residual <= self._convergence_tol
+                and policy_residual <= self._convergence_tol
+            )
+            if self._num_policy_iterations != 1 and joint_fixed_point:
                 converged = True
                 pbar.set_postfix({**postfix, "status": "converged"})
                 pbar.close()
-                self._log("NPL converged!")
+                self._log("NPL parameter and policy residuals converged")
                 break
 
             # Update CCPs for next iteration (if doing NPL)
             if k < max_iterations - 1:
-                v = self._compute_choice_specific_values(
-                    ccps, transitions, utility, current_params, problem
-                )
-                ccps = self._update_ccps_from_values(v, problem.scale_parameter)
+                ccps = candidate_policy
 
             # Stop if only doing Hotz-Miller (K=1)
             if self._num_policy_iterations == 1:
                 break
 
         # Compute final value function and policy
-        v = self._compute_choice_specific_values(
-            ccps, transitions, utility, current_params, problem
-        )
-        final_policy = self._update_ccps_from_values(v, problem.scale_parameter)
+        if last_candidate_policy is None:
+            v = self._compute_choice_specific_values(
+                ccps,
+                transitions,
+                utility,
+                current_params,
+                problem,
+            )
+            final_policy = self._update_ccps_from_values(v, problem.scale_parameter)
+        else:
+            final_policy = last_candidate_policy
 
         # Report value in the package's soft-Bellman convention. The CCP
         # inversion uses the Euler-constant emax correction internally; directly
@@ -870,6 +913,10 @@ class CCPEstimator(BaseEstimator):
                 "num_policy_iterations": num_policy_iterations,
                 "npl_converged": converged,
                 "termination_reason": termination_reason,
+                "npl_parameter_residual": final_parameter_residual,
+                "npl_policy_residual": final_policy_residual,
+                "npl_convergence_tolerance": self._convergence_tol,
+                "npl_residual_history": npl_residual_history,
                 "inner_optimizer_succeeded": not optimizer_failed,
                 "inner_optimizer_history": inner_optimizer_history,
                 "requested_policy_iterations": self._num_policy_iterations,

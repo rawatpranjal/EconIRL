@@ -40,7 +40,7 @@
       ]
     }
   },
-  "checkpoint": "/tmp/econirl_ccp_ready_final.jsonl",
+  "checkpoint": "/tmp/econirl-ccp-ecc-final.F8ErsN/ccp_ready_final.jsonl",
   "configs": {
     "hard_problem": {
       "base_seed": 51000,
@@ -373,7 +373,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 60.0,
-      "value": 39.74280175002059
+      "value": 7.0876058749854565
     },
     {
       "enforced": true,
@@ -440,7 +440,7 @@
       "theta_2": 0.09496306329965588
     },
     "policy_tv_mean": 0.002757652597892661,
-    "runtime_seconds_max": 39.74280175002059,
+    "runtime_seconds_max": 7.0876058749854565,
     "usable_rate": 1.0
   },
   "inference": {
@@ -488,7 +488,7 @@
   },
   "paper_target": null,
   "status": "ready",
-  "summary_report": "================================================================================\n                   Dynamic Discrete Choice Estimation Results                   \n================================================================================\nMethod:      Hotz-Miller (CCP)            Observations:  10,000\nOptimizer:   L-BFGS-B                     Individuals:   250\nFamily:      structural (linear utility)  Discount (\u03b2):  0.95\n                                          Scale (\u03c3):     1.0\n                                          Date:          2026-07-25\n\n[1] DATA\n  State space:          20 states x 2 actions\n  Periods per individual: ~40\n  Obs per state:        max 6,454 . p95 1,677 . p50 40 . p5 23 . min 22\n  State coverage:       20/20 visited (100%)\n  Single-action states: 0\n\n[2] PRE-ESTIMATION CHECKS\n  Reward features (K):  3\n  Design rank:          3/3         Condition:          1.0e+00\n  Contrast rank:        3/3       Contrast condition: 1.0e+00\n  Verdict:              identified -- every reward parameter varies across actions\n\n[3] TRANSITION MODEL\n  Transition source: supplied action-specific tensor\n--------------------------------------------------------------------------------\n[4] RESULTS\n  4a. Estimation\n                          coef   std err       t   P>|t|   [0.025   0.975]\n    theta_0             0.3344    0.0288   11.61   0.000   0.2780   0.3909\n    theta_1            -0.2303    0.0498   -4.62   0.000  -0.3279  -0.1327\n    theta_2             0.2881    0.0529    5.45   0.000   0.1844   0.3918\n  4b. Identification\n    Hessian condition:  6.0     Min eigenvalue: 291.82\n    Status:             Well-identified\n  4c. Inference & fit\n    Converged:   yes\n    Iterations:  1\n    Estimation time: 2.62 seconds\n    Message:     Hotz-Miller one-step estimation completed\n    SE method:  robust (sandwich)\n    Log-lik:    -6,810.02\n    AIC/BIC:    13,626.0 / 13,647.7\n    accuracy 56.5%\n================================================================================",
+  "summary_report": "================================================================================\n                   Dynamic Discrete Choice Estimation Results                   \n================================================================================\nMethod:      Hotz-Miller (CCP)            Observations:  10,000\nOptimizer:   L-BFGS-B                     Individuals:   250\nFamily:      structural (linear utility)  Discount (\u03b2):  0.95\n                                          Scale (\u03c3):     1.0\n                                          Date:          2026-07-25\n\n[1] DATA\n  State space:          20 states x 2 actions\n  Periods per individual: ~40\n  Obs per state:        max 6,454 . p95 1,677 . p50 40 . p5 23 . min 22\n  State coverage:       20/20 visited (100%)\n  Single-action states: 0\n\n[2] PRE-ESTIMATION CHECKS\n  Reward features (K):  3\n  Design rank:          3/3         Condition:          1.0e+00\n  Contrast rank:        3/3       Contrast condition: 1.0e+00\n  Verdict:              identified -- every reward parameter varies across actions\n\n[3] TRANSITION MODEL\n  Transition source: supplied action-specific tensor\n--------------------------------------------------------------------------------\n[4] RESULTS\n  4a. Estimation\n                          coef   std err       t   P>|t|   [0.025   0.975]\n    theta_0             0.3344    0.0288   11.61   0.000   0.2780   0.3909\n    theta_1            -0.2303    0.0498   -4.62   0.000  -0.3279  -0.1327\n    theta_2             0.2881    0.0529    5.45   0.000   0.1844   0.3918\n  4b. Identification\n    Hessian condition:  6.0     Min eigenvalue: 291.82\n    Status:             Well-identified\n  4c. Inference & fit\n    Converged:   yes\n    Iterations:  1\n    Estimation time: 2.76 seconds\n    Message:     Hotz-Miller one-step estimation completed\n    NPL residuals: parameter 4.902e-01, policy 1.756e-01\n    NPL tolerance: 1.000e-10\n    SE method:  robust (sandwich)\n    Log-lik:    -6,810.02\n    AIC/BIC:    13,626.0 / 13,647.7\n    accuracy 56.5%\n================================================================================",
   "support_example": {
     "action_counts": [
       5605,
