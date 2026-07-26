@@ -26,7 +26,7 @@ independent panels.
 | Reward feature 3 | 0.20 | 0.052 | 0.095 |
 
 All 20 panels produced an estimate. The mean policy distance was 0.0028. The
-largest fit took 39.7 seconds. Policy distance is the average total variation
+largest fit took 7.1 seconds. Policy distance is the average total variation
 between the fitted and true action probabilities across states.
 
 ## Inference

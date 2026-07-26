@@ -69,10 +69,17 @@ jobs:
         run: |
           python -c "
           from econirl import NFXP, CCP
-          from econirl.datasets import load_rust_bus
+          from econirl.datasets import load_rust_bus, rust_bus_reward_spec
           df = load_rust_bus()
-          nfxp = NFXP(discount=0.9999).fit(df, state='mileage_bin', action='replaced', id='bus_id')
-          ccp = CCP(discount=0.9999, num_policy_iterations=5).fit(df, state='mileage_bin', action='replaced', id='bus_id')
+          reward = rust_bus_reward_spec(90)
+          nfxp = NFXP(discount=0.9999, utility=reward).fit(
+              df, state='mileage_bin', action='replaced', id='bus_id'
+          )
+          ccp = CCP(
+              discount=0.9999,
+              utility=reward,
+              num_policy_iterations=5,
+          ).fit(df, state='mileage_bin', action='replaced', id='bus_id')
           print('params:', nfxp.params_)
           print('se:', nfxp.se_)
           import numpy as np
