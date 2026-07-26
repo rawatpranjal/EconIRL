@@ -300,6 +300,119 @@ class TestTableIXProfile:
         assert "Command: `make rust-table-ix`" in receipt
         assert "Rust (1987), Table IX" in receipt
 
+    @pytest.mark.slow
+    def test_ccp_fixed_point_profile_matches_table_ix_and_nfxp(self):
+        """Converged NPL should recover the same Table IX MLE and joint SEs."""
+        if not OFFICIAL_GROUP4_RAW.exists():
+            pytest.skip("official NFXP archive not downloaded")
+
+        import jax
+
+        jax.config.update("jax_enable_x64", True)
+        from econirl.environments.rust_bus import RustBusEnvironment
+        from econirl.estimation.ccp import CCPEstimator
+        from econirl.preferences.linear import LinearUtility
+        from econirl.replication.rust1987.table_ix import PAPER_TABLE_IX_GROUP4
+        from econirl.replication.rust1987.tables import _df_to_panel
+
+        df, metadata = load_stordat_group4_panel(OFFICIAL_GROUP4_RAW)
+        panel = _df_to_panel(df)
+        probabilities = tuple(
+            float(metadata["transition_probabilities"][k])
+            for k in range(3)
+        )
+        increments = df.sort_values(["bus_id", "period"])[
+            "monthly_mileage_increment"
+        ].to_numpy(dtype=int)
+        environment = RustBusEnvironment(
+            operating_cost=0.001,
+            replacement_cost=3.0,
+            num_mileage_bins=int(metadata["n_states"]),
+            mileage_transition_probs=probabilities,
+            discount_factor=0.9999,
+        )
+        utility = LinearUtility.from_environment(environment)
+        result = CCPEstimator(
+            mode="npl",
+            ccp_smoothing=0.0,
+            convergence_tol=1e-12,
+            outer_tol=1e-10,
+            outer_max_iter=2000,
+            se_method="full_likelihood_bhhh",
+            compute_hessian=True,
+            verbose=False,
+        ).estimate(
+            panel,
+            utility,
+            environment.problem_spec,
+            environment.transition_matrices,
+            transition_probabilities=probabilities,
+            transition_increments=increments,
+        )
+        nfxp = table_ix_group4(
+            OFFICIAL_GROUP4_RAW,
+            betas=(0.9999,),
+            compute_hessian=True,
+        ).iloc[0]
+        paper = PAPER_TABLE_IX_GROUP4[0.9999]
+        standard_errors = np.asarray(result.standard_errors, dtype=np.float64)
+        details = result.metadata["se_details"]
+        joint_standard_errors = np.asarray(
+            details["joint_standard_errors"],
+            dtype=np.float64,
+        )
+        joint_covariance = np.asarray(
+            details["joint_variance_covariance"],
+            dtype=np.float64,
+        )
+
+        assert bool(result.converged)
+        assert result.metadata["termination_reason"] == "fixed_point_converged"
+        assert result.metadata["npl_parameter_residual"] <= 1e-12
+        assert result.metadata["npl_policy_residual"] <= 1e-12
+        assert (
+            result.metadata["full_likelihood_bhhh"]["bellman_policy_residual"]
+            <= 1e-8
+        )
+        assert float(result.parameters[0]) * 1000.0 == pytest.approx(
+            paper["theta_1_paper_units"],
+            abs=5e-4,
+        )
+        assert standard_errors[0] * 1000.0 == pytest.approx(
+            paper["theta_1_se_paper_units"],
+            abs=5e-4,
+        )
+        assert float(result.parameters[1]) == pytest.approx(paper["RC"], abs=5e-4)
+        assert standard_errors[1] == pytest.approx(paper["RC_se"], abs=5e-4)
+        assert joint_standard_errors[2] == pytest.approx(paper["p0_se"], abs=5e-5)
+        assert joint_standard_errors[3] == pytest.approx(paper["p1_se"], abs=5e-5)
+        assert float(result.log_likelihood) == pytest.approx(
+            paper["choice_log_likelihood"],
+            abs=5e-3,
+        )
+        assert (
+            float(result.log_likelihood)
+            + float(metadata["transition_log_likelihood"])
+        ) == pytest.approx(paper["full_log_likelihood"], abs=5e-3)
+        assert float(result.parameters[0]) * 1000.0 == pytest.approx(
+            float(nfxp["theta_1_paper_units"]),
+            abs=3e-4,
+        )
+        assert float(result.parameters[1]) == pytest.approx(
+            float(nfxp["RC"]),
+            abs=3e-4,
+        )
+        assert standard_errors[0] * 1000.0 == pytest.approx(
+            float(nfxp["theta_1_se_paper_units"]),
+            abs=3e-4,
+        )
+        assert standard_errors[1] == pytest.approx(
+            float(nfxp["RC_se"]),
+            abs=3e-4,
+        )
+        assert np.all(np.isfinite(joint_covariance))
+        assert np.all(np.diag(joint_covariance) > 0.0)
+
 
 class TestMPECStordatProfile:
     """MPEC reproduces the exact Rust Table IX estimates (Su-Judd 2012, Prop 1).

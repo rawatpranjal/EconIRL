@@ -172,6 +172,51 @@ class TestEmaxCorrection:
 
         assert jnp.isfinite(e).all()
 
+    def test_euler_normalization_preserves_choice_probabilities(
+        self,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """Removing Euler's constant should only fix the value-function level."""
+        estimator = CCPEstimator(num_policy_iterations=1)
+        ccps = jnp.full(
+            (problem_spec_small.num_states, problem_spec_small.num_actions),
+            1.0 / problem_spec_small.num_actions,
+        )
+        parameters = jnp.array([0.25, 1.5])
+        normalized_values = estimator._compute_choice_specific_values(
+            ccps,
+            transitions_small,
+            utility_small,
+            parameters,
+            problem_spec_small,
+        )
+        legacy_shift = (
+            problem_spec_small.discount_factor
+            * problem_spec_small.scale_parameter
+            * EULER_GAMMA
+            / (1.0 - problem_spec_small.discount_factor)
+        )
+        legacy_values = normalized_values + legacy_shift
+
+        np.testing.assert_allclose(
+            np.asarray(
+                jax.nn.softmax(
+                    normalized_values / problem_spec_small.scale_parameter,
+                    axis=1,
+                )
+            ),
+            np.asarray(
+                jax.nn.softmax(
+                    legacy_values / problem_spec_small.scale_parameter,
+                    axis=1,
+                )
+            ),
+            rtol=1e-6,
+            atol=1e-6,
+        )
+
 
 class TestHotzMillerEstimation:
     """Tests for Hotz-Miller (K=1) estimator."""
@@ -607,6 +652,31 @@ class TestCCPEdgeCases:
         """Test that negative CCP smoothing fails at construction."""
         with pytest.raises(ValueError, match="ccp_smoothing"):
             CCPEstimator(ccp_smoothing=-1e-6)
+
+    @pytest.mark.parametrize("num_policy_iterations", [1, 2])
+    def test_full_likelihood_rejects_non_fixed_point_profiles(
+        self,
+        num_policy_iterations,
+        small_panel,
+        utility_small,
+        problem_spec_small,
+        transitions_small,
+    ):
+        """Joint inference is available only after unconstrained NPL convergence."""
+        estimator = CCPEstimator(
+            num_policy_iterations=num_policy_iterations,
+            se_method="full_likelihood_bhhh",
+            compute_hessian=True,
+            verbose=False,
+        )
+
+        with pytest.raises(ValueError, match="num_policy_iterations=-1"):
+            estimator.estimate(
+                small_panel,
+                utility_small,
+                problem_spec_small,
+                transitions_small,
+            )
 
     def test_sparse_data(self, rust_env_small, problem_spec_small, transitions_small):
         """Test handling of sparse data (few observations per state)."""

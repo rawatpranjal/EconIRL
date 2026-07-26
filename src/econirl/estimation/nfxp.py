@@ -43,6 +43,10 @@ from econirl.core.solvers import (
 )
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
+from econirl.inference.full_likelihood import (
+    compute_rust_full_likelihood_bhhh_score,
+    rust_transition_derivative_tensor,
+)
 from econirl.inference.standard_errors import SEMethod, compute_numerical_hessian
 from econirl.preferences.base import UtilityFunction
 
@@ -313,100 +317,17 @@ class NFXPEstimator(BaseEstimator):
         transition_probabilities: jnp.ndarray,
         transition_increments: jnp.ndarray,
     ) -> tuple[jnp.ndarray, dict]:
-        """Compute joint full-likelihood BHHH scores for Rust-style NFXP.
-
-        The joint score columns are ordered as structural utility parameters
-        followed by the free transition probabilities. The last transition
-        probability is treated as the residual probability.
-        """
-        beta = operator.problem.discount_factor
-        sigma = operator.problem.scale_parameter
-        transitions = jnp.asarray(operator.transitions, dtype=jnp.float64)
-        features = jnp.asarray(utility.feature_matrix, dtype=jnp.float64)
-        probs = jnp.asarray(transition_probabilities, dtype=jnp.float64)
-        increments = jnp.asarray(transition_increments, dtype=jnp.int32)
-
-        n_states = operator.problem.num_states
-        n_actions = operator.problem.num_actions
-        if n_actions != 2:
-            raise ValueError(
-                "full_likelihood_bhhh currently supports the Rust-style two-action "
-                "replacement model."
-            )
-        if probs.ndim != 1 or probs.shape[0] < 2:
-            raise ValueError("transition_probabilities must contain at least two values")
-        if not bool(jnp.isclose(probs.sum(), 1.0, atol=1e-6)):
-            raise ValueError("transition_probabilities must sum to one")
-        if not bool(jnp.all(probs > 0.0)):
-            raise ValueError("transition_probabilities must be strictly positive")
-        if increments.shape[0] != panel.num_observations:
-            raise ValueError(
-                "transition_increments must have one entry per panel observation"
-            )
-
-        P_pi = jnp.einsum("sa,ast->st", policy, transitions)
-        F = jnp.eye(n_states, dtype=jnp.float64) - beta * P_pi
-
-        # Structural utility score columns.
-        dT_dtheta = jnp.einsum("sa,sak->sk", policy, features)
-        dV_dtheta = jnp.linalg.solve(F, dT_dtheta)
-        EV_deriv = jnp.einsum("ast,tk->ask", transitions, dV_dtheta)
-        dQ_dtheta = features + beta * jnp.transpose(EV_deriv, (1, 0, 2))
-        E_dQ_theta = jnp.einsum("sa,sak->sk", policy, dQ_dtheta)
-
-        states = panel.get_all_states()
-        actions = panel.get_all_actions()
-        structural_scores = (
-            dQ_dtheta[states, actions] - E_dQ_theta[states]
-        ) / sigma
-
-        # Transition-probability score columns. For probabilities
-        # (p_0, ..., p_M), the free parameters are p_0, ..., p_{M-1}; p_M is
-        # the residual probability.
-        dP = self._rust_transition_derivative_tensor(n_states, int(probs.shape[0]))
-        dP_V = jnp.einsum("kast,t->kas", dP, jnp.asarray(V, dtype=jnp.float64))
-        rhs = beta * jnp.einsum("sa,kas->sk", policy, dP_V)
-        dV_dp = jnp.linalg.solve(F, rhs)
-        EV_transition_deriv = jnp.einsum("ast,tk->ask", transitions, dV_dp)
-        dQ_dp = beta * (
-            jnp.transpose(dP_V, (2, 1, 0))
-            + jnp.transpose(EV_transition_deriv, (1, 0, 2))
+        """Compute joint full-likelihood BHHH scores for Rust-style NFXP."""
+        return compute_rust_full_likelihood_bhhh_score(
+            panel=panel,
+            utility=utility,
+            problem=operator.problem,
+            transitions=operator.transitions,
+            value_function=V,
+            policy=policy,
+            transition_probabilities=transition_probabilities,
+            transition_increments=transition_increments,
         )
-        E_dQ_p = jnp.einsum("sa,sak->sk", policy, dQ_dp)
-        transition_choice_scores = (
-            dQ_dp[states, actions] - E_dQ_p[states]
-        ) / sigma
-
-        free_probs = probs[:-1]
-        residual_prob = probs[-1]
-        n_free = int(free_probs.shape[0])
-        transition_density_scores = jnp.zeros(
-            (panel.num_observations, n_free), dtype=jnp.float64
-        )
-        for k in range(n_free):
-            transition_density_scores = transition_density_scores.at[
-                increments == k, k
-            ].set(1.0 / free_probs[k])
-            transition_density_scores = transition_density_scores.at[
-                increments == n_free, k
-            ].set(-1.0 / residual_prob)
-
-        transition_scores = transition_choice_scores + transition_density_scores
-        joint_scores = jnp.concatenate([structural_scores, transition_scores], axis=1)
-        joint_names = list(utility.parameter_names) + [
-            f"transition_p{k}" for k in range(n_free)
-        ]
-        transition_counts = {
-            int(k): int(jnp.sum(increments == k))
-            for k in range(int(probs.shape[0]))
-        }
-
-        return joint_scores, {
-            "joint_parameter_names": joint_names,
-            "transition_probabilities": [float(p) for p in np.asarray(probs)],
-            "transition_counts": transition_counts,
-            "transition_score_columns": [f"transition_p{k}" for k in range(n_free)],
-        }
 
     @staticmethod
     def _rust_transition_derivative_tensor(
@@ -414,23 +335,10 @@ class NFXPEstimator(BaseEstimator):
         n_transition_probabilities: int,
     ) -> jnp.ndarray:
         """Derivative of the Rust mileage transition tensor wrt free probs."""
-        n_free = n_transition_probabilities - 1
-        residual_increment = n_transition_probabilities - 1
-        dP = np.zeros((n_free, 2, n_states, n_states), dtype=np.float64)
-
-        for k in range(n_free):
-            for s in range(n_states):
-                keep_positive = min(s + k, n_states - 1)
-                keep_residual = min(s + residual_increment, n_states - 1)
-                dP[k, 0, s, keep_positive] += 1.0
-                dP[k, 0, s, keep_residual] -= 1.0
-
-                replace_positive = min(k, n_states - 1)
-                replace_residual = min(residual_increment, n_states - 1)
-                dP[k, 1, s, replace_positive] += 1.0
-                dP[k, 1, s, replace_residual] -= 1.0
-
-        return jnp.asarray(dP, dtype=jnp.float64)
+        return rust_transition_derivative_tensor(
+            n_states,
+            n_transition_probabilities,
+        )
 
     def _bhhh_optimize(
         self,
