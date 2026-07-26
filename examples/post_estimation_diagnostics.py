@@ -9,18 +9,17 @@ Run: python examples/post_estimation_diagnostics.py
 import jax.numpy as jnp
 import numpy as np
 
-from econirl import NFXP, CCP
-from econirl.datasets import load_rust_bus
+from econirl import CCP, NFXP
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl.inference import (
-    likelihood_ratio_test,
-    vuong_test,
     brier_score,
-    kl_divergence,
-    efron_pseudo_r_squared,
     ccp_consistency_test,
-    epic_distance,
     detect_reward_shaping,
+    efron_pseudo_r_squared,
+    epic_distance,
     etable,
+    kl_divergence,
+    vuong_test,
 )
 
 # ── Load data and fit two models ─────────────────────────────────────────
@@ -29,14 +28,19 @@ df = load_rust_bus()
 print(f"Loaded Rust bus data: {len(df):,} observations, {df['bus_id'].nunique()} buses\n")
 
 print("Fitting NFXP...")
-nfxp = NFXP(discount=0.9999).fit(
-    df, state="mileage_bin", action="replaced", id="bus_id"
-)
+nfxp = NFXP(
+    n_states=90,
+    discount=0.9999,
+    utility=rust_bus_reward_spec(90, names=("theta_c", "RC")),
+).fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print("Fitting CCP...")
-ccp = CCP(discount=0.9999, num_policy_iterations=3).fit(
-    df, state="mileage_bin", action="replaced", id="bus_id"
-)
+ccp = CCP(
+    n_states=90,
+    discount=0.9999,
+    utility=rust_bus_reward_spec(90, names=("theta_c", "RC")),
+    num_policy_iterations=3,
+).fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 # ── 1. Side-by-side comparison table ─────────────────────────────────────
 
@@ -95,8 +99,10 @@ bs_nfxp = brier_score(jnp.array(nfxp.policy_), obs_states, obs_actions)
 bs_ccp = brier_score(jnp.array(ccp.policy_), obs_states, obs_actions)
 print(f"Brier score NFXP:     {bs_nfxp['brier_score']:.6f}")
 print(f"Brier score CCP:      {bs_ccp['brier_score']:.6f}")
-print(f"  Per-action NFXP:    keep={bs_nfxp['brier_score_per_action'][0]:.6f}, "
-      f"replace={bs_nfxp['brier_score_per_action'][1]:.6f}")
+print(
+    f"  Per-action NFXP:    keep={bs_nfxp['brier_score_per_action'][0]:.6f}, "
+    f"replace={bs_nfxp['brier_score_per_action'][1]:.6f}"
+)
 
 # ── 5. KL divergence ────────────────────────────────────────────────────
 
@@ -115,9 +121,7 @@ for s, a in zip(df["mileage_bin"].values, df["replaced"].values):
     choice_counts[s, a] += 1
 
 state_freq = jnp.array(state_counts / state_counts.sum())
-data_ccps = jnp.array(
-    choice_counts / np.maximum(state_counts[:, None], 1)
-)
+data_ccps = jnp.array(choice_counts / np.maximum(state_counts[:, None], 1))
 
 kl_nfxp = kl_divergence(data_ccps, jnp.array(nfxp.policy_), state_freq)
 kl_ccp = kl_divergence(data_ccps, jnp.array(ccp.policy_), state_freq)
@@ -142,7 +146,8 @@ print("7. CCP CONSISTENCY TEST")
 print("=" * 60)
 
 ccp_test_nfxp = ccp_consistency_test(
-    data_ccps, jnp.array(nfxp.policy_),
+    data_ccps,
+    jnp.array(nfxp.policy_),
     jnp.array(state_counts),
     num_estimated_params=nfxp._result.num_parameters,
 )

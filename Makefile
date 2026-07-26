@@ -1,4 +1,4 @@
-.PHONY: tests docs docs-test rust-table-ix ccp-table-ix mce-gridworld distclean build publish-test publish
+.PHONY: tests docs docs-test rust-table-ix ccp-table-ix mce-gridworld distclean build
 
 tests:
 	pytest -q
@@ -9,10 +9,11 @@ docs:
 docs-test:
 	python -c "\
 	from econirl import NFXP, CCP; \
-	from econirl.datasets import load_rust_bus; \
+	from econirl.datasets import load_rust_bus, rust_bus_reward_spec; \
 	df = load_rust_bus(); \
-	nfxp = NFXP(discount=0.9999).fit(df, state='mileage_bin', action='replaced', id='bus_id'); \
-	ccp = CCP(discount=0.9999, num_policy_iterations=5).fit(df, state='mileage_bin', action='replaced', id='bus_id'); \
+	utility = rust_bus_reward_spec(90); \
+	nfxp = NFXP(n_states=90, discount=0.9999, utility=utility).fit(df, state='mileage_bin', action='replaced', id='bus_id'); \
+	ccp = CCP(n_states=90, discount=0.9999, utility=utility, num_policy_iterations=5).fit(df, state='mileage_bin', action='replaced', id='bus_id'); \
 	print('params:', nfxp.params_); \
 	print('se:', nfxp.se_); \
 	import numpy as np; \
@@ -41,14 +42,5 @@ distclean:
 	rm -rf dist build *.egg-info
 
 build:
-	python -m pip install --upgrade build twine >/dev/null
-	python -m build
-	twine check dist/*
-
-publish-test:
-	@echo "Uploading to TestPyPI (set TWINE_USERNAME=__token__ and TWINE_PASSWORD=***token***)"
-	twine upload --repository testpypi dist/*
-
-publish:
-	@echo "Uploading to PyPI (set TWINE_USERNAME=__token__ and TWINE_PASSWORD=***token***)"
-	twine upload --repository pypi dist/*
+	uv build --out-dir dist
+	uvx twine check dist/*.whl dist/*.tar.gz

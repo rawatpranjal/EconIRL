@@ -7,12 +7,16 @@ The bundled bus engine replacement dataset gives a quick end-to-end smoke
 test: load the panel, fit, inspect, and run a counterfactual.
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import UFXP
 
 df = load_rust_bus()
 
-model = UFXP(n_states=90, discount=0.9999, utility="linear_cost")
+model = UFXP(
+    n_states=90,
+    discount=0.9999,
+    utility=rust_bus_reward_spec(90, names=("theta_c", "RC")),
+)
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
 
 print(model.params_)
