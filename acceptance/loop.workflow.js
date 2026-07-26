@@ -82,11 +82,11 @@ function shortWhere(s) {
 
 function validatePrompt(f) {
   return [
-    'You are an adversarial validator on the econirl self-study loop. A clean-room tester ("Joe") installed the PUBLISHED package econirl==0.0.7 from PyPI as a blind stranger and logged the finding below. Decide, against the CURRENT repo source (HEAD), whether it is REAL.',
+    'You are an adversarial validator on the econirl self-study loop. A clean-room tester ("Joe") installed the PUBLISHED package econirl==0.0.10 from PyPI as a blind stranger and logged the finding below. Decide, against the CURRENT repo source (HEAD), whether it is REAL.',
     '',
     'Default to REFUTING. Confirm only if the HEAD source forces it. Joe may be wrong, may have misused the API, or may have hit a bug that HEAD already fixes.',
     '',
-    'THE FINDING (Joe tested 0.0.7):',
+    'THE FINDING (Joe tested 0.0.10):',
     `  kind: ${f.kind}   severity: ${f.severity}`,
     `  where: ${f.where}`,
     `  what: ${f.what}`,

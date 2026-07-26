@@ -4,7 +4,7 @@ FROM python:3.11-slim
 
 # A real applied scientist's kit: the package, plus notebooks and the usual stack.
 RUN pip install --no-cache-dir \
-    econirl==0.0.7 \
+    econirl==0.0.10 \
     jupyter pandas numpy matplotlib
 
 WORKDIR /work

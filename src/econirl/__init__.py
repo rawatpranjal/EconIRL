@@ -47,39 +47,49 @@ Legacy API (deprecated, for backward compatibility):
     >>> print(result.summary())
 """
 
-__version__ = "0.0.9"
+__version__ = "0.0.10"
 
 # Core types
-from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
+# Datasets
+from econirl import datasets
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.sufficient_stats import SufficientStats
+from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 
 # Environments
 from econirl.environments.rust_bus import RustBusEnvironment
+from econirl.estimation import MPEC
+from econirl.estimation import IQLearnEstimator as IQLearn
+
+# Legacy Estimators — handled by __getattr__ with deprecation warnings
+# Sklearn-style Estimators (JAX backend)
+from econirl.estimators import (
+    AIRL,
+    CCP,
+    GLADIUS,
+    MCEIRL,
+    NFXP,
+    NNES,
+    RHIP,
+    SEES,
+    TDCCP,
+    UFXP,
+    MaxEntIRL,
+    MaxMarginIRL,
+    MCEIRLNeural,
+    NeuralAIRL,
+    NeuralGLADIUS,
+    NeuralUFXP,
+)
 
 # Preferences
 from econirl.preferences.linear import LinearUtility
 
-# Legacy Estimators — handled by __getattr__ with deprecation warnings
-
-# Sklearn-style Estimators (JAX backend)
-from econirl.estimators import NFXP, CCP, MaxEntIRL, MaxMarginIRL, MCEIRL, NNES, SEES, TDCCP, UFXP
-from econirl.estimators import RHIP
-from econirl.estimators import GLADIUS, NeuralGLADIUS
-from econirl.estimators import AIRL, NeuralAIRL
-from econirl.estimation import IQLearnEstimator as IQLearn
-from econirl.estimation import MPEC
-from econirl.estimators import MCEIRLNeural
-from econirl.estimators import NeuralUFXP
-
-# Sklearn-style Utilities
-from econirl.utilities import Utility, LinearCost, make_utility
-
 # Sklearn-style Transition Estimator
 from econirl.transitions import TransitionEstimator
 
-# Datasets
-from econirl import datasets
+# Sklearn-style Utilities
+from econirl.utilities import LinearCost, Utility, make_utility
 
 # Preprocessing
 try:
@@ -152,8 +162,9 @@ _DEPRECATED_LEGACY = {
 def __getattr__(name: str):
     if name in _DEPRECATED_LEGACY:
         module_path, class_name, replacement = _DEPRECATED_LEGACY[name]
-        import warnings
         import importlib
+        import warnings
+
         warnings.warn(
             f"{name} is deprecated. Use econirl.{replacement} (sklearn-style API) instead.",
             DeprecationWarning,
