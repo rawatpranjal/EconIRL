@@ -103,5 +103,7 @@ pseudo-likelihood estimates. They hold the fitted transition model fixed. The
 reported simulation study is also synthetic and supplies the true transition
 tensor. The [replication ledger](../../replications.md) separates two results.
 Its CCP/NPL section checks fixed-point equivalence to NFXP on bundled Group 4
-data. Its Rust Table IX section uses NFXP and official data to reproduce the
-published estimates and standard errors.
+data. On the official STORDAT panel, converged NPL reproduces the Rust Table IX
+estimates and joint full-likelihood standard errors. The
+[JSON receipt](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp_rust_table_ix.json)
+records the data checksum, specification, residuals, and numerical comparisons.

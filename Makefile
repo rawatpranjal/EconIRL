@@ -1,4 +1,4 @@
-.PHONY: tests docs docs-test rust-table-ix mce-gridworld distclean build publish-test publish
+.PHONY: tests docs docs-test rust-table-ix ccp-table-ix mce-gridworld distclean build publish-test publish
 
 tests:
 	pytest -q
@@ -26,6 +26,13 @@ rust-table-ix:
 	test -f downloads/nfxp.zip || curl -L -o downloads/nfxp.zip https://editorialexpress.com/jrust/nfxp.zip
 	test -f downloads/nfxp_unzip/nfxp/dat/a530875.asc || unzip -q downloads/nfxp.zip -d downloads/nfxp_unzip
 	PYTHONPATH=src uv run python -m econirl.replication.rust1987.table_ix --raw-path downloads/nfxp_unzip/nfxp/dat/a530875.asc --out acceptance/loop/nfxp/table_ix
+
+ccp-table-ix:
+	mkdir -p downloads validation/results
+	test -f downloads/nfxp.zip || curl -L -o downloads/nfxp.zip https://editorialexpress.com/jrust/nfxp.zip
+	test -f downloads/nfxp_unzip/nfxp/dat/a530875.asc || unzip -q downloads/nfxp.zip -d downloads/nfxp_unzip
+	PYTHONPATH=src uv run python validation/estimators/ccp/rust_table_ix.py --raw-path downloads/nfxp_unzip/nfxp/dat/a530875.asc --output validation/results/ccp_rust_table_ix.json
+	PYTHONPATH=src uv run python validation/estimators/ccp/rust_table_ix.py --output validation/results/ccp_rust_table_ix.json --verify
 
 mce-gridworld:
 	PYTHONPATH=src uv run python examples/ziebart-mce-irl/run_gridworld.py --grid-size 5 --n-traj 500 --n-periods 30

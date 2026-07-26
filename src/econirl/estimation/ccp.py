@@ -32,8 +32,12 @@ import numpy as np
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.optimizer import minimize_lbfgsb
+from econirl.core.solvers import policy_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
+from econirl.inference.full_likelihood import (
+    compute_rust_full_likelihood_bhhh_score,
+)
 from econirl.inference.standard_errors import SEMethod, compute_numerical_hessian
 from econirl.preferences.base import UtilityFunction
 
@@ -315,12 +319,12 @@ class CCPEstimator(BaseEstimator):
         # Compute emax corrections
         e = self._compute_emax_correction(ccps)
 
-        # Compute Σ_a P(a) ⊙ σe(a) for each state. The normalized correction
-        # e(a) = γ - log P(a|s) must be returned to utility units before it
-        # enters the continuation value.
-        expected_e = (problem.scale_parameter * (ccps * e).sum(axis=1)).astype(
+        # Euler's constant is action invariant. Omitting it fixes the arbitrary
+        # value-function level without changing choice probabilities.
+        normalized_e = e - EULER_GAMMA
+        expected_e = (problem.scale_parameter * (ccps * normalized_e).sum(axis=1)).astype(
             inv_matrix.dtype
-        )  # shape (num_states,)
+        )
 
         # W_e = (I - β·F_π)⁻¹ · expected_e
         W_e = inv_matrix @ expected_e
@@ -801,11 +805,73 @@ class CCPEstimator(BaseEstimator):
         # Compute Hessian for standard errors
         hessian = None
         gradient_contributions = None
+        full_likelihood_metadata = None
 
         if self._compute_hessian:
             self._log("Computing Hessian for standard errors")
 
-            if _is_linear:
+            if self._se_method == "full_likelihood_bhhh":
+                if self._num_policy_iterations != -1 or not converged:
+                    raise ValueError(
+                        "se_method='full_likelihood_bhhh' requires "
+                        "num_policy_iterations=-1 and NPL fixed-point convergence."
+                    )
+                if not _is_linear:
+                    raise ValueError("se_method='full_likelihood_bhhh' requires a linear utility.")
+                transition_probabilities = kwargs.get("transition_probabilities")
+                transition_increments = kwargs.get("transition_increments")
+                if transition_probabilities is None or transition_increments is None:
+                    raise ValueError(
+                        "se_method='full_likelihood_bhhh' requires "
+                        "transition_probabilities and transition_increments."
+                    )
+
+                operator = SoftBellmanOperator(problem, transitions_eval)
+                bellman_result = policy_iteration(
+                    operator,
+                    recovered_reward,
+                    tol=1e-12,
+                    max_iter=1000,
+                )
+                if not bellman_result.converged:
+                    raise RuntimeError(
+                        "Bellman policy iteration did not converge for "
+                        "full-likelihood BHHH inference."
+                    )
+                bellman_policy_residual = float(
+                    jnp.max(jnp.abs(bellman_result.policy - final_policy))
+                )
+                if bellman_policy_residual > 1e-8:
+                    raise RuntimeError(
+                        "The converged NPL policy does not match the Bellman policy "
+                        "at the fitted parameters "
+                        f"(residual={bellman_policy_residual:.3e})."
+                    )
+
+                V = bellman_result.V
+                final_policy = bellman_result.policy
+                gradient_contributions, full_likelihood_metadata = (
+                    compute_rust_full_likelihood_bhhh_score(
+                        panel=panel,
+                        utility=utility,
+                        problem=problem,
+                        transitions=transitions_eval,
+                        value_function=V,
+                        policy=final_policy,
+                        transition_probabilities=jnp.asarray(
+                            transition_probabilities,
+                            dtype=jnp.float64,
+                        ),
+                        transition_increments=jnp.asarray(transition_increments),
+                    )
+                )
+                full_likelihood_metadata.update(
+                    {
+                        "bellman_policy_residual": bellman_policy_residual,
+                        "bellman_iterations": bellman_result.num_iterations,
+                    }
+                )
+            elif _is_linear:
                 # Use the same fixed-CCP pseudo-likelihood for estimation and
                 # inference. Mixing its score with the full structural Hessian
                 # at a finite-stage estimate makes the sandwich inconsistent
@@ -930,9 +996,18 @@ class CCPEstimator(BaseEstimator):
                 "outer_max_iter": self._outer_max_iter,
                 "optimizer": "L-BFGS-B",
                 "se_method_detail": (
-                    "fixed_ccp_pseudo_likelihood"
-                    if _is_linear
-                    else "full_structural_likelihood_fallback"
+                    "joint_full_likelihood_bhhh"
+                    if self._se_method == "full_likelihood_bhhh"
+                    else (
+                        "fixed_ccp_pseudo_likelihood"
+                        if _is_linear
+                        else "full_structural_likelihood_fallback"
+                    )
+                ),
+                **(
+                    {"full_likelihood_bhhh": full_likelihood_metadata}
+                    if full_likelihood_metadata is not None
+                    else {}
                 ),
             },
         )
