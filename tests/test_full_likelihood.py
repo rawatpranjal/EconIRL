@@ -218,3 +218,46 @@ def test_shared_full_likelihood_score_rejects_invalid_rust_inputs(mutation, mess
             transition_probabilities=probabilities,
             transition_increments=increments,
         )
+
+
+def test_shared_full_likelihood_score_allows_missing_replacement_increments():
+    environment, utility, _, transitions, solution, panel, probabilities, increments = (
+        _score_inputs()
+    )
+    replacement_rows = np.asarray(panel.get_all_actions()) == 1
+    increments = increments.copy()
+    increments[replacement_rows] = -1
+
+    scores, metadata = compute_rust_full_likelihood_bhhh_score(
+        panel=panel,
+        utility=utility,
+        problem=environment.problem_spec,
+        transitions=transitions,
+        value_function=solution.V,
+        policy=solution.policy,
+        transition_probabilities=probabilities,
+        transition_increments=increments,
+    )
+
+    assert np.all(np.isfinite(np.asarray(scores)))
+    assert metadata["transition_counts"] == {0: 2, 1: 1, 2: 2}
+
+
+def test_shared_full_likelihood_score_rejects_missing_keep_increment():
+    environment, utility, _, transitions, solution, panel, probabilities, increments = (
+        _score_inputs()
+    )
+    increments = increments.copy()
+    increments[0] = -1
+
+    with pytest.raises(ValueError, match="only replacement actions"):
+        compute_rust_full_likelihood_bhhh_score(
+            panel=panel,
+            utility=utility,
+            problem=environment.problem_spec,
+            transitions=transitions,
+            value_function=solution.V,
+            policy=solution.policy,
+            transition_probabilities=probabilities,
+            transition_increments=increments,
+        )

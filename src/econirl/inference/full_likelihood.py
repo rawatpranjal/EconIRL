@@ -104,6 +104,13 @@ def _validate_rust_score_inputs(
             "structure implied by transition_probabilities"
         )
 
+    states = np.asarray(panel.get_all_states())
+    actions = np.asarray(panel.get_all_actions())
+    if np.any(states < 0) or np.any(states >= n_states):
+        raise ValueError("panel states fall outside the model state space")
+    if np.any(actions < 0) or np.any(actions >= 2):
+        raise ValueError("panel actions must be zero or one")
+
     increments_raw = np.asarray(transition_increments)
     if increments_raw.ndim != 1:
         raise ValueError("transition_increments must be one-dimensional")
@@ -114,10 +121,12 @@ def _validate_rust_score_inputs(
     if not np.all(increments_raw == np.floor(increments_raw)):
         raise ValueError("transition_increments must contain integer category labels")
     increments = increments_raw.astype(np.int32)
-    if np.any(increments < 0) or np.any(increments >= probabilities.size):
+    if np.any(increments < -1) or np.any(increments >= probabilities.size):
         raise ValueError(
-            "transition_increments must lie between zero and the residual transition category"
+            "transition_increments must lie between -1 and the residual transition category"
         )
+    if np.any((increments == -1) & (actions == 0)):
+        raise ValueError("only replacement actions may omit transition increments")
 
     features = np.asarray(getattr(utility, "feature_matrix"), dtype=np.float64)
     if features.ndim != 3 or features.shape[:2] != (n_states, 2):
@@ -137,13 +146,6 @@ def _validate_rust_score_inputs(
         rtol=0.0,
     ):
         raise ValueError("policy rows must be strictly positive and sum to one")
-
-    states = np.asarray(panel.get_all_states())
-    actions = np.asarray(panel.get_all_actions())
-    if np.any(states < 0) or np.any(states >= n_states):
-        raise ValueError("panel states fall outside the model state space")
-    if np.any(actions < 0) or np.any(actions >= 2):
-        raise ValueError("panel actions must be zero or one")
 
     return (
         jnp.asarray(probabilities, dtype=jnp.float64),
