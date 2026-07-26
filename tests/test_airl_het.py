@@ -21,6 +21,7 @@ from econirl.preferences.action_reward import ActionDependentReward
 
 # --- Test environment (small, 6 states) ---
 
+
 def _build_small_env():
     """Build a tiny 6-state serialized content environment.
 
@@ -37,8 +38,8 @@ def _build_small_env():
     T = np.zeros((n_actions, n_states, n_states))
     for s in range(n_episodes):
         T[0, s, min(s + 1, n_episodes - 1)] = 1.0  # buy: advance
-        T[1, s, s] = 1.0                             # wait: stay
-        T[2, s, absorbing] = 1.0                      # exit: absorb
+        T[1, s, s] = 1.0  # wait: stay
+        T[2, s, absorbing] = 1.0  # exit: absorb
     T[0, absorbing, absorbing] = 1.0
     T[1, absorbing, absorbing] = 1.0
     T[2, absorbing, absorbing] = 1.0
@@ -47,9 +48,9 @@ def _build_small_env():
     # Features (3 features: buy_indicator, quality, wait_indicator)
     features = np.zeros((n_states, n_actions, 3))
     for s in range(n_episodes):
-        features[s, 0, 0] = 1.0          # buy indicator
-        features[s, 0, 1] = 1.0 - 0.2*s  # quality
-        features[s, 1, 2] = 1.0          # wait indicator
+        features[s, 0, 0] = 1.0  # buy indicator
+        features[s, 0, 1] = 1.0 - 0.2 * s  # quality
+        features[s, 1, 2] = 1.0  # wait indicator
     feature_matrix = jnp.array(features, dtype=jnp.float32)
 
     # True reward: r(s,buy) = -1 + 2*quality, r(s,wait) = -0.5, r(s,exit) = 0
@@ -107,17 +108,20 @@ def _simulate_panel(env_dict, n_individuals=50, n_periods=20, seed=42):
             next_states.append(next_state)
             state = next_state
 
-        trajectories.append(Trajectory(
-            states=jnp.array(states, dtype=jnp.int32),
-            actions=jnp.array(actions, dtype=jnp.int32),
-            next_states=jnp.array(next_states, dtype=jnp.int32),
-            individual_id=i,
-        ))
+        trajectories.append(
+            Trajectory(
+                states=jnp.array(states, dtype=jnp.int32),
+                actions=jnp.array(actions, dtype=jnp.int32),
+                next_states=jnp.array(next_states, dtype=jnp.int32),
+                individual_id=i,
+            )
+        )
 
     return Panel(trajectories=trajectories)
 
 
 # --- Tests ---
+
 
 class TestAIRLHetConfig:
     """Test config validation."""
@@ -148,6 +152,7 @@ class TestAIRLHetEstimator:
     def panel(self, env):
         return _simulate_panel(env, n_individuals=50, n_periods=20)
 
+    @pytest.mark.slow
     def test_runs_without_error(self, env, panel):
         """Estimator runs end-to-end and returns EstimationSummary."""
         config = AIRLHetConfig(
@@ -160,11 +165,15 @@ class TestAIRLHetEstimator:
         )
         estimator = AIRLHetEstimator(config)
         summary = estimator.estimate(
-            panel, env["utility"], env["problem"], env["transitions"],
+            panel,
+            env["utility"],
+            env["problem"],
+            env["transitions"],
         )
         assert summary is not None
         assert summary.policy.shape == (env["n_states"], env["n_actions"])
 
+    @pytest.mark.slow
     def test_anchor_enforcement(self, env, panel):
         """Segment reward matrices have zero exit action and absorbing state."""
         config = AIRLHetConfig(
@@ -176,21 +185,29 @@ class TestAIRLHetEstimator:
         )
         estimator = AIRLHetEstimator(config)
         summary = estimator.estimate(
-            panel, env["utility"], env["problem"], env["transitions"],
+            panel,
+            env["utility"],
+            env["problem"],
+            env["transitions"],
         )
         for k, rm in enumerate(summary.metadata["segment_reward_matrices"]):
             rm_arr = np.array(rm)
             # Exit action column should be zero
             np.testing.assert_allclose(
-                rm_arr[:, env["exit_action"]], 0.0, atol=1e-6,
-                err_msg=f"Segment {k}: exit action reward not zero"
+                rm_arr[:, env["exit_action"]],
+                0.0,
+                atol=1e-6,
+                err_msg=f"Segment {k}: exit action reward not zero",
             )
             # Absorbing state row should be zero
             np.testing.assert_allclose(
-                rm_arr[env["absorbing"], :], 0.0, atol=1e-6,
-                err_msg=f"Segment {k}: absorbing state reward not zero"
+                rm_arr[env["absorbing"], :],
+                0.0,
+                atol=1e-6,
+                err_msg=f"Segment {k}: absorbing state reward not zero",
             )
 
+    @pytest.mark.slow
     def test_priors_update_from_uniform(self, env, panel):
         """Segment priors should move away from uniform after EM."""
         config = AIRLHetConfig(
@@ -202,7 +219,10 @@ class TestAIRLHetEstimator:
         )
         estimator = AIRLHetEstimator(config)
         summary = estimator.estimate(
-            panel, env["utility"], env["problem"], env["transitions"],
+            panel,
+            env["utility"],
+            env["problem"],
+            env["transitions"],
         )
         priors = np.array(summary.metadata["segment_priors"])
         # Priors should sum to 1
@@ -210,6 +230,7 @@ class TestAIRLHetEstimator:
         # Priors should be positive
         assert all(p > 0 for p in priors)
 
+    @pytest.mark.slow
     def test_posteriors_valid_probabilities(self, env, panel):
         """Segment posteriors should be valid probability distributions."""
         config = AIRLHetConfig(
@@ -221,7 +242,10 @@ class TestAIRLHetEstimator:
         )
         estimator = AIRLHetEstimator(config)
         summary = estimator.estimate(
-            panel, env["utility"], env["problem"], env["transitions"],
+            panel,
+            env["utility"],
+            env["problem"],
+            env["transitions"],
         )
         posteriors = np.array(summary.metadata["segment_posteriors"])
         # Each row should sum to 1
@@ -230,6 +254,7 @@ class TestAIRLHetEstimator:
         # All entries should be non-negative
         assert np.all(posteriors >= 0)
 
+    @pytest.mark.slow
     def test_em_log_likelihood_recorded(self, env, panel):
         """EM log-likelihood history should be recorded in metadata."""
         config = AIRLHetConfig(
@@ -241,7 +266,10 @@ class TestAIRLHetEstimator:
         )
         estimator = AIRLHetEstimator(config)
         summary = estimator.estimate(
-            panel, env["utility"], env["problem"], env["transitions"],
+            panel,
+            env["utility"],
+            env["problem"],
+            env["transitions"],
         )
         em_lls = summary.metadata["em_log_likelihoods"]
         assert len(em_lls) > 0
@@ -253,6 +281,7 @@ class TestAIRLHetEstimator:
         estimator = AIRLHetEstimator(config)
         assert "Lee, Sudhir & Wang" in estimator.name
 
+    @pytest.mark.slow
     def test_three_segments(self, env, panel):
         """Estimator works with K=3 segments."""
         config = AIRLHetConfig(
@@ -264,7 +293,10 @@ class TestAIRLHetEstimator:
         )
         estimator = AIRLHetEstimator(config)
         summary = estimator.estimate(
-            panel, env["utility"], env["problem"], env["transitions"],
+            panel,
+            env["utility"],
+            env["problem"],
+            env["transitions"],
         )
         priors = summary.metadata["segment_priors"]
         assert len(priors) == 3

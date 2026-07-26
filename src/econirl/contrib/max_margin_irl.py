@@ -23,7 +23,6 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 from scipy import optimize
@@ -34,7 +33,7 @@ from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.standard_errors import SEMethod
 from econirl.preferences.action_reward import ActionDependentReward
-from econirl.preferences.base import BaseUtilityFunction, UtilityFunction
+from econirl.preferences.base import BaseUtilityFunction
 from econirl.preferences.reward import LinearReward
 
 
@@ -227,9 +226,9 @@ class MaxMarginIRLEstimator(BaseEstimator):
             d_0 = initial_distribution
 
         # Use matrix inversion for small state spaces
-        I = jnp.eye(num_states, dtype=jnp.float32)
+        identity = jnp.eye(num_states, dtype=jnp.float32)
         try:
-            inv_matrix = jnp.linalg.solve(I - gamma * P_pi, d_0)
+            inv_matrix = jnp.linalg.solve(identity - gamma * P_pi, d_0)
             # Normalize to get proper distribution
             d_pi = (1 - gamma) * inv_matrix
             d_pi = d_pi / d_pi.sum()  # Ensure normalization
@@ -391,9 +390,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
                 jac[anchor_idx] = 1.0
                 return jac
 
-            constraints.append(
-                {"type": "eq", "fun": anchor_constraint, "jac": anchor_jac}
-            )
+            constraints.append({"type": "eq", "fun": anchor_constraint, "jac": anchor_jac})
 
             # Add bounds to prevent numerical instability
             # Non-anchored params bounded to reasonable range
@@ -509,9 +506,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
         for iteration in range(self._max_iterations):
             # Find most violating policy under current theta
-            policy, V = self._find_violating_policy(
-                theta, transitions, reward_fn, problem
-            )
+            policy, V = self._find_violating_policy(theta, transitions, reward_fn, problem)
             violating_policies.append(jnp.array(policy))
 
             # Compute feature expectations of violating policy
@@ -529,7 +524,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
 
             self._log(
                 f"Iteration {iteration + 1}: margin = {margin:.6f}, "
-                f"theta = {theta[:min(3, len(theta))]}..."
+                f"theta = {theta[: min(3, len(theta))]}..."
             )
 
             # Check convergence — margin decreases as constraints tighten,
@@ -545,9 +540,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
         num_iterations = iteration + 1
 
         # Compute final policy and value function
-        final_policy, final_V = self._find_violating_policy(
-            theta, transitions, reward_fn, problem
-        )
+        final_policy, final_V = self._find_violating_policy(theta, transitions, reward_fn, problem)
 
         # Compute pseudo log-likelihood (negative loss)
         # For IRL, we use the margin as a measure of fit
@@ -556,9 +549,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
         # Compute Hessian (numerical approximation)
         hessian = None
         if self._compute_hessian:
-            hessian = self._compute_numerical_hessian(
-                theta, expert_features, violating_features
-            )
+            hessian = self._compute_numerical_hessian(theta, expert_features, violating_features)
 
         optimization_time = time.time() - start_time
 
@@ -618,7 +609,7 @@ class MaxMarginIRLEstimator(BaseEstimator):
             diff_stack = jnp.stack(diffs)
             variances = diff_stack.var(axis=0)
             # Avoid zero variance
-            variances = jnp.clip(variances, a_min=1e-6)
+            variances = jnp.maximum(variances, 1e-6)
             hessian = jnp.diag(1.0 / variances)
         else:
             hessian = jnp.eye(num_features)

@@ -4,10 +4,7 @@ NFXP Estimation on Rust Bus Engine Data (for comparison)
 This demonstrates the structural estimation approach that MaxEntIRL should match.
 """
 
-import numpy as np
-import pandas as pd
-
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 
 # Load the bus data
 print("=" * 60)
@@ -31,6 +28,7 @@ try:
         n_states=90,
         n_actions=2,
         discount=0.9999,
+        utility=rust_bus_reward_spec(90, names=("theta_c", "RC")),
         verbose=True,
     )
 
@@ -53,4 +51,5 @@ except ImportError as e:
 except Exception as e:
     print(f"Error running NFXP: {e}")
     import traceback
+
     traceback.print_exc()

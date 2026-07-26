@@ -1,5 +1,7 @@
 # econirl
 
+[![PyPI version](https://img.shields.io/pypi/v/econirl.svg)](https://pypi.org/project/econirl/)
+
 Structural dynamic discrete choice and inverse reinforcement learning in
 Python.
 

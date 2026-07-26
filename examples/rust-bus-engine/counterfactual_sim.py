@@ -5,29 +5,32 @@ The ground truth is linear (theta_c=0.001, RC=3.0). Both NFXP and
 NeuralGLADIUS should recover the same counterfactual predictions.
 Any gap is estimation error, not model misspecification.
 """
+
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import jax.numpy as jnp
 from pathlib import Path
 
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import numpy as np
+
 from econirl import NFXP
-from econirl.estimators.neural_gladius import NeuralGLADIUS
-from econirl.environments.rust_bus import RustBusEnvironment
-from econirl.simulation.synthetic import simulate_panel
-from econirl.core.types import DDCProblem
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
+from econirl.core.types import DDCProblem
+from econirl.datasets import rust_bus_reward_spec
+from econirl.environments.rust_bus import RustBusEnvironment
+from econirl.estimators.neural_gladius import NeuralGLADIUS
 from econirl.simulation import (
-    neural_global_perturbation,
-    neural_local_perturbation,
-    neural_transition_counterfactual,
     neural_choice_set_counterfactual,
-    neural_sieve_compression,
-    neural_policy_jacobian,
+    neural_local_perturbation,
     neural_perturbation_sweep,
+    neural_policy_jacobian,
+    neural_sieve_compression,
+    neural_transition_counterfactual,
 )
+from econirl.simulation.synthetic import simulate_panel
 
 OUT = Path(__file__).resolve().parent.parent.parent / "docs" / "_static"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -36,36 +39,56 @@ BLUE, ORANGE, GREEN = "#1f77b4", "#ff7f0e", "#2ca02c"
 
 
 def banner(title):
-    print(f"\n{'='*70}\n  {title}\n{'='*70}\n")
+    print(f"\n{'=' * 70}\n  {title}\n{'=' * 70}\n")
 
 
 def main():
     # ── 1. Simulate data ─────────────────────────────────────────────
     banner("1. SIMULATE DATA AND FIT MODELS")
     env = RustBusEnvironment(
-        operating_cost=0.001, replacement_cost=3.0,
-        num_mileage_bins=90, discount_factor=0.9999, seed=42)
+        operating_cost=0.001,
+        replacement_cost=3.0,
+        num_mileage_bins=90,
+        discount_factor=0.9999,
+        seed=42,
+    )
     panel = simulate_panel(env, n_individuals=200, n_periods=100, seed=42)
     df = panel.to_dataframe().rename(columns={"state": "mileage_bin", "action": "replaced"})
-    print(f"Simulated: {len(df):,} obs, {panel.num_individuals} buses, "
-          f"replacement rate {df['replaced'].mean():.4f}")
+    print(
+        f"Simulated: {len(df):,} obs, {panel.num_individuals} buses, "
+        f"replacement rate {df['replaced'].mean():.4f}"
+    )
 
     # Fit NFXP
-    nfxp = NFXP(n_states=90, n_actions=2, discount=0.9999, verbose=False)
+    nfxp = NFXP(
+        n_states=90,
+        n_actions=2,
+        discount=0.9999,
+        utility=rust_bus_reward_spec(90, names=("theta_c", "RC")),
+        verbose=False,
+    )
     nfxp.fit(df, state="mileage_bin", action="replaced", id="id")
     print(f"NFXP:  theta_c={nfxp.params_['theta_c']:.6f}, RC={nfxp.params_['RC']:.4f}")
 
     # Fit NeuralGLADIUS
     gladius = NeuralGLADIUS(
-        n_actions=2, discount=0.9999,
-        q_hidden_dim=64, q_num_layers=2,
-        ev_hidden_dim=64, ev_num_layers=2,
-        max_epochs=500, batch_size=256, patience=100,
-        bellman_weight=1.0, alternating_updates=True, verbose=True)
+        n_actions=2,
+        discount=0.9999,
+        q_hidden_dim=64,
+        q_num_layers=2,
+        ev_hidden_dim=64,
+        ev_num_layers=2,
+        max_epochs=500,
+        batch_size=256,
+        patience=100,
+        bellman_weight=1.0,
+        alternating_updates=True,
+        verbose=True,
+    )
     gladius.fit(df, state="mileage_bin", action="replaced", id="id")
     gladius._n_states = 90
     print(f"GLADIUS: epochs={gladius.n_epochs_}")
-    print(f"True:  theta_c=0.001000, RC=3.0000")
+    print("True:  theta_c=0.001000, RC=3.0000")
 
     # Build shared objects
     nfxp_r = jnp.array(nfxp.reward_matrix_)
@@ -79,8 +102,9 @@ def main():
     prob = DDCProblem(num_states=90, num_actions=2, discount_factor=0.9999, scale_parameter=1.0)
 
     # True policy from environment
-    true_params = jnp.array([env.true_parameters["operating_cost"],
-                              env.true_parameters["replacement_cost"]])
+    true_params = jnp.array(
+        [env.true_parameters["operating_cost"], env.true_parameters["replacement_cost"]]
+    )
     true_r = jnp.einsum("sak,k->sa", jnp.array(env.feature_matrix), true_params)
     op = SoftBellmanOperator(prob, jnp.array(env.transition_matrices))
     true_sol = value_iteration(op, true_r)
@@ -89,14 +113,12 @@ def main():
     # Neural policy from Bellman solve on neural reward
     op2 = SoftBellmanOperator(prob, trans)
     neural_sol = value_iteration(op2, neural_r)
-    nfxp_sol = value_iteration(op2, nfxp_r)
 
     # ── 2. Reward heatmap ────────────────────────────────────────────
     banner("2. REWARD HEATMAP")
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
     labels = ["NFXP (structural)", "NeuralGLADIUS", "Difference"]
-    data = [np.asarray(nfxp_r), np.asarray(neural_r),
-            np.asarray(neural_r - nfxp_r)]
+    data = [np.asarray(nfxp_r), np.asarray(neural_r), np.asarray(neural_r - nfxp_r)]
     for i, (ax, d, lab) in enumerate(zip(axes, data, labels)):
         vmax = max(abs(d.min()), abs(d.max())) if i == 2 else None
         cmap = "RdBu_r" if i == 2 else "viridis"
@@ -114,7 +136,7 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_reward_heatmap.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_reward_heatmap.png")
+    print("Saved sim_bus_reward_heatmap.png")
 
     # ── 3. Policy comparison ─────────────────────────────────────────
     banner("3. POLICY COMPARISON")
@@ -135,29 +157,33 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_policy_comparison.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_policy_comparison.png")
+    print("Saved sim_bus_policy_comparison.png")
 
     # ── 4. Global perturbation sweep ─────────────────────────────────
     banner("4. GLOBAL PERTURBATION SWEEP")
     deltas = jnp.array([0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0])
-    sw_n = neural_perturbation_sweep(neural_r, action=1, delta_grid=deltas, problem=prob, transitions=trans)
-    sw_s = neural_perturbation_sweep(nfxp_r, action=1, delta_grid=deltas, problem=prob, transitions=trans)
+    sw_n = neural_perturbation_sweep(
+        neural_r, action=1, delta_grid=deltas, problem=prob, transitions=trans
+    )
+    sw_s = neural_perturbation_sweep(
+        nfxp_r, action=1, delta_grid=deltas, problem=prob, transitions=trans
+    )
 
     print(f"{'Delta':>6s}  {'Neural':>10s}  {'Struct':>10s}  {'Gap':>8s}")
     for i, d in enumerate(np.asarray(deltas)):
-        n, s = sw_n['mean_action_prob'][i], sw_s['mean_action_prob'][i]
-        print(f"{d:6.1f}  {n:10.4f}  {s:10.4f}  {n-s:+8.4f}")
+        n, s = sw_n["mean_action_prob"][i], sw_s["mean_action_prob"][i]
+        print(f"{d:6.1f}  {n:10.4f}  {s:10.4f}  {n - s:+8.4f}")
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    ax1.plot(np.asarray(deltas), sw_s['mean_action_prob'], 'o-', color=BLUE, label="Structural")
-    ax1.plot(np.asarray(deltas), sw_n['mean_action_prob'], 's-', color=ORANGE, label="Neural")
+    ax1.plot(np.asarray(deltas), sw_s["mean_action_prob"], "o-", color=BLUE, label="Structural")
+    ax1.plot(np.asarray(deltas), sw_n["mean_action_prob"], "s-", color=ORANGE, label="Neural")
     ax1.set_xlabel("Replacement penalty (delta)")
     ax1.set_ylabel("Mean P(replace)")
     ax1.set_title("Policy response to replacement cost increase")
     ax1.legend()
 
-    ax2.plot(np.asarray(deltas), sw_s['welfare'], 'o-', color=BLUE, label="Structural")
-    ax2.plot(np.asarray(deltas), sw_n['welfare'], 's-', color=ORANGE, label="Neural")
+    ax2.plot(np.asarray(deltas), sw_s["welfare"], "o-", color=BLUE, label="Structural")
+    ax2.plot(np.asarray(deltas), sw_n["welfare"], "s-", color=ORANGE, label="Neural")
     ax2.set_xlabel("Replacement penalty (delta)")
     ax2.set_ylabel("Welfare")
     ax2.set_title("Welfare response")
@@ -165,7 +191,7 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_global_perturbation.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_global_perturbation.png")
+    print("Saved sim_bus_global_perturbation.png")
 
     # ── 5. Local perturbation ────────────────────────────────────────
     banner("5. LOCAL PERTURBATION (states > 60)")
@@ -180,8 +206,8 @@ def main():
         s_probs.append(float(rs.counterfactual_policy[affected, 1].mean()))
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(loc_deltas, s_probs, 'o-', color=BLUE, label="Structural")
-    ax.plot(loc_deltas, n_probs, 's-', color=ORANGE, label="Neural")
+    ax.plot(loc_deltas, s_probs, "o-", color=BLUE, label="Structural")
+    ax.plot(loc_deltas, n_probs, "s-", color=ORANGE, label="Neural")
     ax.set_xlabel("Operating cost penalty at s > 60")
     ax.set_ylabel("P(replace | s > 60)")
     ax.set_title("Local perturbation: high-mileage operating cost increase")
@@ -189,7 +215,7 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_local_perturbation.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_local_perturbation.png")
+    print("Saved sim_bus_local_perturbation.png")
 
     # ── 6. Transition counterfactual ─────────────────────────────────
     banner("6. TRANSITION COUNTERFACTUAL")
@@ -206,10 +232,28 @@ def main():
     rs = neural_transition_counterfactual(nfxp_r, new_trans, prob, trans)
 
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(states, np.asarray(rs.baseline_policy[:, 1]), color=BLUE, lw=1.5, label="Struct baseline")
-    ax.plot(states, np.asarray(rs.counterfactual_policy[:, 1]), '--', color=BLUE, lw=1.5, label="Struct CF")
-    ax.plot(states, np.asarray(rn.baseline_policy[:, 1]), color=ORANGE, lw=1.5, label="Neural baseline")
-    ax.plot(states, np.asarray(rn.counterfactual_policy[:, 1]), '--', color=ORANGE, lw=1.5, label="Neural CF")
+    ax.plot(
+        states, np.asarray(rs.baseline_policy[:, 1]), color=BLUE, lw=1.5, label="Struct baseline"
+    )
+    ax.plot(
+        states,
+        np.asarray(rs.counterfactual_policy[:, 1]),
+        "--",
+        color=BLUE,
+        lw=1.5,
+        label="Struct CF",
+    )
+    ax.plot(
+        states, np.asarray(rn.baseline_policy[:, 1]), color=ORANGE, lw=1.5, label="Neural baseline"
+    )
+    ax.plot(
+        states,
+        np.asarray(rn.counterfactual_policy[:, 1]),
+        "--",
+        color=ORANGE,
+        lw=1.5,
+        label="Neural CF",
+    )
     ax.set_xlabel("Mileage bin")
     ax.set_ylabel("P(replace)")
     ax.set_title("Transition counterfactual: faster depreciation")
@@ -217,15 +261,15 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_transition_cf.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_transition_cf.png")
+    print("Saved sim_bus_transition_cf.png")
     print(f"Neural welfare change: {rn.welfare_change:.2f}")
     print(f"Struct welfare change: {rs.welfare_change:.2f}")
 
     # ── 7. Choice set counterfactual ─────────────────────────────────
     banner("7. CHOICE SET COUNTERFACTUAL")
     mask_cs = jnp.ones((90, 2), dtype=jnp.bool_)
-    mask_cs = mask_cs.at[81:, 0].set(False)   # mandatory replace above 80
-    mask_cs = mask_cs.at[:10, 1].set(False)    # warranty below 10
+    mask_cs = mask_cs.at[81:, 0].set(False)  # mandatory replace above 80
+    mask_cs = mask_cs.at[:10, 1].set(False)  # warranty below 10
 
     rn = neural_choice_set_counterfactual(neural_r, mask_cs, prob, trans)
     rs = neural_choice_set_counterfactual(nfxp_r, mask_cs, prob, trans)
@@ -233,7 +277,9 @@ def main():
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
     for ax, res, title in [(ax1, rs, "Structural"), (ax2, rn, "Neural")]:
         ax.plot(states, np.asarray(res.baseline_policy[:, 1]), lw=1.5, label="Baseline")
-        ax.plot(states, np.asarray(res.counterfactual_policy[:, 1]), '--', lw=1.5, label="Constrained")
+        ax.plot(
+            states, np.asarray(res.counterfactual_policy[:, 1]), "--", lw=1.5, label="Constrained"
+        )
         ax.axvspan(0, 9, alpha=0.1, color="red", label="Warranty zone")
         ax.axvspan(81, 89, alpha=0.1, color="green", label="Mandatory zone")
         ax.set_xlabel("Mileage bin")
@@ -244,7 +290,7 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_choice_set.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_choice_set.png")
+    print("Saved sim_bus_choice_set.png")
 
     # ── 8. Sieve compression ────────────────────────────────────────
     banner("8. SIEVE COMPRESSION")
@@ -256,7 +302,7 @@ def main():
     sieve = neural_sieve_compression(neural_r, features, parameter_names=["theta_c", "RC"])
     print(f"Neural projected: theta_c={sieve['theta'][0]:.6f}, RC={abs(sieve['theta'][1]):.4f}")
     print(f"R-squared: {sieve['r_squared']:.4f}")
-    print(f"True:      theta_c=0.001000, RC=3.0000")
+    print("True:      theta_c=0.001000, RC=3.0000")
 
     # Scatter: neural vs structural reward differences
     neural_diff = np.asarray(neural_r[:, 1] - neural_r[:, 0])
@@ -265,7 +311,7 @@ def main():
     fig, ax = plt.subplots(figsize=(7, 7))
     ax.scatter(struct_diff, neural_diff, alpha=0.6, edgecolors="k", lw=0.5)
     lims = [min(struct_diff.min(), neural_diff.min()), max(struct_diff.max(), neural_diff.max())]
-    ax.plot(lims, lims, '--', color="gray", label="45-degree line")
+    ax.plot(lims, lims, "--", color="gray", label="45-degree line")
     ax.set_xlabel("Structural reward difference r(s,replace) - r(s,keep)")
     ax.set_ylabel("Neural reward difference")
     ax.set_title(f"Sieve compression (R² = {sieve['r_squared']:.4f})")
@@ -273,7 +319,7 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_sieve.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_sieve.png")
+    print("Saved sim_bus_sieve.png")
 
     # ── 9. Policy Jacobian ──────────────────────────────────────────
     banner("9. POLICY JACOBIAN")
@@ -290,7 +336,7 @@ def main():
     fig.tight_layout()
     fig.savefig(OUT / "sim_bus_jacobian.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved sim_bus_jacobian.png")
+    print("Saved sim_bus_jacobian.png")
 
     # ── Summary ─────────────────────────────────────────────────────
     banner("SUMMARY")

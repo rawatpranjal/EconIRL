@@ -28,7 +28,8 @@ Usage:
     python examples/scania-component/scania_nfxp.py
 
     # Quick test:
-    python examples/scania-component/scania_nfxp.py --data-dir data/scania/Dataset/ --max-vehicles 1000
+    python examples/scania-component/scania_nfxp.py \
+        --data-dir data/scania/Dataset/ --max-vehicles 1000
 
 Reference:
     SCANIA Component X dataset, IDA 2024 Industrial Challenge.
@@ -38,9 +39,7 @@ Reference:
 import argparse
 import time
 
-import numpy as np
-
-from econirl.datasets import load_scania
+from econirl.datasets import load_scania, rust_bus_reward_spec
 
 
 def print_header(title: str) -> None:
@@ -55,9 +54,7 @@ def print_section(title: str) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Structural estimation on SCANIA Component X data"
-    )
+    parser = argparse.ArgumentParser(description="Structural estimation on SCANIA Component X data")
     parser.add_argument(
         "--data-dir",
         type=str,
@@ -103,8 +100,10 @@ def main():
     print(f"  Observations:     {n_obs:,}")
     print(f"  Vehicles:         {n_vehicles:,}")
     print(f"  Replacements:     {n_replace} ({replace_rate:.2%} per period)")
-    print(f"  Periods/vehicle:  median={obs_per_v.median():.0f}, "
-          f"min={obs_per_v.min()}, max={obs_per_v.max()}")
+    print(
+        f"  Periods/vehicle:  median={obs_per_v.median():.0f}, "
+        f"min={obs_per_v.min()}, max={obs_per_v.max()}"
+    )
     print(f"  Degradation bins: {n_bins}")
     print(f"  Mean degradation: bin {df['degradation_bin'].mean():.1f}")
 
@@ -122,7 +121,8 @@ def main():
     from econirl import NFXP
 
     t0 = time.time()
-    nfxp = NFXP(n_states=n_bins, discount=args.discount).fit(
+    utility = rust_bus_reward_spec(n_bins, names=("theta_c", "RC"))
+    nfxp = NFXP(n_states=n_bins, discount=args.discount, utility=utility).fit(
         df, state="degradation_bin", action="replaced", id="vehicle_id"
     )
     t_nfxp = time.time() - t0
@@ -138,11 +138,13 @@ def main():
 
     t0 = time.time()
     nnes = NNES(
-        n_states=n_bins, discount=args.discount, bellman="npl",
-        v_epochs=300, n_outer_iterations=2,
-    ).fit(
-        df, state="degradation_bin", action="replaced", id="vehicle_id"
-    )
+        n_states=n_bins,
+        discount=args.discount,
+        utility=utility,
+        bellman="npl",
+        v_epochs=300,
+        n_outer_iterations=2,
+    ).fit(df, state="degradation_bin", action="replaced", id="vehicle_id")
     t_nnes = time.time() - t0
     print(nnes.summary())
     print(f"  Time: {t_nnes:.1f}s")
@@ -152,20 +154,28 @@ def main():
     # =========================================================================
     print_header("Results Comparison")
 
-    print(f"\n  {'Estimator':<12} {'theta_c':>10} {'RC':>10} "
-          f"{'SE(theta_c)':>12} {'SE(RC)':>10} {'LL':>12} {'Time':>8}")
+    print(
+        f"\n  {'Estimator':<12} {'theta_c':>10} {'RC':>10} "
+        f"{'SE(theta_c)':>12} {'SE(RC)':>10} {'LL':>12} {'Time':>8}"
+    )
     print("  " + "-" * 74)
 
     for name, model, t in [("NFXP", nfxp, t_nfxp), ("NNES", nnes, t_nnes)]:
         pv = list(model.params_.values())
         sv = list((model.se_ or {}).values())
-        ll = model.log_likelihood_ if hasattr(model, "log_likelihood_") and model.log_likelihood_ is not None else float("nan")
+        ll = (
+            model.log_likelihood_
+            if hasattr(model, "log_likelihood_") and model.log_likelihood_ is not None
+            else float("nan")
+        )
         tc = pv[0] if len(pv) > 0 else float("nan")
         rc = pv[1] if len(pv) > 1 else float("nan")
         se_tc = sv[0] if len(sv) > 0 else float("nan")
         se_rc = sv[1] if len(sv) > 1 else float("nan")
-        print(f"  {name:<12} {tc:>10.4f} {rc:>10.4f} "
-              f"{se_tc:>12.4f} {se_rc:>10.4f} {ll:>12.2f} {t:>7.1f}s")
+        print(
+            f"  {name:<12} {tc:>10.4f} {rc:>10.4f} "
+            f"{se_tc:>12.4f} {se_rc:>10.4f} {ll:>12.2f} {t:>7.1f}s"
+        )
 
     print_header("Summary")
     print(f"""

@@ -12,7 +12,7 @@ set -euo pipefail
 
 EST="${1:-nfxp}"
 SBX="${2:-$HOME/joe-sandbox}"
-SRC="${3:-pypi}"   # pypi = econirl==0.0.7 (released); local = the fixed working tree
+SRC="${3:-pypi}"   # pypi = econirl==0.0.10 (released); local = the working tree
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PROB="$ROOT/problems/$EST"
 
@@ -30,11 +30,11 @@ test ! -e "$SBX/truth.json" && echo "   OK: truth.json is not in the sandbox"
 echo ">> clean venv"
 uv venv "$SBX/.venv" >/dev/null
 if [ "$SRC" = "local" ]; then
-  echo "   installing the LOCAL fixed build from the working tree (not PyPI 0.0.7)"
+  echo "   installing the LOCAL build from the working tree (not PyPI 0.0.10)"
   uv pip install --python "$SBX/.venv/bin/python" -q "$ROOT/.." jupyter pandas numpy matplotlib
 else
-  echo "   installing the published package econirl==0.0.7 (a real PyPI stranger)"
-  uv pip install --python "$SBX/.venv/bin/python" -q econirl==0.0.7 jupyter pandas numpy matplotlib
+  echo "   installing the published package econirl==0.0.10 (a real PyPI stranger)"
+  uv pip install --python "$SBX/.venv/bin/python" -q econirl==0.0.10 jupyter pandas numpy matplotlib
 fi
 # Joe sees only the installed package; the repo source is not in his sandbox.
 test ! -e "$SBX/src" && test ! -e "$SBX/.git" && echo "   OK: no repo source in the sandbox"

@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -22,7 +23,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install .[dev]
       - run: python -c "import econirl; print(econirl.__version__)"
-      - run: python -m pytest tests/ -v -m "not slow" --timeout=120
+      - name: Run cross-version compatibility contracts
+        run: |
+          python -m pytest \
+            tests/test_release_contract.py \
+            tests/test_jax_compatibility_contract.py \
+            -q
 
   smoke:
     runs-on: ubuntu-latest
@@ -89,7 +95,7 @@ jobs:
           "
 
   nightly:
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

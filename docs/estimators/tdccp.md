@@ -343,7 +343,7 @@ parameter-estimation stage.
 ## Usage
 
 ```python
-from econirl.datasets import load_rust_bus
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 from econirl import TDCCP
 
 df = load_rust_bus()
@@ -352,7 +352,7 @@ model = TDCCP(
     n_states=90,
     n_actions=2,
     discount=0.9999,
-    utility="linear_cost",
+    utility=rust_bus_reward_spec(90),
     method="semigradient",
 )
 model.fit(df, state="mileage_bin", action="replaced", id="bus_id")

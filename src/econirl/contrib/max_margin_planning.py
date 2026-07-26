@@ -30,7 +30,6 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
@@ -39,7 +38,6 @@ from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import hybrid_iteration, value_iteration
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
-from econirl.inference.standard_errors import SEMethod
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.base import BaseUtilityFunction
 from econirl.preferences.linear import LinearUtility
@@ -193,7 +191,9 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
         all_states = panel.get_all_states()
         all_actions = panel.get_all_actions()
-        state_action_counts = state_action_counts.at[all_states, all_actions].add(jnp.ones(len(all_states), dtype=jnp.float32))
+        state_action_counts = state_action_counts.at[all_states, all_actions].add(
+            jnp.ones(len(all_states), dtype=jnp.float32)
+        )
         state_counts = state_counts.at[all_states].add(jnp.ones(len(all_states), dtype=jnp.float32))
 
         # Convert to probabilities with smoothing for unvisited states
@@ -201,7 +201,9 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
         for s in range(n_states):
             if state_counts[s] > 0:
-                expert_policy = expert_policy.at[s, :].set(state_action_counts[s, :] / state_counts[s])
+                expert_policy = expert_policy.at[s, :].set(
+                    state_action_counts[s, :] / state_counts[s]
+                )
             else:
                 # Uniform distribution for unvisited states
                 expert_policy = expert_policy.at[s, :].set(1.0 / n_actions)
@@ -366,9 +368,9 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             d_0 = initial_distribution
 
         # Solve d = (1 - γ)(I - γ P_π^T)^{-1} d_0
-        I = jnp.eye(n_states, dtype=jnp.float32)
+        identity = jnp.eye(n_states, dtype=jnp.float32)
         try:
-            inv_matrix = jnp.linalg.solve(I - gamma * P_pi.T, d_0)
+            inv_matrix = jnp.linalg.solve(identity - gamma * P_pi.T, d_0)
             d_pi = (1 - gamma) * inv_matrix
             d_pi = d_pi / d_pi.sum()  # Normalize
         except Exception:
@@ -484,7 +486,6 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             )
 
         reward_fn = utility
-        n_features = reward_fn.num_parameters
         n_states = problem.num_states
         n_actions = problem.num_actions
 
@@ -546,7 +547,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
 
             # Objective value (for tracking)
             # L(θ) = (λ/2)||θ||² + structured hinge loss
-            reg_loss = 0.5 * self.config.regularization_lambda * jnp.sum(theta ** 2)
+            reg_loss = 0.5 * self.config.regularization_lambda * jnp.sum(theta**2)
             hinge_loss = jnp.dot(theta, policy_features - expert_features)
             # Add the actual loss value: Σ Δ(π*, π̂)
             loss_value = jnp.sum(loss_matrix * policy)
@@ -587,13 +588,15 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         final_reward = reward_fn.compute(final_theta)
         if self.config.inner_solver == "hybrid":
             final_result = hybrid_iteration(
-                operator, final_reward,
+                operator,
+                final_reward,
                 tol=self.config.inner_tol,
                 max_iter=self.config.inner_max_iter,
             )
         else:
             final_result = value_iteration(
-                operator, final_reward,
+                operator,
+                final_reward,
                 tol=self.config.inner_tol,
                 max_iter=self.config.inner_max_iter,
             )
@@ -682,13 +685,15 @@ class MaxMarginPlanningEstimator(BaseEstimator):
             reward_matrix = reward_fn.compute(p)
             if self.config.inner_solver == "hybrid":
                 result = hybrid_iteration(
-                    operator, reward_matrix,
+                    operator,
+                    reward_matrix,
                     tol=self.config.inner_tol,
                     max_iter=self.config.inner_max_iter,
                 )
             else:
                 result = value_iteration(
-                    operator, reward_matrix,
+                    operator,
+                    reward_matrix,
                     tol=self.config.inner_tol,
                     max_iter=self.config.inner_max_iter,
                 )
@@ -730,7 +735,7 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         eigenvalues, eigenvectors = jnp.linalg.eigh(hessian)
         if (eigenvalues > 0).any():
             self._log("Warning: Hessian not negative semi-definite, projecting")
-            eigenvalues_clamped = jnp.clip(eigenvalues, a_max=-1e-8)
+            eigenvalues_clamped = jnp.minimum(eigenvalues, -1e-8)
             hessian = eigenvectors @ jnp.diag(eigenvalues_clamped) @ eigenvectors.T
 
         return hessian
@@ -767,13 +772,15 @@ class MaxMarginPlanningEstimator(BaseEstimator):
         reward_matrix = reward_fn.compute(theta)
         if self.config.inner_solver == "hybrid":
             result = hybrid_iteration(
-                operator, reward_matrix,
+                operator,
+                reward_matrix,
                 tol=self.config.inner_tol,
                 max_iter=self.config.inner_max_iter,
             )
         else:
             result = value_iteration(
-                operator, reward_matrix,
+                operator,
+                reward_matrix,
                 tol=self.config.inner_tol,
                 max_iter=self.config.inner_max_iter,
             )

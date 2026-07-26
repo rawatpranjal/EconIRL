@@ -1,6 +1,6 @@
 [project]
 name = "econirl"
-version = "0.0.9"
+version = "0.0.10"
 description = "Behavioral inference. IRL and DDC with standard errors."
 readme = "README.md"
 license = "MIT"
@@ -47,6 +47,7 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "pytest-timeout>=2.3",
+    "tomli>=2.0; python_version < '3.11'",
     "ruff>=0.1",
     "mypy>=1.0",
 ]

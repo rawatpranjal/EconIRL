@@ -3,18 +3,35 @@
 Run: python examples/landing_demo.py
 """
 
-from econirl import NFXP, NNES, CCP, TDCCP
-from econirl.datasets import load_rust_bus
+from econirl import CCP, NFXP, NNES, TDCCP
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 
 df = load_rust_bus()
 print(f"Loaded Rust bus data: {len(df):,} observations, {df['bus_id'].nunique()} buses\n")
+utility = rust_bus_reward_spec(90, names=("theta_c", "RC"))
 
 estimators = {
-    "NFXP": NFXP(discount=0.9999),
-    "CCP": CCP(discount=0.9999, num_policy_iterations=3),
-    "NNES": NNES(discount=0.9999, v_epochs=300, n_outer_iterations=2),
+    "NFXP": NFXP(n_states=90, discount=0.9999, utility=utility),
+    "CCP": CCP(
+        n_states=90,
+        discount=0.9999,
+        utility=utility,
+        num_policy_iterations=3,
+    ),
+    "NNES": NNES(
+        n_states=90,
+        discount=0.9999,
+        utility=utility,
+        v_epochs=300,
+        n_outer_iterations=2,
+    ),
     "TDCCP": TDCCP(
-        discount=0.9999, avi_iterations=15, epochs_per_avi=20, n_policy_iterations=2
+        n_states=90,
+        discount=0.9999,
+        utility=utility,
+        avi_iterations=15,
+        epochs_per_avi=20,
+        n_policy_iterations=2,
     ),
 }
 
@@ -25,9 +42,7 @@ for name, model in estimators.items():
 print("\n" + "=" * 70)
 print("PARAMETER COMPARISON")
 print("=" * 70)
-print(
-    f"{'Estimator':<10} {'theta_c':>12} {'RC':>12} {'SE(theta_c)':>14} {'SE(RC)':>12}"
-)
+print(f"{'Estimator':<10} {'theta_c':>12} {'RC':>12} {'SE(theta_c)':>14} {'SE(RC)':>12}")
 print("-" * 70)
 
 for name, model in estimators.items():

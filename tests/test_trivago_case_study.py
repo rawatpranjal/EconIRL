@@ -7,20 +7,19 @@ Trivago MDP.
 
 import math
 
-import numpy as np
-import pytest
 import jax.numpy as jnp
+import pytest
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.datasets.trivago_search import (
-    load_trivago_sessions,
+    ABSORBING_STATE,
+    N_ACTIONS,
+    N_STATES,
+    build_trivago_features,
     build_trivago_mdp,
     build_trivago_panel,
-    build_trivago_features,
     build_trivago_transitions,
-    N_STATES,
-    N_ACTIONS,
-    ABSORBING_STATE,
+    load_trivago_sessions,
 )
 from econirl.preferences.linear import LinearUtility
 
@@ -234,9 +233,7 @@ class TestStructuralOutperformsUniform:
         all_s = train_panel.get_all_states()
         all_a = train_panel.get_all_actions()
 
-        bc_ll = float(jnp.log(jnp.clip(bc_policy[all_s, all_a], a_min=1e-10)).mean())
+        bc_ll = float(jnp.log(jnp.maximum(bc_policy[all_s, all_a], 1e-10)).mean())
         uniform_ll = math.log(1.0 / N_ACTIONS)  # -1.386
 
-        assert bc_ll > uniform_ll, (
-            f"BC LL {bc_ll:.4f} should beat uniform {uniform_ll:.4f}"
-        )
+        assert bc_ll > uniform_ll, f"BC LL {bc_ll:.4f} should beat uniform {uniform_ll:.4f}"
