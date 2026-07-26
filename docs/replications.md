@@ -1,5 +1,12 @@
 # Replications
 
+## Important Links
+
+- [CCP estimator](estimators/ccp.md)
+- [NFXP estimator](estimators/nfxp.md)
+- [CCP validation](estimators/ccp/validation.md)
+- [NFXP validation](estimators/nfxp/validation.md)
+
 This page reports numerical replication evidence. A study counts as a paper
 replication only when the published design, sample, and estimand are available and
 the reported quantities are directly comparable. Each section sets the package
@@ -141,6 +148,27 @@ poor, the gains from extra policy iterations come fast, and NPL run to its fixed
 point reaches the maximum likelihood estimate. The replication target is this
 equivalence on the bus-engine data.
 
+### STORDAT Group-4 panel, beta = 0.9999
+
+On the official Rust panel, the converged NPL profile reaches the same fixed point
+as NFXP. Joint full-likelihood BHHH then includes the structural parameters and
+the free transition probabilities. The resulting estimates and standard errors
+match Rust's published Table IX values.
+
+| Quantity | CCP / NPL | NFXP | Paper |
+| --- | ---: | ---: | ---: |
+| theta_1 (maintenance) | 2.2931 | 2.2931 | 2.2930 |
+| theta_1 standard error | 0.6388 | 0.6388 | 0.639 |
+| RC (replacement) | 10.0750 | 10.0750 | 10.0750 |
+| RC standard error | 1.5816 | 1.5816 | 1.582 |
+| p0 standard error | 0.0075 | 0.0075 | 0.0075 |
+| p1 standard error | 0.0075 | 0.0075 | 0.0075 |
+| full log-likelihood | -3304.1548 | -3304.1548 | -3304.155 |
+
+The package computes this joint covariance only after NPL reaches its fixed point
+under the Rust residual transition model. Fixed-stage CCP fits report
+standard errors conditional on the fitted transition model.
+
 ### Bundled bus panel, Group 4, beta = 0.9999
 
 | Estimator | theta_1 | RC | choice log-likelihood |
@@ -149,20 +177,28 @@ equivalence on the bus-engine data.
 | Hotz-Miller (K = 1) | 1.2872 | 10.9207 | -168.1879 |
 | NPL (run to convergence) | 2.2640 | 10.1432 | -163.7113 |
 
-The one-step estimator sits well below the MLE. NPL run to its fixed point reaches
-it, the operating cost and replacement cost match NFXP to the third and fourth
-figure. At this discount factor the choice likelihood is nearly flat in the
-replacement cost, so NPL and NFXP both sit about 0.0005 from the exact maximizer
-and agree to the fourth figure rather than the twelfth the paper reports on its
-own machine. At lower discount factors, where the replacement cost is better
-identified, NPL matches the maximum likelihood estimate to five figures. An
-earlier build stopped the policy-iteration loop too early and missed the MLE at
-the fourth figure; running NPL to its fixed point closes that gap.
+The one-step estimator sits below the MLE. NPL run to its fixed point reaches the
+MLE. Its operating and replacement costs match NFXP to the third and fourth
+figures. At this discount factor, the choice likelihood is nearly flat in the
+replacement cost. NPL and NFXP therefore sit about 0.0005 from the exact maximizer
+and agree to the fourth figure. At lower discount factors, where the replacement
+cost is better identified, NPL matches the maximum likelihood estimate to five
+figures.
 
-Reproduce:
+Run `make ccp-table-ix` to fetch the official data, reproduce the table, and
+write the [JSON receipt](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp_rust_table_ix.json).
+Verify a saved receipt without refitting:
 
 ```bash
-pytest tests/test_rust_tables.py::TestNPLConvergenceAM2002
+uv run python validation/estimators/ccp/rust_table_ix.py \
+  --verify \
+  --output validation/results/ccp_rust_table_ix.json
+```
+
+**Result**
+
+```text
+verified validation/results/ccp_rust_table_ix.json
 ```
 
 ## AIRL (Fu, Luo, and Levine, 2018)
