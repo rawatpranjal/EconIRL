@@ -6,12 +6,14 @@ import sys
 # Add source directory to path for autodoc
 sys.path.insert(0, os.path.abspath("../src"))
 
+from econirl import __version__  # noqa: E402
+
 # -- Project information -----------------------------------------------------
 
 project = "econirl"
 copyright = "2024, econirl contributors"
 author = "econirl contributors"
-release = "0.0.7"
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -105,10 +107,22 @@ myst_enable_extensions = [
 # exclude-members are set on the directive. Filter them here instead.
 
 _GYM_INTERNALS = {
-    "metadata", "render", "reset", "step", "close", "action_space",
-    "observation_space", "np_random", "np_random_seed", "render_mode",
-    "reward_range", "spec", "unwrapped", "get_wrapper_attr",
-    "has_wrapper_attr", "set_wrapper_attr",
+    "metadata",
+    "render",
+    "reset",
+    "step",
+    "close",
+    "action_space",
+    "observation_space",
+    "np_random",
+    "np_random_seed",
+    "render_mode",
+    "reward_range",
+    "spec",
+    "unwrapped",
+    "get_wrapper_attr",
+    "has_wrapper_attr",
+    "set_wrapper_attr",
 }
 
 
