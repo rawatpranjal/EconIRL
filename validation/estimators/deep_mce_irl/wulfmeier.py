@@ -306,9 +306,8 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
                 "linear_optimizer_converged": sum(
                     item.get("optimizer_converged") is True for item in linear
                 ),
-                "linear_residuals_pass": sum(
-                    item.get("feature_converged") is True
-                    and item.get("occupancy_converged") is True
+                "linear_solution_residuals_pass": sum(
+                    item.get("occupancy_converged") is True
                     and item.get("bellman_converged") is True
                     for item in linear
                 ),
@@ -434,8 +433,8 @@ def main() -> int:
             cell = summary["cells"][f"binaryworld:{n_demos}"]
             checks.append(
                 {
-                    "name": f"binaryworld_linear_residuals_pass_{n_demos}",
-                    "passed": cell["linear_residuals_pass"] == cell["linear_fits"] == 5,
+                    "name": f"binaryworld_linear_solution_residuals_pass_{n_demos}",
+                    "passed": cell["linear_solution_residuals_pass"] == cell["linear_fits"] == 5,
                 }
             )
             checks.append(
@@ -452,8 +451,8 @@ def main() -> int:
         checks.extend(
             [
                 {
-                    "name": "objectworld_linear_residuals_pass_128",
-                    "passed": objectworld["linear_residuals_pass"]
+                    "name": "objectworld_linear_solution_residuals_pass_128",
+                    "passed": objectworld["linear_solution_residuals_pass"]
                     == objectworld["linear_fits"]
                     == 5,
                 },

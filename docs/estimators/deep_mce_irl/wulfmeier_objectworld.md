@@ -23,9 +23,10 @@ training seeds per panel. Linear MCE-IRL is fitted once to each panel.
 Each neural fit uses a 200-epoch budget. The 30 percent random-action
 contamination means exact occupancy matching is not the target in this
 comparison. The result file records strict convergence and termination counts.
-Every linear fit used by a headline comparison must meet the feature,
-occupancy, and Bellman residual tolerances. The stricter optimizer flag is
-reported separately.
+Every linear fit used by a headline comparison must meet the occupancy and
+Bellman residual tolerances. Feature residuals remain diagnostic because the
+linear baseline is intentionally misspecified. The stricter optimizer flag is
+also reported separately.
 The controlled [Simulation Study](validation.md) provides the estimator
 convergence evidence.
 
