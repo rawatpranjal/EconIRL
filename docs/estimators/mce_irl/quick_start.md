@@ -1,86 +1,124 @@
 # Quick Start
 
-This page shows the feature-based MCE-IRL workflow. The reward that comes out is
-only as interpretable as the supplied feature matrix, transition tensor, and
-normalization.
+## Important Links
 
-The wrapper follows the sklearn-style pattern: build an estimator, call `fit`,
-then read fitted attributes. For multi-action MCE-IRL, provide reward features
-explicitly.
+- [MCE-IRL overview](../mce_irl.md)
+- [Pre-estimation checks](pre_estimation.md)
+- [Simulation evidence](validation.md)
+- [Counterfactuals](counterfactuals.md)
+
+MCE-IRL estimates one reward from demonstrated trajectories and a fixed
+transition system. A task supplies the start distribution, destination,
+horizon, and active part of that system. Different tasks can share the same
+reward parameters.
+
+The example below has two task labels with the same destination, dynamics, and
+reward. The demonstrations choose action one in 70 percent of routes.
 
 ```python
+import jax.numpy as jnp
 import numpy as np
 
-from econirl.datasets import load_rust_bus
-from econirl.estimators import MCEIRL
+from econirl import DeterministicTransitions, MCEIRL, MCEIRLTask
+from econirl.core import Panel, Trajectory
 
-n_states = 90
-n_actions = 2
-features = np.zeros((n_states, n_actions, 2))
-features[:, 0, 0] = -np.arange(n_states) / 100.0
-features[:, 1, 1] = -1.0
-
-df = load_rust_bus()
+transitions = DeterministicTransitions(
+    next_state=np.array([[1, 1], [1, -1]]),
+    valid_action=np.array([[True, True], [True, False]]),
+)
+features = np.zeros((2, 2, 1))
+features[0, 1, 0] = 1.0
+tasks = [
+    MCEIRLTask(
+        task_id=name,
+        initial_state=0,
+        terminal_states=np.array([1]),
+        horizon=1,
+    )
+    for name in ("morning", "evening")
+]
+trajectories = [
+    Trajectory(
+        states=jnp.array([0]),
+        actions=jnp.array([int(index < 70)]),
+        next_states=jnp.array([1]),
+        individual_id=f"{name}-{index}",
+        metadata={"task_id": name},
+    )
+    for name in ("morning", "evening")
+    for index in range(100)
+]
 
 model = MCEIRL(
-    n_states=n_states,
-    n_actions=n_actions,
-    discount=0.99,
+    n_states=2,
+    n_actions=2,
+    discount=1.0,
+    horizon=1,
     feature_matrix=features,
-    feature_names=["keep_mileage_cost", "replace_cost"],
+    feature_names=["action_one"],
+    compute_se=False,
 )
-model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
-
-print(model.params_)
-print(model.policy_.shape)
-```
-
-For a problem other than the Rust bus, pass the dynamics explicitly. Supply a
-transition tensor of shape `(n_actions, n_states, n_states)` and the observed
-next-state column.
-
-```python
 model.fit(
-    df,
-    state="state",
-    action="action",
-    id="id",
-    next_state="next_state",
+    Panel(trajectories),
     transitions=transitions,
+    tasks=tasks,
 )
+
+print({name: round(value, 6) for name, value in model.params_.items()})
+print(
+    np.round(
+        model.predict_proba(
+            np.array([0]),
+            task_id="morning",
+        ),
+        3,
+    ).tolist()
+)
+counterfactual = model.counterfactual(
+    params={"action_one": model.params_["action_one"] + 1.0}
+)
+print(round(float(np.abs(counterfactual.policy_change).max()), 3))
+print(model.termination_reason_)
 ```
 
-`transitions=None` estimates only the two-action Rust-bus keep/replace kernel. A
-model with more than two actions requires an explicit tensor. Build one from
-observed transitions with `estimate_empirical_transitions(panel, n_actions,
-n_states)` from `econirl.estimators`.
+**Result**
 
-Estimates depend on the supplied reward features, transition specification, and
-inference settings, so no canonical output is shown here. The fitted estimator
-exposes reward parameters, standard errors when requested,
-the recovered reward, the policy, the value function, and feature-matching
-diagnostics.
+```text
+{'action_one': 0.847298}
+[[0.3, 0.7]]
+0.164
+joint_convergence
+```
+
+`next_state[s, a]` stores the deterministic successor of state `s` under
+action `a`. `valid_action[s, a]` marks legal actions. Use `-1` for an invalid
+successor only when the corresponding action is false. The estimator never
+constructs an `(A, S, S)` tensor for this representation.
+
+Each trajectory carries its task identifier in `metadata["task_id"]`. For
+data-frame input, pass `state`, `action`, `id`, `next_state`, and `task` to
+`fit`. For example, use `fit(data, state="state", action="action",
+id="route_id", next_state="next_state", task="task_id")`. State and next-state
+values must use the same global indexing as the fixed transition system.
+
+`MCEIRLTask.active_states` can restrict a destination to a compact candidate
+path set. The compiler removes transitions that leave that set. It rejects
+demonstrations that use an invalid action or disagree with the supplied
+successor.
+
+The main fitted attributes are:
 
 | Attribute | Meaning |
 | --- | --- |
-| `params_` | Estimated reward parameters. |
-| `se_` | Standard errors for the reward parameters when available. |
-| `reward_matrix_` | Structural reward matrix by state and action. |
-| `policy_` | Estimated action probabilities by state. |
-| `value_` | Estimated value function by state. |
-| `log_likelihood_` | Log likelihood of the demonstrations under the recovered policy. |
+| `params_` | Shared reward parameters. |
+| `se_` | Standard errors when requested. |
+| `time_policy_` | Period-specific policy for a finite horizon. |
+| `task_policy_` | Policy slices by task. |
+| `reward_matrix_` | Fitted state-action reward. |
+| `termination_reason_` | Reason the fit stopped. |
+| `feature_residual_` | Norm of the final stationarity residual. |
 
-## Simulation Rerun
-
-To reproduce the simulation, run the validation script:
-
-```bash
-PYTHONPATH=src:. python validation/estimators/mce_irl/run.py --quiet-progress --enforce-gates
-```
-
-The command writes the results file and reports the pass/fail summary for the
-two simulation cells.
-
-Use `econirl.estimation.mce_irl.MCEIRLEstimator` when you need direct control
-over `Panel` objects, utility objects, `DDCProblem`, transition tensors, the
-root feature-matching optimizer, or standard-error computation.
+Use `simulate(..., task_id=...)` to draw routes from the fitted model.
+Use `counterfactual(params=...)` for a reward change or
+`counterfactual(transitions=...)` for a transition change. Exactly one
+primitive can change in each call.
