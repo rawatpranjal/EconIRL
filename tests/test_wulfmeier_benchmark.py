@@ -41,15 +41,15 @@ def _compute_evd(
     transitions: jnp.ndarray,
     problem: DDCProblem,
 ) -> float:
-    """Compute Expected Value Difference between optimal and learned policy.
+    """Compute value difference between the true-reward reference and learned policy.
 
-    EVD measures how much worse the learned policy performs compared to
-    the optimal policy, both evaluated under the true reward function.
-    A lower EVD means the learned policy is closer to optimal.
+    Both policies are evaluated under the true reward without an entropy
+    bonus. A value closer to zero means the learned policy is closer to the
+    true-reward soft reference policy.
 
-    The computation solves for the optimal value function under the true
-    reward, then evaluates the learned policy under the same reward via
-    a linear system solve, and returns the mean difference across states.
+    The computation solves for the reference soft policy under the true
+    reward, evaluates both policies under the same reward-only objective, and
+    returns the mean difference across states.
     """
     n_states = problem.num_states
     n_actions = problem.num_actions
@@ -232,8 +232,8 @@ class TestWulfmeierObjectworld:
         print("\nObjectworld 8x8 EVD results:")
         print(f"  Deep MCE-IRL EVD: {evd:.4f}")
 
-        # Sanity check: EVD should be finite and non-negative
-        assert 0 <= evd < 100, (
-            f"Expected EVD in [0, 100), got {evd:.4f}. "
+        # Sanity check: the value difference should be finite and bounded
+        assert np.isfinite(evd) and abs(evd) < 100, (
+            f"Expected finite value difference with magnitude below 100, got {evd:.4f}. "
             f"The neural reward should produce a reasonable policy."
         )

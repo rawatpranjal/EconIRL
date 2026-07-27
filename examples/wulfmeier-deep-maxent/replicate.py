@@ -67,13 +67,13 @@ def compute_evd(
     learned_policy: np.ndarray,
     discount: float,
 ) -> float:
-    """Compute Expected Value Difference between optimal and learned policies.
+    """Compute value difference between the reference and learned policies.
 
-    EVD = mean_s [V*(s; r_true) - V^pi_learned(s; r_true)]
+    EVD = mean_s [V^pi_reference(s; r_true) - V^pi_learned(s; r_true)]
 
-    where V* is the value under the optimal policy for the true reward and
-    V^pi_learned is the value of the learned policy evaluated under the true
-    reward. Lower is better.
+    The reference is the soft policy solved under the true reward. Both
+    policies are then evaluated under the true reward without an entropy
+    bonus. Values closer to zero indicate closer behavior.
 
     Args:
         true_reward: Ground-truth reward vector of shape (n_states,).
