@@ -12,16 +12,15 @@ Tests that MCEIRLNeural:
 
 from __future__ import annotations
 
-import numpy as np
-import pytest
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
+import numpy as np
+import pytest
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.estimators.mceirl_neural import MCEIRLNeural
 from econirl.estimators.protocol import EstimatorProtocol
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: small 5-state gridworld
@@ -77,9 +76,7 @@ def _make_gridworld_data(
             # prefer action 1 (stay) at high states
             p_action0 = 0.8 if state < n_states // 2 else 0.2
             action = 0 if np.random.random() < p_action0 else 1
-            next_state = np.random.choice(
-                n_states, p=T[action, state, :]
-            )
+            next_state = np.random.choice(n_states, p=T[action, state, :])
             data.append(
                 {
                     "agent_id": i,
@@ -97,9 +94,7 @@ def _make_features(n_states: int = _N_STATES) -> RewardSpec:
     """Create state features for projection."""
     s = jnp.arange(n_states, dtype=jnp.float32)
     state_features = jnp.stack([s / n_states, (s / n_states) ** 2], axis=1)
-    return RewardSpec(
-        state_features, names=["linear", "quadratic"], n_actions=_N_ACTIONS
-    )
+    return RewardSpec(state_features, names=["linear", "quadratic"], n_actions=_N_ACTIONS)
 
 
 @pytest.fixture(scope="module")
@@ -251,13 +246,14 @@ class TestParamsWithFeatures:
         assert "linear" in fitted_model.params_
         assert "quadratic" in fitted_model.params_
 
-    def test_se_present(self, fitted_model):
-        assert fitted_model.se_ is not None
-        assert "linear" in fitted_model.se_
+    def test_projection_is_not_sampling_inference(self, fitted_model):
+        assert fitted_model.se_ is None
+        assert fitted_model.pvalues_ is None
+        assert fitted_model.projection_diagnostics_["sampling_inference"] is False
 
-    def test_pvalues_present(self, fitted_model):
-        assert fitted_model.pvalues_ is not None
-        assert "linear" in fitted_model.pvalues_
+    def test_projection_diagnostics_present(self, fitted_model):
+        assert fitted_model.projection_diagnostics_["rank"] == 2
+        assert np.isfinite(fitted_model.projection_diagnostics_["condition_number"])
 
     def test_coef_present(self, fitted_model):
         assert fitted_model.coef_ is not None
@@ -395,27 +391,13 @@ class TestSummary:
 
 
 class TestConfInt:
-    """conf_int() returns valid intervals when features are provided."""
+    """Neural reward-map projection does not imply sampling inference."""
 
-    def test_conf_int_keys(self, fitted_model):
-        ci = fitted_model.conf_int()
-        assert "linear" in ci
-        assert "quadratic" in ci
-
-    def test_conf_int_brackets_estimate(self, fitted_model):
-        ci = fitted_model.conf_int()
-        for name in fitted_model.params_:
-            lower, upper = ci[name]
-            est = fitted_model.params_[name]
-            if np.isfinite(lower) and np.isfinite(upper):
-                assert lower <= est <= upper, (
-                    f"CI for {name}: ({lower}, {upper}) does not contain "
-                    f"estimate {est}"
-                )
-
-    def test_conf_int_no_features_raises(self, fitted_model_no_features):
-        with pytest.raises(RuntimeError, match="No projected parameters"):
-            fitted_model_no_features.conf_int()
+    @pytest.mark.parametrize("fixture_name", ["fitted_model", "fitted_model_no_features"])
+    def test_conf_int_is_unsupported(self, request, fixture_name):
+        model = request.getfixturevalue(fixture_name)
+        with pytest.raises(NotImplementedError, match="does not report"):
+            model.conf_int()
 
 
 # ---------------------------------------------------------------------------
@@ -442,9 +424,7 @@ class TestStateActionRewardType:
             _N_ACTIONS,
         )
 
-    def test_policy_valid_probabilities_state_action(
-        self, fitted_model_state_action
-    ):
+    def test_policy_valid_probabilities_state_action(self, fitted_model_state_action):
         policy = fitted_model_state_action.policy_
         assert (policy >= 0).all()
         assert (policy <= 1).all()
@@ -478,13 +458,8 @@ class TestStateActionRewardType:
         assert "state_action" in summary
 
     def test_conf_int_state_action(self, fitted_model_state_action):
-        ci = fitted_model_state_action.conf_int()
-        assert "linear" in ci
-        for name in fitted_model_state_action.params_:
-            lower, upper = ci[name]
-            est = fitted_model_state_action.params_[name]
-            if np.isfinite(lower) and np.isfinite(upper):
-                assert lower <= est <= upper
+        with pytest.raises(NotImplementedError, match="does not report"):
+            fitted_model_state_action.conf_int()
 
     def test_invalid_reward_type_raises(self):
         with pytest.raises(ValueError, match="reward_type"):
@@ -517,6 +492,121 @@ class TestStateActionRewardType:
         assert result is model
         # Without features, reward_ should still be (S, A)
         assert result.reward_.shape == (_N_STATES, _N_ACTIONS)
+
+
+# ---------------------------------------------------------------------------
+# Completion contract
+# ---------------------------------------------------------------------------
+
+
+class TestCompletionContract:
+    def test_transition_orientation_is_checked(self, gridworld_df):
+        model = MCEIRLNeural(n_states=_N_STATES, n_actions=_N_ACTIONS)
+        wrong = np.zeros((_N_STATES, _N_STATES, _N_ACTIONS))
+        with pytest.raises(ValueError, match="orientation"):
+            model.fit(
+                gridworld_df,
+                state="state",
+                action="action",
+                id="agent_id",
+                transitions=wrong,
+            )
+
+    def test_transition_rows_are_checked(self, gridworld_df, transitions):
+        wrong = np.asarray(transitions).copy()
+        wrong[0, 0] *= 0.5
+        model = MCEIRLNeural(n_states=_N_STATES, n_actions=_N_ACTIONS)
+        with pytest.raises(ValueError, match="sum to one"):
+            model.fit(
+                gridworld_df,
+                state="state",
+                action="action",
+                id="agent_id",
+                transitions=wrong,
+            )
+
+    def test_diagnostics_and_normalization(self, fitted_model_state_action):
+        model = fitted_model_state_action
+        assert model.diagnostics_["transition_orientation"] == ("(n_actions, n_states, n_states)")
+        assert model.n_observations_ == 600
+        np.testing.assert_allclose(model.reward_[:, 0], 0.0, atol=1e-8)
+        assert model.termination_reason_ is not None
+        assert model.bellman_residual_ is not None
+
+    def test_action_mask_counterfactual(self, fitted_model_state_action):
+        mask = np.ones((_N_STATES, _N_ACTIONS), dtype=bool)
+        mask[:, 1] = False
+        result = fitted_model_state_action.counterfactual(action_mask=mask)
+        np.testing.assert_allclose(result.policy[:, 1], 0.0, atol=1e-8)
+        assert result.metadata["changed_primitive"] == "action_availability"
+
+    def test_reward_counterfactual(self, fitted_model_state_action):
+        delta = np.zeros((_N_STATES, _N_ACTIONS))
+        delta[:, 1] = 0.5
+        result = fitted_model_state_action.counterfactual(reward_delta=delta)
+        assert np.max(np.abs(result.policy_change)) > 0
+        assert result.metadata["changed_primitive"] == "reward"
+
+    def test_transition_counterfactual(self, fitted_model_state_action, transitions):
+        changed = np.asarray(transitions)[::-1].copy()
+        result = fitted_model_state_action.counterfactual(transitions=changed)
+        assert np.max(np.abs(result.policy_change)) > 0
+        assert result.metadata["changed_primitive"] == "transitions"
+
+    def test_counterfactual_requires_one_change(self, fitted_model_state_action):
+        with pytest.raises(ValueError, match="exactly one"):
+            fitted_model_state_action.counterfactual()
+        with pytest.raises(ValueError, match="exactly one"):
+            fitted_model_state_action.counterfactual(
+                reward_delta=np.zeros((_N_STATES, _N_ACTIONS)),
+                transitions=np.asarray(fitted_model_state_action.transitions_),
+            )
+
+    def test_counterfactual_cannot_reenable_masked_action(self, gridworld_df, transitions):
+        restricted_data = gridworld_df.loc[gridworld_df["action"] != 1].copy()
+        mask = np.ones((_N_STATES, _N_ACTIONS), dtype=bool)
+        mask[:, 1] = False
+        model = MCEIRLNeural(
+            n_states=_N_STATES,
+            n_actions=_N_ACTIONS,
+            discount=_DISCOUNT,
+            reward_type="state_action",
+            max_epochs=1,
+        )
+        model.fit(
+            restricted_data,
+            state="state",
+            action="action",
+            id="agent_id",
+            transitions=transitions,
+            action_mask=mask,
+        )
+        with pytest.raises(ValueError, match="may only remove actions"):
+            model.counterfactual(action_mask=np.ones_like(mask))
+
+    def test_simulation_is_seeded(self, fitted_model_state_action):
+        first = fitted_model_state_action.simulate(3, 4, seed=91)
+        second = fitted_model_state_action.simulate(3, 4, seed=91)
+        assert first.num_observations == 12
+        np.testing.assert_array_equal(first.all_states, second.all_states)
+        np.testing.assert_array_equal(first.all_actions, second.all_actions)
+
+    def test_exhausting_epochs_is_not_automatic_convergence(self, gridworld_df, transitions):
+        model = MCEIRLNeural(
+            n_states=_N_STATES,
+            n_actions=_N_ACTIONS,
+            max_epochs=1,
+            occupancy_tol=1e-12,
+        )
+        model.fit(
+            gridworld_df,
+            state="state",
+            action="action",
+            id="agent_id",
+            transitions=transitions,
+        )
+        assert model.converged_ is False
+        assert model.termination_reason_ == "occupancy_tolerance_not_met"
 
 
 # ---------------------------------------------------------------------------
@@ -630,9 +720,7 @@ class TestCustomArchitecture:
 
     def test_custom_conv_net_runs(self):
         n, g = 9, 3
-        df = _make_gridworld_data(
-            n_states=n, n_actions=_N_ACTIONS, n_individuals=15, n_periods=20
-        )
+        df = _make_gridworld_data(n_states=n, n_actions=_N_ACTIONS, n_individuals=15, n_periods=20)
         T = _make_gridworld_transitions(n, _N_ACTIONS)
         enc = lambda s: jnp.stack(  # noqa: E731
             [

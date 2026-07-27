@@ -29,17 +29,18 @@ import argparse
 import json
 import time
 from pathlib import Path
+from typing import Any
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import torch
 
-from econirl.environments.objectworld import ObjectworldEnvironment
-from econirl.environments.binaryworld import BinaryworldEnvironment
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import policy_iteration
 from econirl.core.types import DDCProblem, Panel
-from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
+from econirl.environments.binaryworld import BinaryworldEnvironment
+from econirl.environments.objectworld import ObjectworldEnvironment
+from econirl.estimation.mce_irl import MCEIRLConfig, MCEIRLEstimator
 from econirl.estimators.mceirl_neural import MCEIRLNeural
 from econirl.preferences.linear import LinearUtility
 
@@ -61,8 +62,8 @@ DISCOUNT = 0.9
 
 
 def compute_evd(
-    true_reward: torch.Tensor,
-    transitions: torch.Tensor,
+    true_reward,
+    transitions,
     learned_policy: np.ndarray,
     discount: float,
 ) -> float:
@@ -87,9 +88,12 @@ def compute_evd(
     n_actions = transitions.shape[0]
 
     # Build reward matrix (S, A) from state-only reward
-    reward_matrix = true_reward.unsqueeze(1).expand(n_states, n_actions).clone()
+    reward_matrix = jnp.broadcast_to(
+        jnp.asarray(true_reward)[:, None],
+        (n_states, n_actions),
+    )
 
-    # Compute V* via soft policy iteration under true reward
+    # Compute the reference soft policy under the true reward.
     problem = DDCProblem(
         num_states=n_states,
         num_actions=n_actions,
@@ -98,26 +102,23 @@ def compute_evd(
     )
     operator = SoftBellmanOperator(problem, transitions)
     result = policy_iteration(operator, reward_matrix)
-    V_star = result.V.numpy()
 
-    # Compute V^pi_learned under true reward via matrix inversion.
+    # Evaluate both policies under the same reward-only objective.
     # R_pi(s) = sum_a pi(a|s) * r(s,a)
     # P_pi(s, s') = sum_a pi(a|s) * P(s'|s,a)
     # V_pi = (I - gamma * P_pi)^{-1} R_pi
-    policy_np = np.asarray(learned_policy, dtype=np.float64)
-    r_true_np = true_reward.numpy().astype(np.float64)
+    r_true_np = np.asarray(true_reward, dtype=np.float64)
+    trans_np = np.asarray(transitions, dtype=np.float64)
+    identity = np.eye(n_states, dtype=np.float64)
 
-    # State-only reward: R_pi(s) = r(s) for all policies
-    R_pi = r_true_np.copy()
+    def reward_only_value(policy: np.ndarray) -> np.ndarray:
+        policy_np = np.asarray(policy, dtype=np.float64)
+        p_policy = np.einsum("sa,ast->st", policy_np, trans_np)
+        return np.linalg.solve(identity - discount * p_policy, r_true_np)
 
-    # P_pi[s, s'] = sum_a pi(a|s) * P(s'|s, a)
-    trans_np = transitions.numpy().astype(np.float64)
-    P_pi = np.einsum("sa,ast->st", policy_np, trans_np)
-
-    I = np.eye(n_states, dtype=np.float64)
-    V_learned = np.linalg.solve(I - discount * P_pi, R_pi)
-
-    evd = float(np.mean(V_star - V_learned))
+    value_reference = reward_only_value(np.asarray(result.policy))
+    value_learned = reward_only_value(np.asarray(learned_policy))
+    evd = float(np.mean(value_reference - value_learned))
     return evd
 
 
@@ -131,11 +132,13 @@ def panel_to_dataframe(panel: Panel) -> pd.DataFrame:
     rows = []
     for traj in panel.trajectories:
         for t in range(len(traj.states)):
-            rows.append({
-                "agent_id": traj.individual_id,
-                "state": traj.states[t].item(),
-                "action": traj.actions[t].item(),
-            })
+            rows.append(
+                {
+                    "agent_id": traj.individual_id,
+                    "state": traj.states[t].item(),
+                    "action": traj.actions[t].item(),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -151,7 +154,9 @@ def run_estimator_mce_neural(
     discount: float,
     max_epochs: int = 200,
     lr: float = 0.01,
-) -> np.ndarray:
+    training_seed: int = 0,
+    return_model: bool = False,
+) -> Any:
     """Fit MCEIRLNeural and return the learned policy.
 
     The neural reward network uses a 2-hidden-layer MLP with 64 units and
@@ -164,12 +169,18 @@ def run_estimator_mce_neural(
         discount: Discount factor.
         max_epochs: Maximum training epochs.
         lr: Learning rate.
+        training_seed: Neural network initialization seed.
+        return_model: Return the fitted estimator instead of only its policy.
 
     Returns:
         Learned policy of shape (n_states, n_actions) as numpy array.
     """
     n_states = env.num_states
     n_actions = env.num_actions
+    state_features = jnp.asarray(env.feature_matrix)[:, 0, :]
+
+    def encode_features(states: jnp.ndarray) -> jnp.ndarray:
+        return state_features[jnp.asarray(states, dtype=jnp.int32)]
 
     df = panel_to_dataframe(panel)
 
@@ -185,8 +196,9 @@ def run_estimator_mce_neural(
         inner_solver="hybrid",
         inner_tol=1e-8,
         inner_max_iter=5000,
-        state_encoder=env.encode_states,
-        state_dim=env.state_dim,
+        state_encoder=encode_features,
+        state_dim=int(state_features.shape[1]),
+        seed=training_seed,
         verbose=False,
     )
 
@@ -195,10 +207,14 @@ def run_estimator_mce_neural(
         state="state",
         action="action",
         id="agent_id",
-        transitions=env.transition_matrices.numpy(),
+        transitions=np.asarray(env.transition_matrices),
     )
 
-    return model.policy_
+    if return_model:
+        return model
+    if model.policy_ is None:
+        raise RuntimeError("MCEIRLNeural did not produce a policy")
+    return np.asarray(model.policy_)
 
 
 # -----------------------------------------------------------------------
@@ -210,7 +226,8 @@ def run_estimator_mce_linear(
     env,
     panel: Panel,
     discount: float,
-) -> np.ndarray:
+    return_result: bool = False,
+) -> Any:
     """Fit linear MCE-IRL and return the learned policy.
 
     Uses L-BFGS-B optimization with the hybrid inner solver for soft
@@ -230,16 +247,18 @@ def run_estimator_mce_linear(
         parameter_names=env.parameter_names,
     )
 
-    estimator = MCEIRLEstimator(config=MCEIRLConfig(
-        optimizer="L-BFGS-B",
-        inner_solver="hybrid",
-        inner_max_iter=5000,
-        inner_tol=1e-8,
-        outer_max_iter=500,
-        outer_tol=1e-6,
-        compute_se=False,
-        verbose=False,
-    ))
+    estimator = MCEIRLEstimator(
+        config=MCEIRLConfig(
+            optimizer="L-BFGS-B",
+            inner_solver="hybrid",
+            inner_max_iter=5000,
+            inner_tol=1e-8,
+            outer_max_iter=500,
+            outer_tol=1e-6,
+            compute_se=False,
+            verbose=False,
+        )
+    )
 
     result = estimator.estimate(
         panel,
@@ -249,8 +268,12 @@ def run_estimator_mce_linear(
     )
 
     policy = result.policy
-    if isinstance(policy, torch.Tensor):
-        return policy.numpy()
+    if return_result:
+        return result
+    if policy is None:
+        raise RuntimeError("MCE-IRL did not produce a policy")
+    if hasattr(policy, "detach"):
+        return policy.detach().cpu().numpy()
     return np.asarray(policy)
 
 
@@ -300,6 +323,7 @@ def run_benchmark(
             print(f"  {env_name} | N={n_demos}, seed={seed}")
 
             # Create environment with this seed
+            env: ObjectworldEnvironment | BinaryworldEnvironment
             if env_name == "objectworld":
                 env = ObjectworldEnvironment(
                     grid_size=grid_size,
@@ -328,12 +352,18 @@ def run_benchmark(
             t0 = time.time()
             try:
                 neural_policy = run_estimator_mce_neural(
-                    env, panel, grid_size, discount,
-                    max_epochs=max_epochs, lr=lr,
+                    env,
+                    panel,
+                    grid_size,
+                    discount,
+                    max_epochs=max_epochs,
+                    lr=lr,
                 )
                 neural_evd = compute_evd(
-                    env.true_reward, env.transition_matrices,
-                    neural_policy, discount,
+                    env.true_reward,
+                    env.transition_matrices,
+                    neural_policy,
+                    discount,
                 )
                 neural_time = time.time() - t0
                 print(f"    Neural EVD = {neural_evd:.4f} ({neural_time:.1f}s)")
@@ -346,8 +376,10 @@ def run_benchmark(
             try:
                 linear_policy = run_estimator_mce_linear(env, panel, discount)
                 linear_evd = compute_evd(
-                    env.true_reward, env.transition_matrices,
-                    linear_policy, discount,
+                    env.true_reward,
+                    env.transition_matrices,
+                    linear_policy,
+                    discount,
                 )
                 linear_time = time.time() - t0
                 print(f"    Linear EVD = {linear_evd:.4f} ({linear_time:.1f}s)")
@@ -406,39 +438,54 @@ def save_results(all_results: dict, output_path: Path) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Wulfmeier (2016) Deep MaxEnt IRL replication"
-    )
+    parser = argparse.ArgumentParser(description="Wulfmeier (2016) Deep MaxEnt IRL replication")
     parser.add_argument(
-        "--grid-size", type=int, default=GRID_SIZE,
+        "--grid-size",
+        type=int,
+        default=GRID_SIZE,
         help="Side length of the grid (default: 32)",
     )
     parser.add_argument(
-        "--demo-counts", type=int, nargs="+", default=DEMO_COUNTS,
+        "--demo-counts",
+        type=int,
+        nargs="+",
+        default=DEMO_COUNTS,
         help="Demonstration counts to test (default: 8 16 32 64 128)",
     )
     parser.add_argument(
-        "--n-seeds", type=int, default=N_SEEDS,
+        "--n-seeds",
+        type=int,
+        default=N_SEEDS,
         help="Number of random seeds per demo count (default: 5)",
     )
     parser.add_argument(
-        "--max-steps", type=int, default=MAX_STEPS,
+        "--max-steps",
+        type=int,
+        default=MAX_STEPS,
         help="Trajectory length for demonstrations (default: 50)",
     )
     parser.add_argument(
-        "--noise-fraction", type=float, default=NOISE_FRACTION,
+        "--noise-fraction",
+        type=float,
+        default=NOISE_FRACTION,
         help="Fraction of random actions in demonstrations (default: 0.3)",
     )
     parser.add_argument(
-        "--discount", type=float, default=DISCOUNT,
+        "--discount",
+        type=float,
+        default=DISCOUNT,
         help="Discount factor (default: 0.9)",
     )
     parser.add_argument(
-        "--max-epochs", type=int, default=200,
+        "--max-epochs",
+        type=int,
+        default=200,
         help="Maximum training epochs for MCEIRLNeural (default: 200)",
     )
     parser.add_argument(
-        "--lr", type=float, default=0.01,
+        "--lr",
+        type=float,
+        default=0.01,
         help="Learning rate for MCEIRLNeural (default: 0.01)",
     )
     args = parser.parse_args()
