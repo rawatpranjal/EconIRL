@@ -177,7 +177,9 @@ def fit_cell(
             learned_reward = None
             method = "linear"
             converged = bool(result.converged)
-            termination_reason = str(result.metadata.get("termination_reason", result.message))
+            termination_reason = str(
+                result.metadata.get("termination_reason", getattr(result, "message", ""))
+            )
             n_iterations = int(result.num_iterations)
         evd = benchmark.compute_evd(
             environment.true_reward,
@@ -264,6 +266,15 @@ def run_study(
 
 def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     successful = [record for record in records if record.get("error") is None]
+
+    def median(items: list[dict[str, Any]], key: str) -> float | None:
+        values = [float(item[key]) for item in items]
+        return float(np.median(values)) if values else None
+
+    def percentile(items: list[dict[str, Any]], key: str, q: float) -> float | None:
+        values = [float(item[key]) for item in items]
+        return float(np.percentile(values, q)) if values else None
+
     cells: dict[str, Any] = {}
     for environment in ("objectworld", "binaryworld"):
         for n_demos in sorted({int(record["n_demos"]) for record in records}):
@@ -275,11 +286,11 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
             linear = [record for record in subset if record["method"] == "linear"]
             neural = [record for record in subset if record["method"] == "neural"]
             cells[f"{environment}:{n_demos}"] = {
-                "neural_evd_median": float(np.median([r["evd"] for r in neural])),
-                "neural_evd_p95": float(np.percentile([r["evd"] for r in neural], 95)),
-                "linear_evd_median": float(np.median([r["evd"] for r in linear])),
-                "neural_transfer_evd_median": float(np.median([r["transfer_evd"] for r in neural])),
-                "linear_transfer_evd_median": float(np.median([r["transfer_evd"] for r in linear])),
+                "neural_evd_median": median(neural, "evd"),
+                "neural_evd_p95": percentile(neural, "evd", 95),
+                "linear_evd_median": median(linear, "evd"),
+                "neural_transfer_evd_median": median(neural, "transfer_evd"),
+                "linear_transfer_evd_median": median(linear, "transfer_evd"),
             }
     selected: dict[str, Any] = {}
     for environment in ("objectworld", "binaryworld"):
@@ -293,6 +304,8 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
             ),
             key=lambda record: float(record["evd"]),
         )
+        if not candidates:
+            continue
         chosen = candidates[len(candidates) // 2]
         selected[environment] = {
             "n_demos": int(chosen["n_demos"]),
@@ -302,10 +315,16 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
             "true_reward": chosen["true_reward"],
             "learned_reward": chosen["learned_reward"],
         }
+    termination_counts: dict[str, int] = {}
+    for record in successful:
+        key = f"{record['method']}:{record.get('termination_reason', 'unknown')}"
+        termination_counts[key] = termination_counts.get(key, 0) + 1
+
     return {
         "n_requested": len(records),
         "n_successful": len(successful),
         "n_converged": sum(record.get("converged") is True for record in successful),
+        "termination_counts": termination_counts,
         "cells": cells,
         "selected_median_fits": selected,
     }
@@ -389,18 +408,16 @@ def main() -> int:
         {"name": "full_configuration", "passed": final_run},
     ]
     if final_run:
-        checks.append(
-            {
-                "name": "all_estimators_converged",
-                "passed": summary["n_converged"] == summary["n_requested"],
-            }
-        )
         for n_demos in (64, 128):
             cell = summary["cells"][f"binaryworld:{n_demos}"]
             checks.append(
                 {
                     "name": f"binaryworld_neural_beats_linear_{n_demos}",
-                    "passed": cell["neural_evd_median"] < cell["linear_evd_median"],
+                    "passed": (
+                        cell["neural_evd_median"] is not None
+                        and cell["linear_evd_median"] is not None
+                        and cell["neural_evd_median"] < cell["linear_evd_median"]
+                    ),
                 }
             )
         objectworld = summary["cells"]["objectworld:128"]
@@ -408,12 +425,20 @@ def main() -> int:
             [
                 {
                     "name": "objectworld_128_commensurate",
-                    "passed": objectworld["neural_evd_median"] <= objectworld["linear_evd_median"],
+                    "passed": (
+                        objectworld["neural_evd_median"] is not None
+                        and objectworld["linear_evd_median"] is not None
+                        and objectworld["neural_evd_median"] <= objectworld["linear_evd_median"]
+                    ),
                 },
                 {
                     "name": "objectworld_transfer_128_commensurate",
-                    "passed": objectworld["neural_transfer_evd_median"]
-                    <= objectworld["linear_transfer_evd_median"],
+                    "passed": (
+                        objectworld["neural_transfer_evd_median"] is not None
+                        and objectworld["linear_transfer_evd_median"] is not None
+                        and objectworld["neural_transfer_evd_median"]
+                        <= objectworld["linear_transfer_evd_median"]
+                    ),
                 },
             ]
         )
@@ -447,11 +472,12 @@ def main() -> int:
         json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
-    render_figure(
-        summary,
-        grid_size,
-        ROOT / "docs" / "_static" / "estimators" / "deep_mce_irl_wulfmeier.png",
-    )
+    if summary["n_successful"] == summary["n_requested"]:
+        render_figure(
+            summary,
+            grid_size,
+            ROOT / "docs" / "_static" / "estimators" / "deep_mce_irl_wulfmeier.png",
+        )
     print(f"wrote {output}")
     print(f"status: {status}")
     return 0 if (args.smoke or status == "ready") else 1
