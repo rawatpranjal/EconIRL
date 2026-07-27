@@ -162,6 +162,9 @@ def fit_cell(
             transfer_policy = neural_transfer_policy(model, transfer)
             learned_reward = np.asarray(model.reward_, dtype=float).tolist()
             method = "neural"
+            converged = model.converged_ is True
+            termination_reason = model.termination_reason_
+            n_iterations = model.n_epochs_
         else:
             result = benchmark.run_estimator_mce_linear(
                 environment,
@@ -173,6 +176,9 @@ def fit_cell(
             transfer_policy = linear_transfer_policy(result, transfer)
             learned_reward = None
             method = "linear"
+            converged = bool(result.converged)
+            termination_reason = str(result.metadata.get("termination_reason", result.message))
+            n_iterations = int(result.num_iterations)
         evd = benchmark.compute_evd(
             environment.true_reward,
             environment.transition_matrices,
@@ -196,6 +202,9 @@ def fit_cell(
             "true_reward": np.asarray(environment.true_reward, dtype=float).tolist(),
             "learned_reward": learned_reward,
             "runtime_seconds": time.perf_counter() - started,
+            "converged": converged,
+            "termination_reason": termination_reason,
+            "n_iterations": n_iterations,
             "error": None,
         }
     except Exception as exc:  # noqa: BLE001 - failures are evidence
@@ -296,6 +305,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "n_requested": len(records),
         "n_successful": len(successful),
+        "n_converged": sum(record.get("converged") is True for record in successful),
         "cells": cells,
         "selected_median_fits": selected,
     }
@@ -379,6 +389,12 @@ def main() -> int:
         {"name": "full_configuration", "passed": final_run},
     ]
     if final_run:
+        checks.append(
+            {
+                "name": "all_estimators_converged",
+                "passed": summary["n_converged"] == summary["n_requested"],
+            }
+        )
         for n_demos in (64, 128):
             cell = summary["cells"][f"binaryworld:{n_demos}"]
             checks.append(
