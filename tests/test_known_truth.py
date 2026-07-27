@@ -458,15 +458,13 @@ def test_shapeshifter_neural_reward_bridge_has_no_finite_theta_and_full_masks():
     assert set(metrics["counterfactuals"]) == {"type_a", "type_b", "type_c"}
 
     gate_names = {
-        gate.name
-        for gate in recovery_gates("MCE-IRL Deep", summary, metrics, smoke=False)
+        gate.name for gate in recovery_gates("MCE-IRL Deep", summary, metrics, smoke=False)
     }
     assert "projected_parameter_cosine" not in gate_names
     assert "projected_parameter_relative_rmse" not in gate_names
     assert "occupancy_moment_residual" in gate_names
     assert all(
-        gate.passed
-        for gate in recovery_gates("MCE-IRL Deep", summary, metrics, smoke=False)
+        gate.passed for gate in recovery_gates("MCE-IRL Deep", summary, metrics, smoke=False)
     )
 
 
@@ -558,10 +556,7 @@ def test_ccp_smoke_fit_produces_known_truth_metrics_and_gates():
     assert math.isfinite(metrics["q_rmse"])
     assert metrics["policy"].tv >= 0.0
 
-    gate_names = {
-        gate.name
-        for gate in recovery_gates("CCP", result.summary, metrics, smoke=False)
-    }
+    gate_names = {gate.name for gate in recovery_gates("CCP", result.summary, metrics, smoke=False)}
     assert {
         "npl_iterations",
         "standard_errors_finite",
@@ -610,8 +605,7 @@ def test_mpec_smoke_fit_produces_known_truth_metrics_and_gates():
     assert metrics["policy"].tv >= 0.0
 
     gate_names = {
-        gate.name
-        for gate in recovery_gates("MPEC", result.summary, metrics, smoke=False)
+        gate.name for gate in recovery_gates("MPEC", result.summary, metrics, smoke=False)
     }
     assert {
         "converged",
@@ -663,8 +657,7 @@ def test_sees_smoke_fit_produces_known_truth_metrics_and_gates():
     assert metrics["policy"].tv >= 0.0
 
     gate_names = {
-        gate.name
-        for gate in recovery_gates("SEES", result.summary, metrics, smoke=False)
+        gate.name for gate in recovery_gates("SEES", result.summary, metrics, smoke=False)
     }
     assert {
         "bellman_violation",
@@ -720,8 +713,7 @@ def test_nnes_smoke_fit_produces_known_truth_metrics_and_gates():
     assert metrics["policy"].tv >= 0.0
 
     gate_names = {
-        gate.name
-        for gate in recovery_gates("NNES", result.summary, metrics, smoke=False)
+        gate.name for gate in recovery_gates("NNES", result.summary, metrics, smoke=False)
     }
     assert {
         "npl_outer_iterations",
@@ -772,8 +764,7 @@ def test_mce_irl_smoke_fit_produces_known_truth_metrics_and_gates():
     assert metrics["policy"].tv >= 0.0
 
     gate_names = {
-        gate.name
-        for gate in recovery_gates("MCE-IRL", result.summary, metrics, smoke=False)
+        gate.name for gate in recovery_gates("MCE-IRL", result.summary, metrics, smoke=False)
     }
     assert {
         "converged",
@@ -832,14 +823,11 @@ def test_mce_irl_deep_smoke_fit_produces_known_truth_metrics_and_gates():
     assert metrics["policy"].tv >= 0.0
 
     gate_names = {
-        gate.name
-        for gate in recovery_gates("MCE-IRL Deep", result.summary, metrics, smoke=False)
+        gate.name for gate in recovery_gates("MCE-IRL Deep", result.summary, metrics, smoke=False)
     }
     assert {
         "converged",
         "occupancy_moment_residual",
-        "projected_parameter_cosine",
-        "projected_parameter_relative_rmse",
         "reward_normalized_rmse",
         "policy_tv",
         "value_normalized_rmse",
@@ -850,6 +838,8 @@ def test_mce_irl_deep_smoke_fit_produces_known_truth_metrics_and_gates():
     }.issubset(gate_names)
     assert "parameter_cosine" not in gate_names
     assert "parameter_relative_rmse" not in gate_names
+    assert "projected_parameter_cosine" not in gate_names
+    assert "projected_parameter_relative_rmse" not in gate_names
 
 
 def test_mce_irl_deep_accepts_shapeshifter_neural_reward_smoke_case():
@@ -931,8 +921,7 @@ def test_airl_smoke_fit_produces_diagnostic_known_truth_gates():
     assert math.isfinite(result.metrics["q_normalized_rmse"])
 
     gate_names = {
-        gate.name
-        for gate in recovery_gates("AIRL", result.summary, result.metrics, smoke=False)
+        gate.name for gate in recovery_gates("AIRL", result.summary, result.metrics, smoke=False)
     }
     assert {
         "converged",
@@ -1052,8 +1041,7 @@ def test_gladius_non_smoke_gates_require_structural_recovery():
     weak_metrics["projected_reward_normalized_rmse"] = 0.80
     weak_gates = recovery_gates("GLADIUS", summary, weak_metrics, smoke=False)
     projected_gate = next(
-        gate for gate in weak_gates
-        if gate.name == "projected_reward_normalized_rmse"
+        gate for gate in weak_gates if gate.name == "projected_reward_normalized_rmse"
     )
     assert not projected_gate.passed
 
@@ -1101,8 +1089,7 @@ def test_iq_learn_non_smoke_gates_require_structural_recovery():
     weak_metrics["raw_bellman_reward_normalized_rmse"] = 0.40
     weak_gates = recovery_gates("IQ-Learn", summary, weak_metrics, smoke=False)
     raw_gate = next(
-        gate for gate in weak_gates
-        if gate.name == "raw_bellman_reward_normalized_rmse"
+        gate for gate in weak_gates if gate.name == "raw_bellman_reward_normalized_rmse"
     )
     assert not raw_gate.passed
 
