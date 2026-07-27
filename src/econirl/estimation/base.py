@@ -16,6 +16,7 @@ from typing import Any, Protocol, runtime_checkable
 
 import jax.numpy as jnp
 
+from econirl.core.transition_models import TransitionModel
 from econirl.core.types import DDCProblem, Panel
 from econirl.inference.results import EstimationSummary
 from econirl.inference.standard_errors import SEMethod
@@ -77,7 +78,7 @@ class Estimator(Protocol):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: jnp.ndarray,
+        transitions: TransitionModel,
         **kwargs,
     ) -> EstimationSummary:
         """Estimate utility parameters from panel data.
@@ -131,7 +132,7 @@ class BaseEstimator(ABC):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: jnp.ndarray,
+        transitions: TransitionModel,
         initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationResult:
@@ -155,7 +156,7 @@ class BaseEstimator(ABC):
         panel: Panel,
         utility: UtilityFunction,
         problem: DDCProblem,
-        transitions: jnp.ndarray,
+        transitions: TransitionModel,
         initial_params: jnp.ndarray | None = None,
         **kwargs,
     ) -> EstimationSummary:
@@ -222,6 +223,7 @@ class BaseEstimator(ABC):
                             problem=problem,
                             transitions=transitions,
                             initial_params=result.parameters,  # Warm start
+                            **kwargs,
                         )
                     finally:
                         self._compute_hessian = saved_compute_hessian
@@ -265,7 +267,10 @@ class BaseEstimator(ABC):
             num_observations=n_obs,
             aic=-2 * ll + 2 * n_params,
             bic=-2 * ll + n_params * float(jnp.log(jnp.array(n_obs))),
-            prediction_accuracy=self._compute_prediction_accuracy(panel, result.policy),
+            prediction_accuracy=result.metadata.get(
+                "prediction_accuracy",
+                self._compute_prediction_accuracy(panel, result.policy),
+            ),
         )
 
         total_time = time.time() - start_time

@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 import econirl._jax_config  # noqa: F401  # enable float64 before any JAX usage
 
 """
@@ -54,6 +55,7 @@ __version__ = "0.0.10"
 from econirl import datasets
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.sufficient_stats import SufficientStats
+from econirl.core.tasks import MCEIRLTask
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 
 # Environments
@@ -86,7 +88,7 @@ from econirl.estimators import (
 from econirl.preferences.linear import LinearUtility
 
 # Sklearn-style Transition Estimator
-from econirl.transitions import TransitionEstimator
+from econirl.transitions import DeterministicTransitions, TransitionEstimator
 
 # Sklearn-style Utilities
 from econirl.utilities import LinearCost, Utility, make_utility
@@ -141,6 +143,8 @@ __all__ = [
     "make_utility",
     # Sklearn-style Transition Estimator
     "TransitionEstimator",
+    "DeterministicTransitions",
+    "MCEIRLTask",
     # Legacy API (for backward compatibility)
     "LinearUtility",
     "NFXPEstimator",

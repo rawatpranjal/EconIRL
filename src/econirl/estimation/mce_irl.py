@@ -36,14 +36,22 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.optimizer import minimize_lbfgsb
-from econirl.core.solvers import hybrid_iteration, policy_iteration, value_iteration, backward_induction
+from econirl.core.solvers import (
+    hybrid_iteration,
+    policy_iteration,
+    value_iteration,
+)
+from econirl.core.transition_models import (
+    DeterministicTransitions,
+    TransitionModel,
+    advance_distribution,
+)
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.preferences.action_reward import ActionDependentReward
@@ -78,7 +86,9 @@ class MCEIRLConfig:
 
     # Occupancy distance convergence (from imitation library, Gleave & Toyer 2022)
     # Checks L-infinity distance between demo and policy occupancy measures
-    occupancy_tol: float = 1e-3  # max|D_demo - D_policy| convergence threshold
+    occupancy_tol: float = 2e-2  # max|D_demo - D_policy| convergence threshold
+    feature_tol: float = 2e-2
+    l2_regularization: float = 0.0
 
     # Inference
     compute_se: bool = True
@@ -138,6 +148,10 @@ class MCEIRLEstimator(BaseEstimator):
             for key, value in kwargs.items():
                 if hasattr(config, key):
                     setattr(config, key, value)
+        if config.l2_regularization < 0:
+            raise ValueError("l2_regularization must be nonnegative")
+        if config.feature_tol <= 0 or config.occupancy_tol <= 0:
+            raise ValueError("feature_tol and occupancy_tol must be positive")
 
         # Map "hessian" to "asymptotic" for compatibility with standard_errors module
         # (they are semantically equivalent: both use inverse Hessian for variance)
@@ -193,12 +207,26 @@ class MCEIRLEstimator(BaseEstimator):
             Whether the iteration converged (always True for finite horizon).
         """
         if num_periods is not None:
-            # Finite horizon: backward induction (deterministic, no convergence needed)
-            fh_result = backward_induction(operator, reward_matrix, num_periods)
-            return fh_result.V, fh_result.policy, True
+            # Finite horizon: retain the complete time-indexed recursion.
+            V_next = jnp.zeros(
+                operator.problem.num_states,
+                dtype=reward_matrix.dtype,
+            )
+            values = []
+            policies = []
+            for _ in range(num_periods):
+                result = operator.apply(reward_matrix, V_next)
+                values.append(result.V)
+                policies.append(result.policy)
+                V_next = result.V
+            return (
+                jnp.stack(values[::-1]),
+                jnp.stack(policies[::-1]),
+                True,
+            )
 
         if self.config.inner_solver == "policy":
-            result = policy_iteration(
+            solver_result = policy_iteration(
                 operator,
                 reward_matrix,
                 V_init=V_init,
@@ -206,9 +234,9 @@ class MCEIRLEstimator(BaseEstimator):
                 max_iter=self.config.inner_max_iter,
                 eval_method="matrix",
             )
-            return result.V, result.policy, result.converged
+            return solver_result.V, solver_result.policy, solver_result.converged
         elif self.config.inner_solver == "hybrid":
-            result = hybrid_iteration(
+            solver_result = hybrid_iteration(
                 operator,
                 reward_matrix,
                 V_init=V_init,
@@ -216,22 +244,22 @@ class MCEIRLEstimator(BaseEstimator):
                 max_iter=self.config.inner_max_iter,
                 switch_tol=self.config.switch_tol,
             )
-            return result.V, result.policy, result.converged
+            return solver_result.V, solver_result.policy, solver_result.converged
         else:
             # Pure value iteration (original implementation)
-            result = value_iteration(
+            solver_result = value_iteration(
                 operator,
                 reward_matrix,
                 V_init=V_init,
                 tol=self.config.inner_tol,
                 max_iter=self.config.inner_max_iter,
             )
-            return result.V, result.policy, result.converged
+            return solver_result.V, solver_result.policy, solver_result.converged
 
     def _compute_state_visitation(
         self,
         policy: jnp.ndarray,
-        transitions: jnp.ndarray,
+        transitions: TransitionModel,
         problem: DDCProblem,
         initial_dist: jnp.ndarray | None = None,
     ) -> jnp.ndarray:
@@ -264,18 +292,16 @@ class MCEIRLEstimator(BaseEstimator):
         else:
             D = jnp.array(initial_dist)
 
-        # Compute policy-weighted transition: P_π(s'|s) = Σ_a π(a|s) P(s'|s,a)
-        # transitions: (n_actions, n_states, n_states) = [a, from_s, to_s]
-        # policy: (n_states, n_actions) = [s, a]
-        P_pi = jnp.einsum("sa,ast->st", policy, transitions)
-
         # Fixed point iteration: D = ρ₀ + γ P_π^T D
         # Equivalently: D = (I - γ P_π^T)^{-1} ρ₀
         # But we use iteration for numerical stability
 
         rho0 = jnp.array(D)
         for i in range(self.config.svf_max_iter):
-            D_new = rho0 + gamma * (P_pi.T @ D)
+            D_new = rho0 + gamma * advance_distribution(
+                transitions,
+                D[:, None] * policy,
+            )
 
             delta = float(jnp.abs(D_new - D).max())
             D = D_new
@@ -357,9 +383,9 @@ class MCEIRLEstimator(BaseEstimator):
         elif isinstance(reward_fn, LinearReward):
             feature_matrix = reward_fn.state_features  # (S, K)
         else:
-            if hasattr(reward_fn, 'feature_matrix'):
+            if hasattr(reward_fn, "feature_matrix"):
                 feature_matrix = reward_fn.feature_matrix
-            elif hasattr(reward_fn, 'state_features'):
+            elif hasattr(reward_fn, "state_features"):
                 feature_matrix = reward_fn.state_features
             else:
                 raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
@@ -382,12 +408,50 @@ class MCEIRLEstimator(BaseEstimator):
             )
             return D_s @ feature_matrix
 
+    def _compute_empirical_features_finite_horizon(
+        self,
+        panel: Panel,
+        reward_fn: BaseUtilityFunction,
+        num_periods: int,
+        discount: float,
+    ) -> jnp.ndarray:
+        """Compute expert moments on the model's fixed finite-horizon scale.
+
+        A short route is treated as entering an absorbing terminal state with
+        zero features. Demonstrations therefore do not need artificial
+        terminal actions to use the same denominator as the forward pass.
+        """
+        if hasattr(reward_fn, "feature_matrix"):
+            feature_matrix = np.asarray(reward_fn.feature_matrix)
+        elif hasattr(reward_fn, "state_features"):
+            feature_matrix = np.asarray(reward_fn.state_features)
+        else:
+            raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
+
+        feature_sum = np.zeros(feature_matrix.shape[-1], dtype=np.float64)
+        for trajectory in panel.trajectories:
+            states = np.asarray(trajectory.states, dtype=np.int64)
+            actions = np.asarray(trajectory.actions, dtype=np.int64)
+            for period in range(min(len(trajectory), num_periods)):
+                if feature_matrix.ndim == 3:
+                    feature_sum += (
+                        discount**period * feature_matrix[states[period], actions[period]]
+                    )
+                else:
+                    feature_sum += discount**period * feature_matrix[states[period]]
+
+        total_weight = sum(discount**period for period in range(num_periods))
+        denominator = len(panel.trajectories) * total_weight
+        if denominator == 0:
+            return jnp.zeros(feature_matrix.shape[-1], dtype=jnp.float64)
+        return jnp.asarray(feature_sum / denominator)
+
     def _compute_expected_features(
         self,
         panel: Panel,
         policy: jnp.ndarray,
         reward_fn: BaseUtilityFunction,
-        transitions: jnp.ndarray | None = None,
+        transitions: TransitionModel | None = None,
         initial_dist: jnp.ndarray | None = None,
         discount: float = 0.9,
     ) -> jnp.ndarray:
@@ -432,9 +496,9 @@ class MCEIRLEstimator(BaseEstimator):
         elif isinstance(reward_fn, LinearReward):
             feature_matrix = reward_fn.state_features  # (n_states, n_features)
         else:
-            if hasattr(reward_fn, 'feature_matrix'):
+            if hasattr(reward_fn, "feature_matrix"):
                 feature_matrix = reward_fn.feature_matrix
-            elif hasattr(reward_fn, 'state_features'):
+            elif hasattr(reward_fn, "state_features"):
                 feature_matrix = reward_fn.state_features
             else:
                 raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
@@ -464,9 +528,15 @@ class MCEIRLEstimator(BaseEstimator):
         total_obs = sum(len(traj) for traj in panel.trajectories)
 
         if feature_matrix.ndim == 3:
-            all_states_np = np.asarray(panel.get_all_states()) if hasattr(panel.get_all_states(), '__len__') else np.concatenate([np.asarray(traj.states) for traj in panel.trajectories])
+            all_states_np = (
+                np.asarray(panel.get_all_states())
+                if hasattr(panel.get_all_states(), "__len__")
+                else np.concatenate([np.asarray(traj.states) for traj in panel.trajectories])
+            )
             all_states_idx = jnp.array(all_states_np)
-            feature_sum = (policy[all_states_idx][:, :, None] * feature_matrix[all_states_idx]).sum(axis=(0, 1))
+            feature_sum = (policy[all_states_idx][:, :, None] * feature_matrix[all_states_idx]).sum(
+                axis=(0, 1)
+            )
             if total_obs > 0:
                 return feature_sum / total_obs
             return feature_sum
@@ -484,7 +554,7 @@ class MCEIRLEstimator(BaseEstimator):
         policy: jnp.ndarray,
         reward_fn: BaseUtilityFunction,
         num_periods: int,
-        transitions: jnp.ndarray | None = None,
+        transitions: TransitionModel | None = None,
         initial_dist: jnp.ndarray | None = None,
         discount: float = 0.95,
     ) -> jnp.ndarray:
@@ -506,15 +576,14 @@ class MCEIRLEstimator(BaseEstimator):
         discount : float
             Discount factor γ.
         """
-        if hasattr(reward_fn, 'feature_matrix'):
+        if hasattr(reward_fn, "feature_matrix"):
             feature_matrix = reward_fn.feature_matrix
-        elif hasattr(reward_fn, 'state_features'):
+        elif hasattr(reward_fn, "state_features"):
             feature_matrix = reward_fn.state_features
         else:
             raise ValueError(f"Unsupported reward function type: {type(reward_fn)}")
 
         n_states = policy.shape[1]
-        n_actions = policy.shape[2]
 
         if initial_dist is None:
             D_t = jnp.ones(n_states) / n_states
@@ -527,20 +596,22 @@ class MCEIRLEstimator(BaseEstimator):
         for t in range(num_periods):
             if feature_matrix.ndim == 3:
                 # E_π[φ]_t = γ^t Σ_s D_t(s) Σ_a π_t(a|s) φ(s,a,k)
-                feature_sum = feature_sum + (discount ** t) * jnp.einsum(
+                feature_sum = feature_sum + (discount**t) * jnp.einsum(
                     "s,sa,sak->k", D_t, policy[t], feature_matrix
                 )
             else:
                 # State-only: E_π[φ]_t = γ^t Σ_s D_t(s) φ(s,k)
-                feature_sum = feature_sum + (discount ** t) * (D_t @ feature_matrix)
+                feature_sum = feature_sum + (discount**t) * (D_t @ feature_matrix)
 
             # Advance state distribution: D_{t+1}(s') = Σ_s Σ_a D_t(s) π_t(a|s) P(s'|s,a)
             if transitions is not None and t < num_periods - 1:
-                P_pi_t = jnp.einsum("sa,ast->st", policy[t], transitions)
-                D_t = P_pi_t.T @ D_t
+                D_t = advance_distribution(
+                    transitions,
+                    D_t[:, None] * policy[t],
+                )
 
         # Normalize by total discounted weight
-        total_weight = sum(discount ** t for t in range(num_periods))
+        total_weight = sum(discount**t for t in range(num_periods))
         return feature_sum / total_weight
 
     def _compute_initial_distribution(
@@ -549,9 +620,7 @@ class MCEIRLEstimator(BaseEstimator):
         n_states: int,
     ) -> jnp.ndarray:
         """Compute initial state distribution from data."""
-        init_states_list = [
-            int(traj.states[0]) for traj in panel.trajectories if len(traj) > 0
-        ]
+        init_states_list = [int(traj.states[0]) for traj in panel.trajectories if len(traj) > 0]
         counts_np = np.zeros(n_states, dtype=np.float32)
         init_states_np = np.array(init_states_list, dtype=np.int64)
         np.add.at(counts_np, init_states_np, 1.0)
@@ -566,7 +635,7 @@ class MCEIRLEstimator(BaseEstimator):
         panel: Panel,
         utility: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: jnp.ndarray,
+        transitions: TransitionModel,
         initial_params: jnp.ndarray | None = None,
         true_params: jnp.ndarray | None = None,
         **kwargs,
@@ -584,8 +653,16 @@ class MCEIRLEstimator(BaseEstimator):
         # Use float64 for the Bellman operator to handle high discount factors
         # (condition number of (I - beta*P) ~ 1/(1-beta), so float32 is insufficient
         # for beta > 0.99)
-        transitions_f64 = transitions.astype(jnp.float64)
-        operator = SoftBellmanOperator(problem, transitions_f64)
+        if isinstance(transitions, DeterministicTransitions):
+            transitions_f64: TransitionModel = transitions
+        else:
+            transitions_f64 = transitions.astype(jnp.float64)
+        terminal_states = kwargs.get("terminal_states")
+        operator = SoftBellmanOperator(
+            problem,
+            transitions_f64,
+            terminal_states=terminal_states,
+        )
 
         # Initialize parameters
         if initial_params is None:
@@ -593,15 +670,46 @@ class MCEIRLEstimator(BaseEstimator):
         else:
             params = jnp.array(initial_params)
 
-        # Compute empirical features (constant) — all in float64 for precision
-        empirical_features = self._compute_empirical_features(
-            panel,
-            reward_fn,
-            problem.num_states,
-            problem.num_actions,
-            discount=problem.discount_factor,
-        ).astype(jnp.float64)
-        initial_dist = self._compute_initial_distribution(panel, problem.num_states).astype(jnp.float64)
+        finite_horizon = problem.num_periods is not None
+        num_periods = problem.num_periods
+        if finite_horizon:
+            assert num_periods is not None
+            if max(panel.num_periods_per_individual) > num_periods:
+                raise ValueError("a demonstration is longer than problem.num_periods")
+
+        # Compute empirical features (constant) — all in float64 for precision.
+        if finite_horizon:
+            empirical_features = self._compute_empirical_features_finite_horizon(
+                panel,
+                reward_fn,
+                num_periods,
+                problem.discount_factor,
+            )
+        else:
+            empirical_features = self._compute_empirical_features(
+                panel,
+                reward_fn,
+                problem.num_states,
+                problem.num_actions,
+                discount=problem.discount_factor,
+            ).astype(jnp.float64)
+
+        supplied_initial_dist = kwargs.get("initial_dist")
+        if supplied_initial_dist is None:
+            initial_dist = self._compute_initial_distribution(panel, problem.num_states)
+        else:
+            initial_dist = jnp.asarray(supplied_initial_dist)
+            if initial_dist.shape != (problem.num_states,):
+                raise ValueError(
+                    f"initial_dist must have shape ({problem.num_states},), "
+                    f"got {initial_dist.shape}"
+                )
+            if bool(jnp.any(initial_dist < 0)) or not np.isclose(
+                float(initial_dist.sum()),
+                1.0,
+            ):
+                raise ValueError("initial_dist must be nonnegative and sum to one")
+        initial_dist = initial_dist.astype(jnp.float64)
 
         # Compute empirical state occupancy (constant) for occupancy distance check
         # Following Gleave & Toyer (2022): convergence when max|D_demo - D_policy| < tol
@@ -615,7 +723,8 @@ class MCEIRLEstimator(BaseEstimator):
         D_sa_demo = D_sa_demo.astype(jnp.float64)
 
         self._log(f"Empirical features: {empirical_features}")
-        self._log(f"Initial distribution entropy: {-(initial_dist * jnp.log(initial_dist + 1e-10)).sum():.3f}")
+        initial_entropy = -(initial_dist * jnp.log(initial_dist + 1e-10)).sum()
+        self._log(f"Initial distribution entropy: {initial_entropy:.3f}")
 
         # Tracking
         n_function_evals = 0
@@ -627,6 +736,9 @@ class MCEIRLEstimator(BaseEstimator):
 
             all_states = panel.get_all_states()
             all_actions = panel.get_all_actions()
+            all_periods = jnp.concatenate(
+                [jnp.arange(len(traj), dtype=jnp.int32) for traj in panel.trajectories]
+            )
 
             prev_V = [None]  # mutable container for warm-starting
             gamma = problem.discount_factor
@@ -639,18 +751,55 @@ class MCEIRLEstimator(BaseEstimator):
                 # Compute reward in float64 for numerical precision with high discount factors
                 reward_matrix = reward_fn.compute(theta.astype(jnp.float32)).astype(jnp.float64)
                 V, policy, converged = self._soft_value_iteration(
-                    operator, reward_matrix, V_init=prev_V[0],
+                    operator,
+                    reward_matrix,
+                    num_periods=num_periods,
+                    V_init=prev_V[0],
                 )
                 prev_V[0] = jnp.array(V)
                 if not converged:
                     inner_not_converged += 1
                 # Log-likelihood: LL = Σ_t log π(a_t|s_t)
+                if finite_horizon:
+                    log_policy = jnp.log(jnp.clip(policy, 1e-300, 1.0))
+                    clipped_periods = jnp.minimum(all_periods, num_periods - 1)
+                    ll = float(
+                        log_policy[
+                            clipped_periods,
+                            all_states,
+                            all_actions,
+                        ].sum()
+                    )
+                    expected = self._compute_expected_features_finite_horizon(
+                        panel,
+                        policy,
+                        reward_fn,
+                        num_periods,
+                        transitions=transitions_f64,
+                        initial_dist=initial_dist,
+                        discount=problem.discount_factor,
+                    )
+                    grad_ll = np.asarray(
+                        (empirical_features - expected) * panel.num_observations / sigma,
+                        dtype=np.float64,
+                    )
+                    if n_function_evals % 10 == 0:
+                        self._log(
+                            f"Eval {n_function_evals}: NLL={-ll:.2f}, "
+                            f"||grad||={np.linalg.norm(grad_ll):.6f}"
+                        )
+                    return -ll, -grad_ll
+
                 log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
                 ll = float(log_probs[all_states, all_actions].sum())
                 # Analytical gradient via implicit differentiation (same as NFXP):
                 # dV/dθ_k = (I - γ P_π)^{-1} [Σ_a π(a|s) φ(s,a,k)]
                 # dLL/dθ_k = (1/σ) Σ_t [dQ_k(s_t,a_t) - dV_k(s_t)]
-                fm = reward_fn.feature_matrix.astype(jnp.float64) if hasattr(reward_fn, 'feature_matrix') else reward_fn.state_features.astype(jnp.float64)
+                fm = (
+                    reward_fn.feature_matrix.astype(jnp.float64)
+                    if hasattr(reward_fn, "feature_matrix")
+                    else reward_fn.state_features.astype(jnp.float64)
+                )
                 n_params = fm.shape[-1]
                 n_states = problem.num_states
                 # Build P_π: policy-weighted transition matrix
@@ -674,57 +823,198 @@ class MCEIRLEstimator(BaseEstimator):
                     dQ_obs = dQ_k[all_states, all_actions]  # (N,)
                     dV_obs = (policy[all_states] * dQ_k[all_states]).sum(axis=1)  # (N,)
                     grad_ll[k] = float(((dQ_obs - dV_obs) / sigma).sum())
+                penalty = (
+                    panel.num_observations
+                    * self.config.l2_regularization
+                    * float(jnp.sum(theta**2))
+                )
+                grad_ll -= (
+                    2.0 * panel.num_observations * self.config.l2_regularization * np.asarray(theta)
+                )
                 if n_function_evals % 10 == 0:
-                    self._log(f"Eval {n_function_evals}: NLL={-ll:.2f}, ||grad||={np.linalg.norm(grad_ll):.6f}")
-                return -ll, -grad_ll
+                    gradient_norm = np.linalg.norm(grad_ll)
+                    self._log(
+                        f"Eval {n_function_evals}: NLL={-ll:.2f}, ||grad||={gradient_norm:.6f}"
+                    )
+                return -(ll - penalty), -grad_ll
 
-            result_opt = minimize_lbfgsb(
-                neg_ll_and_grad,
-                jnp.asarray(params, dtype=jnp.float64),
-                bounds=None,
-                maxiter=self.config.outer_max_iter,
-                tol=self.config.outer_tol,
-                verbose=self.config.verbose,
-                desc="MCE-IRL L-BFGS-B",
-                value_and_grad=True,
-                jit=False,
-            )
+            if finite_horizon:
+                from scipy.optimize import root as scipy_root
+
+                def finite_feature_residual(theta_np: np.ndarray) -> np.ndarray:
+                    theta = jnp.asarray(theta_np, dtype=jnp.float64)
+                    reward_matrix = reward_fn.compute(theta).astype(jnp.float64)
+                    _, finite_policy, _ = self._soft_value_iteration(
+                        operator,
+                        reward_matrix,
+                        num_periods=num_periods,
+                    )
+                    expected = self._compute_expected_features_finite_horizon(
+                        panel,
+                        finite_policy,
+                        reward_fn,
+                        num_periods,
+                        transitions=transitions_f64,
+                        initial_dist=initial_dist,
+                        discount=problem.discount_factor,
+                    )
+                    stationarity = (
+                        empirical_features - expected - 2.0 * self.config.l2_regularization * theta
+                    )
+                    return np.asarray(stationarity, dtype=np.float64)
+
+                result_opt = scipy_root(
+                    finite_feature_residual,
+                    np.asarray(params, dtype=np.float64),
+                    method="hybr",
+                    tol=self.config.outer_tol,
+                    options={"maxfev": self.config.outer_max_iter * (len(params) + 1)},
+                )
+                n_function_evals = int(getattr(result_opt, "nfev", 0))
+            else:
+                result_opt = minimize_lbfgsb(
+                    neg_ll_and_grad,
+                    jnp.asarray(params, dtype=jnp.float64),
+                    bounds=None,
+                    maxiter=self.config.outer_max_iter,
+                    tol=self.config.outer_tol,
+                    verbose=self.config.verbose,
+                    desc="MCE-IRL L-BFGS-B",
+                    value_and_grad=True,
+                    jit=False,
+                )
             final_params = jnp.array(result_opt.x, dtype=jnp.float32)
-            converged = result_opt.success
+            optimizer_converged = bool(result_opt.success)
 
             # Final solution
             reward_matrix = reward_fn.compute(final_params).astype(jnp.float64)
-            V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
-            D = self._compute_state_visitation(policy, transitions_f64, problem, initial_dist)
-            D_sa = D[:, None] * policy
-            occupancy_moment_residual = float(jnp.max(jnp.abs(D_sa_demo - D_sa)))
-            final_expected = self._compute_expected_features(
-                panel, policy, reward_fn,
-                transitions=transitions_f64, initial_dist=initial_dist,
-                discount=problem.discount_factor,
+            V, policy, _ = self._soft_value_iteration(
+                operator,
+                reward_matrix,
+                num_periods=num_periods,
             )
+            if finite_horizon:
+                time_value = V
+                time_policy = policy
+                final_expected = self._compute_expected_features_finite_horizon(
+                    panel,
+                    time_policy,
+                    reward_fn,
+                    num_periods,
+                    transitions=transitions_f64,
+                    initial_dist=initial_dist,
+                    discount=problem.discount_factor,
+                )
+                D = jnp.zeros(problem.num_states, dtype=jnp.float64)
+                D_sa = jnp.zeros(
+                    (problem.num_states, problem.num_actions),
+                    dtype=jnp.float64,
+                )
+                occupancy_moment_residual = None
+                log_policy = jnp.log(jnp.clip(policy, 1e-300, 1.0))
+                clipped_periods = jnp.minimum(all_periods, num_periods - 1)
+                ll = float(
+                    log_policy[
+                        clipped_periods,
+                        all_states,
+                        all_actions,
+                    ].sum()
+                )
+                prediction_accuracy = float(
+                    jnp.mean(
+                        jnp.argmax(
+                            policy[clipped_periods, all_states],
+                            axis=1,
+                        )
+                        == all_actions
+                    )
+                )
+                output_V = V[0]
+                output_policy = policy[0]
+            else:
+                D = self._compute_state_visitation(policy, transitions_f64, problem, initial_dist)
+                D_sa = D[:, None] * policy
+                occupancy_moment_residual = float(jnp.max(jnp.abs(D_sa_demo - D_sa)))
+                final_expected = self._compute_expected_features(
+                    panel,
+                    policy,
+                    reward_fn,
+                    transitions=transitions_f64,
+                    initial_dist=initial_dist,
+                    discount=problem.discount_factor,
+                )
+                log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
+                ll = float(log_probs[all_states, all_actions].sum())
+                prediction_accuracy = float(
+                    jnp.mean(jnp.argmax(policy[all_states], axis=1) == all_actions)
+                )
+                output_V = V
+                output_policy = policy
             feature_diff = float(jnp.linalg.norm(empirical_features - final_expected))
-            log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
-            ll = float(log_probs[all_states, all_actions].sum())
+            stationarity_residual = float(
+                jnp.linalg.norm(
+                    empirical_features
+                    - final_expected
+                    - 2.0 * self.config.l2_regularization * final_params
+                )
+            )
+            bellman_residual = 0.0
+            if not finite_horizon:
+                bellman_residual = float(
+                    jnp.max(jnp.abs(operator.apply(reward_matrix, output_V).V - output_V))
+                )
+            feature_converged = stationarity_residual <= self.config.feature_tol
+            occupancy_converged = (
+                occupancy_moment_residual is None
+                or occupancy_moment_residual <= self.config.occupancy_tol
+            )
+            bellman_converged = finite_horizon or (
+                inner_not_converged == 0 and bellman_residual <= self.config.inner_tol * 10
+            )
+            converged = (
+                optimizer_converged
+                and feature_converged
+                and occupancy_converged
+                and bellman_converged
+            )
+            if not optimizer_converged:
+                termination_reason = "optimizer_failed"
+            elif not bellman_converged:
+                termination_reason = "bellman_residual"
+            elif not feature_converged:
+                termination_reason = "feature_residual"
+            elif not occupancy_converged:
+                termination_reason = "occupancy_residual"
+            else:
+                termination_reason = "joint_convergence"
 
-            self._log(f"L-BFGS-B complete: NLL={-ll:.2f}, converged={converged}")
+            self._log(
+                f"L-BFGS-B complete: NLL={-ll:.2f}, "
+                f"converged={converged}, reason={termination_reason}"
+            )
             if inner_not_converged > 0:
                 self._log(f"Warning: Inner loop did not converge {inner_not_converged} times")
 
             # Compute Hessian for standard errors if requested
             hessian = None
             if self.config.compute_se and self.config.se_method != "bootstrap":
-                self._log(f"Computing numerical Hessian for standard errors")
+                self._log("Computing numerical Hessian for standard errors")
                 hessian = self._numerical_hessian(
-                    final_params, panel, reward_fn, problem, transitions_f64, initial_dist
+                    final_params,
+                    panel,
+                    reward_fn,
+                    problem,
+                    transitions_f64,
+                    initial_dist,
+                    terminal_states=terminal_states,
                 )
 
             optimization_time = time.time() - start_time
             return EstimationResult(
                 parameters=final_params,
                 log_likelihood=ll,
-                value_function=V,
-                policy=policy,
+                value_function=output_V,
+                policy=output_policy,
                 hessian=hessian,
                 gradient_contributions=None,
                 converged=converged,
@@ -739,9 +1029,20 @@ class MCEIRLEstimator(BaseEstimator):
                     "final_expected_features": np.asarray(final_expected).tolist(),
                     "feature_diff": feature_diff,
                     "feature_difference": feature_diff,
+                    "stationarity_residual": stationarity_residual,
+                    "l2_regularization": self.config.l2_regularization,
                     "occupancy_moment_residual": occupancy_moment_residual,
                     "state_visitation": np.asarray(D).tolist(),
                     "state_action_visitation": np.asarray(D_sa).tolist(),
+                    "termination_reason": termination_reason,
+                    "optimizer_converged": optimizer_converged,
+                    "feature_converged": feature_converged,
+                    "occupancy_converged": occupancy_converged,
+                    "bellman_converged": bellman_converged,
+                    "bellman_residual": bellman_residual,
+                    "prediction_accuracy": prediction_accuracy,
+                    "time_policy": (np.asarray(policy).tolist() if finite_horizon else None),
+                    "time_value_function": (np.asarray(V).tolist() if finite_horizon else None),
                 },
             )
 
@@ -754,29 +1055,38 @@ class MCEIRLEstimator(BaseEstimator):
             from scipy.optimize import root as _scipy_root
 
             self._log("Starting MCE IRL with root-finding (feature matching)")
-            finite_horizon = problem.num_periods is not None
-            num_periods = problem.num_periods
 
             def feature_residual(theta_np: np.ndarray) -> np.ndarray:
                 theta = jnp.asarray(theta_np, dtype=jnp.float64)
                 reward_matrix = reward_fn.compute(theta).astype(jnp.float64)
                 V, policy, _ = self._soft_value_iteration(
-                    operator, reward_matrix, num_periods=num_periods,
+                    operator,
+                    reward_matrix,
+                    num_periods=num_periods,
                 )
                 if finite_horizon:
                     expected = self._compute_expected_features_finite_horizon(
-                        panel, policy, reward_fn, num_periods,
-                        transitions=transitions_f64, initial_dist=initial_dist,
-                        discount=problem.discount_factor,
-                    )
-                else:
-                    expected = self._compute_expected_features(
-                        panel, policy, reward_fn,
+                        panel,
+                        policy,
+                        reward_fn,
+                        num_periods,
                         transitions=transitions_f64,
                         initial_dist=initial_dist,
                         discount=problem.discount_factor,
                     )
-                return np.asarray(empirical_features - expected, dtype=np.float64)
+                else:
+                    expected = self._compute_expected_features(
+                        panel,
+                        policy,
+                        reward_fn,
+                        transitions=transitions_f64,
+                        initial_dist=initial_dist,
+                        discount=problem.discount_factor,
+                    )
+                stationarity = (
+                    empirical_features - expected - 2.0 * self.config.l2_regularization * theta
+                )
+                return np.asarray(stationarity, dtype=np.float64)
 
             sol = _scipy_root(
                 feature_residual,
@@ -786,29 +1096,54 @@ class MCEIRLEstimator(BaseEstimator):
                 options={"maxfev": self.config.outer_max_iter * (len(params) + 1)},
             )
             params = jnp.asarray(sol.x, dtype=jnp.float64)
-            converged = bool(sol.success)
+            optimizer_converged = bool(sol.success)
             n_function_evals = int(getattr(sol, "nfev", 0))
 
             reward_matrix = reward_fn.compute(params).astype(jnp.float64)
             V, policy, _ = self._soft_value_iteration(
-                operator, reward_matrix, num_periods=num_periods,
+                operator,
+                reward_matrix,
+                num_periods=num_periods,
             )
             if finite_horizon:
                 final_expected = self._compute_expected_features_finite_horizon(
-                    panel, policy, reward_fn, num_periods,
-                    transitions=transitions_f64, initial_dist=initial_dist,
+                    panel,
+                    policy,
+                    reward_fn,
+                    num_periods,
+                    transitions=transitions_f64,
+                    initial_dist=initial_dist,
                     discount=problem.discount_factor,
                 )
                 D = jnp.zeros(problem.num_states, dtype=jnp.float64)
                 D_sa = jnp.zeros((problem.num_states, problem.num_actions), dtype=jnp.float64)
                 occupancy_moment_residual = None
-                ll = 0.0
-                V = V[0] if V.ndim > 1 else V
-                policy = policy[0] if policy.ndim > 2 else policy
+                all_states = panel.get_all_states()
+                all_actions = panel.get_all_actions()
+                all_periods = jnp.concatenate(
+                    [
+                        jnp.arange(len(trajectory), dtype=jnp.int32)
+                        for trajectory in panel.trajectories
+                    ]
+                )
+                log_policy = jnp.log(jnp.clip(time_policy, 1e-300, 1.0))
+                ll = float(log_policy[all_periods, all_states, all_actions].sum())
+                prediction_accuracy = float(
+                    jnp.mean(
+                        jnp.argmax(time_policy[all_periods, all_states], axis=1) == all_actions
+                    )
+                )
+                V = time_value[0]
+                policy = time_policy[0]
             else:
+                time_value = None
+                time_policy = None
                 final_expected = self._compute_expected_features(
-                    panel, policy, reward_fn,
-                    transitions=transitions_f64, initial_dist=initial_dist,
+                    panel,
+                    policy,
+                    reward_fn,
+                    transitions=transitions_f64,
+                    initial_dist=initial_dist,
                     discount=problem.discount_factor,
                 )
                 D = self._compute_state_visitation(
@@ -821,19 +1156,72 @@ class MCEIRLEstimator(BaseEstimator):
                 occupancy_moment_residual = float(jnp.max(jnp.abs(D_sa_demo - D_sa)))
                 log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
                 ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
+                prediction_accuracy = float(
+                    jnp.mean(
+                        jnp.argmax(policy[panel.get_all_states()], axis=1)
+                        == panel.get_all_actions()
+                    )
+                )
             feature_diff = float(jnp.linalg.norm(empirical_features - final_expected))
+            stationarity_residual = float(
+                jnp.linalg.norm(
+                    empirical_features
+                    - final_expected
+                    - 2.0 * self.config.l2_regularization * params
+                )
+            )
+            bellman_residual = 0.0
+            if not finite_horizon:
+                bellman_residual = float(jnp.max(jnp.abs(operator.apply(reward_matrix, V).V - V)))
+            feature_converged = stationarity_residual <= self.config.feature_tol
+            occupancy_converged = (
+                occupancy_moment_residual is None
+                or occupancy_moment_residual <= self.config.occupancy_tol
+            )
+            bellman_converged = finite_horizon or bellman_residual <= self.config.inner_tol * 10
+            converged = (
+                optimizer_converged
+                and feature_converged
+                and occupancy_converged
+                and bellman_converged
+            )
+            if not optimizer_converged:
+                termination_reason = "optimizer_failed"
+            elif not bellman_converged:
+                termination_reason = "bellman_residual"
+            elif not feature_converged:
+                termination_reason = "feature_residual"
+            elif not occupancy_converged:
+                termination_reason = "occupancy_residual"
+            else:
+                termination_reason = "joint_convergence"
             elapsed = time.time() - start_time
             self._log(
                 f"Root-finding done in {elapsed:.2f}s, "
-                f"||mu_D - mu_pi|| = {feature_diff:.6f}"
+                f"stationarity residual = {stationarity_residual:.6f}"
             )
+            hessian = None
+            if self.config.compute_se and self.config.se_method != "bootstrap":
+                hessian = self._numerical_hessian(
+                    params,
+                    panel,
+                    reward_fn,
+                    problem,
+                    transitions_f64,
+                    initial_dist,
+                    terminal_states=terminal_states,
+                )
             return EstimationResult(
                 parameters=params,
                 log_likelihood=ll,
                 value_function=V,
                 policy=policy,
+                hessian=hessian,
                 converged=converged,
                 num_iterations=n_function_evals,
+                num_function_evals=n_function_evals,
+                message=str(sol.message),
+                optimization_time=elapsed,
                 metadata={
                     "optimizer": self.config.optimizer,
                     "estimator": "MCE-IRL (root)",
@@ -842,9 +1230,24 @@ class MCEIRLEstimator(BaseEstimator):
                     "final_expected_features": np.asarray(final_expected).tolist(),
                     "feature_diff": feature_diff,
                     "feature_difference": feature_diff,
+                    "stationarity_residual": stationarity_residual,
+                    "l2_regularization": self.config.l2_regularization,
                     "occupancy_moment_residual": occupancy_moment_residual,
                     "state_visitation": np.asarray(D).tolist(),
                     "state_action_visitation": np.asarray(D_sa).tolist(),
+                    "termination_reason": termination_reason,
+                    "optimizer_converged": optimizer_converged,
+                    "feature_converged": feature_converged,
+                    "occupancy_converged": occupancy_converged,
+                    "bellman_converged": bellman_converged,
+                    "bellman_residual": bellman_residual,
+                    "prediction_accuracy": prediction_accuracy,
+                    "time_policy": (
+                        None if time_policy is None else np.asarray(time_policy).tolist()
+                    ),
+                    "time_value_function": (
+                        None if time_value is None else np.asarray(time_value).tolist()
+                    ),
                 },
             )
 
@@ -862,7 +1265,7 @@ class MCEIRLEstimator(BaseEstimator):
         # The gradient is: ∇L = μ_D - μ_π (for maximization)
         self._log(f"Starting MCE IRL with {optimizer_name} (lr={self.config.learning_rate})")
 
-        best_obj = float('inf')
+        best_obj = float("inf")
         best_params = jnp.array(params)
         patience_counter = 0
         max_patience = 20
@@ -875,16 +1278,15 @@ class MCEIRLEstimator(BaseEstimator):
             leave=True,
         )
 
-        finite_horizon = problem.num_periods is not None
-        num_periods = problem.num_periods
-
         prev_V_grad = None  # warm-start for gradient path
 
         for i in pbar:
             # Forward and backward passes
             reward_matrix = reward_fn.compute(params).astype(jnp.float64)
             V, policy, inner_converged = self._soft_value_iteration(
-                operator, reward_matrix, num_periods=num_periods,
+                operator,
+                reward_matrix,
+                num_periods=num_periods,
                 V_init=prev_V_grad,
             )
             prev_V_grad = jnp.array(V) if not finite_horizon else None
@@ -895,13 +1297,19 @@ class MCEIRLEstimator(BaseEstimator):
                 # For finite horizon, compute expected features using time-indexed policy
                 # Average policy across periods weighted by empirical period distribution
                 expected_features = self._compute_expected_features_finite_horizon(
-                    panel, policy, reward_fn, num_periods,
-                    transitions=transitions_f64, initial_dist=initial_dist,
+                    panel,
+                    policy,
+                    reward_fn,
+                    num_periods,
+                    transitions=transitions_f64,
+                    initial_dist=initial_dist,
                     discount=problem.discount_factor,
                 )
             else:
                 expected_features = self._compute_expected_features(
-                    panel, policy, reward_fn,
+                    panel,
+                    policy,
+                    reward_fn,
                     transitions=transitions_f64,
                     initial_dist=initial_dist,
                     discount=problem.discount_factor,
@@ -909,7 +1317,11 @@ class MCEIRLEstimator(BaseEstimator):
 
             # Feature matching gradient: μ_D - μ_π
             # We want to INCREASE params in direction where μ_D > μ_π
-            gradient = empirical_features - expected_features  # Gradient ascent direction
+            gradient = (
+                empirical_features
+                - expected_features
+                - 2.0 * self.config.l2_regularization * params
+            )
 
             # Gradient clipping (prevents divergence when rewards approach zero)
             grad_norm = float(jnp.linalg.norm(gradient))
@@ -918,7 +1330,7 @@ class MCEIRLEstimator(BaseEstimator):
                 grad_norm = self.config.gradient_clip
 
             # Objective: ||μ_D - μ_π||^2
-            obj = float(0.5 * jnp.sum((empirical_features - expected_features) ** 2))
+            obj = float(0.5 * jnp.sum(gradient**2))
 
             # Occupancy distance: max|D_demo - D_policy| (Gleave & Toyer 2022)
             # Only computed for infinite horizon where state visitation is meaningful
@@ -928,7 +1340,7 @@ class MCEIRLEstimator(BaseEstimator):
                 )
                 occ_dist = float(jnp.max(jnp.abs(D_demo - D_policy)))
             else:
-                occ_dist = float('inf')
+                occ_dist = float("inf")
 
             # Track best
             if obj < best_obj:
@@ -968,12 +1380,14 @@ class MCEIRLEstimator(BaseEstimator):
                 # Adam update (Kingma & Ba, 2014)
                 t = i + 1  # Timestep (1-indexed)
                 m = self.config.adam_beta1 * m + (1 - self.config.adam_beta1) * gradient
-                v = self.config.adam_beta2 * v + (1 - self.config.adam_beta2) * (gradient ** 2)
+                v = self.config.adam_beta2 * v + (1 - self.config.adam_beta2) * (gradient**2)
                 # Bias correction
-                m_hat = m / (1 - self.config.adam_beta1 ** t)
-                v_hat = v / (1 - self.config.adam_beta2 ** t)
+                m_hat = m / (1 - self.config.adam_beta1**t)
+                v_hat = v / (1 - self.config.adam_beta2**t)
                 # Update
-                params = params + self.config.learning_rate * m_hat / (jnp.sqrt(v_hat) + self.config.adam_eps)
+                params = params + self.config.learning_rate * m_hat / (
+                    jnp.sqrt(v_hat) + self.config.adam_eps
+                )
             else:
                 # Simple SGD
                 params = params + self.config.learning_rate * gradient
@@ -986,24 +1400,30 @@ class MCEIRLEstimator(BaseEstimator):
 
         # Final solution
         reward_matrix = reward_fn.compute(final_params).astype(jnp.float64)
-        V, policy, _ = self._soft_value_iteration(
-            operator, reward_matrix, num_periods=num_periods
+        V, policy, final_bellman_converged = self._soft_value_iteration(
+            operator,
+            reward_matrix,
+            num_periods=num_periods,
         )
 
         if finite_horizon:
+            time_value = V
+            time_policy = policy
             final_expected = self._compute_expected_features_finite_horizon(
-                panel, policy, reward_fn, num_periods,
-                transitions=transitions_f64, initial_dist=initial_dist,
+                panel,
+                time_policy,
+                reward_fn,
+                num_periods,
+                transitions=transitions_f64,
+                initial_dist=initial_dist,
                 discount=problem.discount_factor,
             )
             D = jnp.zeros(problem.num_states)
             D_sa = jnp.zeros((problem.num_states, problem.num_actions))
             occupancy_moment_residual = None
 
-            # Finite-horizon LL: use period-specific policies
-            sigma = problem.scale_parameter
-            fh_result = backward_induction(operator, reward_matrix, num_periods)
-            log_policy = jax.nn.log_softmax(fh_result.Q / sigma, axis=-1)  # (T, S, A)
+            # Finite-horizon LL: use period-specific policies.
+            log_policy = jnp.log(jnp.clip(policy, 1e-300, 1.0))
             ll = 0.0
             for traj in panel.trajectories:
                 for t in range(len(traj.states)):
@@ -1011,23 +1431,75 @@ class MCEIRLEstimator(BaseEstimator):
                     s = int(traj.states[t])
                     a = int(traj.actions[t])
                     ll += float(log_policy[period, s, a])
+            all_states = panel.get_all_states()
+            all_actions = panel.get_all_actions()
+            all_periods = jnp.concatenate(
+                [jnp.arange(len(trajectory)) for trajectory in panel.trajectories]
+            )
+            prediction_accuracy = float(
+                jnp.mean(jnp.argmax(time_policy[all_periods, all_states], axis=1) == all_actions)
+            )
 
             # Flatten to period-0 for EstimationResult (base class expects 2D)
-            V = V[0] if V.ndim > 1 else V
-            policy = policy[0] if policy.ndim > 2 else policy
+            V = time_value[0]
+            policy = time_policy[0]
         else:
+            time_value = None
+            time_policy = None
             D = self._compute_state_visitation(policy, transitions_f64, problem, initial_dist)
             D_sa = D[:, None] * policy
             occupancy_moment_residual = float(jnp.max(jnp.abs(D_sa_demo - D_sa)))
             final_expected = self._compute_expected_features(
-                panel, policy, reward_fn,
-                transitions=transitions_f64, initial_dist=initial_dist,
+                panel,
+                policy,
+                reward_fn,
+                transitions=transitions_f64,
+                initial_dist=initial_dist,
                 discount=problem.discount_factor,
             )
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
             ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
+            prediction_accuracy = float(
+                jnp.mean(
+                    jnp.argmax(policy[panel.get_all_states()], axis=1) == panel.get_all_actions()
+                )
+            )
 
         feature_diff = float(jnp.linalg.norm(empirical_features - final_expected))
+        stationarity_residual = float(
+            jnp.linalg.norm(
+                empirical_features
+                - final_expected
+                - 2.0 * self.config.l2_regularization * final_params
+            )
+        )
+        bellman_residual = 0.0
+        if not finite_horizon:
+            bellman_residual = float(jnp.max(jnp.abs(operator.apply(reward_matrix, V).V - V)))
+        optimizer_converged = bool(grad_norm < self.config.outer_tol)
+        feature_converged = stationarity_residual <= self.config.feature_tol
+        occupancy_converged = (
+            occupancy_moment_residual is None
+            or occupancy_moment_residual <= self.config.occupancy_tol
+        )
+        bellman_converged = finite_horizon or (
+            final_bellman_converged
+            and inner_not_converged == 0
+            and bellman_residual <= self.config.inner_tol * 10
+        )
+        converged = (
+            optimizer_converged and feature_converged and occupancy_converged and bellman_converged
+        )
+        if not optimizer_converged:
+            termination_reason = "optimizer_failed"
+        elif not bellman_converged:
+            termination_reason = "bellman_residual"
+        elif not feature_converged:
+            termination_reason = "feature_residual"
+        elif not occupancy_converged:
+            termination_reason = "occupancy_residual"
+        else:
+            termination_reason = "joint_convergence"
 
         # Inference
         hessian = None
@@ -1037,14 +1509,16 @@ class MCEIRLEstimator(BaseEstimator):
         if self.config.compute_se:
             self._log(f"Computing standard errors via {self.config.se_method}")
 
-            if self.config.se_method == "bootstrap":
-                standard_errors = self._bootstrap_inference(
-                    panel, reward_fn, problem, transitions_f64, final_params, initial_dist
-                )
-            else:
+            if self.config.se_method != "bootstrap":
                 # Numerical Hessian
                 hessian = self._numerical_hessian(
-                    final_params, panel, reward_fn, problem, transitions_f64, initial_dist
+                    final_params,
+                    panel,
+                    reward_fn,
+                    problem,
+                    transitions_f64,
+                    initial_dist,
+                    terminal_states=terminal_states,
                 )
 
         optimization_time = time.time() - start_time
@@ -1072,79 +1546,28 @@ class MCEIRLEstimator(BaseEstimator):
                 "final_expected_features": np.asarray(final_expected).tolist(),
                 "feature_difference": feature_diff,
                 "feature_diff": feature_diff,
+                "stationarity_residual": stationarity_residual,
+                "l2_regularization": self.config.l2_regularization,
                 "occupancy_moment_residual": occupancy_moment_residual,
                 "state_visitation": np.asarray(D).tolist(),
                 "state_action_visitation": np.asarray(D_sa).tolist(),
                 "inner_not_converged": inner_not_converged,
-                "standard_errors": np.asarray(standard_errors).tolist() if standard_errors is not None else None,
+                "termination_reason": termination_reason,
+                "optimizer_converged": optimizer_converged,
+                "feature_converged": feature_converged,
+                "occupancy_converged": occupancy_converged,
+                "bellman_converged": bellman_converged,
+                "bellman_residual": bellman_residual,
+                "prediction_accuracy": prediction_accuracy,
+                "time_policy": (None if time_policy is None else np.asarray(time_policy).tolist()),
+                "time_value_function": (
+                    None if time_value is None else np.asarray(time_value).tolist()
+                ),
+                "standard_errors": np.asarray(standard_errors).tolist()
+                if standard_errors is not None
+                else None,
             },
         )
-
-    def _bootstrap_inference(
-        self,
-        panel: Panel,
-        reward_fn: BaseUtilityFunction,
-        problem: DDCProblem,
-        transitions: jnp.ndarray,
-        point_estimate: jnp.ndarray,
-        initial_dist: jnp.ndarray,
-    ) -> jnp.ndarray:
-        """Compute standard errors via bootstrap.
-
-        Resamples trajectories and re-estimates parameters to get
-        sampling distribution.
-        """
-        n_params = len(point_estimate)
-        bootstrap_estimates = np.zeros((self.config.n_bootstrap, n_params))
-
-        trajectories = panel.trajectories
-        n_traj = len(trajectories)
-
-        operator = SoftBellmanOperator(problem, transitions)
-
-        for b in range(self.config.n_bootstrap):
-            # Resample trajectories with replacement
-            indices = np.random.choice(n_traj, size=n_traj, replace=True)
-            boot_trajectories = [trajectories[i] for i in indices]
-            boot_panel = Panel(trajectories=boot_trajectories)
-
-            # Compute empirical features for bootstrap sample
-            empirical_features = self._compute_empirical_features(
-                boot_panel,
-                reward_fn,
-                problem.num_states,
-                problem.num_actions,
-                discount=problem.discount_factor,
-            )
-            boot_initial = self._compute_initial_distribution(boot_panel, problem.num_states)
-
-            # Quick optimization from point estimate
-            params = jnp.array(point_estimate)
-
-            for _ in range(50):  # Fewer iterations for bootstrap
-                reward_matrix = reward_fn.compute(params).astype(jnp.float64)
-                V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
-                expected_features = self._compute_expected_features(
-                    boot_panel, policy, reward_fn,
-                    transitions=transitions, initial_dist=boot_initial,
-                    discount=problem.discount_factor,
-                )
-
-                gradient = empirical_features - expected_features  # μ_D - μ_π (ascent)
-                params = params + 0.1 * gradient
-
-                if float(jnp.linalg.norm(gradient)) < 0.01:
-                    break
-
-            bootstrap_estimates[b] = np.asarray(params)
-
-            if self.config.verbose and (b + 1) % 20 == 0:
-                self._log(f"Bootstrap {b + 1}/{self.config.n_bootstrap}")
-
-        # Standard errors = std of bootstrap estimates
-        standard_errors = jnp.array(bootstrap_estimates.std(axis=0))
-
-        return standard_errors
 
     def _numerical_hessian(
         self,
@@ -1152,8 +1575,9 @@ class MCEIRLEstimator(BaseEstimator):
         panel: Panel,
         reward_fn: BaseUtilityFunction,
         problem: DDCProblem,
-        transitions: jnp.ndarray,
+        transitions: TransitionModel,
         initial_dist: jnp.ndarray,
+        terminal_states: jnp.ndarray | np.ndarray | None = None,
         eps: float = 1e-3,
     ) -> jnp.ndarray:
         """Compute numerical Hessian of the log-likelihood.
@@ -1196,19 +1620,40 @@ class MCEIRLEstimator(BaseEstimator):
         - The default eps=1e-3 balances truncation error (favors larger h)
           against rounding error (favors smaller h) for float32 precision
         """
-        operator = SoftBellmanOperator(problem, transitions)
+        del initial_dist
+        operator = SoftBellmanOperator(
+            problem,
+            transitions,
+            terminal_states=terminal_states,
+        )
         n_params = len(params)
         hessian_np = np.zeros((n_params, n_params), dtype=np.float64)
         params_np = np.asarray(params, dtype=np.float64)
 
+        all_states = panel.get_all_states()
+        all_actions = panel.get_all_actions()
+        all_periods = jnp.concatenate(
+            [jnp.arange(len(trajectory), dtype=jnp.int32) for trajectory in panel.trajectories]
+        )
+
         def ll_at(p_np):
             p = jnp.array(p_np, dtype=jnp.float32)
             reward_matrix = reward_fn.compute(p).astype(jnp.float64)
-            V, policy, _ = self._soft_value_iteration(operator, reward_matrix)
+            V, policy, _ = self._soft_value_iteration(
+                operator,
+                reward_matrix,
+                num_periods=problem.num_periods,
+            )
+            if problem.num_periods is not None:
+                log_policy = jnp.log(jnp.clip(policy, 1e-300, 1.0))
+                ll = log_policy[all_periods, all_states, all_actions].sum()
+                ll -= panel.num_observations * self.config.l2_regularization * jnp.sum(p**2)
+                return float(ll)
             log_probs = operator.compute_log_choice_probabilities(reward_matrix, V)
-
-            ll = float(log_probs[panel.get_all_states(), panel.get_all_actions()].sum())
-            return ll
+            ll = float(log_probs[all_states, all_actions].sum())
+            return ll - (
+                panel.num_observations * self.config.l2_regularization * float(jnp.sum(p**2))
+            )
 
         # Compute Hessian using central differences
         # Use adaptive step size based on parameter magnitude with bounds

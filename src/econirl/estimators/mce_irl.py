@@ -6,19 +6,29 @@ Maximum Causal Entropy Inverse Reinforcement Learning with sklearn-style API.
 from __future__ import annotations
 
 import warnings
-from typing import Literal
+from typing import Hashable, Literal
 
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
 from scipy.stats import norm as scipy_norm
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.reward_spec import RewardSpec
+from econirl.core.tasks import (
+    CompiledMCEIRLTasks,
+    MCEIRLTask,
+    compile_mce_irl_tasks,
+)
+from econirl.core.transition_models import DeterministicTransitions, TransitionModel
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
-from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
+from econirl.estimation.mce_irl import MCEIRLConfig, MCEIRLEstimator
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.reward import LinearReward
+from econirl.simulation.counterfactual import (
+    CounterfactualResult,
+    CounterfactualType,
+)
 from econirl.transitions import TransitionEstimator
 
 
@@ -59,9 +69,7 @@ def estimate_empirical_transitions(
         np.add.at(counts, (a, s, sp), 1.0)
 
     row_sums = counts.sum(axis=2, keepdims=True)
-    kernel = np.divide(
-        counts, row_sums, out=np.zeros_like(counts), where=row_sums > 0
-    )
+    kernel = np.divide(counts, row_sums, out=np.zeros_like(counts), where=row_sums > 0)
     empty = row_sums[..., 0] == 0
     rows, cols = np.nonzero(empty)
     kernel[rows, cols, cols] = 1.0  # unobserved (a, s): stay in place
@@ -96,6 +104,19 @@ class MCEIRL:
         Method for standard errors: "bootstrap", "asymptotic", or "hessian".
     n_bootstrap : int, default=100
         Number of bootstrap samples for SE computation.
+    compute_se : bool, default=True
+        Whether to compute standard errors.
+    inner_max_iter : int, default=10000
+        Maximum iterations for the infinite-horizon Bellman solve.
+    horizon : int, optional
+        Finite number of decision periods. Required when ``discount=1``.
+    terminal_states : numpy.ndarray, optional
+        Boolean terminal-state mask for a single-task fit.
+    l2_regularization : float, default=0
+        Per-observation L2 penalty. Positive values make the stationarity
+        equation ``mu_expert - mu_model - 2 * penalty * theta = 0``.
+    se_seed : int, optional
+        Random seed for trajectory bootstrap standard errors.
     verbose : bool, default=False
         Print progress messages.
 
@@ -120,7 +141,13 @@ class MCEIRL:
     log_likelihood_ : float
         Log-likelihood of the data under learned model.
     converged_ : bool
-        Whether optimization converged.
+        Whether the optimizer, stationarity, occupancy, and Bellman checks pass.
+    time_policy_ : numpy.ndarray or None
+        Period-specific policy for a finite-horizon fit.
+    task_policy_ : dict or None
+        Period-specific or stationary policy slices by task identifier.
+    termination_reason_ : str or None
+        Joint convergence or the first failed residual check.
 
     Examples
     --------
@@ -170,7 +197,12 @@ class MCEIRL:
         feature_names: list[str] | None = None,
         se_method: Literal["bootstrap", "asymptotic", "hessian"] = "bootstrap",
         n_bootstrap: int = 100,
+        compute_se: bool = True,
         inner_max_iter: int = 10000,
+        horizon: int | None = None,
+        terminal_states: np.ndarray | None = None,
+        l2_regularization: float = 0.0,
+        se_seed: int | None = None,
         verbose: bool = False,
     ):
         self.n_states = n_states
@@ -180,7 +212,12 @@ class MCEIRL:
         self.feature_names = feature_names
         self.se_method = se_method
         self.n_bootstrap = n_bootstrap
+        self.compute_se = compute_se
         self.inner_max_iter = inner_max_iter
+        self.horizon = horizon
+        self.terminal_states = terminal_states
+        self.l2_regularization = l2_regularization
+        self.se_seed = se_seed
         self.verbose = verbose
 
         # Fitted attributes
@@ -193,16 +230,30 @@ class MCEIRL:
         self.value_function_: np.ndarray | None = None
         self.value_: np.ndarray | None = None
         self.state_visitation_: np.ndarray | None = None
-        self.transitions_: np.ndarray | None = None
+        self.transitions_: np.ndarray | DeterministicTransitions | None = None
+        self.transition_model_: TransitionModel | None = None
         self.log_likelihood_: float | None = None
         self.converged_: bool | None = None
         self.reward_spec_: RewardSpec | None = None
+        self.time_policy_: np.ndarray | None = None
+        self.time_value_function_: np.ndarray | None = None
+        self.task_policy_: dict[Hashable, np.ndarray] | None = None
+        self.task_value_function_: dict[Hashable, np.ndarray] | None = None
+        self.termination_reason_: str | None = None
+        self.feature_residual_: float | None = None
+        self.occupancy_residual_: float | None = None
+        self.bellman_residual_: float | None = None
 
         # Internal
         self._result = None
         self._panel = None
         self._reward_fn = None
         self._problem = None
+        self._compiled_tasks: CompiledMCEIRLTasks | None = None
+        self._effective_terminal_states: np.ndarray | None = None
+        self._tasks: list[MCEIRLTask] | None = None
+        self._source_panel: Panel | None = None
+        self._source_feature_matrix: np.ndarray | jnp.ndarray | None = None
 
     def fit(
         self,
@@ -211,8 +262,10 @@ class MCEIRL:
         action: str | None = None,
         id: str | None = None,
         next_state: str | None = None,
-        transitions: np.ndarray | None = None,
+        transitions: np.ndarray | DeterministicTransitions | None = None,
         reward: RewardSpec | None = None,
+        tasks: list[MCEIRLTask] | None = None,
+        task: str | None = None,
     ) -> "MCEIRL":
         """Fit the MCE IRL estimator.
 
@@ -246,6 +299,12 @@ class MCEIRL:
             Reward/utility specification.  If provided, overrides the
             ``feature_matrix`` and ``feature_names`` parameters passed at
             construction time.
+        tasks : list[MCEIRLTask], optional
+            Finite-horizon task definitions over one shared deterministic
+            transition system. Reward parameters remain shared across tasks.
+        task : str, optional
+            DataFrame column containing the task identifier. Every trajectory
+            must map to exactly one supplied task.
 
         Returns
         -------
@@ -260,17 +319,25 @@ class MCEIRL:
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            self._panel = self._dataframe_to_panel(data, state, action, id, next_state)
+            self._panel = self._dataframe_to_panel(
+                data,
+                state,
+                action,
+                id,
+                next_state,
+                task,
+            )
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
+        self._compiled_tasks = None
+        self._tasks = tasks
+        self._source_panel = self._panel
 
         # Estimate transitions
         if transitions is None:
@@ -288,24 +355,67 @@ class MCEIRL:
             trans_est.fit(self._panel)
             self.transitions_ = trans_est.matrix_
         else:
-            self.transitions_ = np.asarray(transitions)
-
-        # Build transition tensor
-        transition_tensor = self._build_transition_tensor(self.transitions_)
-
-        # Create problem
-        self._problem = DDCProblem(
-            num_states=self.n_states,
-            num_actions=self.n_actions,
-            discount_factor=self.discount,
-            scale_parameter=1.0,
-        )
+            self.transitions_ = (
+                transitions
+                if isinstance(transitions, DeterministicTransitions)
+                else np.asarray(transitions)
+            )
 
         # Create reward function (RewardSpec overrides feature_matrix)
         if self.reward_spec_ is not None:
             self._reward_fn = self.reward_spec_.to_linear_reward()
         else:
             self._reward_fn = self._create_reward()
+        self._source_feature_matrix = getattr(
+            self._reward_fn,
+            "feature_matrix",
+            getattr(self._reward_fn, "state_features", None),
+        )
+
+        transition_tensor = self._build_transition_tensor(self.transitions_)
+        effective_n_states = self.n_states
+        effective_horizon = self.horizon
+        effective_terminal_states = self.terminal_states
+        if tasks is not None:
+            if not isinstance(transition_tensor, DeterministicTransitions):
+                raise TypeError(
+                    "tasks require DeterministicTransitions so active subgraphs "
+                    "can be compiled without dense state duplication"
+                )
+            feature_matrix = getattr(self._reward_fn, "feature_matrix", None)
+            if feature_matrix is None:
+                feature_matrix = getattr(self._reward_fn, "state_features", None)
+            if feature_matrix is None:
+                raise TypeError(
+                    "task compilation requires a linear state or state-action feature matrix"
+                )
+            compiled = compile_mce_irl_tasks(
+                tasks,
+                transition_tensor,
+                feature_matrix,
+                self._panel,
+            )
+            self._compiled_tasks = compiled
+            self._panel = compiled.panel
+            transition_tensor = compiled.transitions
+            effective_n_states = compiled.transitions.num_states
+            effective_horizon = compiled.horizon
+            effective_terminal_states = np.asarray(compiled.terminal_states)
+            self._reward_fn = self._reward_with_features(compiled.feature_matrix)
+
+        self.transition_model_ = transition_tensor
+        self._effective_terminal_states = (
+            None
+            if effective_terminal_states is None
+            else np.asarray(effective_terminal_states, dtype=bool)
+        )
+        self._problem = DDCProblem(
+            num_states=effective_n_states,
+            num_actions=self.n_actions,
+            discount_factor=self.discount,
+            scale_parameter=1.0,
+            num_periods=effective_horizon,
+        )
 
         self._warn_if_unidentified()
 
@@ -313,7 +423,9 @@ class MCEIRL:
         config = MCEIRLConfig(
             se_method=self.se_method,
             n_bootstrap=self.n_bootstrap,
+            compute_se=self.compute_se,
             inner_max_iter=self.inner_max_iter,
+            l2_regularization=self.l2_regularization,
             verbose=self.verbose,
         )
         estimator = MCEIRLEstimator(config=config)
@@ -324,6 +436,12 @@ class MCEIRL:
             utility=self._reward_fn,
             problem=self._problem,
             transitions=transition_tensor,
+            n_bootstrap=self.n_bootstrap,
+            se_seed=self.se_seed,
+            terminal_states=effective_terminal_states,
+            initial_dist=(
+                None if self._compiled_tasks is None else self._compiled_tasks.initial_state_dist
+            ),
         )
 
         # Extract results
@@ -338,12 +456,19 @@ class MCEIRL:
         action: str,
         id: str,
         next_state: str | None = None,
+        task: str | None = None,
     ) -> Panel:
         """Convert DataFrame to Panel."""
         trajectories = []
 
         for ind_id, group in data.groupby(id, sort=True):
             sorted_group = group.sort_index()
+            task_id = None
+            if task is not None:
+                task_values = sorted_group[task].drop_duplicates()
+                if len(task_values) != 1:
+                    raise ValueError(f"trajectory {ind_id!r} contains multiple task identifiers")
+                task_id = task_values.iloc[0]
 
             states = sorted_group[state].values.astype(np.int64)
             actions = sorted_group[action].values.astype(np.int64)
@@ -368,20 +493,49 @@ class MCEIRL:
                 actions=np.array(actions, dtype=np.int64),
                 next_states=np.array(next_states, dtype=np.int64),
                 individual_id=ind_id,
+                metadata={} if task_id is None else {"task_id": task_id},
             )
             trajectories.append(traj)
 
         return Panel(trajectories=trajectories)
 
-    def _build_transition_tensor(self, keep_transitions: np.ndarray) -> jnp.ndarray:
+    def _reward_with_features(
+        self,
+        feature_matrix: jnp.ndarray,
+    ) -> LinearReward | ActionDependentReward:
+        """Rebuild the linear reward on compiled task-state features."""
+        parameter_names = list(self._reward_fn.parameter_names)
+        if feature_matrix.ndim == 3:
+            return ActionDependentReward(
+                feature_matrix=feature_matrix,
+                parameter_names=parameter_names,
+            )
+        return LinearReward(
+            state_features=feature_matrix,
+            parameter_names=parameter_names,
+            n_actions=self.n_actions,
+        )
+
+    def _build_transition_tensor(
+        self,
+        keep_transitions: np.ndarray | DeterministicTransitions,
+    ) -> TransitionModel:
         """Build transition tensor for both actions."""
+        if isinstance(keep_transitions, DeterministicTransitions):
+            expected_shape = (self.n_states, self.n_actions)
+            if keep_transitions.next_state.shape != expected_shape:
+                raise ValueError(
+                    "deterministic transitions must have shape "
+                    f"{expected_shape}, got {keep_transitions.next_state.shape}"
+                )
+            return keep_transitions
+
         keep_transitions = np.asarray(keep_transitions, dtype=np.float32)
         if keep_transitions.ndim == 3:
             expected_shape = (self.n_actions, self.n_states, self.n_states)
             if keep_transitions.shape != expected_shape:
                 raise ValueError(
-                    "3D transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
                 )
             return jnp.array(keep_transitions)
 
@@ -486,8 +640,7 @@ class MCEIRL:
 
         if len(param_names) != n_features:
             raise ValueError(
-                f"feature_names length {len(param_names)} must match "
-                f"feature dimension {n_features}"
+                f"feature_names length {len(param_names)} must match feature dimension {n_features}"
             )
 
         if features.ndim == 3:
@@ -532,9 +685,7 @@ class MCEIRL:
                 se_val = self.se_[name]
                 if se_val and se_val > 0 and np.isfinite(se_val):
                     t_stat = self.params_[name] / se_val
-                    pvalues[name] = float(
-                        2 * (1 - scipy_norm.cdf(abs(t_stat)))
-                    )
+                    pvalues[name] = float(2 * (1 - scipy_norm.cdf(abs(t_stat))))
                 else:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues
@@ -554,11 +705,37 @@ class MCEIRL:
         # Policy
         if self._result.policy is not None:
             self.policy_ = np.asarray(self._result.policy)
+        if self._result.metadata:
+            time_policy = self._result.metadata.get("time_policy")
+            self.time_policy_ = None if time_policy is None else np.asarray(time_policy)
+            self.termination_reason_ = self._result.metadata.get("termination_reason")
+            self.feature_residual_ = self._result.metadata.get(
+                "stationarity_residual",
+                self._result.metadata.get("feature_difference"),
+            )
+            self.occupancy_residual_ = self._result.metadata.get("occupancy_moment_residual")
+            self.bellman_residual_ = self._result.metadata.get("bellman_residual")
 
         # Value function
         if self._result.value_function is not None:
             self.value_function_ = np.asarray(self._result.value_function)
             self.value_ = self.value_function_
+        if self._result.metadata:
+            time_value = self._result.metadata.get("time_value_function")
+            self.time_value_function_ = None if time_value is None else np.asarray(time_value)
+
+        if self._compiled_tasks is not None:
+            self.task_policy_ = {}
+            self.task_value_function_ = {}
+            for task_id, task_slice in self._compiled_tasks.task_slices.items():
+                if self.time_policy_ is not None:
+                    self.task_policy_[task_id] = self.time_policy_[:, task_slice, :]
+                elif self.policy_ is not None:
+                    self.task_policy_[task_id] = self.policy_[task_slice]
+                if self.time_value_function_ is not None:
+                    self.task_value_function_[task_id] = self.time_value_function_[:, task_slice]
+                elif self.value_function_ is not None:
+                    self.task_value_function_[task_id] = self.value_function_[task_slice]
 
         # State visitation
         if self._result.metadata and "state_visitation" in self._result.metadata:
@@ -584,7 +761,13 @@ class MCEIRL:
         reward_matrix = self._reward_fn.compute(param_vector)
         return np.asarray(reward_matrix)
 
-    def predict_proba(self, states: np.ndarray) -> np.ndarray:
+    def predict_proba(
+        self,
+        states: np.ndarray,
+        *,
+        task_id: Hashable | None = None,
+        period: int = 0,
+    ) -> np.ndarray:
         """Predict choice probabilities.
 
         Parameters
@@ -601,7 +784,218 @@ class MCEIRL:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
         states = np.asarray(states, dtype=np.int64)
+        if self._compiled_tasks is not None:
+            if task_id is None:
+                raise ValueError("task_id is required for a multi-task fit")
+            if task_id not in self._compiled_tasks.global_to_local:
+                raise KeyError(f"unknown task_id {task_id!r}")
+            mapping = self._compiled_tasks.global_to_local[task_id]
+            try:
+                local_states = np.asarray([mapping[int(s)] for s in states])
+            except KeyError as exc:
+                raise ValueError(f"state {exc.args[0]} is not active for task {task_id!r}") from exc
+            task_policy = self.task_policy_[task_id]
+            if task_policy.ndim == 3:
+                if period < 0 or period >= task_policy.shape[0]:
+                    raise ValueError(f"period must lie in [0, {task_policy.shape[0]})")
+                return task_policy[period, local_states]
+            return task_policy[local_states]
+        if self.time_policy_ is not None:
+            if period < 0 or period >= self.time_policy_.shape[0]:
+                raise ValueError(f"period must lie in [0, {self.time_policy_.shape[0]})")
+            return self.time_policy_[period, states]
         return self.policy_[states]
+
+    def simulate(
+        self,
+        n_trajectories: int,
+        *,
+        task_id: Hashable | None = None,
+        n_periods: int | None = None,
+        seed: int | None = None,
+    ) -> TrajectoryPanel:
+        """Simulate trajectories from the fitted policy and dynamics."""
+        if self.policy_ is None or self.transition_model_ is None:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        if n_trajectories < 1:
+            raise ValueError("n_trajectories must be positive")
+
+        rng = np.random.default_rng(seed)
+        horizon = n_periods
+        if horizon is None:
+            horizon = self._problem.num_periods
+        if horizon is None:
+            horizon = max(self._panel.num_periods_per_individual)
+        if horizon < 1:
+            raise ValueError("n_periods must be positive")
+
+        state_offset = 0
+        local_to_global = None
+        if self._compiled_tasks is not None:
+            if task_id is None:
+                raise ValueError("task_id is required for a multi-task fit")
+            if task_id not in self._compiled_tasks.task_slices:
+                raise KeyError(f"unknown task_id {task_id!r}")
+            task_slice = self._compiled_tasks.task_slices[task_id]
+            state_offset = task_slice.start
+            local_to_global = self._compiled_tasks.local_to_global[task_id]
+            initial_dist = self._compiled_tasks.task_initial_state_dist[task_id]
+        else:
+            initial_dist = np.zeros(self._problem.num_states, dtype=float)
+            for trajectory in self._panel.trajectories:
+                initial_dist[int(trajectory.states[0])] += 1.0
+            initial_dist /= initial_dist.sum()
+
+        terminal = self._effective_terminal_states
+        trajectories = []
+        for individual in range(n_trajectories):
+            local_initial = int(rng.choice(len(initial_dist), p=initial_dist))
+            state = state_offset + local_initial
+            states = []
+            actions = []
+            next_states = []
+            for period in range(horizon):
+                if terminal is not None and terminal[state]:
+                    break
+                if self.time_policy_ is None:
+                    action_prob = self.policy_[state]
+                else:
+                    action_prob = self.time_policy_[
+                        min(period, self.time_policy_.shape[0] - 1),
+                        state,
+                    ]
+                action = int(rng.choice(self.n_actions, p=action_prob))
+                if isinstance(self.transition_model_, DeterministicTransitions):
+                    successor = int(self.transition_model_.next_state[state, action])
+                else:
+                    successor = int(
+                        rng.choice(
+                            self._problem.num_states,
+                            p=np.asarray(self.transition_model_[action, state]),
+                        )
+                    )
+
+                if local_to_global is None:
+                    output_state = state
+                    output_successor = successor
+                else:
+                    output_state = int(local_to_global[state - state_offset])
+                    output_successor = int(local_to_global[successor - state_offset])
+                states.append(output_state)
+                actions.append(action)
+                next_states.append(output_successor)
+                state = successor
+
+            trajectories.append(
+                Trajectory(
+                    states=jnp.asarray(states, dtype=jnp.int32),
+                    actions=jnp.asarray(actions, dtype=jnp.int32),
+                    next_states=jnp.asarray(next_states, dtype=jnp.int32),
+                    individual_id=individual,
+                    metadata={} if task_id is None else {"task_id": task_id},
+                )
+            )
+        return TrajectoryPanel(trajectories=trajectories)
+
+    def counterfactual(
+        self,
+        *,
+        params: dict[str, float] | np.ndarray | None = None,
+        transitions: np.ndarray | DeterministicTransitions | None = None,
+        description: str | None = None,
+    ) -> CounterfactualResult:
+        """Re-solve one reward or transition counterfactual."""
+        if self.params_ is None or self.transition_model_ is None:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        if (params is None) == (transitions is None):
+            raise ValueError("supply exactly one of params or transitions")
+
+        baseline_params = np.asarray(self.coef_, dtype=float)
+        changed_params = baseline_params.copy()
+        changed_transitions: TransitionModel = self.transition_model_
+        if params is not None:
+            if isinstance(params, dict):
+                unknown = set(params).difference(self.params_)
+                if unknown:
+                    raise KeyError(f"unknown reward parameters: {sorted(unknown)}")
+                names = list(self._result.parameter_names)
+                for name, value in params.items():
+                    changed_params[names.index(name)] = float(value)
+            else:
+                changed_params = np.asarray(params, dtype=float)
+                if changed_params.shape != baseline_params.shape:
+                    raise ValueError(f"params must have shape {baseline_params.shape}")
+            counterfactual_type = CounterfactualType.REWARD_CHANGE
+        else:
+            if (
+                self._compiled_tasks is not None
+                and isinstance(transitions, DeterministicTransitions)
+                and transitions.num_states == self.n_states
+            ):
+                assert self._tasks is not None
+                assert self._source_feature_matrix is not None
+                assert self._source_panel is not None
+                compiled = compile_mce_irl_tasks(
+                    self._tasks,
+                    transitions,
+                    self._source_feature_matrix,
+                    self._source_panel,
+                    validate_demonstrations=False,
+                )
+                changed_transitions = compiled.transitions
+            else:
+                changed_transitions = (
+                    transitions
+                    if isinstance(transitions, DeterministicTransitions)
+                    else jnp.asarray(transitions)
+                )
+            counterfactual_type = CounterfactualType.ENVIRONMENT_CHANGE
+
+        operator = SoftBellmanOperator(
+            self._problem,
+            changed_transitions,
+            terminal_states=self._effective_terminal_states,
+        )
+        reward_matrix = self._reward_fn.compute(jnp.asarray(changed_params))
+        solver = MCEIRLEstimator(MCEIRLConfig(compute_se=False))
+        values, policy, _ = solver._soft_value_iteration(
+            operator,
+            reward_matrix,
+            num_periods=self._problem.num_periods,
+        )
+        if values.ndim == 2:
+            counterfactual_value = values[0]
+            counterfactual_policy = policy[0]
+        else:
+            counterfactual_value = values
+            counterfactual_policy = policy
+
+        baseline_value = jnp.asarray(self.value_function_)
+        baseline_policy = jnp.asarray(self.policy_)
+        value_change = counterfactual_value - baseline_value
+        result_params = {
+            name: float(value)
+            for name, value in zip(
+                self._result.parameter_names,
+                changed_params,
+            )
+        }
+        return CounterfactualResult(
+            baseline_policy=baseline_policy,
+            counterfactual_policy=counterfactual_policy,
+            baseline_value=baseline_value,
+            counterfactual_value=counterfactual_value,
+            policy_change=counterfactual_policy - baseline_policy,
+            value_change=value_change,
+            welfare_change=float(jnp.mean(value_change)),
+            counterfactual_type=counterfactual_type,
+            description=description or "MCE-IRL counterfactual",
+            metadata={
+                "reward_level_identified": False,
+                "changed_primitive": ("reward_parameters" if params is not None else "transitions"),
+            },
+            params=result_params,
+        )
 
     def conf_int(self, alpha: float = 0.05) -> dict:
         """Compute confidence intervals for parameters.
@@ -642,20 +1036,33 @@ class MCEIRL:
         lines.append("=" * 70)
         lines.append(f"{'Method:':<25} MCE IRL (Ziebart 2010)")
         lines.append(f"{'Discount Factor (β):':<25} {self.discount}")
-        lines.append(f"{'No. States:':<25} {self.n_states}")
+        fitted_states = self._problem.num_states if self._problem is not None else self.n_states
+        lines.append(f"{'No. States:':<25} {fitted_states}")
         lines.append(f"{'No. Actions:':<25} {self.n_actions}")
+        if self._compiled_tasks is not None:
+            lines.append(f"{'No. Tasks:':<25} {len(self._compiled_tasks.task_slices)}")
         lines.append(f"{'Log-Likelihood:':<25} {self.log_likelihood_:,.2f}")
         lines.append(f"{'Converged:':<25} {'Yes' if self.converged_ else 'No'}")
+        if self.termination_reason_ is not None:
+            lines.append(f"{'Termination:':<25} {self.termination_reason_}")
+        if self.feature_residual_ is not None:
+            lines.append(f"{'Feature residual:':<25} {self.feature_residual_:.6g}")
+        if self.occupancy_residual_ is not None:
+            lines.append(f"{'Occupancy residual:':<25} {self.occupancy_residual_:.6g}")
+        if self.bellman_residual_ is not None:
+            lines.append(f"{'Bellman residual:':<25} {self.bellman_residual_:.6g}")
         lines.append("-" * 70)
         lines.append("")
         lines.append("Parameter Estimates:")
         lines.append("-" * 70)
-        lines.append(f"{'Parameter':<20} {'Estimate':>12} {'Std Err':>12} {'t-stat':>10} {'95% CI':>20}")
+        lines.append(
+            f"{'Parameter':<20} {'Estimate':>12} {'Std Err':>12} {'t-stat':>10} {'95% CI':>20}"
+        )
         lines.append("-" * 70)
 
         for name in self.params_:
             param = self.params_[name]
-            se = self.se_.get(name, float('nan')) if self.se_ else float('nan')
+            se = self.se_.get(name, float("nan")) if self.se_ else float("nan")
 
             if np.isfinite(se) and se > 0:
                 t_stat = param / se
@@ -663,7 +1070,7 @@ class MCEIRL:
                 ci_high = param + 1.96 * se
                 ci_str = f"[{ci_low:.4f}, {ci_high:.4f}]"
             else:
-                t_stat = float('nan')
+                t_stat = float("nan")
                 ci_str = "[nan, nan]"
 
             lines.append(f"{name:<20} {param:>12.4f} {se:>12.4f} {t_stat:>10.2f} {ci_str:>20}")

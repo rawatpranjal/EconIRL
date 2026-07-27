@@ -19,7 +19,10 @@ from typing import Tuple
 
 import numpy as np
 
+from econirl.core.transition_models import DeterministicTransitions
 from econirl.core.types import Panel
+
+__all__ = ["DeterministicTransitions", "TransitionEstimator"]
 
 
 class TransitionEstimator:
@@ -74,8 +77,13 @@ class TransitionEstimator:
         self.increment_counts_: np.ndarray | None = None
         self.transition_increments_: np.ndarray | None = None
 
-    def fit(self, data: Panel, state: str | None = None, id: str | None = None,
-            action: str | None = None) -> "TransitionEstimator":
+    def fit(
+        self,
+        data: Panel,
+        state: str | None = None,
+        id: str | None = None,
+        action: str | None = None,
+    ) -> "TransitionEstimator":
         """Fit the transition estimator to panel data.
 
         Counts state transitions for observations where action=0 (keep/no replacement)
