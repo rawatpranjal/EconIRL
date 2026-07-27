@@ -230,9 +230,9 @@ def run_estimator_mce_linear(
 ) -> Any:
     """Fit linear MCE-IRL and return the learned policy.
 
-    Uses L-BFGS-B optimization with the hybrid inner solver for soft
-    value iteration, following the standard MCE-IRL algorithm from
-    Ziebart (2010).
+    Uses root finding on the feature-matching equations with the hybrid inner
+    solver for soft value iteration, following the standard MCE-IRL algorithm
+    from Ziebart (2010).
 
     Args:
         env: An Objectworld or Binaryworld environment instance.
@@ -249,7 +249,7 @@ def run_estimator_mce_linear(
 
     estimator = MCEIRLEstimator(
         config=MCEIRLConfig(
-            optimizer="L-BFGS-B",
+            optimizer="root",
             inner_solver="hybrid",
             inner_max_iter=5000,
             inner_tol=1e-8,

@@ -65,4 +65,7 @@ def test_wulfmeier_shaped_study_is_ready() -> None:
     assert (
         sum(payload["summary"]["termination_counts"].values()) == payload["summary"]["n_requested"]
     )
+    for cell_name in ("objectworld:128", "binaryworld:64", "binaryworld:128"):
+        cell = payload["summary"]["cells"][cell_name]
+        assert cell["linear_joint_solution_pass"] == cell["linear_fits"] == 5
     assert all(check["passed"] for check in payload["checks"])

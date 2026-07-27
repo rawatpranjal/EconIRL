@@ -143,7 +143,7 @@ class TestWulfmeierBinaryworld:
         )
         estimator = MCEIRLEstimator(
             config=MCEIRLConfig(
-                optimizer="L-BFGS-B",
+                optimizer="root",
                 inner_solver="hybrid",
                 inner_max_iter=5000,
                 inner_tol=1e-8,
