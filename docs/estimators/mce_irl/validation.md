@@ -38,7 +38,7 @@ traces or their fitted road graph.
 
 ![The 64 generated origin-destination tasks on one road grid, followed by a close view comparing the median-match held-out route with the fitted most-likely route.](../../_static/estimators/mce_irl_ziebart_road.png)
 
-The left panel places all tasks on the shared road grid. The right panel
+The upper panel places all tasks on the shared road grid. The lower panel
 enlarges the held-out route nearest the median distance match. The study
 selects the held-out route whose distance match is nearest the held-out median.
 It does not select the best-matching route.

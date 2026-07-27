@@ -123,6 +123,10 @@ def test_ziebart_public_page_uses_receipt_values_and_three_pillars() -> None:
     assert "## Monte Carlo Inference" in page
     assert "## Counterfactuals" in page
     assert "../../_static/estimators/mce_irl_ziebart_road.png" in page
+    assert "The upper panel places all tasks" in page
+    assert "The lower panel" in page
+    assert "The left panel places all tasks" not in page
+    assert "The right panel" not in page
     for value in payload["synthetic_metrics"].values():
         assert f"{value:.2f}" in page, f"missing generated metric {value:.2f}"
     for value in payload["paper_target_gaps"].values():
