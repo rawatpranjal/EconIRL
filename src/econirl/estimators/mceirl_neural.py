@@ -420,6 +420,15 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             raise ValueError(
                 "MCEIRLNeural requires transitions. Pass an (n_actions, n_states, n_states) array."
             )
+        if isinstance(data, pd.DataFrame):
+            for column_name, label in ((state, "state"), (action, "action")):
+                if column_name is None or column_name not in data:
+                    continue
+                numeric = pd.to_numeric(data[column_name], errors="coerce").to_numpy(
+                    dtype=np.float64
+                )
+                if not np.isfinite(numeric).all() or not np.equal(numeric, np.floor(numeric)).all():
+                    raise ValueError(f"{label} values must be finite integer codes")
 
         panel, all_states, all_actions, all_next = self._extract_data(data, state, action, id)
         if all_states.size == 0:

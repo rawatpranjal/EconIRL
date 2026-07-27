@@ -525,6 +525,21 @@ class TestCompletionContract:
                 transitions=wrong,
             )
 
+    @pytest.mark.parametrize("column", ["state", "action"])
+    def test_dataframe_codes_must_be_integer(self, gridworld_df, transitions, column):
+        invalid = gridworld_df.copy()
+        invalid[column] = invalid[column].astype(float)
+        invalid.loc[invalid.index[0], column] = 1.5
+        model = MCEIRLNeural(n_states=_N_STATES, n_actions=_N_ACTIONS)
+        with pytest.raises(ValueError, match=f"{column} values must be finite integer codes"):
+            model.fit(
+                invalid,
+                state="state",
+                action="action",
+                id="agent_id",
+                transitions=transitions,
+            )
+
     def test_diagnostics_and_normalization(self, fitted_model_state_action):
         model = fitted_model_state_action
         assert model.diagnostics_["transition_orientation"] == ("(n_actions, n_states, n_states)")
