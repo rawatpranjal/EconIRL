@@ -38,6 +38,7 @@ from scipy.linalg import qr
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 DEFAULT_OUTPUT = ROOT / "validation" / "results" / "mce_irl_ziebart_synthetic.json"
+DEFAULT_FIGURE = ROOT / "docs" / "_static" / "estimators" / "mce_irl_ziebart_road.png"
 
 for path in (ROOT, ROOT / "src"):
     if str(path) not in sys.path:
@@ -152,8 +153,20 @@ class RawTrip:
     noisy: bool = False
 
 
+@dataclass(frozen=True)
+class RouteComparison:
+    """One held-out route and the fitted route for the same task."""
+
+    trajectory_index: int
+    individual_id: int | str
+    task_id: Hashable
+    actual_states: np.ndarray
+    predicted_states: np.ndarray
+    distance_match: float
+
+
 def _state_index(x: np.ndarray, y: np.ndarray, heading: np.ndarray, width: int) -> np.ndarray:
-    return ((y * width + x) * 4 + heading).astype(np.int32)
+    return np.asarray((y * width + x) * 4 + heading, dtype=np.int32)
 
 
 def build_road_network(config: RoadStudyConfig) -> RoadNetwork:
@@ -505,7 +518,7 @@ def generate_raw_trips(
     rng = np.random.default_rng(config.seed)
     terminal_states = np.asarray(compiled.terminal_states)
     next_state = np.asarray(compiled.transitions.next_state)
-    retained = []
+    retained: list[RawTrip] = []
     trip_index = 0
     while len(retained) < config.retained_trips:
         task = tasks[len(retained) % len(tasks)]
@@ -630,19 +643,87 @@ def split_trips(
     return train, test
 
 
+def _most_likely_route(
+    model: MCEIRL,
+    task_id: Hashable,
+    initial_state: int,
+) -> np.ndarray:
+    """Return the fitted route's decision states in global indexing."""
+    if model.task_policy_ is None or model._compiled_tasks is None:
+        raise RuntimeError("task policies are unavailable")
+    compiled = model._compiled_tasks
+    terminal_states = np.asarray(compiled.terminal_states)
+    next_state = np.asarray(compiled.transitions.next_state)
+    task_slice = compiled.task_slices[task_id]
+    mapping = compiled.global_to_local[task_id]
+    local_to_global = compiled.local_to_global[task_id]
+    task_policy = model.task_policy_[task_id]
+    state = int(initial_state)
+    predicted_states = []
+    for period in range(task_policy.shape[0]):
+        local_state = mapping[state]
+        compiled_state = task_slice.start + local_state
+        if terminal_states[compiled_state]:
+            break
+        predicted_states.append(state)
+        action = int(np.argmax(task_policy[period, local_state]))
+        successor = int(next_state[compiled_state, action])
+        state = int(local_to_global[successor - task_slice.start])
+    return np.asarray(predicted_states, dtype=int)
+
+
+def compare_held_out_routes(
+    model: MCEIRL,
+    path_panel: Panel,
+    segment_lengths: np.ndarray,
+) -> list[RouteComparison]:
+    """Compare every held-out path with its fitted most-likely path."""
+    comparisons = []
+    for trajectory_index, trajectory in enumerate(path_panel.trajectories):
+        task_id = trajectory.metadata["task_id"]
+        actual_states = np.asarray(trajectory.states, dtype=int)
+        predicted_states = _most_likely_route(model, task_id, int(actual_states[0]))
+        actual_distance = float(segment_lengths[actual_states].sum())
+        shared_states = np.intersect1d(actual_states, predicted_states)
+        shared_distance = float(segment_lengths[shared_states].sum())
+        comparisons.append(
+            RouteComparison(
+                trajectory_index=trajectory_index,
+                individual_id=trajectory.individual_id,
+                task_id=task_id,
+                actual_states=actual_states,
+                predicted_states=predicted_states,
+                distance_match=shared_distance / actual_distance,
+            )
+        )
+    return comparisons
+
+
+def select_representative_route(
+    comparisons: list[RouteComparison],
+) -> RouteComparison:
+    """Select the held-out route nearest the median match without cherry-picking."""
+    if not comparisons:
+        raise ValueError("at least one held-out route is required")
+    median_match = float(np.median([item.distance_match for item in comparisons]))
+    return min(
+        comparisons,
+        key=lambda item: (abs(item.distance_match - median_match), item.trajectory_index),
+    )
+
+
 def evaluate_routes(
     model: MCEIRL,
     *,
     path_panel: Panel,
     probability_panel: Panel,
     segment_lengths: np.ndarray,
+    comparisons: list[RouteComparison] | None = None,
 ) -> dict[str, float]:
     """Compute the Table 1 metrics with the paper's train/test semantics."""
     if model.task_policy_ is None or model._compiled_tasks is None:
         raise RuntimeError("task policies are unavailable")
     compiled = model._compiled_tasks
-    terminal_states = np.asarray(compiled.terminal_states)
-    next_state = np.asarray(compiled.transitions.next_state)
 
     log_probabilities = []
     for trajectory in probability_panel.trajectories:
@@ -657,36 +738,251 @@ def evaluate_routes(
             log_probability += float(np.log(max(probability, 1e-300)))
         log_probabilities.append(log_probability)
 
-    distance_matches = []
-    for trajectory in path_panel.trajectories:
-        task_id = trajectory.metadata["task_id"]
-        actual_states = np.asarray(trajectory.states, dtype=int)
-        task_slice = compiled.task_slices[task_id]
-        mapping = compiled.global_to_local[task_id]
-        local_to_global = compiled.local_to_global[task_id]
-        task_policy = model.task_policy_[task_id]
-        state = int(actual_states[0])
-        predicted_states = []
-        for period in range(task_policy.shape[0]):
-            local_state = mapping[state]
-            compiled_state = task_slice.start + local_state
-            if terminal_states[compiled_state]:
-                break
-            predicted_states.append(state)
-            action = int(np.argmax(task_policy[period, local_state]))
-            successor = int(next_state[compiled_state, action])
-            state = int(local_to_global[successor - task_slice.start])
-
-        actual_distance = float(segment_lengths[actual_states].sum())
-        shared_states = np.intersect1d(actual_states, np.asarray(predicted_states))
-        shared_distance = float(segment_lengths[shared_states].sum())
-        distance_matches.append(shared_distance / actual_distance)
-
-    matches = np.asarray(distance_matches)
+    if comparisons is None:
+        comparisons = compare_held_out_routes(model, path_panel, segment_lengths)
+    matches = np.asarray([item.distance_match for item in comparisons])
     return {
         "distance_match_percent": 100.0 * float(matches.mean()),
         "routes_at_least_90_percent": 100.0 * float(np.mean(matches >= 0.9)),
         "average_log_probability": float(np.mean(log_probabilities)),
+    }
+
+
+def _state_coordinates(states: np.ndarray, width: int) -> tuple[np.ndarray, np.ndarray]:
+    """Decode directed segment-state indices to intersection coordinates."""
+    intersections = np.asarray(states, dtype=np.int64) // 4
+    return intersections % width, intersections // width
+
+
+def render_road_figure(
+    config: RoadStudyConfig,
+    network: RoadNetwork,
+    tasks: list[MCEIRLTask],
+    representative: RouteComparison,
+    output: Path,
+) -> dict[str, Any]:
+    """Render the shared task map and one representative route comparison."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    from matplotlib.lines import Line2D
+
+    task_by_id = {task.task_id: task for task in tasks}
+    task = task_by_id[representative.task_id]
+    terminal = int(np.asarray(task.terminal_states, dtype=int)[0])
+
+    blue = "#3b6ea5"
+    orange = "#c1654a"
+    road = "#d5d9dd"
+    road_dark = "#aeb6bf"
+    fig, (overview, detail) = plt.subplots(
+        2,
+        1,
+        figsize=(8.4, 8.2),
+        gridspec_kw={"height_ratios": [1.45, 0.75]},
+    )
+
+    for spacing, color, width, alpha in (
+        (7, road, 0.25, 0.55),
+        (15, road_dark, 0.45, 0.55),
+        (55, "#7f8b96", 0.75, 0.60),
+    ):
+        coordinates = np.arange(0, config.width, spacing)
+        overview.vlines(
+            coordinates,
+            0,
+            config.height - 1,
+            colors=color,
+            linewidth=width,
+            alpha=alpha,
+            zorder=0,
+        )
+        overview.hlines(
+            coordinates,
+            0,
+            config.width - 1,
+            colors=color,
+            linewidth=width,
+            alpha=alpha,
+            zorder=0,
+        )
+
+    for candidate in tasks:
+        candidate_terminal = int(np.asarray(candidate.terminal_states, dtype=int)[0])
+        start_x, start_y = _state_coordinates(np.asarray([candidate.initial_state]), config.width)
+        end_x, end_y = _state_coordinates(np.asarray([candidate_terminal]), config.width)
+        selected = candidate.task_id == representative.task_id
+        overview.plot(
+            [start_x[0], end_x[0]],
+            [start_y[0], end_y[0]],
+            color=orange if selected else blue,
+            linewidth=1.8 if selected else 0.7,
+            alpha=0.95 if selected else 0.28,
+            zorder=2 if selected else 1,
+        )
+        overview.scatter(
+            start_x,
+            start_y,
+            s=18 if selected else 7,
+            color=orange if selected else blue,
+            alpha=0.95 if selected else 0.35,
+            edgecolors="white",
+            linewidths=0.35,
+            zorder=3,
+        )
+        overview.scatter(
+            end_x,
+            end_y,
+            marker="*",
+            s=70 if selected else 22,
+            color=orange if selected else blue,
+            alpha=0.95 if selected else 0.35,
+            edgecolors="white",
+            linewidths=0.35,
+            zorder=3,
+        )
+
+    overview.set_title(f"{len(tasks)} tasks on one {config.width} by {config.height} road grid")
+    overview.set_xlabel("road-grid coordinate $x$")
+    overview.set_ylabel("road-grid coordinate $y$")
+    overview.set_xlim(0, config.width - 1)
+    overview.set_ylim(0, config.height - 1)
+    overview.set_aspect("equal")
+
+    active = set(map(int, np.asarray(task.active_states, dtype=int)))
+    next_state = np.asarray(network.transitions.next_state)
+    edges: set[tuple[tuple[int, int], tuple[int, int]]] = set()
+    for state in active:
+        state_x, state_y = _state_coordinates(np.asarray([state]), config.width)
+        start = (int(state_x[0]), int(state_y[0]))
+        for action in range(config.num_actions):
+            successor = int(next_state[state, action])
+            if successor not in active:
+                continue
+            next_x, next_y = _state_coordinates(np.asarray([successor]), config.width)
+            end = (int(next_x[0]), int(next_y[0]))
+            if start != end:
+                edge = (start, end) if start < end else (end, start)
+                edges.add(edge)
+    detail.add_collection(
+        LineCollection(
+            [[start, end] for start, end in sorted(edges)],
+            colors=road_dark,
+            linewidths=1.0,
+            alpha=0.75,
+            zorder=0,
+        )
+    )
+
+    actual_path = np.append(representative.actual_states, terminal)
+    predicted_path = np.append(representative.predicted_states, terminal)
+    actual_x, actual_y = _state_coordinates(actual_path, config.width)
+    predicted_x, predicted_y = _state_coordinates(predicted_path, config.width)
+    detail.plot(
+        predicted_x,
+        predicted_y,
+        color=blue,
+        linewidth=3.0,
+        solid_capstyle="round",
+        zorder=2,
+    )
+    detail.plot(
+        actual_x,
+        actual_y,
+        color=orange,
+        linewidth=2.0,
+        linestyle=(0, (3, 2)),
+        solid_capstyle="round",
+        zorder=3,
+    )
+    detail.scatter(
+        actual_x[0],
+        actual_y[0],
+        s=60,
+        color="#263238",
+        edgecolors="white",
+        linewidths=0.8,
+        zorder=4,
+    )
+    detail.scatter(
+        actual_x[-1],
+        actual_y[-1],
+        marker="*",
+        s=170,
+        color="#263238",
+        edgecolors="white",
+        linewidths=0.8,
+        zorder=4,
+    )
+    all_x, all_y = _state_coordinates(np.asarray(sorted(active)), config.width)
+    padding = 1.2
+    detail.set_xlim(float(all_x.min()) - padding, float(all_x.max()) + padding)
+    detail.set_ylim(float(all_y.min()) - padding, float(all_y.max()) + padding)
+    detail.set_aspect("equal")
+    detail.set_xlabel("road-grid coordinate $x$")
+    detail.set_ylabel("road-grid coordinate $y$")
+    detail.set_title(f"Median held-out match ({100.0 * representative.distance_match:.1f} percent)")
+    detail.legend(
+        handles=[
+            Line2D([0], [0], color=blue, linewidth=3.0, label="fitted route"),
+            Line2D(
+                [0],
+                [0],
+                color=orange,
+                linewidth=2.0,
+                linestyle=(0, (3, 2)),
+                label="held-out route",
+            ),
+            Line2D(
+                [0],
+                [0],
+                marker="o",
+                color="none",
+                markerfacecolor="#263238",
+                markeredgecolor="white",
+                markersize=7,
+                label="origin",
+            ),
+            Line2D(
+                [0],
+                [0],
+                marker="*",
+                color="none",
+                markerfacecolor="#263238",
+                markeredgecolor="white",
+                markersize=11,
+                label="destination",
+            ),
+        ],
+        loc="lower right",
+        frameon=False,
+        fontsize=8,
+    )
+
+    for axis in (overview, detail):
+        axis.spines["top"].set_visible(False)
+        axis.spines["right"].set_visible(False)
+
+    fig.suptitle("Generated road tasks and fitted route behavior", fontsize=14)
+    fig.tight_layout()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output, dpi=180, facecolor="white", bbox_inches="tight")
+    plt.close(fig)
+
+    display_output = output.relative_to(ROOT) if output.is_relative_to(ROOT) else output
+    return {
+        "path": str(display_output),
+        "selection_rule": "held-out route nearest the median distance match",
+        "task_id": str(representative.task_id),
+        "trajectory_index": representative.trajectory_index,
+        "individual_id": int(representative.individual_id),
+        "distance_match_percent": 100.0 * representative.distance_match,
+        "panels": [
+            "all origin-destination tasks on the shared road grid",
+            "held-out route and fitted most-likely route for the selected task",
+        ],
     }
 
 
@@ -737,7 +1033,12 @@ def shape_checks(
     return checks
 
 
-def run(config: RoadStudyConfig, *, output: Path) -> dict[str, Any]:
+def run(
+    config: RoadStudyConfig,
+    *,
+    output: Path,
+    figure_output: Path | None = None,
+) -> dict[str, Any]:
     """Run the synthetic study and write a machine-readable receipt."""
     started = time.perf_counter()
     network = build_road_network(config)
@@ -784,11 +1085,25 @@ def run(config: RoadStudyConfig, *, output: Path) -> dict[str, Any]:
         -1, compiled_features.shape[-1]
     )
     contrast_rank = int(np.linalg.matrix_rank(compiled_contrast))
+    route_comparisons = compare_held_out_routes(model, test, network.segment_lengths)
     synthetic_metrics = evaluate_routes(
         model,
         path_panel=test,
         probability_panel=train,
         segment_lengths=network.segment_lengths,
+        comparisons=route_comparisons,
+    )
+    representative = select_representative_route(route_comparisons)
+    figure_metadata = (
+        render_road_figure(
+            config,
+            network,
+            tasks,
+            representative,
+            figure_output,
+        )
+        if figure_output is not None
+        else None
     )
     coefficient_rmse = float(np.sqrt(np.mean((model.coef_ - theta) ** 2)))
     target_gaps = {name: synthetic_metrics[name] - target for name, target in PAPER_TARGETS.items()}
@@ -800,7 +1115,7 @@ def run(config: RoadStudyConfig, *, output: Path) -> dict[str, Any]:
             "num_actions": config.num_actions,
         }
     )
-    receipt = {
+    receipt: dict[str, Any] = {
         "claim": (
             "Paper-faithful generated-data validation of the road-choice adapter. "
             "This does not reproduce Table 1 from the unavailable Pittsburgh data."
@@ -856,6 +1171,7 @@ def run(config: RoadStudyConfig, *, output: Path) -> dict[str, Any]:
             "coefficient_rmse": coefficient_rmse,
             "fit_seconds": fit_seconds,
         },
+        "figure": figure_metadata,
         "synthetic_metrics": synthetic_metrics,
         "paper_target_gaps": target_gaps,
         "metric_semantics": {
@@ -883,19 +1199,35 @@ def run(config: RoadStudyConfig, *, output: Path) -> dict[str, Any]:
     return receipt
 
 
+def resolve_figure_output(*, smoke: bool, requested: Path | None) -> Path | None:
+    """Keep smoke runs away from the tracked paper-scale figure by default."""
+    if requested is not None:
+        return requested
+    return None if smoke else DEFAULT_FIGURE
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--figure-output", type=Path)
     args = parser.parse_args()
     config = SMOKE_SHAPE if args.smoke else PAPER_SHAPE
-    receipt = run(config, output=args.output)
+    figure_output = resolve_figure_output(smoke=args.smoke, requested=args.figure_output)
+    receipt = run(config, output=args.output, figure_output=figure_output)
     if args.quiet:
         display_output = (
             args.output.relative_to(ROOT) if args.output.is_relative_to(ROOT) else args.output
         )
         print(f"wrote {display_output}")
+        if figure_output is not None:
+            display_figure = (
+                figure_output.relative_to(ROOT)
+                if figure_output.is_relative_to(ROOT)
+                else figure_output
+            )
+            print(f"wrote {display_figure}")
         print(f"status: {'passed' if receipt['passed'] else 'failed'}")
     else:
         print(json.dumps(receipt, indent=2))
