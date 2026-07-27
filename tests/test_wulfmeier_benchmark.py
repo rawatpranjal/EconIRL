@@ -5,17 +5,17 @@ outperforms linear MCE-IRL on Binaryworld where the reward has
 nonlinear feature interactions.
 """
 
-import pytest
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
+import pytest
 
-from econirl.environments.binaryworld import BinaryworldEnvironment
-from econirl.environments.objectworld import ObjectworldEnvironment
-from econirl.core.types import DDCProblem, Panel
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import policy_iteration
-from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
+from econirl.core.types import DDCProblem, Panel
+from econirl.environments.binaryworld import BinaryworldEnvironment
+from econirl.environments.objectworld import ObjectworldEnvironment
+from econirl.estimation.mce_irl import MCEIRLConfig, MCEIRLEstimator
 from econirl.estimators.mceirl_neural import MCEIRLNeural
 from econirl.preferences.linear import LinearUtility
 
@@ -25,11 +25,13 @@ def _panel_to_df(panel: Panel) -> pd.DataFrame:
     rows = []
     for traj in panel.trajectories:
         for t in range(len(traj.states)):
-            rows.append({
-                "agent_id": traj.individual_id,
-                "state": int(traj.states[t]),
-                "action": int(traj.actions[t]),
-            })
+            rows.append(
+                {
+                    "agent_id": traj.individual_id,
+                    "state": int(traj.states[t]),
+                    "action": int(traj.actions[t]),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -39,15 +41,15 @@ def _compute_evd(
     transitions: jnp.ndarray,
     problem: DDCProblem,
 ) -> float:
-    """Compute Expected Value Difference between optimal and learned policy.
+    """Compute value difference between the true-reward reference and learned policy.
 
-    EVD measures how much worse the learned policy performs compared to
-    the optimal policy, both evaluated under the true reward function.
-    A lower EVD means the learned policy is closer to optimal.
+    Both policies are evaluated under the true reward without an entropy
+    bonus. A value closer to zero means the learned policy is closer to the
+    true-reward soft reference policy.
 
-    The computation solves for the optimal value function under the true
-    reward, then evaluates the learned policy under the same reward via
-    a linear system solve, and returns the mean difference across states.
+    The computation solves for the reference soft policy under the true
+    reward, evaluates both policies under the same reward-only objective, and
+    returns the mean difference across states.
     """
     n_states = problem.num_states
     n_actions = problem.num_actions
@@ -56,19 +58,22 @@ def _compute_evd(
     # Build the reward matrix (S, A) from the state-only reward
     reward_sa = jnp.tile(true_reward[:, None], (1, n_actions)).astype(jnp.float64)
 
-    # Optimal value under true reward
+    # Reference soft policy under true reward
     operator = SoftBellmanOperator(problem, transitions)
     opt_result = policy_iteration(operator, reward_sa.astype(jnp.float32), tol=1e-10, max_iter=200)
-    v_star = opt_result.V.astype(jnp.float64)
 
-    # Value of learned policy under true reward
-    pi = learned_policy.astype(jnp.float64)
-    r_pi = (pi * reward_sa).sum(axis=1)
-    P_pi = jnp.einsum("sa,ast->st", pi, transitions.astype(jnp.float64))
-    I = jnp.eye(n_states, dtype=jnp.float64)
-    v_learned = jnp.linalg.solve(I - gamma * P_pi, r_pi)
+    # Evaluate both policies under the same reward-only objective
+    identity = jnp.eye(n_states, dtype=jnp.float64)
 
-    return float((v_star - v_learned).mean())
+    def reward_only_value(policy: jnp.ndarray) -> jnp.ndarray:
+        pi = policy.astype(jnp.float64)
+        r_pi = (pi * reward_sa).sum(axis=1)
+        p_pi = jnp.einsum("sa,ast->st", pi, transitions.astype(jnp.float64))
+        return jnp.linalg.solve(identity - gamma * p_pi, r_pi)
+
+    v_reference = reward_only_value(opt_result.policy)
+    v_learned = reward_only_value(learned_policy)
+    return float((v_reference - v_learned).mean())
 
 
 @pytest.mark.slow
@@ -100,6 +105,7 @@ class TestWulfmeierBinaryworld:
         # binary neighborhood feature vectors. The neural network needs these
         # features as input to learn the nonlinear count-based reward.
         state_features = features[:, 0, :]  # (S, 9) -- same across actions
+
         def binaryworld_encoder(states: jnp.ndarray) -> jnp.ndarray:
             return state_features[states.astype(jnp.int32)]
 
@@ -128,9 +134,7 @@ class TestWulfmeierBinaryworld:
         )
         deep_policy = jnp.array(deep_model.policy_).astype(jnp.float32)
 
-        deep_evd = _compute_evd(
-            env.true_reward, deep_policy, transitions, env.problem_spec
-        )
+        deep_evd = _compute_evd(env.true_reward, deep_policy, transitions, env.problem_spec)
 
         # --- Linear MCE-IRL ---
         utility = LinearUtility(
@@ -139,7 +143,7 @@ class TestWulfmeierBinaryworld:
         )
         estimator = MCEIRLEstimator(
             config=MCEIRLConfig(
-                optimizer="L-BFGS-B",
+                optimizer="root",
                 inner_solver="hybrid",
                 inner_max_iter=5000,
                 inner_tol=1e-8,
@@ -149,16 +153,12 @@ class TestWulfmeierBinaryworld:
                 verbose=False,
             )
         )
-        result = estimator.estimate(
-            panel, utility, env.problem_spec, transitions
-        )
+        result = estimator.estimate(panel, utility, env.problem_spec, transitions)
         linear_policy = result.policy
 
-        linear_evd = _compute_evd(
-            env.true_reward, linear_policy, transitions, env.problem_spec
-        )
+        linear_evd = _compute_evd(env.true_reward, linear_policy, transitions, env.problem_spec)
 
-        print(f"\nBinaryworld 8x8 EVD results:")
+        print("\nBinaryworld 8x8 EVD results:")
         print(f"  Deep MCE-IRL EVD:   {deep_evd:.4f}")
         print(f"  Linear MCE-IRL EVD: {linear_evd:.4f}")
         print(f"  Deep wins by:       {linear_evd - deep_evd:.4f}")
@@ -186,9 +186,7 @@ class TestWulfmeierObjectworld:
         np.random.seed(42)
 
         # Create environment and generate demonstrations
-        env = ObjectworldEnvironment(
-            grid_size=8, feature_type="continuous", seed=42
-        )
+        env = ObjectworldEnvironment(grid_size=8, feature_type="continuous", seed=42)
         panel = env.simulate_demonstrations(n_demos=32, max_steps=30, seed=0)
         df = _panel_to_df(panel)
 
@@ -200,6 +198,7 @@ class TestWulfmeierObjectworld:
 
         # Build a state encoder from the environment features
         state_features = features[:, 0, :]  # (S, K) -- same across actions
+
         def objectworld_encoder(states: jnp.ndarray) -> jnp.ndarray:
             return state_features[states.astype(jnp.int32)]
 
@@ -228,15 +227,13 @@ class TestWulfmeierObjectworld:
         )
         deep_policy = jnp.array(deep_model.policy_).astype(jnp.float32)
 
-        evd = _compute_evd(
-            env.true_reward, deep_policy, transitions, env.problem_spec
-        )
+        evd = _compute_evd(env.true_reward, deep_policy, transitions, env.problem_spec)
 
-        print(f"\nObjectworld 8x8 EVD results:")
+        print("\nObjectworld 8x8 EVD results:")
         print(f"  Deep MCE-IRL EVD: {evd:.4f}")
 
-        # Sanity check: EVD should be finite and non-negative
-        assert 0 <= evd < 100, (
-            f"Expected EVD in [0, 100), got {evd:.4f}. "
+        # Sanity check: the value difference should be finite and bounded
+        assert np.isfinite(evd) and abs(evd) < 100, (
+            f"Expected finite value difference with magnitude below 100, got {evd:.4f}. "
             f"The neural reward should produce a reasonable policy."
         )

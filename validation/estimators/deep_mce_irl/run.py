@@ -28,7 +28,7 @@ SIMULATION_OVERRIDES = {
 CELL_ROLES = {
     "canonical_low_state_only": "sanity",
     "deep_mce_neural_reward": "primary",
-    "deep_mce_neural_features": "finite-theta check",
+    "deep_mce_neural_features": "projection diagnostic",
     "deep_mce_neural_reward_features": "stress test",
 }
 CELL_LABELS = {
@@ -47,6 +47,7 @@ from validation_display import (  # noqa: E402
     validation_display_name,
     validation_role,
 )
+
 from validation.known_truth import (  # noqa: E402
     RecoveryGateFailure,
     build_known_truth_dgp,
@@ -112,8 +113,7 @@ def main() -> None:
             details.append(
                 f"{cell_id}: "
                 + ", ".join(
-                    f"{gate.name}={gate.value} {gate.operator} {gate.threshold}"
-                    for gate in failed
+                    f"{gate.name}={gate.value} {gate.operator} {gate.threshold}" for gate in failed
                 )
             )
         raise RecoveryGateFailure("; ".join(details))
@@ -177,8 +177,8 @@ def render_results_tex(records: list[dict[str, Any]]) -> str:
         "supplied state encodings. The flexible neural DGPs use action 0 as the "
         "zero-reward anchor. Neural network weights are not treated as "
         "structural parameters. When the truth has a frozen neural reward, the "
-        "gated object is the learned reward table; finite projected parameters "
-        "are gated only when the projection basis is numerically identifiable."
+        "gated object is the learned reward table. Finite projections are "
+        "descriptive diagnostics rather than structural parameter estimates."
     )
     add("")
     add(r"\subsection{Validation Design Context}")
@@ -228,8 +228,7 @@ def render_results_tex(records: list[dict[str, Any]]) -> str:
         gates = payload["gates"]
         passed = sum(gate.passed for gate in gates)
         regrets = "/".join(
-            cell_metric(record, f"{kind}_regret", 4)
-            for kind in ("type_a", "type_b", "type_c")
+            cell_metric(record, f"{kind}_regret", 4) for kind in ("type_a", "type_b", "type_c")
         )
         add(
             f"{tex_text(validation_display_name(cell_id))} & "
@@ -263,8 +262,7 @@ def render_results_tex(records: list[dict[str, Any]]) -> str:
             add(
                 " Failed gates: "
                 + ", ".join(
-                    f"\\texttt{{{tex_text(gate.name)}}}={fmt(gate.value, 4)}"
-                    for gate in failed
+                    f"\\texttt{{{tex_text(gate.name)}}}={fmt(gate.value, 4)}" for gate in failed
                 )
                 + "."
             )
@@ -273,8 +271,8 @@ def render_results_tex(records: list[dict[str, Any]]) -> str:
             and payload["metrics"].get("parameters") is not None
         ):
             add(
-                " Projected finite-theta statistics are diagnostic in this "
-                "cell because the projection condition number is "
+                " Projected finite-theta statistics are descriptive in this "
+                "cell. The projection condition number is "
                 f"{fmt(payload['summary'].metadata.get('projection_condition_number'), 3)}."
             )
 
@@ -334,7 +332,7 @@ def fmt(value: Any, digits: int = 3) -> str:
         return tex_text(str(value))
     if math.isnan(x):
         return "---"
-    if abs(x) >= 10 ** digits or (0 < abs(x) < 10 ** (-(digits - 1))):
+    if abs(x) >= 10**digits or (0 < abs(x) < 10 ** (-(digits - 1))):
         return f"{x:.{digits}e}"
     return f"{x:.{digits}f}"
 

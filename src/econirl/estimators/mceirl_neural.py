@@ -28,7 +28,7 @@ Reference:
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 import equinox as eqx
 import jax
@@ -36,15 +36,14 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import pandas as pd
-from scipy.stats import norm as scipy_norm
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.occupancy import compute_state_action_visitation
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.solvers import hybrid_iteration, value_iteration
-from econirl.core.types import DDCProblem, Panel, TrajectoryPanel
+from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimators.neural_base import NeuralEstimatorMixin
-
+from econirl.simulation.counterfactual import CounterfactualResult, CounterfactualType
 
 # ---------------------------------------------------------------------------
 # Internal network modules (Equinox)
@@ -129,9 +128,7 @@ class _StateActionRewardNetwork(eqx.Module):
         self.layers = layers
         self.output_layer = eqx.nn.Linear(in_dim, 1, key=keys[-1])
 
-    def __call__(
-        self, state_feat: jax.Array, action_onehot: jax.Array
-    ) -> jax.Array:
+    def __call__(self, state_feat: jax.Array, action_onehot: jax.Array) -> jax.Array:
         """Compute R(s,a) for a single (state, action) pair.
 
         Parameters
@@ -314,34 +311,37 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         n_states: int | None = None,
         n_actions: int | None = None,
         discount: float = 0.95,
-        # Reward type
         reward_type: str = "state_action",
-        # Network
         reward_hidden_dim: int = 64,
         reward_num_layers: int = 2,
         reward_network: Callable | None = None,
-        # Training
         max_epochs: int = 200,
         lr: float = 1e-3,
-        # Inner solver
+        occupancy_tol: float = 1e-2,
+        patience: int = 100,
+        improvement_tol: float = 1e-5,
         inner_solver: str = "hybrid",
         inner_tol: float = 1e-8,
         inner_max_iter: int = 5000,
-        # Encoders
         state_encoder: Callable | None = None,
         state_dim: int | None = None,
-        # Projection
         feature_names: list[str] | None = None,
-        anchor_action: int | None = None,
+        anchor_action: int | None = 0,
+        anchor_state: int | None = 0,
         absorbing_state: int | None = None,
         seed: int = 0,
         verbose: bool = False,
     ):
         if reward_type not in ("state", "state_action"):
-            raise ValueError(
-                f"reward_type must be 'state' or 'state_action', "
-                f"got '{reward_type}'"
-            )
+            raise ValueError(f"reward_type must be 'state' or 'state_action', got '{reward_type}'")
+        if not 0.0 <= discount <= 1.0:
+            raise ValueError("discount must lie in [0, 1]")
+        if max_epochs < 1:
+            raise ValueError("max_epochs must be positive")
+        if patience < 1:
+            raise ValueError("patience must be positive")
+        if occupancy_tol <= 0 or inner_tol <= 0 or improvement_tol < 0:
+            raise ValueError("solver tolerances must be positive")
         self.n_states = n_states
         self.n_actions = n_actions
         self.discount = discount
@@ -351,6 +351,9 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         self.reward_network = reward_network
         self.max_epochs = max_epochs
         self.lr = lr
+        self.occupancy_tol = occupancy_tol
+        self.patience = patience
+        self.improvement_tol = improvement_tol
         self.inner_solver = inner_solver
         self.inner_tol = inner_tol
         self.inner_max_iter = inner_max_iter
@@ -358,32 +361,41 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         self.state_dim = state_dim
         self.feature_names = feature_names
         self.anchor_action = anchor_action
+        self.anchor_state = absorbing_state if absorbing_state is not None else anchor_state
         self.absorbing_state = absorbing_state
         self.seed = seed
         self.verbose = verbose
 
-        # Fitted attributes (set after fit())
         self.params_: dict[str, float] | None = None
-        self.se_: dict[str, float] | None = None
-        self.pvalues_: dict[str, float] | None = None
+        self.se_: None = None
+        self.pvalues_: None = None
         self.coef_: np.ndarray | None = None
         self.policy_: np.ndarray | None = None
         self.value_: np.ndarray | None = None
         self.reward_: np.ndarray | None = None
         self.projection_r2_: float | None = None
+        self.projection_diagnostics_: dict[str, object] | None = None
         self.converged_: bool | None = None
+        self.termination_reason_: str | None = None
         self.n_epochs_: int | None = None
+        self.best_epoch_: int | None = None
+        self.training_loss_: float | None = None
         self.feature_difference_: float | None = None
         self.occupancy_moment_residual_: float | None = None
+        self.bellman_residual_: float | None = None
+        self.n_observations_: int | None = None
+        self.diagnostics_: dict[str, object] | None = None
+        self.transitions_: np.ndarray | None = None
+        self.action_mask_: np.ndarray | None = None
 
-        # Internal state
-        self._reward_net = None
+        self._reward_net: Any = None
         self._state_encoder: Callable | None = None
         self._state_dim: int | None = None
         self._n_states: int | None = None
         self._n_actions: int | None = None
         self._empirical_sa: jnp.ndarray | None = None
         self._initial_distribution: jnp.ndarray | None = None
+        self._action_mask_jax: jax.Array | None = None
 
     def fit(
         self,
@@ -393,76 +405,115 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         id: str | None = None,
         features: RewardSpec | np.ndarray | None = None,
         transitions: np.ndarray | None = None,
+        action_mask: np.ndarray | None = None,
         context: object = None,
     ) -> "MCEIRLNeural":
-        """Fit the MCEIRLNeural estimator to data.
+        """Fit the neural reward map under known transitions.
 
-        Parameters
-        ----------
-        data : pandas.DataFrame or Panel or TrajectoryPanel
-            Panel data with demonstrations.  When a DataFrame is passed,
-            ``state``, ``action``, and ``id`` column names are required.
-        state : str, optional
-            Column name for the state variable (required for DataFrame).
-        action : str, optional
-            Column name for the action variable (required for DataFrame).
-        id : str, optional
-            Column name for the individual identifier (required for DataFrame).
-        features : RewardSpec or numpy.ndarray, optional
-            Feature specification for parameter projection.  If provided,
-            the neural reward is projected onto these features to extract
-            interpretable theta.
-        transitions : numpy.ndarray
-            Transition matrices ``P(s'|s,a)``, shape (n_actions, n_states, n_states).
-            Required for v1 (exact soft value iteration).
-        context : ignored
-            Accepted for API compatibility but not used.
-
-        Returns
-        -------
-        self : MCEIRLNeural
-            Returns self for method chaining.
+        ``transitions`` must use ``(n_actions, n_states, n_states)`` orientation.
+        ``action_mask``, when supplied, has shape ``(n_states, n_actions)``.
+        Feature inputs are projection diagnostics and do not turn neural weights
+        into structural parameters.
         """
+        del context
         if transitions is None:
             raise ValueError(
-                "MCEIRLNeural v1 requires transitions. "
-                "Pass transitions as (n_actions, n_states, n_states) array."
+                "MCEIRLNeural requires transitions. Pass an (n_actions, n_states, n_states) array."
             )
+        if isinstance(data, pd.DataFrame):
+            for column_name, label in ((state, "state"), (action, "action")):
+                if column_name is None or column_name not in data:
+                    continue
+                numeric = pd.to_numeric(data[column_name], errors="coerce").to_numpy(
+                    dtype=np.float64
+                )
+                if not np.isfinite(numeric).all() or not np.equal(numeric, np.floor(numeric)).all():
+                    raise ValueError(f"{label} values must be finite integer codes")
 
-        # --- Step 1: Extract arrays from data ---
-        panel, all_states, all_actions, all_next = self._extract_data(
-            data, state, action, id
-        )
-
-        n_states = self.n_states or int(all_states.max()) + 1
+        panel, all_states, all_actions, all_next = self._extract_data(data, state, action, id)
+        if all_states.size == 0:
+            raise ValueError("data must contain at least one observation")
+        n_states = self.n_states or int(max(all_states.max(), all_next.max())) + 1
         n_actions = self.n_actions or int(all_actions.max()) + 1
-        if self.anchor_action is not None and not 0 <= self.anchor_action < n_actions:
-            raise ValueError(
-                f"anchor_action must be in [0, {n_actions}), got {self.anchor_action}"
-            )
-        if self.absorbing_state is not None and not 0 <= self.absorbing_state < n_states:
-            raise ValueError(
-                f"absorbing_state must be in [0, {n_states}), got {self.absorbing_state}"
-            )
         self._n_states = n_states
         self._n_actions = n_actions
+        self.n_observations_ = int(all_states.size)
 
-        # Convert transitions to JAX
-        transitions_jax = jnp.asarray(transitions, dtype=jnp.float32)
+        if np.any(all_states < 0) or np.any(all_states >= n_states):
+            raise ValueError("observed states fall outside [0, n_states)")
+        if np.any(all_next < 0) or np.any(all_next >= n_states):
+            raise ValueError("observed next states fall outside [0, n_states)")
+        if np.any(all_actions < 0) or np.any(all_actions >= n_actions):
+            raise ValueError("observed actions fall outside [0, n_actions)")
 
-        # --- Step 2: Build encoder ---
+        transition_array = np.asarray(transitions, dtype=np.float64)
+        expected_shape = (n_actions, n_states, n_states)
+        if transition_array.shape != expected_shape:
+            raise ValueError(
+                "transitions must have shape "
+                f"{expected_shape} in (actions, states, next_states) orientation; "
+                f"got {transition_array.shape}"
+            )
+        if not np.isfinite(transition_array).all() or np.any(transition_array < 0):
+            raise ValueError("transitions must be finite and nonnegative")
+        row_error = float(np.max(np.abs(transition_array.sum(axis=2) - 1.0)))
+        if row_error > 1e-6:
+            raise ValueError(
+                f"transition rows must sum to one; maximum row error is {row_error:.3g}"
+            )
+
+        if action_mask is None:
+            mask = np.ones((n_states, n_actions), dtype=bool)
+        else:
+            mask = np.asarray(action_mask, dtype=bool)
+            if mask.shape != (n_states, n_actions):
+                raise ValueError(
+                    f"action_mask must have shape {(n_states, n_actions)}, got {mask.shape}"
+                )
+            if np.any(mask.sum(axis=1) == 0):
+                raise ValueError("every state must retain at least one available action")
+        if np.any(~mask[all_states, all_actions]):
+            raise ValueError("demonstrations contain actions marked unavailable")
+
+        if self.reward_type == "state_action":
+            if self.anchor_action is None or not 0 <= self.anchor_action < n_actions:
+                raise ValueError(f"state_action rewards require anchor_action in [0, {n_actions})")
+        elif self.anchor_state is None or not 0 <= self.anchor_state < n_states:
+            raise ValueError(f"state rewards require anchor_state in [0, {n_states})")
+
+        counts = np.zeros((n_states, n_actions), dtype=np.int64)
+        np.add.at(counts, (all_states, all_actions), 1)
+        available_cells = int(mask.sum())
+        observed_available = int(np.count_nonzero((counts > 0) & mask))
+        action_shares = np.bincount(all_actions, minlength=n_actions) / all_actions.size
+        self.diagnostics_ = {
+            "transition_orientation": "(n_actions, n_states, n_states)",
+            "max_transition_row_error": row_error,
+            "observed_states": int(np.unique(all_states).size),
+            "state_coverage": float(np.unique(all_states).size / n_states),
+            "state_action_coverage": float(observed_available / available_cells),
+            "single_action_states": int(np.sum(mask.sum(axis=1) == 1)),
+            "min_action_share": float(action_shares.min()),
+            "normalization": (
+                f"anchor_action={self.anchor_action}"
+                if self.reward_type == "state_action"
+                else f"anchor_state={self.anchor_state}"
+            ),
+        }
+
+        self.transitions_ = transition_array.astype(np.float32)
+        self.action_mask_ = mask
+        self._action_mask_jax = jnp.asarray(mask)
+        transitions_jax = jnp.asarray(self.transitions_)
         self._build_encoder(n_states)
-
-        # --- Step 3: Compute empirical state-action occupancy ---
+        assert self._state_dim is not None
+        assert self._state_encoder is not None
         empirical_sa = self._compute_empirical_occupancy(
             panel, n_states, n_actions, discount=self.discount
         )
         self._empirical_sa = empirical_sa
-        self._initial_distribution = self._compute_initial_distribution(
-            panel, n_states
-        )
+        self._initial_distribution = self._compute_initial_distribution(panel, n_states)
 
-        # --- Step 4: Build reward network ---
         key = jax.random.PRNGKey(self.seed)
         if self.reward_network is not None:
             self._reward_net = self.reward_network(self._state_dim, n_actions, key)
@@ -482,24 +533,18 @@ class MCEIRLNeural(NeuralEstimatorMixin):
                 key=key,
             )
 
-        # --- Step 5: Training loop ---
-        self._train_mce(
-            transitions_jax, empirical_sa, n_states, n_actions,
-        )
-
-        # --- Step 6: Extract policy, value, and reward ---
+        self._train_mce(transitions_jax, empirical_sa, n_states, n_actions)
         self._extract_final(transitions_jax, n_states, n_actions)
 
-        # --- Step 7: Feature projection ---
         if features is not None:
             self._project_onto_features(features, n_states, n_actions)
         else:
             self.params_ = None
-            self.se_ = None
-            self.pvalues_ = None
-            self.projection_r2_ = None
             self.coef_ = None
-
+            self.projection_r2_ = None
+            self.projection_diagnostics_ = None
+        self.se_ = None
+        self.pvalues_ = None
         return self
 
     # ------------------------------------------------------------------
@@ -517,12 +562,9 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         if isinstance(data, pd.DataFrame):
             if state is None or action is None or id is None:
                 raise ValueError(
-                    "state, action, and id column names are required "
-                    "when data is a DataFrame"
+                    "state, action, and id column names are required when data is a DataFrame"
                 )
-            panel = TrajectoryPanel.from_dataframe(
-                data, state=state, action=action, id=id
-            )
+            panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
             all_states = np.asarray(panel.all_states, dtype=np.int64)
             all_actions = np.asarray(panel.all_actions, dtype=np.int64)
             all_next = np.asarray(panel.all_next_states, dtype=np.int64)
@@ -533,8 +575,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             all_next = np.asarray(panel.get_all_next_states(), dtype=np.int64)
         else:
             raise TypeError(
-                f"data must be a DataFrame, Panel, or TrajectoryPanel, "
-                f"got {type(data)}"
+                f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
 
         return panel, all_states, all_actions, all_next
@@ -587,9 +628,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             if discount == 1.0:
                 weights = np.ones(len(states), dtype=np.float32)
             else:
-                weights = np.power(float(discount), np.arange(len(states))).astype(
-                    np.float32
-                )
+                weights = np.power(float(discount), np.arange(len(states))).astype(np.float32)
             flat_idx = states * n_actions + actions
             np.add.at(sa_counts.ravel(), flat_idx, weights)
             total += float(weights.sum())
@@ -641,7 +680,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
                 return jnp.broadcast_to(out[:, None], (n_states, n_actions))
             return out
         if self.reward_type == "state_action":
-            return reward_net.all_actions(state_feat)
+            return jnp.asarray(reward_net.all_actions(state_feat))
         rewards_s = jax.vmap(reward_net)(state_feat)
         return jnp.broadcast_to(rewards_s[:, None], (n_states, n_actions))
 
@@ -652,14 +691,16 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         n_states: int,
         n_actions: int,
     ) -> jax.Array:
-        """Compute R(s,a) for all states and actions."""
-        rewards = self._net_reward_matrix(
-            reward_net, state_feat, n_states, n_actions
-        )
-        if self.absorbing_state is not None:
-            rewards = rewards.at[int(self.absorbing_state), :].set(0.0)
-        if self.anchor_action is not None:
+        """Compute the anchored reward matrix and apply availability."""
+        rewards = self._net_reward_matrix(reward_net, state_feat, n_states, n_actions)
+        if self.reward_type == "state_action":
+            assert self.anchor_action is not None
             rewards = rewards.at[:, int(self.anchor_action)].set(0.0)
+        else:
+            assert self.anchor_state is not None
+            rewards = rewards - rewards[int(self.anchor_state), 0]
+        if self._action_mask_jax is not None:
+            rewards = jnp.where(self._action_mask_jax, rewards, -1e9)
         return rewards
 
     def _train_mce(
@@ -669,22 +710,12 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         n_states: int,
         n_actions: int,
     ) -> None:
-        """Run MCE-IRL training with neural reward network.
-
-        Training loop:
-        1. Forward: compute R(s,a) for all states and actions
-        2. Solve soft Bellman: V, policy = soft_value_iteration(R, transitions)
-        3. Compute state visitation: D(s) = forward_pass(policy, transitions)
-        4. Expected occupancy: E_policy[sa] = D(s) * pi(a|s)
-        5. Gradient: grad_R = policy_sa - empirical_sa
-        6. Backprop through reward network via surrogate loss
-        """
+        """Train the reward network against discounted occupancy moments."""
         optimizer = optax.chain(
             optax.clip_by_global_norm(1.0),
             optax.adamw(learning_rate=self.lr, weight_decay=1e-5),
         )
         opt_state = optimizer.init(eqx.filter(self._reward_net, eqx.is_array))
-
         problem = DDCProblem(
             num_states=n_states,
             num_actions=n_actions,
@@ -692,16 +723,16 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             scale_parameter=1.0,
         )
         bellman = SoftBellmanOperator(problem=problem, transitions=transitions)
-
         best_loss = float("inf")
         best_net = self._reward_net
+        best_epoch = 0
         patience_counter = 0
-        patience = 100
-
         all_state_indices = jnp.arange(n_states)
+        assert self._state_encoder is not None
         reward_net = self._reward_net
 
         from tqdm import tqdm
+
         pbar = tqdm(
             range(self.max_epochs),
             desc="MCE-IRL-NN",
@@ -709,83 +740,59 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             leave=True,
         )
         for epoch in pbar:
-            # 1. Compute reward matrix R(s,a) (no gradient tracking needed here)
             state_feat = self._state_encoder(all_state_indices)
-            reward_matrix = self._compute_reward_matrix(
-                reward_net, state_feat, n_states, n_actions
-            )
-
-            # 2. Solve soft Bellman (no gradient through VI)
+            reward_matrix = self._compute_reward_matrix(reward_net, state_feat, n_states, n_actions)
             if self.inner_solver == "hybrid":
                 result = hybrid_iteration(
-                    bellman,
-                    reward_matrix,
-                    tol=self.inner_tol,
-                    max_iter=self.inner_max_iter,
+                    bellman, reward_matrix, tol=self.inner_tol, max_iter=self.inner_max_iter
                 )
             else:
                 result = value_iteration(
-                    bellman,
-                    reward_matrix,
-                    tol=self.inner_tol,
-                    max_iter=self.inner_max_iter,
+                    bellman, reward_matrix, tol=self.inner_tol, max_iter=self.inner_max_iter
                 )
-            policy = result.policy
+            if not result.converged or not np.isfinite(result.final_error):
+                self.termination_reason_ = "inner_solver_failed"
+                break
+            policy_sa = self._forward_pass(result.policy, transitions, n_states, self.discount)
+            grad_r = jax.lax.stop_gradient(policy_sa - empirical_sa)
 
-            # 3. Compute state-action occupancy via discounted forward pass
-            policy_sa = self._forward_pass(
-                policy, transitions, n_states, self.discount
-            )
-
-            # 4. Feature matching gradient w.r.t. R(s,a)
-            grad_r = policy_sa - empirical_sa
-
-            # 5. Compute network parameter gradients via surrogate loss.
-            #    The surrogate loss L = sum(R * grad_r) has gradient
-            #    dL/d_params = sum(grad_r * dR/d_params), which is exactly
-            #    the chain rule for the MCE-IRL objective.
             def surrogate_loss(net):
-                R = self._compute_reward_matrix(
-                    net, state_feat, n_states, n_actions
-                )
-                return jnp.sum(R * grad_r)
+                reward = self._compute_reward_matrix(net, state_feat, n_states, n_actions)
+                return jnp.sum(reward * grad_r)
 
-            loss_val_jax, grads = eqx.filter_value_and_grad(surrogate_loss)(
-                reward_net
-            )
-
+            _, grads = eqx.filter_value_and_grad(surrogate_loss)(reward_net)
             updates, opt_state = optimizer.update(
                 grads, opt_state, eqx.filter(reward_net, eqx.is_array)
             )
             reward_net = eqx.apply_updates(reward_net, updates)
-
-            # Monitor feature matching residual
-            loss_val = float(jnp.sum(grad_r ** 2))
-            feature_diff = float(jnp.linalg.norm(empirical_sa - policy_sa))
-
-            pbar.set_postfix({
-                "loss": f"{loss_val:.4f}",
-                "fdiff": f"{feature_diff:.4f}",
-                "best": f"{best_loss:.4f}",
-                "no_imp": patience_counter,
-            })
-
-            # Early stopping with best model checkpoint
-            if loss_val < best_loss - 1e-5:
+            loss_val = float(jnp.sum(grad_r**2))
+            if not np.isfinite(loss_val):
+                self.termination_reason_ = "nonfinite_training_loss"
+                break
+            feature_diff = float(jnp.linalg.norm(grad_r))
+            pbar.set_postfix(
+                loss=f"{loss_val:.4f}",
+                fdiff=f"{feature_diff:.4f}",
+                best=f"{best_loss:.4f}",
+                no_imp=patience_counter,
+            )
+            if loss_val < best_loss - self.improvement_tol:
                 best_loss = loss_val
                 best_net = reward_net
+                best_epoch = epoch + 1
                 patience_counter = 0
             else:
                 patience_counter += 1
-                if patience_counter >= patience:
-                    if self.verbose:
-                        print(f"  Early stopping at epoch {epoch + 1}")
+                if patience_counter >= self.patience:
+                    self.termination_reason_ = "training_plateau"
                     break
+        else:
+            self.termination_reason_ = "max_epochs_reached"
 
-        # Restore best model
         self._reward_net = best_net
-        self.converged_ = patience_counter >= patience or epoch == self.max_epochs - 1
         self.n_epochs_ = epoch + 1
+        self.best_epoch_ = best_epoch
+        self.training_loss_ = best_loss
         self.feature_difference_ = float(np.sqrt(best_loss))
 
     def _forward_pass(
@@ -836,58 +843,60 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         n_states: int,
         n_actions: int,
     ) -> None:
-        """Extract policy, value function, and reward from trained network."""
+        """Extract fitted reward, policy, values, and convergence diagnostics."""
         all_state_indices = jnp.arange(n_states)
+        assert self._state_encoder is not None
         state_feat = self._state_encoder(all_state_indices)
-
         reward_matrix = self._compute_reward_matrix(
             self._reward_net, state_feat, n_states, n_actions
         )
-
         problem = DDCProblem(
             num_states=n_states,
             num_actions=n_actions,
             discount_factor=self.discount,
             scale_parameter=1.0,
         )
-        bellman = SoftBellmanOperator(
-            problem=problem, transitions=transitions
-        )
-
+        bellman = SoftBellmanOperator(problem=problem, transitions=transitions)
         if self.inner_solver == "hybrid":
             result = hybrid_iteration(
-                bellman,
-                reward_matrix,
-                tol=self.inner_tol,
-                max_iter=self.inner_max_iter,
+                bellman, reward_matrix, tol=self.inner_tol, max_iter=self.inner_max_iter
             )
         else:
             result = value_iteration(
-                bellman,
-                reward_matrix,
-                tol=self.inner_tol,
-                max_iter=self.inner_max_iter,
+                bellman, reward_matrix, tol=self.inner_tol, max_iter=self.inner_max_iter
             )
 
         self.policy_ = np.asarray(result.policy)
         self.value_ = np.asarray(result.V)
-        if self.reward_type == "state_action":
-            self.reward_ = np.asarray(reward_matrix)
-        else:
-            raw = self._net_reward_matrix(
-                self._reward_net, state_feat, n_states, n_actions
-            )
-            self.reward_ = np.asarray(raw[:, 0])
+        self.reward_ = (
+            np.asarray(reward_matrix)
+            if self.reward_type == "state_action"
+            else np.asarray(reward_matrix[:, 0])
+        )
+        self.bellman_residual_ = float(result.final_error)
         if self._empirical_sa is not None:
-            policy_sa = self._forward_pass(
-                result.policy,
-                transitions,
-                n_states,
-                self.discount,
-            )
+            policy_sa = self._forward_pass(result.policy, transitions, n_states, self.discount)
             residual = self._empirical_sa - policy_sa
             self.feature_difference_ = float(jnp.linalg.norm(residual))
             self.occupancy_moment_residual_ = float(jnp.max(jnp.abs(residual)))
+        finite = all(
+            np.isfinite(value).all() for value in (self.policy_, self.value_, self.reward_)
+        )
+        occupancy_ok = (
+            self.occupancy_moment_residual_ is not None
+            and self.occupancy_moment_residual_ <= self.occupancy_tol
+        )
+        self.converged_ = bool(result.converged and finite and occupancy_ok)
+        if not result.converged:
+            self.termination_reason_ = "inner_solver_failed"
+        elif not finite:
+            self.termination_reason_ = "nonfinite_fitted_state"
+        elif not occupancy_ok:
+            self.termination_reason_ = "occupancy_tolerance_not_met"
+        elif self.termination_reason_ == "max_epochs_reached":
+            self.termination_reason_ = "converged_at_max_epochs"
+        else:
+            self.termination_reason_ = "converged"
 
     def _project_onto_features(
         self,
@@ -895,64 +904,75 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         n_states: int,
         n_actions: int,
     ) -> None:
-        """Project neural rewards onto features for interpretable theta.
+        """Project the fitted reward map onto a supplied linear basis.
 
-        For ``reward_type="state_action"``, R(s,a) is projected onto
-        (S*A, K) features:
-            theta = argmin ||Phi_flat @ theta - R_flat||^2
-
-        For ``reward_type="state"``, R(s) is projected onto (S, K) state
-        features (original behaviour).
-
-        Parameters
-        ----------
-        features : RewardSpec or numpy.ndarray
-            Feature specification.  RewardSpec provides (S, A, K) matrix.
-            An array of shape (S, K) or (S, A, K) is also accepted.
-        n_states : int
-            Number of states.
-        n_actions : int
-            Number of actions.
+        This is descriptive geometry of one fitted reward map. It is not
+        sampling inference for the neural estimator.
         """
-        # Extract feature matrix and names
         if isinstance(features, RewardSpec):
-            feat_3d = np.asarray(features.feature_matrix)
-            names = features.parameter_names
+            feat_3d = np.asarray(features.feature_matrix, dtype=np.float64)
+            names = list(features.parameter_names)
         else:
-            feat_arr = np.asarray(features)
+            feat_arr = np.asarray(features, dtype=np.float64)
             if feat_arr.ndim == 3:
                 feat_3d = feat_arr
             elif feat_arr.ndim == 2:
-                # (S, K) -> broadcast to (S, A, K)
                 feat_3d = np.broadcast_to(
                     feat_arr[:, None, :],
                     (feat_arr.shape[0], n_actions, feat_arr.shape[1]),
                 ).copy()
             else:
                 raise ValueError(
-                    f"features must be 2D (S, K) or 3D (S, A, K), "
-                    f"got {feat_arr.ndim}D"
+                    f"features must be 2D (S, K) or 3D (S, A, K), got {feat_arr.ndim}D"
                 )
-            names = self.feature_names or [
-                f"f{i}" for i in range(feat_3d.shape[-1])
-            ]
-
-        rewards = self.reward_.astype(np.float32)
-
+            names = self.feature_names or [f"f{i}" for i in range(feat_3d.shape[-1])]
+        if feat_3d.shape[:2] != (n_states, n_actions):
+            raise ValueError(
+                "features must align with states and actions; "
+                f"got {feat_3d.shape[:2]}, expected {(n_states, n_actions)}"
+            )
+        rewards = np.asarray(self.reward_matrix_, dtype=np.float64)
         if self.reward_type == "state_action":
-            phi = feat_3d.reshape(-1, feat_3d.shape[-1]).astype(np.float32)
-            r_flat = rewards.reshape(-1)
+            mask = (
+                self.action_mask_
+                if self.action_mask_ is not None
+                else np.ones((n_states, n_actions), dtype=bool)
+            )
+            phi = feat_3d[mask]
+            target = rewards[mask]
         else:
-            phi = feat_3d[:, 0, :].astype(np.float32)
-            r_flat = rewards
-
-        theta, se, r2 = self._project_parameters(phi, r_flat)
-
-        self.params_ = {n: float(v) for n, v in zip(names, theta)}
-        self.se_ = {n: float(v) for n, v in zip(names, se)}
-        self.pvalues_ = self._compute_pvalues(self.params_, self.se_)
-        self.projection_r2_ = r2
+            phi = feat_3d[:, 0, :]
+            target = rewards[:, 0]
+        rank = int(np.linalg.matrix_rank(phi))
+        condition = float(np.linalg.cond(phi))
+        if rank < phi.shape[1]:
+            raise ValueError(
+                f"projection feature matrix is rank deficient: rank {rank} < {phi.shape[1]}"
+            )
+        theta, _, r2 = self._project_parameters(phi, target)
+        residual = (
+            target
+            - np.column_stack([phi, np.ones(phi.shape[0])])
+            @ np.r_[
+                theta,
+                np.linalg.lstsq(np.column_stack([phi, np.ones(phi.shape[0])]), target, rcond=None)[
+                    0
+                ][-1],
+            ]
+        )
+        self.params_ = {name: float(value) for name, value in zip(names, theta)}
         self.coef_ = theta
+        self.projection_r2_ = float(r2)
+        self.projection_diagnostics_ = {
+            "rank": rank,
+            "num_features": int(phi.shape[1]),
+            "condition_number": condition,
+            "r_squared": float(r2),
+            "residual_scale": float(np.sqrt(np.mean(residual**2))),
+            "sampling_inference": False,
+        }
+        self.se_ = None
+        self.pvalues_ = None
 
     # ------------------------------------------------------------------
     # Prediction methods
@@ -973,6 +993,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             return self.reward_
         # State-only reward: broadcast to all actions
         n_actions = self._n_actions or self.n_actions
+        assert n_actions is not None
         return np.tile(self.reward_[:, np.newaxis], (1, n_actions))
 
     def predict_proba(self, states: np.ndarray) -> np.ndarray:
@@ -996,80 +1017,219 @@ class MCEIRLNeural(NeuralEstimatorMixin):
         if self.policy_ is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         states = np.asarray(states, dtype=np.int64)
-        return self.policy_[states]
+        return np.asarray(self.policy_[states])
+
+    def simulate(
+        self,
+        n_trajectories: int,
+        n_periods: int,
+        *,
+        seed: int = 0,
+        initial_distribution: np.ndarray | None = None,
+    ) -> TrajectoryPanel:
+        """Simulate trajectories from the fitted policy and transition kernel."""
+        if self.policy_ is None or self.transitions_ is None:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        if n_trajectories < 1 or n_periods < 1:
+            raise ValueError("n_trajectories and n_periods must be positive")
+        distribution = (
+            np.asarray(initial_distribution, dtype=float)
+            if initial_distribution is not None
+            else np.asarray(self._initial_distribution, dtype=float)
+        )
+        if distribution.shape != (self.policy_.shape[0],):
+            raise ValueError(f"initial_distribution must have shape {(self.policy_.shape[0],)}")
+        if np.any(distribution < 0) or not np.isclose(distribution.sum(), 1.0):
+            raise ValueError("initial_distribution must be a probability vector")
+        rng = np.random.default_rng(seed)
+        trajectories: list[Trajectory] = []
+        for individual in range(n_trajectories):
+            current = int(rng.choice(self.policy_.shape[0], p=distribution))
+            states: list[int] = []
+            actions: list[int] = []
+            next_states: list[int] = []
+            for _ in range(n_periods):
+                chosen = int(rng.choice(self.policy_.shape[1], p=self.policy_[current]))
+                following = int(
+                    rng.choice(
+                        self.policy_.shape[0],
+                        p=self.transitions_[chosen, current],
+                    )
+                )
+                states.append(current)
+                actions.append(chosen)
+                next_states.append(following)
+                current = following
+            trajectories.append(
+                Trajectory(
+                    states=jnp.asarray(states),
+                    actions=jnp.asarray(actions),
+                    next_states=jnp.asarray(next_states),
+                    individual_id=individual,
+                )
+            )
+        return TrajectoryPanel(trajectories=trajectories)
+
+    def counterfactual(
+        self,
+        *,
+        reward_delta: np.ndarray | None = None,
+        transitions: np.ndarray | None = None,
+        action_mask: np.ndarray | None = None,
+        description: str | None = None,
+    ) -> CounterfactualResult:
+        """Re-solve one reward, transition, or action-availability change."""
+        if self.policy_ is None or self.value_ is None or self.transitions_ is None:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        supplied = sum(value is not None for value in (reward_delta, transitions, action_mask))
+        if supplied != 1:
+            raise ValueError("supply exactly one of reward_delta, transitions, or action_mask")
+        baseline_reward = np.asarray(self.reward_matrix_, dtype=np.float64)
+        changed_reward = baseline_reward.copy()
+        changed_transitions = np.asarray(self.transitions_, dtype=np.float64)
+        changed_mask = np.asarray(self.action_mask_, dtype=bool)
+        changed_primitive: str
+        cf_type = CounterfactualType.ENVIRONMENT_CHANGE
+
+        if reward_delta is not None:
+            delta = np.asarray(reward_delta, dtype=np.float64)
+            if self.reward_type == "state" and delta.shape == (baseline_reward.shape[0],):
+                delta = np.broadcast_to(delta[:, None], baseline_reward.shape)
+            if delta.shape != baseline_reward.shape:
+                raise ValueError(f"reward_delta must have shape {baseline_reward.shape}")
+            if not np.isfinite(delta).all():
+                raise ValueError("reward_delta must be finite")
+            changed_reward += delta
+            if self.reward_type == "state_action":
+                assert self.anchor_action is not None
+                changed_reward[:, int(self.anchor_action)] = 0.0
+            else:
+                assert self.anchor_state is not None
+                changed_reward -= changed_reward[int(self.anchor_state), 0]
+            changed_primitive = "reward"
+            cf_type = CounterfactualType.REWARD_CHANGE
+        elif transitions is not None:
+            candidate = np.asarray(transitions, dtype=np.float64)
+            if candidate.shape != changed_transitions.shape:
+                raise ValueError(f"transitions must have shape {changed_transitions.shape}")
+            if np.any(candidate < 0) or not np.isfinite(candidate).all():
+                raise ValueError("transitions must be finite and nonnegative")
+            if np.max(np.abs(candidate.sum(axis=2) - 1.0)) > 1e-6:
+                raise ValueError("transition rows must sum to one")
+            changed_transitions = candidate
+            changed_primitive = "transitions"
+        else:
+            candidate = np.asarray(action_mask, dtype=bool)
+            if candidate.shape != changed_mask.shape:
+                raise ValueError(f"action_mask must have shape {changed_mask.shape}")
+            if np.any(candidate.sum(axis=1) == 0):
+                raise ValueError("every state must retain at least one available action")
+            if np.any(candidate & ~changed_mask):
+                raise ValueError(
+                    "action_mask counterfactuals may only remove actions that "
+                    "were available during fitting"
+                )
+            changed_mask = candidate
+            changed_primitive = "action_availability"
+
+        solved_reward = np.where(changed_mask, changed_reward, -1e9)
+        problem = DDCProblem(
+            num_states=changed_reward.shape[0],
+            num_actions=changed_reward.shape[1],
+            discount_factor=self.discount,
+            scale_parameter=1.0,
+        )
+        operator = SoftBellmanOperator(
+            problem=problem,
+            transitions=jnp.asarray(changed_transitions),
+        )
+        if self.inner_solver == "hybrid":
+            result = hybrid_iteration(
+                operator,
+                jnp.asarray(solved_reward),
+                tol=self.inner_tol,
+                max_iter=self.inner_max_iter,
+            )
+        else:
+            result = value_iteration(
+                operator,
+                jnp.asarray(solved_reward),
+                tol=self.inner_tol,
+                max_iter=self.inner_max_iter,
+            )
+        if not result.converged:
+            raise RuntimeError("counterfactual Bellman solve did not converge")
+        baseline_policy = jnp.asarray(self.policy_)
+        baseline_value = jnp.asarray(self.value_)
+        value_change = result.V - baseline_value
+        return CounterfactualResult(
+            baseline_policy=baseline_policy,
+            counterfactual_policy=result.policy,
+            baseline_value=baseline_value,
+            counterfactual_value=result.V,
+            policy_change=result.policy - baseline_policy,
+            value_change=value_change,
+            welfare_change=float(jnp.mean(value_change)),
+            counterfactual_type=cf_type,
+            description=description or f"Neural MCE-IRL {changed_primitive} counterfactual",
+            metadata={
+                "changed_primitive": changed_primitive,
+                "reward_normalization": (
+                    f"anchor_action={self.anchor_action}"
+                    if self.reward_type == "state_action"
+                    else f"anchor_state={self.anchor_state}"
+                ),
+                "neural_weights_interpretable": False,
+            },
+            transitions=jnp.asarray(self.transitions_),
+            counterfactual_transitions=jnp.asarray(changed_transitions),
+            params=dict(self.params_ or {}),
+        )
 
     # ------------------------------------------------------------------
     # Inference
     # ------------------------------------------------------------------
 
     def conf_int(self, alpha: float = 0.05) -> dict[str, tuple[float, float]]:
-        """Compute confidence intervals for projected parameters.
-
-        Parameters
-        ----------
-        alpha : float, default=0.05
-            Significance level.  Returns (1 - alpha) confidence intervals.
-
-        Returns
-        -------
-        dict
-            ``{param_name: (lower, upper)}`` confidence intervals.
-
-        Raises
-        ------
-        RuntimeError
-            If no projected parameters are available.
-        """
-        if self.params_ is None or self.se_ is None:
-            raise RuntimeError(
-                "No projected parameters available. "
-                "Call fit() with features= to extract structural parameters."
-            )
-        z = scipy_norm.ppf(1 - alpha / 2)
-        intervals: dict[str, tuple[float, float]] = {}
-        for name in self.params_:
-            est = self.params_[name]
-            se = self.se_[name]
-            if np.isfinite(se):
-                intervals[name] = (est - z * se, est + z * se)
-            else:
-                intervals[name] = (float("nan"), float("nan"))
-        return intervals
+        """Confidence intervals are not supported for neural reward maps."""
+        del alpha
+        raise NotImplementedError(
+            "MCEIRLNeural does not report sampling confidence intervals. "
+            "Projected coefficients describe one fitted reward map; use "
+            "repeated panel and training seeds to assess stability."
+        )
 
     # ------------------------------------------------------------------
     # Summary
     # ------------------------------------------------------------------
 
     def summary(self) -> str:
-        """Generate a formatted summary of estimation results.
-
-        Returns
-        -------
-        str
-            Human-readable summary including neural reward info,
-            parameter estimates, and projection R-squared.
-        """
+        """Return a concise report of the fitted neural reward map."""
         if self.policy_ is None:
             return "MCEIRLNeural: Not fitted yet. Call fit() first."
-
-        return self._format_neural_summary(
-            method_name="MCEIRLNeural (Deep MCE-IRL)",
-            params=self.params_,
-            se=self.se_,
-            pvalues=self.pvalues_,
-            projection_r2=self.projection_r2_,
-            n_observations=self._n_states,
-            n_epochs=self.n_epochs_,
-            converged=self.converged_,
-            discount=self.discount,
-            extra_lines=[
-                f"Reward type: {self.reward_type}",
-                f"Reward network: {self.reward_num_layers} layers x {self.reward_hidden_dim} hidden",
-                f"Inner solver: {self.inner_solver}",
-                f"Anchor action: {self.anchor_action}",
-                f"Absorbing state: {self.absorbing_state}",
-            ],
-        )
+        assert self.diagnostics_ is not None
+        lines = [
+            "MCEIRLNeural (Neural MCE-IRL)",
+            f"Observations: {self.n_observations_}",
+            f"States x actions: {self._n_states} x {self._n_actions}",
+            f"Reward type: {self.reward_type}",
+            f"Normalization: {self.diagnostics_['normalization']}",
+            f"Network: {self.reward_num_layers} layers x {self.reward_hidden_dim} hidden",
+            f"Epochs: {self.n_epochs_} (best {self.best_epoch_})",
+            f"Converged: {self.converged_}",
+            f"Termination: {self.termination_reason_}",
+            f"Occupancy residual: {self.occupancy_moment_residual_:.6g}",
+            f"Bellman residual: {self.bellman_residual_:.6g}",
+            "Sampling inference: not supported",
+        ]
+        if self.projection_diagnostics_ is not None:
+            lines.extend(
+                [
+                    f"Projection R-squared: {self.projection_r2_:.6g}",
+                    "Projected coefficients: descriptive only",
+                ]
+            )
+        return "\n".join(lines)
 
     # ------------------------------------------------------------------
     # Repr

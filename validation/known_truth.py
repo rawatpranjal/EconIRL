@@ -234,12 +234,7 @@ class ContentHeterogeneityKnownTruthConfig:
 
     @property
     def num_regular_states(self) -> int:
-        return (
-            self.num_chapters
-            * self.wait_bins
-            * self.price_levels
-            * self.quality_levels
-        )
+        return self.num_chapters * self.wait_bins * self.price_levels * self.quality_levels
 
     @property
     def num_states(self) -> int:
@@ -325,9 +320,7 @@ class KnownTruthDGP:
     """A fully specified synthetic DGP with all truth objects exposed."""
 
     config: (
-        KnownTruthDGPConfig
-        | ShapeshifterKnownTruthConfig
-        | ContentHeterogeneityKnownTruthConfig
+        KnownTruthDGPConfig | ShapeshifterKnownTruthConfig | ContentHeterogeneityKnownTruthConfig
     )
     problem: DDCProblem
     transitions: jnp.ndarray
@@ -463,9 +456,7 @@ def build_shapeshifter_known_truth_dgp(
         parameter_names=parameter_names,
         true_parameters=true_parameters,
         reward_matrix=jnp.asarray(env.true_reward_matrix, dtype=jnp.float32),
-        initial_distribution=jnp.asarray(
-            env._get_initial_state_distribution(), dtype=jnp.float32
-        ),
+        initial_distribution=jnp.asarray(env._get_initial_state_distribution(), dtype=jnp.float32),
         segment_probabilities=None,
     )
 
@@ -478,9 +469,7 @@ def build_content_heterogeneity_known_truth_dgp(
     config.validate()
     transitions = _build_content_transitions(config)
     state_features = _build_content_state_features(config)
-    feature_matrix, parameter_names = _build_content_reward_features(
-        config, state_features
-    )
+    feature_matrix, parameter_names = _build_content_reward_features(config, state_features)
     true_parameters = _build_content_parameters(config, parameter_names)
     reward_matrix = _compute_rewards(feature_matrix, true_parameters)
     initial_distribution = _build_content_initial_distribution(config)
@@ -519,10 +508,8 @@ def _content_state_index(
     quality_level: int,
 ) -> int:
     return (
-        (((chapter * config.wait_bins) + wait_bin) * config.price_levels + price_level)
-        * config.quality_levels
-        + quality_level
-    )
+        ((chapter * config.wait_bins) + wait_bin) * config.price_levels + price_level
+    ) * config.quality_levels + quality_level
 
 
 def _content_state_tuple(
@@ -566,19 +553,17 @@ def _build_content_transitions(
 
         if chapter == last_chapter:
             read_target = absorbing
-            wait_target = absorbing if wait_bin == last_wait else _content_state_index(
-                config, chapter, wait_bin + 1, price, quality
+            wait_target = (
+                absorbing
+                if wait_bin == last_wait
+                else _content_state_index(config, chapter, wait_bin + 1, price, quality)
             )
         else:
             read_target = _content_state_index(config, chapter + 1, 0, price, quality)
             if wait_bin == last_wait:
-                wait_target = _content_state_index(
-                    config, chapter + 1, 0, price, quality
-                )
+                wait_target = _content_state_index(config, chapter + 1, 0, price, quality)
             else:
-                wait_target = _content_state_index(
-                    config, chapter, wait_bin + 1, price, quality
-                )
+                wait_target = _content_state_index(config, chapter, wait_bin + 1, price, quality)
 
         targets = {0: read_target, 1: wait_target, config.exit_action: absorbing}
         for action, target in targets.items():
@@ -682,11 +667,7 @@ def _build_content_reward_features(
     cliffhanger = sf[:, 4]
     final_chapter = sf[:, 5]
     unlock_ready = sf[:, 6]
-    episode_wave = (
-        np.sin(np.pi * progress)
-        if sf.shape[1] <= 8
-        else sf[:, 14]
-    )
+    episode_wave = np.sin(np.pi * progress) if sf.shape[1] <= 8 else sf[:, 14]
     late_unlock = final_chapter * unlock_ready
 
     read_candidates = [
@@ -735,9 +716,7 @@ def _build_content_reward_features(
     )
     selected_read = read_candidates[:target_read]
     selected_wait = wait_candidates[:target_wait]
-    names = [name for name, _ in selected_read] + [
-        name for name, _ in selected_wait
-    ]
+    names = [name for name, _ in selected_read] + [name for name, _ in selected_wait]
     features = np.zeros(
         (config.num_states, config.num_actions, len(names)),
         dtype=np.float64,
@@ -856,17 +835,13 @@ def simulate_known_truth_panel(
 ) -> Panel:
     """Simulate panel data from the known optimal policy."""
 
-
     if config is None:
         config = SimulationConfig()
     if isinstance(dgp.config, ContentHeterogeneityKnownTruthConfig):
         return _simulate_content_heterogeneity_panel(dgp, config)
 
     rng = np.random.default_rng(config.seed)
-    solutions = [
-        solve_known_truth(dgp, segment_index=g)
-        for g in range(dgp.num_segments)
-    ]
+    solutions = [solve_known_truth(dgp, segment_index=g) for g in range(dgp.num_segments)]
 
     iterator = range(config.n_individuals)
     if config.show_progress:
@@ -940,10 +915,7 @@ def _simulate_content_heterogeneity_panel(
         raise TypeError("content simulation requires ContentHeterogeneityKnownTruthConfig")
 
     rng = np.random.default_rng(config.seed)
-    solutions = [
-        solve_known_truth(dgp, segment_index=g)
-        for g in range(dgp.num_segments)
-    ]
+    solutions = [solve_known_truth(dgp, segment_index=g) for g in range(dgp.num_segments)]
     segment_probs = np.asarray(dgp.segment_probabilities, dtype=np.float64)
     segment_probs = segment_probs / segment_probs.sum()
     initial_distribution = np.asarray(dgp.initial_distribution, dtype=np.float64)
@@ -1187,9 +1159,7 @@ def _expand_state_basis(state_features: np.ndarray, n_features: int) -> np.ndarr
     basis = np.zeros((n_states, n_features), dtype=np.float64)
     basis[:, 0] = 1.0
     if use:
-        basis[regular_mask, 1 : 1 + use] = (
-            u[:, :use] * np.sqrt(float(regular_mask.sum()))
-        )
+        basis[regular_mask, 1 : 1 + use] = u[:, :use] * np.sqrt(float(regular_mask.sum()))
     if use < needed:
         fallback = raw_regular[:, : needed - use]
         basis[regular_mask, 1 + use :] = fallback
@@ -1201,9 +1171,7 @@ def _build_parameters(config: KnownTruthDGPConfig, n_params: int) -> jnp.ndarray
     if config.reward_dim == "low":
         if config.reward_mode == "action_dependent":
             non_exit_actions = [
-                action
-                for action in range(config.num_actions)
-                if action != config.exit_action
+                action for action in range(config.num_actions) if action != config.exit_action
             ]
             intercepts = np.linspace(0.10, 0.00, len(non_exit_actions))
             slopes = np.linspace(0.50, -0.20, len(non_exit_actions))
@@ -1532,9 +1500,7 @@ def run_pre_estimation_diagnostics(
     max_transition_row_error = float(np.max(np.abs(row_sums - 1.0)))
 
     exit_action = _exit_action(dgp)
-    non_exit_actions = [
-        a for a in range(dgp.problem.num_actions) if a != exit_action
-    ]
+    non_exit_actions = [a for a in range(dgp.problem.num_actions) if a != exit_action]
     action_features = features[:, non_exit_actions, :]
     action_reference = action_features[:, :1, :]
     action_diff = np.max(np.abs(action_features - action_reference))
@@ -1557,9 +1523,7 @@ def run_pre_estimation_diagnostics(
     errors: list[str] = []
     warnings: list[str] = []
     if feature_rank < features.shape[-1]:
-        errors.append(
-            f"feature rank {feature_rank} is less than {features.shape[-1]} features"
-        )
+        errors.append(f"feature rank {feature_rank} is less than {features.shape[-1]} features")
     if condition_number > condition_threshold:
         warnings.append(f"feature condition number {condition_number:.3g} is high")
     if max_transition_row_error > 1e-6:
@@ -1597,9 +1561,7 @@ def run_pre_estimation_diagnostics(
             ccps = np.divide(counts, row_sums, out=np.zeros_like(counts), where=row_sums > 0)
             min_positive_ccp = float(ccps[ccps > 0].min())
         if observed_states < dgp.problem.num_states:
-            warnings.append(
-                f"{observed_states} of {dgp.problem.num_states} states are observed"
-            )
+            warnings.append(f"{observed_states} of {dgp.problem.num_states} states are observed")
         if single_action_states > 0:
             warnings.append(f"{single_action_states} observed states have one action")
         if min_action_share < 0.02:
@@ -1874,7 +1836,6 @@ def evaluate_estimator_against_truth(
             counterfactual_kinds=counterfactual_kinds,
         )
 
-
     truth = solve_known_truth(dgp, segment_index=segment_index)
     estimated_params = jnp.asarray(summary.parameters)
     true_params = jnp.asarray(dgp.homogeneous_parameters)
@@ -1934,8 +1895,7 @@ def evaluate_estimator_against_truth(
         )
 
     if (
-        summary.metadata.get("counterfactual_reward_source")
-        == "raw_bellman_reward_table"
+        summary.metadata.get("counterfactual_reward_source") == "raw_bellman_reward_table"
         and raw_bellman_reward is not None
     ):
         estimated_reward = raw_bellman_reward
@@ -2061,8 +2021,7 @@ def evaluate_segmented_estimator_against_truth(
 
     true_to_estimated = list(best_perm)
     estimated_to_true = {
-        estimated_idx: true_idx
-        for true_idx, estimated_idx in enumerate(true_to_estimated)
+        estimated_idx: true_idx for true_idx, estimated_idx in enumerate(true_to_estimated)
     }
 
     reward_errors: list[float] = []
@@ -2077,9 +2036,7 @@ def evaluate_segmented_estimator_against_truth(
         truth = solve_known_truth(dgp, segment_index=true_idx)
         true_reward = get_segment_reward(dgp, true_idx)
         estimated_reward = estimated_rewards[estimated_idx]
-        reward_errors.append(
-            normalized_rmse(estimated_reward, true_reward, reward_mask)
-        )
+        reward_errors.append(normalized_rmse(estimated_reward, true_reward, reward_mask))
 
         estimated_policy = estimated_policies[estimated_idx]
         policy_metrics.append(policy_divergence(truth.policy, estimated_policy))
@@ -2164,9 +2121,7 @@ def evaluate_segmented_estimator_against_truth(
         "num_estimated_segments": estimated_count,
         "segment_permutation": {
             "true_to_estimated": true_to_estimated,
-            "estimated_to_true": {
-                str(key): value for key, value in estimated_to_true.items()
-            },
+            "estimated_to_true": {str(key): value for key, value in estimated_to_true.items()},
         },
         "segment_reward_normalized_rmse": reward_errors,
         "max_segment_reward_normalized_rmse": max(reward_errors, default=float("inf")),
@@ -2522,6 +2477,7 @@ class EstimatorRun:
     compatibility: CompatibilityReport
     metrics: dict[str, Any] = field(default_factory=dict)
     gates: list[RecoveryGate] = field(default_factory=list)
+    fitted_estimator: Any | None = None
 
 
 class RecoveryGateFailure(AssertionError):
@@ -2543,13 +2499,9 @@ def check_estimator_compatibility(
     warnings = list(diagnostics.warnings)
 
     if dgp.config.reward_mode not in contract.required_reward_modes:
-        errors.append(
-            f"{estimator_name} does not support reward mode {dgp.config.reward_mode}"
-        )
+        errors.append(f"{estimator_name} does not support reward mode {dgp.config.reward_mode}")
     if dgp.config.state_mode not in contract.required_state_modes:
-        errors.append(
-            f"{estimator_name} does not support state mode {dgp.config.state_mode}"
-        )
+        errors.append(f"{estimator_name} does not support state mode {dgp.config.state_mode}")
     if "theta" in contract.recovers and not diagnostics.is_action_dependent:
         errors.append(f"{estimator_name} needs action-dependent features for theta recovery")
     if estimator_name == "NFXP" and dgp.config.heterogeneity != "none":
@@ -2601,6 +2553,7 @@ class _MCEIRLNeuralKnownTruthAdapter:
         self.dgp = dgp
         self.smoke = smoke
         self.verbose = verbose
+        self.model_: Any | None = None
 
     def estimate(
         self,
@@ -2625,11 +2578,7 @@ class _MCEIRLNeuralKnownTruthAdapter:
                 getattr(self.dgp.config, "reward_mode", "") == "action_dependent",
             )
         )
-        reward_type = (
-            "state_action"
-            if truth_action_dependent
-            else "state"
-        )
+        reward_type = "state_action" if truth_action_dependent else "state"
         network_source = env_config if env_config is not None else self.dgp.config
         network_width = (
             int(network_source.network_width)
@@ -2664,7 +2613,7 @@ class _MCEIRLNeuralKnownTruthAdapter:
             feature_names=list(self.dgp.parameter_names),
             anchor_action=0 if reward_type == "state_action" else None,
             absorbing_state=_absorbing_state(self.dgp),
-            seed=2,
+            seed=int(panel.metadata.get("neural_training_seed", 2)),
             verbose=self.verbose,
         )
         projection_features = (
@@ -2673,19 +2622,20 @@ class _MCEIRLNeuralKnownTruthAdapter:
             else None
         )
         projection_condition_number = None
+        # Projection describes one normalized neural reward map. It is not a
+        # structural parameter estimate, even when the supplied basis is
+        # numerically full rank and well conditioned.
         projected_parameter_identified = False
         if projection_features is not None:
             projection_condition_number = _safe_condition_number(
                 np.asarray(projection_features).reshape(-1, projection_features.shape[-1])
-            )
-            projected_parameter_identified = bool(
-                true_params.size > 0 and projection_condition_number <= 100.0
             )
         model.fit(
             panel,
             transitions=np.asarray(transitions),
             features=projection_features,
         )
+        self.model_ = model
 
         raw_reward_matrix = np.asarray(model.reward_matrix_, dtype=np.float64)
         if model.policy_ is None:
@@ -2700,9 +2650,7 @@ class _MCEIRLNeuralKnownTruthAdapter:
                 self.dgp.utility().compute(projected_parameters),
                 dtype=np.float64,
             )
-            operator = SoftBellmanOperator(
-                problem, jnp.asarray(transitions, dtype=jnp.float64)
-            )
+            operator = SoftBellmanOperator(problem, jnp.asarray(transitions, dtype=jnp.float64))
             projected_solution = value_iteration(
                 operator,
                 jnp.asarray(projected_reward_matrix, dtype=jnp.float64),
@@ -2947,9 +2895,7 @@ def make_estimator(
         from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
 
         neural_q = (
-            dgp.config.state_mode == "high_dim"
-            and dgp.config.reward_dim == "high"
-            and not smoke
+            dgp.config.state_mode == "high_dim" and dgp.config.reward_dim == "high" and not smoke
         )
         return IQLearnEstimator(
             config=IQLearnConfig(
@@ -2967,11 +2913,7 @@ def make_estimator(
     if estimator_name == "AIRL":
         from econirl.estimation.adversarial.airl import AIRLConfig, AIRLEstimator
 
-        reward_arg = (
-            "state_action"
-            if dgp.config.reward_mode == "action_dependent"
-            else "state"
-        )
+        reward_arg = "state_action" if dgp.config.reward_mode == "action_dependent" else "state"
         paper_identification_case = bool(
             reward_arg == "state"
             and getattr(dgp.config, "exit_action", None) is None
@@ -2980,9 +2922,7 @@ def make_estimator(
         )
         reward_type = "linear" if paper_identification_case else "tabular"
         anchor_action = dgp.config.exit_action if reward_arg == "state_action" else None
-        absorbing_state = (
-            dgp.config.absorbing_state if reward_arg == "state_action" else None
-        )
+        absorbing_state = dgp.config.absorbing_state if reward_arg == "state_action" else None
         return AIRLEstimator(
             config=AIRLConfig(
                 reward_type=reward_type,
@@ -2991,22 +2931,10 @@ def make_estimator(
                 absorbing_state=absorbing_state,
                 reward_lr=0.02,
                 discriminator_steps=3 if smoke else 5,
-                policy_step_size=(
-                    0.3
-                    if smoke
-                    else (0.1 if paper_identification_case else 0.3)
-                ),
+                policy_step_size=(0.3 if smoke else (0.1 if paper_identification_case else 0.3)),
                 max_rounds=10 if smoke else 200,
-                min_rounds=(
-                    3
-                    if smoke
-                    else (150 if paper_identification_case else 20)
-                ),
-                convergence_tol=(
-                    1e-4
-                    if smoke
-                    else (0.01 if paper_identification_case else 1e-4)
-                ),
+                min_rounds=(3 if smoke else (150 if paper_identification_case else 20)),
+                convergence_tol=(1e-4 if smoke else (0.01 if paper_identification_case else 1e-4)),
                 generator_reward="f" if paper_identification_case else "recovered",
                 generator_max_iter=500 if smoke else 5_000,
                 compute_se=False,
@@ -3023,11 +2951,7 @@ def make_estimator(
                 exit_action=dgp.config.exit_action,
                 absorbing_state=dgp.config.absorbing_state,
                 reward_type="linear",
-                reward_lr=(
-                    0.001
-                    if content_cell
-                    else 0.02
-                ),
+                reward_lr=(0.001 if content_cell else 0.02),
                 discriminator_steps=2 if content_cell else (3 if smoke else 5),
                 policy_step_size=0.1 if content_cell else (0.3 if smoke else 0.1),
                 generator_reward="f",
@@ -3050,9 +2974,7 @@ def make_estimator(
     if estimator_name == "f-IRL":
         from econirl.estimation.f_irl import FIRLEstimator
 
-        paper_state_marginal = (
-            dgp.config.reward_mode == "state_only" and _exit_action(dgp) is None
-        )
+        paper_state_marginal = dgp.config.reward_mode == "state_only" and _exit_action(dgp) is None
         return FIRLEstimator(
             f_divergence="fkl",
             lr=0.20 if paper_state_marginal else 0.50,
@@ -3110,8 +3032,7 @@ def run_estimator(
         failed = [gate for gate in gates if not gate.passed]
         if failed:
             details = "; ".join(
-                f"{gate.name}={gate.value} {gate.operator} {gate.threshold}"
-                for gate in failed
+                f"{gate.name}={gate.value} {gate.operator} {gate.threshold}" for gate in failed
             )
             raise RecoveryGateFailure(
                 f"{estimator_name} failed known-truth recovery gates: {details}"
@@ -3123,6 +3044,7 @@ def run_estimator(
         compatibility=compatibility,
         metrics=metrics,
         gates=gates,
+        fitted_estimator=estimator,
     )
 
 
@@ -3184,9 +3106,7 @@ def recovery_gates(
             _numeric_gate("q_rmse", metrics["q_rmse"], "<=", 0.10),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
         return checks
 
     if estimator_name == "UFXP":
@@ -3213,9 +3133,7 @@ def recovery_gates(
             _numeric_gate("q_rmse", metrics["q_rmse"], "<=", 0.10),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
         return checks
 
     if estimator_name == "MPEC":
@@ -3251,9 +3169,7 @@ def recovery_gates(
             _numeric_gate("q_rmse", metrics["q_rmse"], "<=", 0.10),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
         return checks
 
     if estimator_name == "SEES":
@@ -3282,9 +3198,7 @@ def recovery_gates(
             _numeric_gate("q_rmse", metrics["q_rmse"], "<=", 0.10),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.01)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.01))
         return checks
 
     if estimator_name == "NNES":
@@ -3316,9 +3230,7 @@ def recovery_gates(
             _numeric_gate("q_rmse", metrics["q_rmse"], "<=", 0.20),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
         return checks
 
     if estimator_name == "MCE-IRL":
@@ -3361,9 +3273,7 @@ def recovery_gates(
             ),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
         return checks
 
     if estimator_name == "MCE-IRL Deep":
@@ -3371,8 +3281,7 @@ def recovery_gates(
             summary.metadata.get("occupancy_moment_residual", float("inf"))
         )
         neural_reward_target = (
-            summary.metadata.get("reward_validation_target")
-            == "raw_neural_reward_matrix"
+            summary.metadata.get("reward_validation_target") == "raw_neural_reward_matrix"
             and metrics["parameters"] is None
         )
         reward_threshold = 0.15 if neural_reward_target else 0.10
@@ -3432,9 +3341,7 @@ def recovery_gates(
                 ),
             )
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", cf_threshold)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", cf_threshold))
         return checks
 
     if estimator_name == "AIRL":
@@ -3461,9 +3368,7 @@ def recovery_gates(
             ),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.08)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.08))
         return checks
 
     if estimator_name == "AIRL-Het":
@@ -3539,9 +3444,7 @@ def recovery_gates(
             _numeric_gate("q_rmse", metrics["q_rmse"], "<=", 0.10),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.01)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.01))
         return checks
 
     if estimator_name == "f-IRL":
@@ -3577,9 +3480,7 @@ def recovery_gates(
                 ),
             ]
             for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-                checks.append(
-                    _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-                )
+                checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
             return checks
         checks = [
             _bool_gate("converged", bool(summary.converged), True),
@@ -3632,9 +3533,7 @@ def recovery_gates(
             ),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.12)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.12))
         return checks
 
     if estimator_name == "IQ-Learn":
@@ -3679,9 +3578,7 @@ def recovery_gates(
             ),
         ]
         for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-            checks.append(
-                _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-            )
+            checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
         return checks
 
     if estimator_name != "NFXP":
@@ -3707,9 +3604,7 @@ def recovery_gates(
         _numeric_gate("value_rmse", metrics["value_rmse"], "<=", 0.10),
     ]
     for kind, cf_metrics in sorted(metrics["counterfactuals"].items()):
-        checks.append(
-            _numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05)
-        )
+        checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.05))
     return checks
 
 
@@ -3791,9 +3686,7 @@ def to_jsonable(value: Any) -> Any:
 class KnownTruthCell:
     cell_id: str
     dgp_config: (
-        KnownTruthDGPConfig
-        | ShapeshifterKnownTruthConfig
-        | ContentHeterogeneityKnownTruthConfig
+        KnownTruthDGPConfig | ShapeshifterKnownTruthConfig | ContentHeterogeneityKnownTruthConfig
     )
     simulation_config: SimulationConfig = field(default_factory=SimulationConfig)
     description: str = ""
@@ -4085,6 +3978,7 @@ def get_cell(cell_id: str) -> KnownTruthCell:
 
 # --- CLI entrypoints ---
 
+
 def run_cell_estimator(
     cell_id: str,
     estimator: str,
@@ -4145,8 +4039,7 @@ def run_oracle_cell(cell_id: str, output_dir: Path) -> Path:
     solutions = [solve_known_truth(dgp, segment_index=g) for g in range(dgp.num_segments)]
     counterfactuals = {
         kind: [
-            solve_counterfactual_oracle(dgp, kind, segment_index=g)
-            for g in range(dgp.num_segments)
+            solve_counterfactual_oracle(dgp, kind, segment_index=g) for g in range(dgp.num_segments)
         ]
         for kind in ("type_a", "type_b", "type_c")
     }
@@ -4184,9 +4077,7 @@ def _summary_payload(summary: EstimationSummary) -> dict[str, Any]:
         "goodness_of_fit": summary.goodness_of_fit,
         "metadata": summary.metadata,
         "value_function": (
-            None
-            if summary.value_function is None
-            else np.asarray(summary.value_function).tolist()
+            None if summary.value_function is None else np.asarray(summary.value_function).tolist()
         ),
         "policy": None if summary.policy is None else np.asarray(summary.policy).tolist(),
     }

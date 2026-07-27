@@ -1,5 +1,13 @@
 # Neural MCE-IRL
 
+## Important Links
+
+- [Quick Start](deep_mce_irl/quick_start.md)
+- [Pre-Estimation Checks](deep_mce_irl/pre_estimation.md)
+- [Simulation Study](deep_mce_irl/validation.md)
+- [Wulfmeier-Shaped Study](deep_mce_irl/wulfmeier_objectworld.md)
+- [Counterfactuals](deep_mce_irl/counterfactuals.md)
+
 Neural MCE-IRL (also called Deep MCE-IRL) recovers a neural reward map from
 observed choices by matching
 the discounted state-action occupancy of an entropy-regularized policy to the
@@ -9,8 +17,8 @@ network rather than a dot product with fixed features. The validated object is
 the anchored reward matrix and the behavior it induces; raw network weights are
 not a structural estimand.
 
-Read this page as the neural-reward version of MCE-IRL. The reward matrix under
-the chosen anchor is the object to inspect; the raw network weights are not.
+For a runnable fit with exact output, start with the
+[Quick Start](deep_mce_irl/quick_start.md).
 
 ## Source Papers
 
@@ -47,9 +55,8 @@ $(A, S, S)$ orientation. The soft value function is $V(s)$, the
 choice-specific value is $Q(s, a)$, and the conditional choice probability is
 $\pi(a \mid s)$. The empirical discounted state-action occupancy from
 demonstrations is $D_\text{data}(s, a)$ and the model occupancy under the
-current policy is $D_\pi(s, a)$. $N$ denotes the total number of
-agent-period observations. The initial-state distribution is $\rho_0(s)$,
-giving the probability of starting in state $s$.
+current policy is $D_\pi(s, a)$. The initial-state distribution is
+$\rho_0(s)$, giving the probability of starting in state $s$.
 
 ## Model
 
@@ -103,16 +110,26 @@ conditions.
   drawn independently across choices. The agent acts before observing future
   randomness, so the soft Bellman operator respects the causal direction of
   time in the decision problem.
-- **Reward normalization.** A neural reward map is identified only up to an
-  action-independent additive function of the state: two maps that differ by
-  such a shift induce identical policies. An anchor action whose reward column
-  is set to zero for all states, or an absorbing state whose reward row is set
-  to zero, removes this indeterminacy. The package enforces anchor
-  normalization by pinning action $a_0$:
+- **Reward normalization.** Behavior alone cannot distinguish rewards related
+  by potential shaping:
+
+  $$
+  \widetilde r(s,a)
+  = r(s,a) + \Phi(s)
+  - \beta\mathbb{E}[\Phi(s')\mid s,a].
+  $$
+
+  These rewards induce the same policy under the observed transition law. For
+  state-action rewards, the package imposes the DDC normalization
 
   $$r_\eta(s, a_0) = 0 \quad \text{for all } s.$$
 
-  Reward-map comparisons are meaningful only under the same normalization.
+  With known transitions, a known anchor payoff, and expert support on the
+  anchor action, this condition selects an identified reward representative on
+  the covered support. Reward-map comparisons require the same transition law
+  and normalization. For state-only rewards, the package subtracts the reward
+  at `anchor_state` from every state. This removes a global additive constant
+  without changing the induced policy.
 - **State encoding supplied.** The state encoder $x(s)$ is supplied
   externally. The reward map is identified relative to the chosen encoding;
   a different encoding produces a reward map on a different domain.
@@ -121,13 +138,14 @@ conditions.
   reward matrix under the chosen normalization, not the raw network weights.
 
 These conditions hold inside a finite discrete state space with a stationary
-environment and a fixed discount factor $\beta$. Given them, the anchored
-reward matrix and the induced policy, value, and Q functions are identified.
+environment and a fixed discount factor $\beta$. At the population level,
+these conditions identify the anchored reward matrix and its induced policy,
+value, and Q functions on the covered support.
 Identification weakens under thin state-action coverage, an inconsistent
-normalization anchor, or a poorly conditioned state encoding. Finite projected
-parameters are identified only when the feature projection is
-well-conditioned; see the
-[Pre-Estimation Checks](deep_mce_irl/pre_estimation.md) page.
+normalization anchor, or a poorly conditioned state encoding. A finite
+projection can summarize one fitted reward surface when its design is
+well-conditioned. It is descriptive, not a structural parameter estimate.
+See the [Pre-Estimation Checks](deep_mce_irl/pre_estimation.md) page.
 
 ## Estimator
 
@@ -147,81 +165,58 @@ respect to the network weights $\eta$ is the MCE-IRL objective. The surrogate
 below is used in place of differentiating through $Z$ directly, which would
 require backpropagating through the soft Bellman solve.
 
-The empirical discounted occupancy from demonstrations is
+The implementation normalizes empirical discounted occupancy to sum to one.
+Let
+
+$$
+C_\mathcal{D} = \sum_{i,t}\beta^t.
+$$
+
+Then
 
 $$
 D_\text{data}(s, a)
-= \frac{1}{N} \sum_{i,t} \beta^t \,\mathbf{1}[s_{it} = s,\; a_{it} = a],
+= \frac{1}{C_\mathcal{D}}
+  \sum_{i,t} \beta^t \,\mathbf{1}[s_{it} = s,\; a_{it} = a].
 $$
 
-where $N$ is the total number of agent-period observations. The discounted
-$\beta^t$ weighting follows the DDC convention; Wulfmeier (2015) and Ziebart
-(2008) state the gradient for undiscounted visitation counts. The same
-chain-rule argument extends to the discounted case. Define the discounted
-model occupancy $D_\pi^\beta(s,a) = (1-\beta)\sum_{t=0}^\infty \beta^t
-P(s_t=s,\, a_t=a \mid \pi,\rho_0)$. The MaxEnt log-likelihood is the data
-reward minus the log-partition term $\log Z^\beta$, and the partition gradient
-is the model occupancy,
+For the model, first compute the unnormalized discounted state occupancy
 
 $$
-\frac{\partial \log Z^\beta}{\partial r(s,a)} = D_\pi^\beta(s,a),
-$$
-
-so the occupancy-matching gradient identity becomes
-
-$$
-\frac{\partial L}{\partial r(s,a)}
-= D_\text{data}(s,a) - D_\pi^\beta(s,a).
-$$
-
-The model occupancy $D_\pi(s, a)$ is computed by the discounted forward pass:
-
-$$
-D_\pi(s) = \rho_0(s) + \beta \sum_{s', a} D_\pi(s', a)\, P(s \mid s', a),
+\widetilde D_\pi(s)
+= \rho_0(s) + \beta \sum_{s',a}
+  \widetilde D_\pi(s',a)P(s\mid s',a),
 \qquad
-D_\pi(s, a) = \pi(a \mid s)\, D_\pi(s),
+\widetilde D_\pi(s,a)=\pi(a\mid s)\widetilde D_\pi(s).
 $$
 
-where $\rho_0$ is the initial-state distribution. Because $D_\pi$ depends on
-the policy, which depends on the soft Bellman solution, differentiating
-through the full solve is expensive. The implementation instead uses a
-surrogate loss whose gradient equals the chain-rule gradient of the occupancy
-mismatch:
+Then normalize:
+
+$$
+D_\pi(s)
+= \frac{\widetilde D_\pi(s)}
+       {\sum_u\widetilde D_\pi(u)},
+\qquad
+D_\pi(s,a)=\pi(a\mid s)D_\pi(s).
+$$
+
+At each epoch, the estimator forms the normalized occupancy mismatch
+
+$$
+\Delta_D(s,a)=D_\pi(s,a)-D_\text{data}(s,a).
+$$
+
+It treats this quantity as a fixed reward sensitivity and backpropagates the
+surrogate
 
 $$
 L_\text{surrogate}(\eta)
-= \sum_{s,a} r_\eta(s, a)\cdot
-  \bigl(D_\pi(s, a) - D_\text{data}(s, a)\bigr).
+= \sum_{s,a} r_\eta(s,a)\Delta_D(s,a)
 $$
 
-Minimizing $L_\text{surrogate}$ over $\eta$ is equivalent to maximizing the
-MCE log-likelihood; the sign convention here is for gradient descent (model
-minus data), matching Wulfmeier (2015) eq. 11 up to sign. The chain-rule
-decomposition (Wulfmeier 2015, eqs. 10-11) shows that
-
-$$
-\nabla_\eta L_\text{surrogate}
-= \frac{\partial L}{\partial r} \cdot \frac{\partial r}{\partial \eta}
-= \sum_{s,a} \bigl(D_\pi(s, a) - D_\text{data}(s, a)\bigr)
-  \frac{\partial r_\eta(s, a)}{\partial \eta},
-$$
-
-where $\partial L / \partial r(s,a) = D_\pi(s,a) - D_\text{data}(s,a)$ is the
-occupancy mismatch at each $(s,a)$ cell (Ziebart 2008 for the occupancy-matching
-gradient identity) and $\partial r_\eta(s,a)/\partial \eta$ is obtained by
-backpropagating through the reward network $f_\eta$.
-
-By the occupancy-matching identity (Ziebart 2008), the gradient of the MCE
-log-likelihood with respect to $r(s,a)$ equals the negative occupancy mismatch,
-so the surrogate gradient equals the negative log-likelihood gradient:
-
-$$
-\nabla_\eta L_\text{surrogate}(\eta)
-= -\nabla_\eta L(\eta).
-$$
-
-Minimizing $L_\text{surrogate}$ by gradient descent is therefore equivalent to
-maximizing the MCE log-likelihood; no additional approximation is involved.
+through the reward network. This is the occupancy-matching update used by the
+estimator. The implementation does not evaluate the finite-trajectory
+partition function directly.
 
 ## Algorithm
 
@@ -235,28 +230,29 @@ Output  reward matrix R_hat(s,a), policy pi, value V
 2   compute D_data(s,a) from the demonstration panel (discounted occupancy)
 3   compute rho_0 from the initial states in the panel
 4   initialize AdamW optimizer with global gradient-norm clip
-5   set best_loss = infinity,  patience_counter = 0
+5   set best_moment_loss = infinity,  patience_counter = 0
 6   for epoch = 1, ..., max_epochs                 # outer loop: AdamW descent
 7       R(s,a) := f_eta([x(s), e(a)])  for all (s,a)   # neural reward matrix
 8       set R(s, a_0) := 0             # enforce anchor normalization
 9       solve V, pi via hybrid soft value iteration (R, P)     # inner Bellman
 10      compute D_pi(s,a) via discounted forward pass using pi and P
 11      grad_R(s,a) := D_pi(s,a) - D_data(s,a)         # occupancy mismatch
-12      loss := sum_{s,a} R(s,a) * grad_R(s,a)          # surrogate loss
-13      backpropagate grad_R through f_eta;  mask gradients for R(s,a_0) to zero;  AdamW step
-14      if loss < best_loss - tol:  update checkpoint;  patience_counter := 0
-15      else:  patience_counter := patience_counter + 1
-16      if patience_counter >= patience:  break           # early stopping
-17  restore best checkpoint
-18  re-solve V, pi at best R via hybrid soft value iteration
-19  return R_hat := R(s,a), pi, V
+12      surrogate := sum_{s,a} R(s,a) * grad_R(s,a)
+13      backpropagate surrogate;  mask gradients for R(s,a_0) to zero;  AdamW step
+14      moment_loss := sum_{s,a} grad_R(s,a)^2
+15      if moment_loss < best_moment_loss - tol:  update checkpoint;  patience_counter := 0
+16      else:  patience_counter := patience_counter + 1
+17      if patience_counter >= patience:  break           # early stopping
+18  restore best checkpoint
+19  re-solve V, pi at best R via hybrid soft value iteration
+20  return R_hat := R(s,a), pi, V
 ```
 
 Gradients with respect to entries $R(s, a_0)$ are masked to zero before the
 AdamW step (step 13), so the anchor normalization is enforced throughout
 training, not only at inference.
 
-The inner solve in steps 9 and 18 defaults to `inner_solver="hybrid"`:
+The inner solve in steps 9 and 19 defaults to `inner_solver="hybrid"`:
 successive approximation while the Bellman residual is above a switch
 tolerance, then Newton-Kantorovich steps near the fixed point. The alternative
 `inner_solver="value"` uses plain value iteration throughout, which is
@@ -315,56 +311,24 @@ anchored reward matrix and the behavior it induces.
 
 ## Usage
 
-```python
-from econirl.estimators import MCEIRLNeural
+The [Quick Start](deep_mce_irl/quick_start.md) page gives a complete runnable
+fit with exact output. The fitted estimator provides `reward_matrix_`,
+`policy_`, `value_`, `simulate()`, and `counterfactual()`.
 
-model = MCEIRLNeural(
-    n_states=32, n_actions=3, discount=0.95,
-    reward_type="state_action", anchor_action=0,
-)
-model.fit(
-    data=df, state="state", action="action", id="agent_id",
-    transitions=transitions,
-)
-
-print(model.reward_.shape)   # (32, 3) -- anchored reward matrix R(s,a)
-print(model.policy_.shape)   # (32, 3) -- choice probabilities pi(a|s)
-print(model.summary())
-```
-
-Counterfactual analysis re-solves the model under a changed environment
-using the learned reward matrix. For a Type A intervention (reward shift),
-the anchored reward matrix is modified and the soft Bellman is re-solved:
-
-```python
-import numpy as np
-from econirl.core.solvers import hybrid_iteration
-from econirl.core.bellman import SoftBellmanOperator
-from econirl.core.types import DDCProblem
-
-R_cf = model.reward_matrix_.copy()
-R_cf[:, 1] += 0.5        # raise the reward for action 1 by 0.5
-
-problem = DDCProblem(
-    num_states=32, num_actions=3,
-    discount_factor=0.95, scale_parameter=1.0,
-)
-bellman = SoftBellmanOperator(problem=problem, transitions=transitions)
-result = hybrid_iteration(bellman, R_cf)
-print(result.policy)     # new choice probabilities under the intervention
-```
-
-The [Quick Start](deep_mce_irl/quick_start.md) page documents the full set of
-fitted attributes, including `reward_matrix_`, `value_`, and the optional
-feature projection interface.
+`counterfactual()` accepts one reward, transition, or action-availability
+change. It re-solves the learned reward map without retraining the network.
+The [Counterfactuals](deep_mce_irl/counterfactuals.md) page shows the supported
+inputs and result object.
 
 ## Evidence
 
-Behavioral recovery is measured on a synthetic benchmark with 32 states, 3
-actions, 160,000 observations, a nonlinear neural reward, stochastic transitions,
-and an anchor action that normalizes the reward map. The oracle reward matrix, policy, value function, Q function,
-and counterfactual objects are all known for this cell, so every figure below
-is compared against the oracle.
+Behavioral recovery is measured on a synthetic benchmark with 32 states and
+three actions. It uses 160,000 observations, a nonlinear neural reward,
+stochastic transitions, and an anchor action. The reward matrix, policy, value
+function, Q function, and counterfactual objects are known for this cell.
+
+All four controlled cells converged and passed 36 of 36 checks. The table
+shows the primary nonlinear reward cell.
 
 | Metric | Value |
 | --- | ---: |
@@ -381,6 +345,12 @@ across all three families indicate that the learned reward map reproduces the
 demonstrator's behavior and supports counterfactual re-solving with low error.
 There is no parameter-recovery table: the reward is identified only up to the
 chosen normalization, not as a unique finite vector.
+
+The separate [Simulation Study](deep_mce_irl/validation.md) varies both the
+generated panel and neural initialization. All 300 fits converged. Median
+reward normalized RMSE was 0.0677, median policy total variation was 0.00850,
+and median counterfactual regret was below 0.00474 for each intervention
+family. These repeated fits measure stability, not sampling uncertainty.
 
 For the cross-estimator comparison, see the
 [bus engine simulation study](../simulation_studies/rust_bus.md) and the
@@ -409,6 +379,7 @@ Pages:
 - [Quick Start](deep_mce_irl/quick_start.md)
 - [Pre-Estimation Checks](deep_mce_irl/pre_estimation.md)
 - [Simulation Study](deep_mce_irl/validation.md)
+- [Wulfmeier-Shaped Study](deep_mce_irl/wulfmeier_objectworld.md)
 - [Counterfactuals](deep_mce_irl/counterfactuals.md)
 
 ```{toctree}
@@ -417,5 +388,6 @@ Pages:
 deep_mce_irl/quick_start
 deep_mce_irl/pre_estimation
 deep_mce_irl/validation
+deep_mce_irl/wulfmeier_objectworld
 deep_mce_irl/counterfactuals
 ```

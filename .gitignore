@@ -71,6 +71,10 @@ AGENTS.md
 /legacy/*
 !/legacy/README.md
 
+# Validation receipts are tracked as compact JSON. Resumable per-fit checkpoints
+# stay local because they contain the full raw record stream.
+/validation/results/*.jsonl
+
 # Secrets and local environment
 .env
 .env.*

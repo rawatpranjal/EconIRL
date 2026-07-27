@@ -1,0 +1,159 @@
+{
+  "checkpoint": "/private/tmp/econirl-neural-mce.fTjpdo/validation/results/deep_mce_irl_ready.jsonl",
+  "checks": [
+    {
+      "name": "all_fits_successful",
+      "passed": true
+    },
+    {
+      "name": "all_fits_converged",
+      "passed": true
+    },
+    {
+      "name": "median_reward_nrmse",
+      "passed": true
+    },
+    {
+      "name": "p95_reward_nrmse",
+      "passed": true
+    },
+    {
+      "name": "median_policy_tv",
+      "passed": true
+    },
+    {
+      "name": "p95_policy_tv",
+      "passed": true
+    },
+    {
+      "name": "median_training_seed_policy_tv",
+      "passed": true
+    },
+    {
+      "name": "p95_training_seed_policy_tv",
+      "passed": true
+    },
+    {
+      "name": "type_a_median_regret",
+      "passed": true
+    },
+    {
+      "name": "type_a_p95_regret",
+      "passed": true
+    },
+    {
+      "name": "type_a_oracle_policy_changes",
+      "passed": true
+    },
+    {
+      "name": "type_b_median_regret",
+      "passed": true
+    },
+    {
+      "name": "type_b_p95_regret",
+      "passed": true
+    },
+    {
+      "name": "type_b_oracle_policy_changes",
+      "passed": true
+    },
+    {
+      "name": "type_c_median_regret",
+      "passed": true
+    },
+    {
+      "name": "type_c_p95_regret",
+      "passed": true
+    },
+    {
+      "name": "type_c_oracle_policy_changes",
+      "passed": true
+    },
+    {
+      "name": "full_configuration",
+      "passed": true
+    }
+  ],
+  "configuration": {
+    "cell": "deep_mce_neural_reward",
+    "execution": "CPU",
+    "n_fits": 300,
+    "n_panels": 100,
+    "n_training_seeds": 3
+  },
+  "environment": {
+    "git_sha": "7f728b57d015098c001560ca75bea27dc660664c",
+    "packages": {
+      "econirl": "0.0.10",
+      "equinox": "0.13.6",
+      "jax": "0.9.2",
+      "jaxlib": "0.9.2",
+      "numpy": "2.4.1",
+      "optax": "0.2.8"
+    },
+    "platform": "macOS-14.5-arm64-arm-64bit-Mach-O",
+    "python": "3.13.12"
+  },
+  "estimator": "Neural MCE-IRL",
+  "inference": "not supported; repeated-panel and training-seed stability",
+  "status": "ready",
+  "summary": {
+    "convergence_rate": 1.0,
+    "counterfactual_regret": {
+      "type_a": {
+        "median": 0.004737392502372317,
+        "p95": 0.013081491899602254
+      },
+      "type_b": {
+        "median": 0.004271936778917129,
+        "p95": 0.010976657905635701
+      },
+      "type_c": {
+        "median": 0.0044490531954934215,
+        "p95": 0.013047341631038229
+      }
+    },
+    "n_converged": 300,
+    "n_requested": 300,
+    "n_successful": 300,
+    "oracle_counterfactual_policy_tv": {
+      "type_a": {
+        "median": 0.02630891271722946,
+        "minimum": 0.02630891271722946
+      },
+      "type_b": {
+        "median": 0.00834930651635697,
+        "minimum": 0.00834930651635697
+      },
+      "type_c": {
+        "median": 0.28970993211396756,
+        "minimum": 0.28970993211396756
+      }
+    },
+    "policy_tv": {
+      "maximum": 0.01873653621178992,
+      "median": 0.00850373829049023,
+      "p95": 0.014926522561265056
+    },
+    "q_nrmse": {
+      "maximum": 0.15958330414523053,
+      "median": 0.06890168765775145,
+      "p95": 0.12426287582752571
+    },
+    "reward_nrmse": {
+      "maximum": 0.15323770818914773,
+      "median": 0.06768686413802157,
+      "p95": 0.11983479571867146
+    },
+    "training_seed_policy_tv": {
+      "median": 0.005545544553026093,
+      "p95": 0.00977362917977944
+    },
+    "value_nrmse": {
+      "maximum": 1.995728860339017,
+      "median": 0.3056222152516127,
+      "p95": 1.8937517926855367
+    }
+  },
+  "target": "anchored reward map and induced behavior"
+}
