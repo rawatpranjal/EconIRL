@@ -1,0 +1,92 @@
+{
+  "claim": "Paper-shaped synthetic validation. This does not reproduce Ziebart et al. Table 1 from the withheld Pittsburgh taxi data.",
+  "paper": {
+    "citation": "Ziebart, Maas, Bagnell, and Dey (2008)",
+    "reported_table_1_targets": {
+      "distance_match_percent": 78.79,
+      "routes_at_least_90_percent": 52.98,
+      "average_log_probability": -6.85
+    }
+  },
+  "config": {
+    "num_states": 300001,
+    "num_actions": 3,
+    "raw_trips": 13220,
+    "discarded_trips": 3966,
+    "train_trips": 1851,
+    "test_trips": 7403,
+    "num_tasks": 25,
+    "task_states": 48,
+    "horizon": 47,
+    "seed": 2008,
+    "reward_scale": 1.0,
+    "l2_regularization": 0.0001
+  },
+  "network": {
+    "transition_orientation": "next_state[state, action]",
+    "num_states": 300001,
+    "num_action_slots": 900003,
+    "feature_names": [
+      "road_type_0",
+      "road_type_1",
+      "road_type_2",
+      "road_type_3",
+      "road_type_4",
+      "road_type_5",
+      "speed_0",
+      "speed_1",
+      "speed_2",
+      "speed_3",
+      "speed_4",
+      "speed_5",
+      "lanes_0",
+      "lanes_1",
+      "lanes_2",
+      "lanes_3",
+      "lanes_4",
+      "turn_0",
+      "turn_1",
+      "turn_2",
+      "turn_3",
+      "turn_4"
+    ],
+    "shape_checks": {
+      "states_over_300000": true,
+      "actions_over_900000": true,
+      "deterministic": true,
+      "feature_families": 4,
+      "feature_counts": 22,
+      "raw_trips_approximately_13000": true,
+      "discard_fraction": 0.3,
+      "training_fraction_of_retained": 0.20002161227577264,
+      "test_trips": 7403,
+      "paper_scale": true,
+      "passed": true
+    }
+  },
+  "data": {
+    "train_trips": 1851,
+    "test_trips": 7403,
+    "train_observations": 44662,
+    "test_observations": 177885
+  },
+  "fit": {
+    "converged": true,
+    "termination_reason": "joint_convergence",
+    "stationarity_residual": 4.495453824758196e-09,
+    "coefficient_rmse": 0.0916842445731163,
+    "fit_seconds": 7.479814208054449
+  },
+  "synthetic_metrics": {
+    "distance_match_percent": 58.96566394782151,
+    "routes_at_least_90_percent": 0.013508037282182897,
+    "average_log_probability": -24.74977389795316
+  },
+  "runtime_seconds": 43.88607033301378,
+  "environment": {
+    "python": "3.13.12",
+    "numpy": "2.4.1",
+    "jax": "0.9.2"
+  },
+  "passed": true
+}

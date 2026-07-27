@@ -44,23 +44,23 @@ class DDCProblem:
     scale_parameter: float = 1.0
     num_periods: int | None = None  # None = infinite horizon, int = finite horizon
     state_dim: int | None = None
-    state_encoder: Callable | None = field(
-        default=None, hash=False, compare=False
-    )
+    state_encoder: Callable | None = field(default=None, hash=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.num_states < 1:
             raise ValueError(f"num_states must be positive, got {self.num_states}")
         if self.num_actions < 1:
             raise ValueError(f"num_actions must be positive, got {self.num_actions}")
-        if not 0 <= self.discount_factor < 1:
+        finite_horizon_undiscounted = self.discount_factor == 1.0 and self.num_periods is not None
+        if not (0 <= self.discount_factor < 1 or finite_horizon_undiscounted):
             raise ValueError(
-                f"discount_factor must be in [0, 1), got {self.discount_factor}"
+                "discount_factor must be in [0, 1), or exactly 1 for a "
+                f"finite-horizon problem, got {self.discount_factor}"
             )
+        if self.num_periods is not None and self.num_periods < 1:
+            raise ValueError(f"num_periods must be positive when supplied, got {self.num_periods}")
         if self.scale_parameter <= 0:
-            raise ValueError(
-                f"scale_parameter must be positive, got {self.scale_parameter}"
-            )
+            raise ValueError(f"scale_parameter must be positive, got {self.scale_parameter}")
 
 
 @dataclass
@@ -188,9 +188,7 @@ class Panel:
         frequencies = frequencies.at[all_states].add(1.0)
         return frequencies / frequencies.sum()
 
-    def compute_choice_frequencies(
-        self, num_states: int, num_actions: int
-    ) -> jnp.ndarray:
+    def compute_choice_frequencies(self, num_states: int, num_actions: int) -> jnp.ndarray:
         """Compute empirical choice frequencies by state.
 
         This gives the empirical conditional choice probabilities (CCPs)
@@ -342,9 +340,7 @@ class TrajectoryPanel(Panel):
             actions_arr = jnp.array(group[action].values, dtype=jnp.int32)
 
             if next_state is not None:
-                next_states_arr = jnp.array(
-                    group[next_state].values, dtype=jnp.int32
-                )
+                next_states_arr = jnp.array(group[next_state].values, dtype=jnp.int32)
             else:
                 # Infer next_states from sequential rows
                 n = len(states_arr)
@@ -414,19 +410,15 @@ class TrajectoryPanel(Panel):
         next_states = self.all_next_states
 
         # --- state-action counts ---
-        state_action_counts = jnp.zeros(
-            (n_states, n_actions), dtype=jnp.float64
-        )
+        state_action_counts = jnp.zeros((n_states, n_actions), dtype=jnp.float64)
         state_action_counts = state_action_counts.at[states, actions].add(1.0)
 
         # --- empirical CCPs ---
         row_sums = state_action_counts.sum(axis=1, keepdims=True)
-        row_sums_safe = jnp.where(
-            row_sums > 0, row_sums, jnp.ones_like(row_sums)
-        )
+        row_sums_safe = jnp.where(row_sums > 0, row_sums, jnp.ones_like(row_sums))
         empirical_ccps = state_action_counts / row_sums_safe
         # States with zero observations: uniform over actions
-        zero_mask = (row_sums.squeeze(1) == 0)
+        zero_mask = row_sums.squeeze(1) == 0
         empirical_ccps = jnp.where(
             zero_mask[:, None],
             jnp.ones((n_states, n_actions)) / n_actions,
@@ -435,9 +427,7 @@ class TrajectoryPanel(Panel):
 
         # --- transition matrix (A, S, S) ---
         # Build as numpy for the counting loop, then convert
-        transition_counts_np = np.zeros(
-            (n_actions, n_states, n_states), dtype=np.float64
-        )
+        transition_counts_np = np.zeros((n_actions, n_states, n_states), dtype=np.float64)
         states_np = np.asarray(states)
         actions_np = np.asarray(actions)
         next_states_np = np.asarray(next_states)
@@ -455,7 +445,7 @@ class TrajectoryPanel(Panel):
         )
         transitions = transition_counts / transition_row_sums_safe
         # Zero-count rows get uniform
-        zero_transition_mask = (transition_row_sums.squeeze(2) == 0)
+        zero_transition_mask = transition_row_sums.squeeze(2) == 0
         transitions = jnp.where(
             zero_transition_mask[:, :, None],
             jnp.ones((n_actions, n_states, n_states)) / n_states,
@@ -468,9 +458,7 @@ class TrajectoryPanel(Panel):
 
         # --- initial distribution ---
         initial_dist = jnp.zeros(n_states, dtype=jnp.float64)
-        initial_states = jnp.array(
-            [traj.states[0] for traj in self.trajectories], dtype=jnp.int32
-        )
+        initial_states = jnp.array([traj.states[0] for traj in self.trajectories], dtype=jnp.int32)
         initial_dist = initial_dist.at[initial_states].add(1.0)
         initial_total = initial_dist.sum()
         initial_dist = jnp.where(
@@ -606,8 +594,10 @@ class TrajectoryPanel(Panel):
 
         lengths = np.array([len(t) for t in self.trajectories], dtype=np.int32)
         ids = np.array(
-            [t.individual_id if t.individual_id is not None else i
-             for i, t in enumerate(self.trajectories)],
+            [
+                t.individual_id if t.individual_id is not None else i
+                for i, t in enumerate(self.trajectories)
+            ],
             dtype=object,
         )
 

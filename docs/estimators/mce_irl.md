@@ -1,12 +1,19 @@
 # MCE-IRL
 
+## Important Links
+
+- [Quick start](mce_irl/quick_start.md)
+- [Pre-estimation checks](mce_irl/pre_estimation.md)
+- [Simulation Study](mce_irl/validation.md)
+- [Counterfactuals](mce_irl/counterfactuals.md)
+
 Maximum causal entropy inverse reinforcement learning recovers reward
 parameters from demonstrated state-action trajectories by matching discounted
 feature expectations under a soft-optimal causal policy. For each candidate
-reward, the estimator solves a forward soft dynamic program, computes the
-implied feature moments, and updates the parameters until the model moments
-equal the expert moments. Counterfactuals are meaningful only through the
-fitted MDP primitives.
+reward, the estimator solves the soft dynamic program, propagates the implied
+state distribution forward, and computes the model feature moments. It updates
+the parameters until the model moments equal the expert moments.
+Counterfactuals are meaningful only through the fitted MDP primitives.
 
 Read this page when demonstrations, not a structural likelihood, define the
 problem. The estimated object is a reward inside the supplied feature basis and
@@ -47,9 +54,11 @@ estimated. The subscript $k$ indexes the $k$-th component of $\phi$, so
 $\phi_k(s, a)$ denotes the $k$-th feature value at $(s, a)$. The discount
 factor is $\beta$ and the logit shock scale is $\sigma$. Setting $\sigma = 1$
 recovers the unit-scale convention used in the internal derivation and in
-Ziebart (2010); the public page keeps $\sigma$ explicit for the DDC
+Ziebart (2010). The public page keeps $\sigma$ explicit for the DDC
 comparison. The transition kernel $P_a(s, s')$ gives the probability of
-moving to $s'$ from $s$ under action $a$, stored in $(A, S, S)$ orientation.
+moving to $s'$ from $s$ under action $a$. A dense kernel uses $(A, S, S)$
+orientation. A deterministic system stores one successor in
+`next_state[s, a]` and one legality flag in `valid_action[s, a]`.
 The initial state distribution is $\rho_0(s)$. The soft value function is
 $V_\theta(s)$, the choice-specific value is $Q_\theta(s, a)$, and the causal
 policy is $\pi_\theta(a \mid s)$. The empirical discounted expert occupancy is
@@ -93,6 +102,27 @@ to logit dynamic discrete choice: both use the same soft choice form, but
 MCE-IRL estimates the reward through feature moments rather than through a
 conditional likelihood alone.
 
+For a finite horizon, the estimator keeps a separate value and policy for each
+period. A terminal state is absorbing and has zero continuation value. The
+discount factor may equal one only in this finite-horizon case.
+
+## Shared Tasks
+
+Route data often contain many origins and destinations over one road graph.
+`MCEIRLTask` represents each problem. A task supplies a task identifier, a
+start distribution, terminal states, a finite horizon, and optional active
+states and legal actions.
+
+The compiler builds compact disjoint views for the dynamic program. It does
+not duplicate a global dense transition tensor. Reward features and parameters
+remain shared across tasks. This matches the road-choice structure in Ziebart
+et al. (2008), where destinations define different MDPs and one reward vector
+explains all routes.
+
+Each demonstration carries a task identifier. Its states must remain inside
+the active subgraph. Its action and next state must agree with the fixed
+transition system.
+
 ## Identification
 
 This is the section that says when matching feature moments is enough to recover
@@ -113,10 +143,11 @@ MCE-IRL identifies a reward representation under the following assumptions.
   transformations that leave behavior unchanged, including additive constants
   and reward shaping. A normalization anchor must be applied consistently when
   comparing estimated and reference rewards.
-- **Action-dependent feature rank.** The feature design must have full rank
-  after applying the normalization. For multi-action reward recovery, features
-  must vary across actions. State-only features broadcast across actions and
-  leave action-specific payoff differences unidentified.
+- **Action-contrast identification.** After normalization, the feature-moment
+  Jacobian with respect to $\theta$ must have full column rank. Raw feature
+  rank is not enough. Features that are constant across feasible actions can
+  difference out of choice probabilities and leave reward directions
+  unidentified.
 - **Sufficient action support.** Each action must have enough observed support
   for the occupancy comparison. States with only one feasible action, or rare
   actions in the data, leave the corresponding reward directions weakly
@@ -125,10 +156,12 @@ MCE-IRL identifies a reward representation under the following assumptions.
   state-action indexing system as the transition tensor.
 
 These hold inside a finite discrete state space with a stationary environment
-and a known discount factor $\beta$. Under them, the feature-moment condition
-$\mu_E = \mu_\theta$ uniquely determines $\theta$ within the supplied feature
-basis and normalization. Identification weakens under a rank-deficient or
-state-only feature matrix, thin action support, or an invalid normalization.
+and a known discount factor $\beta$. When the normalized moment map is
+one-to-one, the condition $\mu_E = \mu_\theta$ determines $\theta$ within the
+supplied feature basis. A full-rank local Jacobian supports local
+identification. It does not by itself prove global uniqueness. Identification
+weakens with deficient action contrasts, thin action support, or an invalid
+normalization.
 
 ## Estimator
 
@@ -158,16 +191,20 @@ $$
 
 where $H_\text{causal}(\pi)$ is the causal entropy of the policy. Introducing
 $\theta$ as the Lagrange multiplier on the feature-matching constraint gives
-the dual objective
+the concave dual target
 
 $$
 L(\theta) = \min_{\pi \text{ causal}}
-  \Bigl[\theta \cdot (\mu_\pi - \mu_E)\Bigr] + H_\text{causal}(\pi),
+  \left[
+    \theta \cdot (\mu_E - \mu_\pi)
+    - H_\text{causal}(\pi)
+  \right].
 $$
 
-whose gradient is $\nabla_\theta L(\theta) = \mu_E - \mu_\theta$
-(Ziebart, 2010, ch. 3). The causal policy is the soft-optimal policy of this
-dual, which is precisely the softmax of $Q_\theta / \sigma$ derived above.
+Its gradient is $\nabla_\theta L(\theta) = \mu_E - \mu_\theta$
+(Ziebart, 2010, ch. 3). The inner minimization is equivalent to maximizing
+causal entropy plus expected reward. Its solution is the soft-optimal policy,
+which is precisely the softmax of $Q_\theta / \sigma$ derived above.
 This equivalence follows from differentiating $\log \pi_\theta(a \mid s)$
 directly. Since the policy is the softmax of $Q_\theta / \sigma$, the score has
 the logit form
@@ -196,10 +233,12 @@ $$
 \nabla_\theta L(\theta) = \mu_E - \mu_\theta.
 $$
 
-In the default L-BFGS-B path, the estimator maximizes the conditional log
-likelihood of the demonstrations under $\pi_\theta$, with the gradient
-computed by implicit differentiation through the soft Bellman fixed point. The
-score differentiates through the value function via:
+For an infinite-horizon fit, the default L-BFGS-B path maximizes the
+conditional log likelihood under $\pi_\theta$. Its gradient uses implicit
+differentiation through the soft Bellman fixed point. A finite-horizon fit
+instead uses backward induction and solves the feature-moment condition
+directly. The infinite-horizon score differentiates through the value
+function via:
 
 $$
 (I - \beta P_\pi)\frac{\partial V}{\partial \theta_k}
@@ -218,7 +257,9 @@ D_\theta(s) = \rho_0(s)
 $$
 
 or in matrix form $D_\theta = \rho_0 + \beta P_\pi^\top D_\theta$, solved by
-fixed-point iteration. The state-action occupancy is then
+fixed-point iteration. The implementation normalizes this discounted
+occupancy to sum to one, matching the normalized empirical discounted
+occupancy. The state-action occupancy is then
 $D_\theta(s, a) = D_\theta(s)\,\pi_\theta(a \mid s)$, from which
 $\mu_\theta = \sum_{s,a} D_\theta(s, a)\,\phi(s, a)$.
 
@@ -241,39 +282,44 @@ same logit form as the structural conditional likelihood score.
 ## Algorithm
 
 ```text
-Algorithm  MCE-IRL (default: L-BFGS-B outer, hybrid inner solver)
+Algorithm  MCE-IRL
 Input   panel {(s_it, a_it, s_{i,t+1})}, features phi, transitions P,
         discount beta, logit scale sigma
 Output  theta_hat, policy pi, value V
 
 1   compute expert feature moments mu_E from the demonstration occupancy
-2   compute initial state distribution rho_0 from the data
+2   obtain rho_0 from the data or the supplied task start distributions
 3   initialize theta
-4   repeat                                         # outer loop: L-BFGS-B
+4   repeat
 5       r_theta(s, a) := phi(s, a)' theta
-6       solve  V_theta = T_theta V_theta           # inner loop: hybrid soft Bellman
+6       solve the soft dynamic program             # hybrid fixed point or backward induction
 7       Q_theta(s, a) := r_theta(s, a) + beta * sum_{s'} P_a(s, s') V_theta(s')
 8       pi_theta(a | s) := exp(Q_theta(s, a)/sigma) / sum_b exp(Q_theta(s, b)/sigma)
-9       L(theta) := sum_{i,t} log pi_theta(a_it | s_it)
-10      solve  (I - beta P_pi) dV/dtheta_k = sum_a pi_theta phi_k(s, a)  for each k
-11      compute grad L from dV/dtheta_k via the logit score
-12      update theta using L-BFGS-B
-13  until the gradient norm is below tolerance
+9       compute model feature moments mu_theta
+10      residual := mu_E - mu_theta
+11      update theta
+12  until the optimizer and residual checks pass
+13  verify the Bellman and occupancy checks
 14  return theta_hat, pi_theta, V_theta
 ```
 
-The inner solve in step 6 defaults to `inner_solver="hybrid"`: value iteration
+For an infinite horizon, the inner solve in step 6 defaults to
+`inner_solver="hybrid"`: value iteration
 (contraction) while far from the fixed point, then Newton-Kantorovich steps
 near the solution. Two pure variants are also available. `"value"` (successive
 approximation) converges linearly and is robust from any start. `"policy"`
 (policy iteration with matrix-inversion evaluation) converges faster near the
 solution but requires a good starting point.
 
-An alternative outer path, used in the package's own simulation study, is
-`optimizer="root"`: a direct root-finding solver (HYBR method) that solves
-$\mu_E - \mu_\theta = 0$ without maximizing the log likelihood. A gradient-descent
-path (`optimizer="gradient"`) is also available, using Adam or plain SGD as
-the outer update.
+Finite-horizon fits use backward induction and retain every period's policy
+and value function. With `optimizer="L-BFGS-B"`, `"BFGS"`, or `"root"`, they
+solve the feature stationarity equation with the HYBR root method. The
+`"gradient"` path instead uses Adam or SGD. Infinite-horizon dense fits use
+L-BFGS-B with implicit differentiation by default.
+
+A fit reports convergence only when the optimizer, stationarity residual,
+occupancy residual when applicable, and Bellman residual all pass. The
+`termination_reason_` attribute identifies the first failed check.
 
 ## System View
 
@@ -309,7 +355,7 @@ fit behavior without recovering the intended reward.
 
 | Applicable when | Prefer an alternative when |
 | --- | --- |
-| Demonstrations come from a discrete sequential decision problem. | Likelihood-based structural standard errors are required. |
+| Demonstrations come from a discrete sequential decision problem. | A structural disturbance model beyond soft choice is required. |
 | Transitions are known or can be supplied. | Transition estimation is the main modeling challenge. |
 | Reward features are supplied and action-dependent. | Reward features are unknown or require a neural representation. |
 | The behavioral model is maximum causal entropy. | The target is deterministic control without entropy regularization. |
@@ -323,97 +369,30 @@ replaces the tabular feature basis with a neural reward map.
 
 ## Usage
 
-```python
-import numpy as np
+The [Quick Start](mce_irl/quick_start.md) gives a complete deterministic,
+multi-task example with exact output. Use a dense `(A, S, S)` tensor for a
+small stochastic MDP. Use `DeterministicTransitions` for a large sparse system.
 
-from econirl import MCEIRL
-
-from econirl.datasets import load_rust_bus
-
-n_states = 90
-n_actions = 2
-features = np.zeros((n_states, n_actions, 2))
-features[:, 0, 0] = -np.arange(n_states) / 100.0
-features[:, 1, 1] = -1.0
-
-df = load_rust_bus()
-
-model = MCEIRL(
-    n_states=n_states,
-    n_actions=n_actions,
-    discount=0.99,
-    feature_matrix=features,
-    feature_names=["keep_mileage_cost", "replace_cost"],
-)
-model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
-
-print(model.params_)
-print(model.policy_.shape)
-```
-
-The fitted policy gives action probabilities by state:
-
-```python
-print(model.predict_proba([0, 10, 50, 89]))
-```
-
-### General MDP
-
-The example above is the Rust bus, where `transitions=None` estimates the
-two-action keep/replace kernel from the data. For any other problem, supply the
-dynamics explicitly. Pass a transition tensor of shape `(n_actions, n_states,
-n_states)` and the observed next-state column. A two-dimensional matrix fills
-the non-keep actions with the bus reset-to-state-0 kernel. A model with more
-than two actions and no explicit tensor is rejected.
-
-```python
-from econirl import MCEIRL
-from econirl.estimators import estimate_empirical_transitions
-
-# transitions[a, s, s2] = P(s2 | s, a)
-# features[s, a, k]      = phi_k(s, a)
-model = MCEIRL(
-    n_states=n_states,
-    n_actions=n_actions,
-    discount=0.95,
-    feature_matrix=features,
-    feature_names=feature_names,
-)
-model.fit(
-    df,
-    state="state",
-    action="action",
-    id="id",
-    next_state="next_state",
-    transitions=transitions,
-)
-```
-
-When the kernel is unknown, estimate it from the observed transitions in a
-`Panel` and pass the result:
-
-```python
-transitions = estimate_empirical_transitions(panel, n_actions, n_states)
-```
-
-Reward parameters are identified only when the action-contrast features have
-full rank and each action has enough observed support. The estimator warns at
-fit time when the action-contrast design is rank deficient, which means
-action-specific payoffs are not identified even with correct transitions. See
-[Pre-Estimation Checks](mce_irl/pre_estimation.md).
-
-Counterfactual analysis requires re-solving the dynamic program under changed
-primitives. The fitted primitives available for this are `model.reward_matrix_`,
-`model.policy_`, and `model.value_function_`. For controlled payoff, transition,
-or action-set interventions, use the simulation and evaluation utilities with
-an explicit problem and transition environment. The
-[Counterfactuals](mce_irl/counterfactuals.md) page documents the three
-counterfactual families and the reported regret figures.
-
-The [Quick Start](mce_irl/quick_start.md) page documents the full set of fitted
-attributes and the full `MCEIRLEstimator` API.
+The fitted model exposes shared reward parameters, standard errors,
+period-specific policies, task-specific policy views, simulation, and
+counterfactual re-solving. The
+[Pre-Estimation Checks](mce_irl/pre_estimation.md) page covers rank, support,
+transition alignment, terminal states, and task membership.
 
 ## Evidence
+
+The repeated-run inference study completes 300 independent fits. The 95
+percent intervals cover the true reward parameter in 96.0 percent of runs.
+The asymptotic standard error is 1.057 times the trajectory-bootstrap standard
+error computed from 200 resamples. All fits pass the joint convergence checks.
+
+A separate generated road study constructs arrays with 300,001 states,
+900,003 valid deterministic state-action links, and 22 feature counts. The
+fitted problem contains 25 destination tasks with 48 active states each and
+evaluates 7,403 held-out routes. This checks paper-scale sparse storage and
+shared-reward task compilation. It does not reproduce the Pittsburgh graph,
+data, or Table 1 results. See [Simulation Study](mce_irl/validation.md) for
+the paper values and generated results.
 
 Behavioral recovery is measured on a synthetic benchmark with 25 states, 3
 actions, and 8 action-dependent reward features. The reward, transitions, policy,
@@ -464,6 +443,8 @@ Implementation and reproduction:
 - sklearn wrapper: [`econirl.MCEIRL`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/mce_irl.py).
 - Validation runner: [`validation/estimators/mce_irl/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/run.py).
 - Results file: [`mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json).
+- Inference runner: [`validation/estimators/mce_irl/ready.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/ready.py).
+- Road generator: [`validation/estimators/mce_irl/ziebart_road_synthetic.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/ziebart_road_synthetic.py).
 
 Pages:
 

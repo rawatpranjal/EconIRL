@@ -1,0 +1,70 @@
+{
+  "checkpoint": "validation/results/mce_irl_ready.jsonl",
+  "environment": {
+    "jax": "0.9.2",
+    "jax_enable_x64": true,
+    "platform": "macOS-14.5-arm64-arm-64bit-Mach-O",
+    "python": "3.13.12"
+  },
+  "estimator": "MCE-IRL",
+  "gates": [
+    {
+      "name": "all_fits_converged",
+      "passed": true
+    },
+    {
+      "name": "coverage_selfcheck",
+      "passed": true
+    },
+    {
+      "name": "absolute_bias",
+      "passed": true
+    },
+    {
+      "name": "rmse",
+      "passed": true
+    },
+    {
+      "name": "stationarity",
+      "passed": true
+    },
+    {
+      "name": "asymptotic_bootstrap_se_ratio",
+      "passed": true
+    },
+    {
+      "name": "counterfactual_effect",
+      "passed": true
+    }
+  ],
+  "intervention_check": {
+    "error": null,
+    "max_policy_change": 0.20540917801020545,
+    "passed": true
+  },
+  "n_observations_per_fit": 400,
+  "n_replications": 300,
+  "repeated_run_inference": {
+    "bias": 0.005844293534755685,
+    "convergence_rate": 1.0,
+    "coverage": 0.96,
+    "coverage_error": null,
+    "coverage_selfcheck_passed": true,
+    "max_stationarity_residual": 6.6186605085505335e-09,
+    "mean_asymptotic_se": 0.10219074296600344,
+    "mean_estimate": 0.4058442935347557,
+    "monte_carlo_sd": 0.09854482709018543,
+    "n_successful": 300,
+    "rmse": 0.09855388595416968
+  },
+  "standard_error_check": {
+    "asymptotic_se": 0.06528589794344061,
+    "bootstrap_se": 0.06179439112220691,
+    "error": null,
+    "n_bootstrap": 200,
+    "passed": true,
+    "ratio": 1.0565020021692384
+  },
+  "status": "ready",
+  "truth": 0.4
+}
