@@ -163,6 +163,7 @@ def fit_cell(
             learned_reward = np.asarray(model.reward_, dtype=float).tolist()
             method = "neural"
             converged = model.converged_ is True
+            optimizer_converged = None
             termination_reason = model.termination_reason_
             n_iterations = model.n_epochs_
         else:
@@ -177,6 +178,7 @@ def fit_cell(
             learned_reward = None
             method = "linear"
             converged = bool(result.converged)
+            optimizer_converged = bool(result.metadata.get("optimizer_converged", False))
             termination_reason = str(
                 result.metadata.get("termination_reason", getattr(result, "message", ""))
             )
@@ -205,6 +207,7 @@ def fit_cell(
             "learned_reward": learned_reward,
             "runtime_seconds": time.perf_counter() - started,
             "converged": converged,
+            "optimizer_converged": optimizer_converged,
             "termination_reason": termination_reason,
             "n_iterations": n_iterations,
             "error": None,
@@ -291,6 +294,10 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
                 "linear_evd_median": median(linear, "evd"),
                 "neural_transfer_evd_median": median(neural, "transfer_evd"),
                 "linear_transfer_evd_median": median(linear, "transfer_evd"),
+                "linear_optimizer_converged": sum(
+                    item.get("optimizer_converged") is True for item in linear
+                ),
+                "linear_fits": len(linear),
             }
     selected: dict[str, Any] = {}
     for environment in ("objectworld", "binaryworld"):
@@ -412,6 +419,12 @@ def main() -> int:
             cell = summary["cells"][f"binaryworld:{n_demos}"]
             checks.append(
                 {
+                    "name": f"binaryworld_linear_optimizer_completed_{n_demos}",
+                    "passed": cell["linear_optimizer_converged"] == cell["linear_fits"] == 5,
+                }
+            )
+            checks.append(
+                {
                     "name": f"binaryworld_neural_beats_linear_{n_demos}",
                     "passed": (
                         cell["neural_evd_median"] is not None
@@ -423,6 +436,12 @@ def main() -> int:
         objectworld = summary["cells"]["objectworld:128"]
         checks.extend(
             [
+                {
+                    "name": "objectworld_linear_optimizer_completed_128",
+                    "passed": objectworld["linear_optimizer_converged"]
+                    == objectworld["linear_fits"]
+                    == 5,
+                },
                 {
                     "name": "objectworld_128_commensurate",
                     "passed": (
