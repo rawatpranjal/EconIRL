@@ -1,5 +1,5 @@
 {
-  "claim": "Paper-shaped synthetic validation. This does not reproduce Ziebart et al. Table 1 from the withheld Pittsburgh taxi data.",
+  "claim": "Paper-faithful generated-data validation of the road-choice adapter. This does not reproduce Table 1 from the unavailable Pittsburgh data.",
   "paper": {
     "citation": "Ziebart, Maas, Bagnell, and Dey (2008)",
     "reported_table_1_targets": {
@@ -9,24 +9,30 @@
     }
   },
   "config": {
-    "num_states": 300001,
-    "num_actions": 3,
+    "width": 275,
+    "height": 275,
     "raw_trips": 13220,
     "discarded_trips": 3966,
     "train_trips": 1851,
     "test_trips": 7403,
-    "num_tasks": 25,
-    "task_states": 48,
-    "horizon": 47,
+    "num_drivers": 25,
+    "num_tasks": 64,
+    "horizon": 32,
     "seed": 2008,
-    "reward_scale": 1.0,
-    "l2_regularization": 0.0001
+    "reward_scale": 20.0,
+    "driver_types": 2,
+    "exploratory_scale": 0.15,
+    "l2_regularization": 0.0001,
+    "num_states": 302500,
+    "num_actions": 3
   },
   "network": {
+    "state_definition": "directed road segment ending at an intersection",
+    "action_definition": "left, straight, or right intersection transition",
     "transition_orientation": "next_state[state, action]",
-    "num_states": 300001,
-    "num_action_slots": 900003,
-    "feature_names": [
+    "num_states": 302500,
+    "num_action_slots": 907500,
+    "raw_feature_names": [
       "road_type_0",
       "road_type_1",
       "road_type_2",
@@ -50,39 +56,141 @@
       "turn_3",
       "turn_4"
     ],
+    "fit_feature_names": [
+      "road_type_0",
+      "road_type_1",
+      "road_type_2",
+      "road_type_4",
+      "road_type_5",
+      "speed_0",
+      "speed_1",
+      "speed_2",
+      "speed_3",
+      "speed_4",
+      "speed_5",
+      "lanes_0",
+      "lanes_2",
+      "lanes_3",
+      "lanes_4",
+      "turn_0",
+      "turn_1",
+      "turn_3",
+      "turn_4"
+    ],
+    "normalization": {
+      "selected_columns": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21
+      ],
+      "rule": "pivoted full-rank action-contrast basis",
+      "feature_scale": [
+        0.016724849119782448,
+        0.034677598625421524,
+        0.05068349093198776,
+        0.01924092508852482,
+        0.012916267849504948,
+        0.004729858133941889,
+        0.04692821949720383,
+        0.09654738754034042,
+        0.07546386867761612,
+        0.04244575276970863,
+        0.023502839729189873,
+        0.012392012402415276,
+        0.0669550970196724,
+        0.039542119950056076,
+        0.020865317434072495,
+        0.3932696580886841,
+        0.9148029088973999,
+        0.6557579636573792,
+        0.2564062774181366
+      ]
+    },
     "shape_checks": {
       "states_over_300000": true,
       "actions_over_900000": true,
+      "spatial_segment_topology": true,
       "deterministic": true,
       "feature_families": 4,
-      "feature_counts": 22,
+      "raw_feature_counts": 22,
+      "identified_fit_features": 19,
+      "all_road_types_present": true,
       "raw_trips_approximately_13000": true,
       "discard_fraction": 0.3,
       "training_fraction_of_retained": 0.20002161227577264,
       "test_trips": 7403,
+      "drivers": 25,
+      "filter_reasons": {
+        "noisy": 1322,
+        "cyclic": 1322,
+        "too_short": 1322
+      },
       "paper_scale": true,
       "passed": true
     }
   },
   "data": {
+    "raw_trips": 13220,
+    "discarded_trips": 3966,
+    "discard_reasons": {
+      "noisy": 1322,
+      "cyclic": 1322,
+      "too_short": 1322
+    },
+    "retained_trips": 9254,
     "train_trips": 1851,
     "test_trips": 7403,
-    "train_observations": 44662,
-    "test_observations": 177885
+    "train_observations": 59232,
+    "test_observations": 236896,
+    "drivers": 25,
+    "driver_types": 2,
+    "driver_parameter_spread": 0.42230508877454614,
+    "tasks": 64
   },
   "fit": {
+    "estimator": "econirl.estimators.MCEIRL",
+    "road_specific_estimator_logic": false,
+    "compiled_states": 7552,
+    "contrast_rank": 19,
+    "num_parameters": 19,
     "converged": true,
     "termination_reason": "joint_convergence",
-    "stationarity_residual": 4.495453824758196e-09,
-    "coefficient_rmse": 0.0916842445731163,
-    "fit_seconds": 7.479814208054449
+    "stationarity_residual": 7.372898593080394e-09,
+    "coefficient_rmse": 1.2623481750488281,
+    "fit_seconds": 4.197608667018358
   },
   "synthetic_metrics": {
-    "distance_match_percent": 58.96566394782151,
-    "routes_at_least_90_percent": 0.013508037282182897,
-    "average_log_probability": -24.74977389795316
+    "distance_match_percent": 80.82198064684447,
+    "routes_at_least_90_percent": 30.149939213832226,
+    "average_log_probability": -3.857906890551431
   },
-  "runtime_seconds": 43.88607033301378,
+  "paper_target_gaps": {
+    "distance_match_percent": 2.0319806468444597,
+    "routes_at_least_90_percent": -22.83006078616777,
+    "average_log_probability": 2.9920931094485685
+  },
+  "metric_semantics": {
+    "distance_match_percent": "most likely fitted path versus held-out path, distance weighted",
+    "routes_at_least_90_percent": "held-out paths with at least 90 percent shared distance",
+    "average_log_probability": "mean fitted log probability on the training paths"
+  },
+  "runtime_seconds": 7.657542832952458,
   "environment": {
     "python": "3.13.12",
     "numpy": "2.4.1",

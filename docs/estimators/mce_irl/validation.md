@@ -55,29 +55,34 @@ status: ready
 
 ## Ziebart Road Structure
 
-The road study generates data. It does not use the Pittsburgh taxi traces.
-The generated model follows the structure reported by Ziebart et al. (2008):
+The road study generates data. It does not use the Pittsburgh taxi traces or
+their fitted road graph. The generated experiment follows the observable data
+and model structure reported by Ziebart et al. (2008):
 
 | Contract | Generated value |
 | --- | ---: |
-| Deterministic road-segment states | 300,001 |
-| Available transition actions | 900,003 |
-| Feature counts | 22 |
+| Deterministic directed road-segment states | 302,500 |
+| Intersection transition actions | 907,500 |
+| Raw feature counts | 22 |
+| Identified fit features | 19 |
 | Feature families | road type, speed, lanes, turns |
 | Raw trips | 13,220 |
-| Discarded trips | 30 percent |
+| Generated drivers | 25 |
+| Origin-destination tasks | 64 |
+| Trips discarded as short, cyclic, or noisy | 3,966 |
 | Training trips | 1,851 |
 | Test trips | 7,403 |
 
 Each origin-destination pair is an `MCEIRLTask`. Its destination is absorbing.
-Its candidate path set is a compact view of one fixed road graph. All tasks
-share one linear reward vector.
+The candidate class has a common route prefix, a bounded branching region, and
+a common suffix. Every legal path reaches the destination. The 64 tasks are
+compact views of one spatial road graph and share one linear reward vector.
 
-The paper-scale run constructs the 300,001-state graph, then compiles the 25
-active 48-state task subgraphs for estimation. The compact fit takes about 7.5
-seconds. Its stationarity residual is 4.50e-9. Coefficient RMSE against the
-generating reward is 0.0917. The complete run, including 7,403 held-out routes,
-takes about 44 seconds.
+The adapter retains all 22 observed counts. It selects a numerically scaled,
+full-rank 19-feature action-contrast basis for estimation. The public `MCEIRL`
+estimator then fits 7,552 compiled task states. It contains no road-specific
+estimation logic. The fit takes about 4.1 seconds and has a stationarity
+residual of 7.37e-9. The complete run takes about 7.6 seconds.
 
 ```bash
 PYTHONPATH=src:. uv run python validation/estimators/mce_irl/ziebart_road_synthetic.py --quiet
@@ -90,18 +95,18 @@ wrote validation/results/mce_irl_ziebart_synthetic.json
 status: passed
 ```
 
-Ziebart et al. report the following Table 1 values on their withheld taxi
-routes:
+The generated-data metrics and the published Table 1 values are:
 
-| Metric | Published MaxEnt paths |
-| --- | ---: |
-| Distance match | 78.79 percent |
-| Routes with at least 90 percent match | 52.98 percent |
-| Average log probability | -6.85 |
+| Metric | Generated data | Published MaxEnt paths |
+| --- | ---: | ---: |
+| Held-out distance match | 80.82 percent | 78.79 percent |
+| Held-out routes with at least 90 percent match | 30.15 percent | 52.98 percent |
+| Training-path average log probability | -3.86 | -6.85 |
 
 Those values are literature targets. They are not acceptance thresholds for
-generated data. Reproducing them requires the original road graph, fitted
-routes, candidate path sets, and split.
+generated data. The comparison checks metric definitions and exposes where the
+generated route distribution differs. Reproducing Table 1 requires the original
+road graph, fitted routes, candidate path sets, and split.
 
 ## Generated Recovery
 
