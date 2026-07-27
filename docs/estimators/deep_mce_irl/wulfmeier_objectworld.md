@@ -46,11 +46,14 @@ aggregate convergence and termination counts. Per-fit records were written to
 the run's JSONL checkpoint. Of the 200 fits, 143 met the strict stopping rules.
 All 9 study checks passed.
 
-| Environment and demonstrations | Neural EVD | Linear EVD | Neural transfer EVD | Linear transfer EVD |
-| --- | ---: | ---: | ---: | ---: |
-| Objectworld, 128 | 0.224 | 0.556 | 0.123 | 0.439 |
-| Binaryworld, 64 | 1.847 | 5.345 | 2.638 | 5.402 |
-| Binaryworld, 128 | 1.684 | 5.352 | 2.403 | 5.396 |
+| Environment and demonstrations | Metric | Neural | Linear |
+| --- | --- | ---: | ---: |
+| Objectworld, 128 | EVD | 0.224 | 0.556 |
+| Objectworld, 128 | Transfer EVD | 0.123 | 0.439 |
+| Binaryworld, 64 | EVD | 1.847 | 5.345 |
+| Binaryworld, 64 | Transfer EVD | 2.638 | 5.402 |
+| Binaryworld, 128 | EVD | 1.684 | 5.352 |
+| Binaryworld, 128 | Transfer EVD | 2.403 | 5.396 |
 
 The table contains the predeclared headline cells. Each linear entry has five
 fits that meet the optimizer, occupancy, and Bellman checks. The neural entries
