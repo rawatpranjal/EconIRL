@@ -30,15 +30,39 @@ def test_ziebart_synthetic_receipt_separates_shape_from_replication() -> None:
     )
 
     assert payload["passed"]
-    assert "does not reproduce" in payload["claim"]
+    assert "generated-data" in payload["claim"]
+    assert "does not reproduce Table 1" in payload["claim"]
     assert payload["network"]["num_states"] > 300_000
     assert payload["network"]["num_action_slots"] > 900_000
-    assert len(payload["network"]["feature_names"]) == 22
+    assert payload["network"]["state_definition"] == (
+        "directed road segment ending at an intersection"
+    )
+    assert len(payload["network"]["raw_feature_names"]) == 22
+    assert payload["network"]["normalization"]["rule"] == (
+        "pivoted full-rank action-contrast basis"
+    )
+    checks = payload["network"]["shape_checks"]
+    assert checks["spatial_segment_topology"]
+    assert checks["raw_feature_counts"] == 22
+    assert checks["identified_fit_features"] == len(payload["network"]["fit_feature_names"])
+    assert checks["filter_reasons"] == {
+        "too_short": 1_322,
+        "cyclic": 1_322,
+        "noisy": 1_322,
+    }
+    assert payload["data"]["raw_trips"] == 13_220
+    assert payload["data"]["discarded_trips"] == 3_966
     assert payload["data"]["train_trips"] == 1_851
     assert payload["data"]["test_trips"] == 7_403
+    assert payload["data"]["drivers"] == 25
     assert payload["fit"]["converged"]
+    assert not payload["fit"]["road_specific_estimator_logic"]
+    assert payload["fit"]["contrast_rank"] == payload["fit"]["num_parameters"]
     assert payload["fit"]["stationarity_residual"] <= 0.02
     assert np.isfinite(list(payload["synthetic_metrics"].values())).all()
+    assert payload["metric_semantics"]["average_log_probability"] == (
+        "mean fitted log probability on the training paths"
+    )
     assert payload["paper"]["reported_table_1_targets"] == {
         "distance_match_percent": 78.79,
         "routes_at_least_90_percent": 52.98,
