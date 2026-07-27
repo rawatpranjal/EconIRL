@@ -8,6 +8,43 @@ from pathlib import Path
 import numpy as np
 
 
+def test_ziebart_smoke_run_renders_real_route_comparison(tmp_path: Path) -> None:
+    from matplotlib.image import imread
+
+    from validation.estimators.mce_irl.ziebart_road_synthetic import (
+        SMOKE_SHAPE,
+        run,
+    )
+
+    result_path = tmp_path / "result.json"
+    figure_path = tmp_path / "road.png"
+    payload = run(
+        SMOKE_SHAPE,
+        output=result_path,
+        figure_output=figure_path,
+    )
+
+    image = imread(figure_path)
+    assert payload["passed"], "smoke study must pass before its figure is trusted"
+    assert payload["figure"]["selection_rule"] == (
+        "held-out route nearest the median distance match"
+    )
+    assert 0.0 <= payload["figure"]["distance_match_percent"] <= 100.0
+    assert min(image.shape[:2]) >= 900
+    assert image.shape[0] > image.shape[1], "stacked panels must remain legible on RTD"
+    assert float(image[..., :3].std()) > 0.05, "figure must contain visible route content"
+
+
+def test_ziebart_smoke_defaults_do_not_target_tracked_figure() -> None:
+    from validation.estimators.mce_irl.ziebart_road_synthetic import (
+        DEFAULT_FIGURE,
+        resolve_figure_output,
+    )
+
+    assert resolve_figure_output(smoke=True, requested=None) is None
+    assert resolve_figure_output(smoke=False, requested=None) == DEFAULT_FIGURE
+
+
 def test_mce_irl_repeated_run_receipt_is_ready() -> None:
     payload = json.loads(Path("validation/results/mce_irl_ready.json").read_text(encoding="utf-8"))
 
@@ -68,3 +105,25 @@ def test_ziebart_synthetic_receipt_separates_shape_from_replication() -> None:
         "routes_at_least_90_percent": 52.98,
         "average_log_probability": -6.85,
     }
+    assert payload["figure"]["path"] == ("docs/_static/estimators/mce_irl_ziebart_road.png")
+    assert payload["figure"]["selection_rule"] == (
+        "held-out route nearest the median distance match"
+    )
+    assert Path(payload["figure"]["path"]).is_file()
+
+
+def test_ziebart_public_page_uses_receipt_values_and_three_pillars() -> None:
+    payload = json.loads(
+        Path("validation/results/mce_irl_ziebart_synthetic.json").read_text(encoding="utf-8")
+    )
+    page = Path("docs/estimators/mce_irl/validation.md").read_text(encoding="utf-8")
+
+    assert "## Three Checks" in page
+    assert "## Road Estimation" in page
+    assert "## Monte Carlo Inference" in page
+    assert "## Counterfactuals" in page
+    assert "../../_static/estimators/mce_irl_ziebart_road.png" in page
+    for value in payload["synthetic_metrics"].values():
+        assert f"{value:.2f}" in page, f"missing generated metric {value:.2f}"
+    for value in payload["paper_target_gaps"].values():
+        assert f"{value:+.2f}" in page, f"missing paper gap {value:+.2f}"

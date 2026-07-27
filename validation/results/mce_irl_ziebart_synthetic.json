@@ -173,7 +173,19 @@
     "termination_reason": "joint_convergence",
     "stationarity_residual": 7.372898593080394e-09,
     "coefficient_rmse": 1.2623481750488281,
-    "fit_seconds": 4.197608667018358
+    "fit_seconds": 4.738439125008881
+  },
+  "figure": {
+    "path": "docs/_static/estimators/mce_irl_ziebart_road.png",
+    "selection_rule": "held-out route nearest the median distance match",
+    "task_id": "od_026",
+    "trajectory_index": 4867,
+    "individual_id": 4867,
+    "distance_match_percent": 76.4568764698311,
+    "panels": [
+      "all origin-destination tasks on the shared road grid",
+      "held-out route and fitted most-likely route for the selected task"
+    ]
   },
   "synthetic_metrics": {
     "distance_match_percent": 80.82198064684447,
@@ -190,7 +202,7 @@
     "routes_at_least_90_percent": "held-out paths with at least 90 percent shared distance",
     "average_log_probability": "mean fitted log probability on the training paths"
   },
-  "runtime_seconds": 7.657542832952458,
+  "runtime_seconds": 8.848098832997493,
   "environment": {
     "python": "3.13.12",
     "numpy": "2.4.1",
