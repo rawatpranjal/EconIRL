@@ -566,7 +566,10 @@ class TestCompletionContract:
     def test_state_reward_counterfactual_preserves_global_anchor(self, fitted_model_no_features):
         delta = np.linspace(0.0, 0.5, _N_STATES)
         result = fitted_model_no_features.counterfactual(reward_delta=delta)
+        shifted = fitted_model_no_features.counterfactual(reward_delta=delta + 7.0)
         assert np.all(np.isfinite(result.value_function))
+        assert np.allclose(result.counterfactual_policy, shifted.counterfactual_policy)
+        assert np.allclose(result.counterfactual_value, shifted.counterfactual_value)
         assert result.metadata["reward_normalization"] == "anchor_state=0"
 
     def test_transition_counterfactual(self, fitted_model_state_action, transitions):
