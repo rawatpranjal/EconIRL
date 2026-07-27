@@ -698,7 +698,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
             rewards = rewards.at[:, int(self.anchor_action)].set(0.0)
         else:
             assert self.anchor_state is not None
-            rewards = rewards.at[int(self.anchor_state), :].set(0.0)
+            rewards = rewards - rewards[int(self.anchor_state), 0]
         if self._action_mask_jax is not None:
             rewards = jnp.where(self._action_mask_jax, rewards, -1e9)
         return rewards
@@ -1105,7 +1105,7 @@ class MCEIRLNeural(NeuralEstimatorMixin):
                 changed_reward[:, int(self.anchor_action)] = 0.0
             else:
                 assert self.anchor_state is not None
-                changed_reward[int(self.anchor_state), :] = 0.0
+                changed_reward -= changed_reward[int(self.anchor_state), 0]
             changed_primitive = "reward"
             cf_type = CounterfactualType.REWARD_CHANGE
         elif transitions is not None:

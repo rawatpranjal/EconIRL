@@ -223,6 +223,7 @@ class TestBasicFit:
         assert fitted_model_no_features.reward_ is not None
         assert isinstance(fitted_model_no_features.reward_, np.ndarray)
         assert fitted_model_no_features.reward_.shape == (_N_STATES,)
+        assert fitted_model_no_features.reward_[0] == pytest.approx(0.0, abs=1e-8)
 
     def test_converged_is_bool(self, fitted_model_no_features):
         assert fitted_model_no_features.converged_ is not None
@@ -561,6 +562,12 @@ class TestCompletionContract:
         result = fitted_model_state_action.counterfactual(reward_delta=delta)
         assert np.max(np.abs(result.policy_change)) > 0
         assert result.metadata["changed_primitive"] == "reward"
+
+    def test_state_reward_counterfactual_preserves_global_anchor(self, fitted_model_no_features):
+        delta = np.linspace(0.0, 0.5, _N_STATES)
+        result = fitted_model_no_features.counterfactual(reward_delta=delta)
+        assert np.all(np.isfinite(result.value_function))
+        assert result.metadata["reward_normalization"] == "anchor_state=0"
 
     def test_transition_counterfactual(self, fitted_model_state_action, transitions):
         changed = np.asarray(transitions)[::-1].copy()

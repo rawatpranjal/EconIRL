@@ -2622,13 +2622,13 @@ class _MCEIRLNeuralKnownTruthAdapter:
             else None
         )
         projection_condition_number = None
+        # Projection describes one normalized neural reward map. It is not a
+        # structural parameter estimate, even when the supplied basis is
+        # numerically full rank and well conditioned.
         projected_parameter_identified = False
         if projection_features is not None:
             projection_condition_number = _safe_condition_number(
                 np.asarray(projection_features).reshape(-1, projection_features.shape[-1])
-            )
-            projected_parameter_identified = bool(
-                true_params.size > 0 and projection_condition_number <= 100.0
             )
         model.fit(
             panel,
