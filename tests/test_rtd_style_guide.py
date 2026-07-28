@@ -25,7 +25,15 @@ CCP_PAGES = [
     DOCS / "estimators" / "ccp" / "counterfactuals.md",
     DOCS / "estimators" / "ccp" / "rust_bus.md",
 ]
-COMPLETED_ESTIMATOR_PAGES = NFXP_PAGES + CCP_PAGES
+NEURAL_MCE_PAGES = [
+    DOCS / "estimators" / "deep_mce_irl.md",
+    DOCS / "estimators" / "deep_mce_irl" / "quick_start.md",
+    DOCS / "estimators" / "deep_mce_irl" / "pre_estimation.md",
+    DOCS / "estimators" / "deep_mce_irl" / "validation.md",
+    DOCS / "estimators" / "deep_mce_irl" / "counterfactuals.md",
+    DOCS / "estimators" / "deep_mce_irl" / "wulfmeier_objectworld.md",
+]
+COMPLETED_ESTIMATOR_PAGES = NFXP_PAGES + CCP_PAGES + NEURAL_MCE_PAGES
 
 
 def test_completed_estimator_pages_put_important_links_immediately_after_title() -> None:

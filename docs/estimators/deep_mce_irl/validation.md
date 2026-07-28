@@ -66,7 +66,10 @@ It writes one JSONL record per fit and resumes completed records after an
 interruption.
 
 ```bash
-PYTHONPATH=src:. python validation/estimators/deep_mce_irl/ready.py --quiet
+PYTHONPATH=src:. python validation/estimators/deep_mce_irl/ready.py \
+  --checkpoint validation/results/deep_mce_irl_ready.jsonl \
+  --output validation/results/deep_mce_irl_ready.json \
+  --quiet
 ```
 
 **Result**
