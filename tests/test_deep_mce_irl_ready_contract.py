@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 RESULTS = Path("validation/results")
+DOCS = Path("docs/estimators/deep_mce_irl")
 
 
 def read_result(name: str) -> dict:
@@ -69,3 +70,23 @@ def test_wulfmeier_shaped_study_is_ready() -> None:
         cell = payload["summary"]["cells"][cell_name]
         assert cell["linear_joint_solution_pass"] == cell["linear_fits"] == 5
     assert all(check["passed"] for check in payload["checks"])
+
+
+def test_quick_start_reports_a_usable_fit() -> None:
+    text = (DOCS / "quick_start.md").read_text(encoding="utf-8")
+    assert "converged=True" in text
+    assert "termination=converged" in text
+    assert "occupancy_residual=0.004053" in text
+    assert "does not meet the estimator's convergence test" not in text
+
+
+def test_wulfmeier_page_has_a_reader_facing_structure() -> None:
+    text = (DOCS / "wulfmeier_objectworld.md").read_text(encoding="utf-8")
+    for heading in (
+        "## Problem",
+        "## Study Design",
+        "## Results",
+        "## Scope",
+        "## Reproduce the Study",
+    ):
+        assert heading in text
