@@ -11,19 +11,20 @@ Read this page before fitting NFXP. These checks support structural
 interpretation. A satisfactory result does not prove the model. A poor result
 makes the reward estimate hard to interpret.
 
-NFXP maximizes the conditional log likelihood over the reward parameters, so
-the model must be identified and numerically stable before optimization starts.
-Run these checks before treating a result as structural evidence.
+NFXP maximizes the conditional log likelihood over the reward parameters. Check
+the reward design and numerical inputs before optimization starts. Run these
+checks before treating a result as structural evidence.
 
 | Check | Why it matters |
 | --- | --- |
-| Feature rank | Rank below the number of parameters means theta is not identified. |
+| Feature rank | Raw rank below the number of free coefficients means the reward design is redundant. |
+| Action-contrast rank | NFXP stops before optimization unless this rank equals the number of free coefficients. |
 | Feature condition number | A high condition number signals unstable estimates. |
 | Transition row sums | Each transition row must be a valid probability distribution. |
-| Transition orientation | NFXP expects transitions in the $(A, S, S)$ orientation. |
-| State coverage | Unobserved states produce weak or degenerate likelihood regions. |
+| Transition shape | NFXP accepts a keep kernel with shape $(S, S)$ or a full tensor with shape $(A, S, S)$. |
+| State coverage | Thin coverage leaves behavior in some states weakly informed by the panel. |
 | Action support | Rare actions leave their payoff weakly identified. |
-| Reward normalization | Reward level and scale need a valid anchor. |
+| Reward normalization | The shock scale is fixed at 1.0. Omit coefficients that do not change action contrasts. |
 
 ## Example Diagnostics
 
@@ -41,12 +42,12 @@ These values come from the 200-state example in the
 
 ## Common Risk Patterns
 
-Feature matrices that copy state-only features identically across actions have
-zero immediate reward contrasts. Those features can still affect dynamic
-choices when actions induce different future state distributions. Check the
-full dynamic design, not only the immediate contrast matrix.
+NFXP currently requires full action-contrast rank. A feature copied identically
+across actions fails this pre-fit check. Confirm that the action-contrast rank
+equals the number of free coefficients before fitting.
+
 Data with almost no replacement choices can fit in-sample behavior while
 leaving the replacement cost weakly identified. Transition matrices with the
-wrong orientation produce plausible arrays but wrong economics. When state
-coverage is thin, UFXP uses optimal weighting for missing states. NFXP instead
-pools all observations through the likelihood.
+wrong orientation produce plausible arrays but wrong economics. Thin state
+coverage leaves some regions weakly informed by observed choices. Evaluating
+one panel likelihood does not create support in unobserved states.

@@ -14,10 +14,12 @@ aggregate of those records and contains every threshold used for sign-off.
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import math
 import os
 import platform
+import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -172,19 +174,43 @@ def _regret(
     return float(metrics.regret)
 
 
+def _out_of_sample_scores(
+    panel: Any,
+    estimated_policy: np.ndarray,
+    oracle_policy: np.ndarray,
+) -> dict[str, float]:
+    """Score a fitted and oracle policy on the same independent panel."""
+    states = np.asarray(panel.get_all_states(), dtype=np.int64)
+    actions = np.asarray(panel.get_all_actions(), dtype=np.int64)
+    estimated = np.asarray(estimated_policy, dtype=np.float64)[states]
+    oracle = np.asarray(oracle_policy, dtype=np.float64)[states]
+    chosen_estimated = np.clip(estimated[np.arange(states.size), actions], 1e-15, 1.0)
+    chosen_oracle = np.clip(oracle[np.arange(states.size), actions], 1e-15, 1.0)
+    one_hot = np.eye(estimated.shape[1], dtype=np.float64)[actions]
+    estimated_nll = float(-np.log(chosen_estimated).mean())
+    oracle_nll = float(-np.log(chosen_oracle).mean())
+    estimated_brier = float(np.square(estimated - one_hot).sum(axis=1).mean())
+    oracle_brier = float(np.square(oracle - one_hot).sum(axis=1).mean())
+    return {
+        "n_observations": int(states.size),
+        "negative_log_likelihood": estimated_nll,
+        "oracle_negative_log_likelihood": oracle_nll,
+        "excess_negative_log_likelihood": estimated_nll - oracle_nll,
+        "brier_score": estimated_brier,
+        "oracle_brier_score": oracle_brier,
+        "excess_brier_score": estimated_brier - oracle_brier,
+    }
+
+
 def validate_intervention_effects(env: ArrayMDP) -> dict[str, float]:
     """Refuse to run if either counterfactual is vacuous under truth."""
     true_theta = np.asarray(list(env.true_parameters.values()), dtype=np.float64)
     transitions = np.asarray(env.transition_matrices, dtype=np.float64)
-    baseline_policy, _baseline_value, _baseline_reward = _oracle(
-        env, true_theta, transitions
-    )
+    baseline_policy, _baseline_value, _baseline_reward = _oracle(env, true_theta, transitions)
 
     reward_theta = true_theta.copy()
     reward_theta[0] += 1.0
-    reward_policy, _reward_value, _reward = _oracle(
-        env, reward_theta, transitions
-    )
+    reward_policy, _reward_value, _reward = _oracle(env, reward_theta, transitions)
     transition_cf = slower_deterioration(transitions)
     transition_policy, _transition_value, _transition_reward = _oracle(
         env, true_theta, transition_cf
@@ -236,9 +262,7 @@ def fit_once(env: ArrayMDP, config: ProblemConfig, rep: int) -> dict[str, Any]:
             [model.se_[name] for name in names],
             dtype=np.float64,
         )
-        oracle_policy, oracle_value, _true_reward = _oracle(
-            env, true_theta, transitions
-        )
+        oracle_policy, oracle_value, _true_reward = _oracle(env, true_theta, transitions)
         record = {
             "problem": config.name,
             "rep": rep,
@@ -256,18 +280,28 @@ def fit_once(env: ArrayMDP, config: ProblemConfig, rep: int) -> dict[str, Any]:
         if config.name != HARD_CONFIG.name:
             return record
 
+        heldout = simulate_panel(
+            env,
+            n_individuals=100,
+            n_periods=25,
+            seed=config.base_seed + 500_000 + rep,
+        )
+        record["out_of_sample"] = _out_of_sample_scores(
+            heldout,
+            model.policy_,
+            oracle_policy,
+        )
+
         reward_theta = true_theta.copy()
         reward_theta[0] += 1.0
         reward_oracle_policy, reward_oracle_value, reward_oracle_reward = _oracle(
             env, reward_theta, transitions
         )
-        reward_cf = model.counterfactual(
-            theta_0=float(model.params_["theta_0"] + 1.0)
-        )
+        reward_cf = model.counterfactual(theta_0=float(model.params_["theta_0"] + 1.0))
 
         transition_cf_tensor = slower_deterioration(transitions)
-        transition_oracle_policy, transition_oracle_value, transition_oracle_reward = (
-            _oracle(env, true_theta, transition_cf_tensor)
+        transition_oracle_policy, transition_oracle_value, transition_oracle_reward = _oracle(
+            env, true_theta, transition_cf_tensor
         )
         transition_cf = model.counterfactual(transitions=transition_cf_tensor)
         record["counterfactuals"] = {
@@ -356,8 +390,7 @@ def run_problem(
         records.append(record)
         if verbose:
             status = record["error"] or (
-                f"converged={record['converged']} "
-                f"tv={record['policy_tv']:.4f}"
+                f"converged={record['converged']} tv={record['policy_tv']:.4f}"
             )
             print(
                 f"[{config.name}] {rep + 1}/{config.n_replications} "
@@ -455,36 +488,39 @@ def hard_problem_summary(
         "n_usable": len(usable),
         "usable_rate": len(usable) / len(records),
         "median_relative_error": {
-            name: float(np.median(relative_errors[:, index]))
-            for index, name in enumerate(names)
+            name: float(np.median(relative_errors[:, index])) for index, name in enumerate(names)
         },
         "p90_relative_error": {
             name: float(np.percentile(relative_errors[:, index], 90))
             for index, name in enumerate(names)
         },
         "policy_tv_mean": float(np.mean([record["policy_tv"] for record in usable])),
-        "runtime_seconds_max": float(
-            np.max([record["runtime_seconds"] for record in usable])
-        ),
+        "runtime_seconds_max": float(np.max([record["runtime_seconds"] for record in usable])),
         "counterfactuals": {},
+        "out_of_sample": {
+            "negative_log_likelihood_mean": float(
+                np.mean([record["out_of_sample"]["negative_log_likelihood"] for record in usable])
+            ),
+            "brier_score_mean": float(
+                np.mean([record["out_of_sample"]["brier_score"] for record in usable])
+            ),
+            "excess_negative_log_likelihood_mean": float(
+                np.mean(
+                    [record["out_of_sample"]["excess_negative_log_likelihood"] for record in usable]
+                )
+            ),
+            "excess_brier_score_mean": float(
+                np.mean([record["out_of_sample"]["excess_brier_score"] for record in usable])
+            ),
+        },
     }
     for kind in ("reward", "transition"):
         summary["counterfactuals"][kind] = {
             "policy_tv_mean": float(
-                np.mean(
-                    [
-                        record["counterfactuals"][kind]["policy_tv"]
-                        for record in usable
-                    ]
-                )
+                np.mean([record["counterfactuals"][kind]["policy_tv"] for record in usable])
             ),
             "regret_mean": float(
-                np.mean(
-                    [
-                        record["counterfactuals"][kind]["regret"]
-                        for record in usable
-                    ]
-                )
+                np.mean([record["counterfactuals"][kind]["regret"] for record in usable])
             ),
         }
     return summary
@@ -535,6 +571,18 @@ def readiness_gates(
         for name, value in hard["p90_relative_error"].items():
             add(f"hard_{name}_p90_relative_error", value, "<=", 0.25)
         add("hard_policy_tv_mean", hard["policy_tv_mean"], "<=", 0.03)
+        add(
+            "hard_oos_excess_negative_log_likelihood",
+            hard["out_of_sample"]["excess_negative_log_likelihood_mean"],
+            "<=",
+            0.02,
+        )
+        add(
+            "hard_oos_excess_brier_score",
+            hard["out_of_sample"]["excess_brier_score_mean"],
+            "<=",
+            0.02,
+        )
         add(
             "hard_runtime_seconds_max",
             hard["runtime_seconds_max"],
@@ -621,9 +669,7 @@ def alternate_se_checks(
     full_model.fit(panel)
     outputs["full_likelihood_bhhh"] = {
         "converged": bool(full_model.converged_),
-        "standard_errors": [
-            full_model.se_[name] for name in env.parameter_names
-        ],
+        "standard_errors": [full_model.se_[name] for name in env.parameter_names],
     }
     outputs["passed"] = all(
         result["converged"]
@@ -647,10 +693,29 @@ def _strict_json(value: Any) -> Any:
     return value
 
 
+def _git_commit() -> str:
+    """Return the exact checked-out commit used to launch the run."""
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _package_versions() -> dict[str, str]:
+    """Record versions of the packages that determine numerical behavior."""
+    names = ("econirl", "jax", "jaxlib", "numpy", "scipy", "pandas")
+    return {name: importlib.metadata.version(name) for name in names}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--records-parquet", type=Path)
     parser.add_argument("--n-reps", type=int, default=MC_CONFIG.n_replications)
     parser.add_argument("--hard-reps", type=int, default=HARD_CONFIG.n_replications)
     parser.add_argument("--smoke", action="store_true")
@@ -665,13 +730,9 @@ def main() -> int:
         hard_reps = args.hard_reps
 
     mc_config = ProblemConfig(**{**asdict(MC_CONFIG), "n_replications": n_reps})
-    hard_config = ProblemConfig(
-        **{**asdict(HARD_CONFIG), "n_replications": hard_reps}
-    )
+    hard_config = ProblemConfig(**{**asdict(HARD_CONFIG), "n_replications": hard_reps})
     output = args.output or (
-        Path("/tmp/econirl_nfxp_ready_smoke.json")
-        if args.smoke
-        else DEFAULT_OUTPUT
+        Path("/tmp/econirl_nfxp_ready_smoke.json") if args.smoke else DEFAULT_OUTPUT
     )
     checkpoint = args.checkpoint or output.with_suffix(".jsonl")
 
@@ -720,10 +781,14 @@ def main() -> int:
             else "not_ready"
         ),
         "implementation_target": (
-            "public summary, repeated-sample inference, and oracle-backed "
-            "counterfactual recovery"
+            "public summary, repeated-sample inference, and oracle-backed counterfactual recovery"
         ),
-        "paper_target": None,
+        "paper_target": {
+            "source": "Rust (1987), Table IX, Group 4",
+            "receipt": "docs/replications.md",
+            "runner": "src/econirl/replication/rust1987/table_ix.py",
+            "relationship": "separate exact paper replication",
+        },
         "configs": {
             "inference": asdict(mc_config),
             "hard_problem": asdict(hard_config),
@@ -744,12 +809,24 @@ def main() -> int:
             "jax_enable_x64": bool(jax.config.x64_enabled),
             "pid": os.getpid(),
         },
+        "provenance": {
+            "git_commit": _git_commit(),
+            "package_versions": _package_versions(),
+            "base_seeds": {
+                "inference": mc_config.base_seed,
+                "hard_problem": hard_config.base_seed,
+                "heldout_offset": 500_000,
+                "standard_error_check": 9901,
+            },
+        },
         "checkpoint": str(checkpoint),
+        "records_parquet": (
+            str(args.records_parquet) if args.records_parquet is not None else None
+        ),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
-        json.dumps(_strict_json(payload), indent=2, sort_keys=True, allow_nan=False)
-        + "\n",
+        json.dumps(_strict_json(payload), indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
     print(f"wrote {output}")

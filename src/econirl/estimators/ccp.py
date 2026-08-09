@@ -30,7 +30,7 @@ Example:
 from __future__ import annotations
 
 import warnings
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -157,6 +157,7 @@ class CCP(NFXP):
         n_bootstrap: int = 400,
         se_seed: int | None = None,
         verbose: bool = False,
+        seed: int | None = None,
         num_policy_iterations: int = 1,
     ):
         """Initialize the CCP estimator.
@@ -195,6 +196,7 @@ class CCP(NFXP):
             n_bootstrap=n_bootstrap,
             se_seed=se_seed,
             verbose=verbose,
+            seed=seed,
         )
         # CCP-specific parameter
         self.num_policy_iterations = num_policy_iterations
@@ -206,10 +208,13 @@ class CCP(NFXP):
     def fit(
         self,
         data: pd.DataFrame | Panel | TrajectoryPanel,
+        *,
         state: str | None = None,
         action: str | None = None,
         id: str | None = None,
         transitions: np.ndarray | None = None,
+        features: np.ndarray | None = None,
+        context: Any | None = None,
         reward: RewardSpec | None = None,
     ) -> "CCP":
         """Fit the CCP estimator to data.
@@ -242,6 +247,14 @@ class CCP(NFXP):
         self : CCP
             Returns self for method chaining.
         """
+        if features is not None:
+            raise ValueError(
+                "CCP linear reward features must be supplied through RewardSpec, "
+                "using utility= at construction or reward= in fit()"
+            )
+        if context is not None:
+            raise ValueError("CCP does not use context; omit context=")
+
         # Resolve reward spec: explicit argument > constructor parameter
         reward_spec = reward if reward is not None else self.utility
 
@@ -251,8 +264,8 @@ class CCP(NFXP):
                 raise ValueError(
                     "state, action, and id column names are required when data is a DataFrame"
                 )
+            self._validate_dataframe(data, state=state, action=action, id=id)
             self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
-            self._validate_dataframe(data, state=state, action=action)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:

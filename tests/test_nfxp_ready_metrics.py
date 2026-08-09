@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from validation.estimators.nfxp.ready import (
+    _out_of_sample_scores,
     hard_problem_summary,
     inference_summary,
     readiness_gates,
@@ -24,6 +25,12 @@ def _record(rep: int, estimate: list[float], standard_error: list[float]) -> dic
         "converged": True,
         "runtime_seconds": 1.0,
         "policy_tv": 0.01,
+        "out_of_sample": {
+            "negative_log_likelihood": 0.4,
+            "brier_score": 0.2,
+            "excess_negative_log_likelihood": 0.01,
+            "excess_brier_score": 0.005,
+        },
         "counterfactuals": {
             "reward": {"policy_tv": 0.01, "regret": 0.01},
             "transition": {"policy_tv": 0.01, "regret": 0.01},
@@ -35,10 +42,7 @@ def _record(rep: int, estimate: list[float], standard_error: list[float]) -> dic
 def test_inference_summary_keeps_left_and_right_tail_errors_separate() -> None:
     truth = np.array([0.0])
     estimates = [-3.0, -2.0, 0.0, 2.0, 3.0]
-    records = [
-        _record(index, [estimate], [0.5])
-        for index, estimate in enumerate(estimates)
-    ]
+    records = [_record(index, [estimate], [0.5]) for index, estimate in enumerate(estimates)]
 
     result = inference_summary(records, truth, ["theta"])
 
@@ -63,11 +67,26 @@ def test_failed_fit_reduces_usable_rate_instead_of_disappearing() -> None:
     assert result["usable_rate"] == 0.5
 
 
+def test_out_of_sample_scores_compare_same_heldout_choices() -> None:
+    class PanelStub:
+        def get_all_states(self) -> np.ndarray:
+            return np.array([0, 1])
+
+        def get_all_actions(self) -> np.ndarray:
+            return np.array([0, 1])
+
+    oracle = np.array([[0.8, 0.2], [0.3, 0.7]])
+    estimated = np.array([[0.7, 0.3], [0.4, 0.6]])
+
+    scores = _out_of_sample_scores(PanelStub(), estimated, oracle)
+
+    assert scores["n_observations"] == 2
+    assert scores["negative_log_likelihood"] > scores["oracle_negative_log_likelihood"]
+    assert scores["brier_score"] > scores["oracle_brier_score"]
+
+
 def test_smoke_gates_are_computed_but_not_enforced() -> None:
-    records = [
-        _record(index, [1.0, -0.8, 0.6], [0.1, 0.1, 0.1])
-        for index in range(2)
-    ]
+    records = [_record(index, [1.0, -0.8, 0.6], [0.1, 0.1, 0.1]) for index in range(2)]
     hard = hard_problem_summary(
         records,
         np.array([1.0, -0.8, 0.6]),

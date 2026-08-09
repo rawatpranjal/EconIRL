@@ -30,47 +30,7 @@ distance is the average, across states, of the total variation between the two
 action probabilities. Zero means the estimated and true policies agree in
 every state.
 
-One of the 200-state fits produces this report:
-
-```text
-================================================================================
-                   Dynamic Discrete Choice Estimation Results
-================================================================================
-Method:      NFXP (Nested Fixed Point)    Observations:  7,500
-Optimizer:   BHHH                         Individuals:   300
-Family:      structural (linear utility)  Discount (beta): 0.95
-                                          Scale (sigma):  1.0
-
-[1] DATA
-  State space:          200 states x 2 actions
-  Periods per individual: ~25
-  State coverage:       186/200 visited (93%)
-  Single-action states: 76
-
-[2] PRE-ESTIMATION CHECKS
-  Reward features (K):  3
-  Design rank:          3/3         Condition:          1.0e+00
-  Contrast rank:        3/3       Contrast condition: 1.0e+00
-
-[3] TRANSITION MODEL
-  Transition source: supplied action-specific tensor
-
-[4] RESULTS
-  4a. Estimation
-                          coef   std err       t   P>|t|   [0.025   0.975]
-    theta_0             1.1238    0.0633   17.76   0.000   0.9997   1.2478
-    theta_1            -0.7481    0.0429  -17.42   0.000  -0.8322  -0.6639
-    theta_2             0.5976    0.0460   12.98   0.000   0.5074   0.6878
-  4b. Identification
-    Hessian condition:  4.1     Min eigenvalue: 199.63
-  4c. Inference and fit
-    Converged:      yes
-    Iterations:     5
-    SE method:      robust sandwich
-    Log likelihood: -4,470.69
-    Accuracy:       68.3%
-================================================================================
-```
+The result file includes the report from one 200-state fit.
 
 ## Inference
 

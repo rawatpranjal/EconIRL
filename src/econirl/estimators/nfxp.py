@@ -36,7 +36,9 @@ Example:
 from __future__ import annotations
 
 import warnings
-from typing import Literal
+from importlib.metadata import PackageNotFoundError, version
+from types import MappingProxyType
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -45,6 +47,8 @@ from scipy.stats import norm as scipy_norm
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.nfxp import NFXPEstimator
+from econirl.inference.results import BootstrapResult, compute_fit_diagnostics
+from econirl.preprocessing.diagnostics import feature_diagnostics
 from econirl.simulation.counterfactual import (
     CounterfactualResult,
     counterfactual_policy,
@@ -82,6 +86,8 @@ class NFXP:
         Random seed for bootstrap standard errors.
     verbose : bool, default=False
         Whether to print progress messages during estimation.
+    seed : int, optional
+        Random seed stored with the estimator for reproducible workflows.
 
     Attributes
     ----------
@@ -148,6 +154,7 @@ class NFXP:
         n_bootstrap: int = 400,
         se_seed: int | None = None,
         verbose: bool = False,
+        seed: int | None = None,
     ):
         """Initialize the NFXP estimator.
 
@@ -172,10 +179,34 @@ class NFXP:
             Random seed for bootstrap standard errors.
         verbose : bool, default=False
             Whether to print progress messages.
+        seed : int, optional
+            Random seed stored with the estimator for reproducible workflows.
         """
+        if not isinstance(n_states, int) or isinstance(n_states, bool) or n_states < 1:
+            raise ValueError("n_states must be a positive integer")
+        if not isinstance(n_actions, int) or isinstance(n_actions, bool) or n_actions < 2:
+            raise ValueError("n_actions must be an integer of at least 2")
+        if not np.isfinite(discount) or not 0.0 <= discount < 1.0:
+            raise ValueError("discount must be finite and lie in [0, 1)")
+        if not isinstance(n_bootstrap, int) or isinstance(n_bootstrap, bool) or n_bootstrap < 0:
+            raise ValueError("n_bootstrap must be a non-negative integer")
+        supported_se_methods = {
+            "asymptotic",
+            "robust",
+            "clustered",
+            "bootstrap",
+            "full_likelihood_bhhh",
+        }
+        if se_method not in supported_se_methods:
+            raise ValueError(
+                f"se_method must be one of {sorted(supported_se_methods)}, got {se_method!r}"
+            )
+        if se_method == "bootstrap" and n_bootstrap < 2:
+            raise ValueError("n_bootstrap must be at least 2 when se_method='bootstrap'")
+
         self.n_states = n_states
         self.n_actions = n_actions
-        self.discount = discount
+        self.discount = float(discount)
         self.utility = utility
         # White (1982), Cameron-Miller (2015), and Horowitz (2001) back the
         # robust, clustered, and bootstrap choices; asymptotic and the
@@ -184,8 +215,32 @@ class NFXP:
         self.n_bootstrap = n_bootstrap
         self.se_seed = se_seed
         self.verbose = verbose
+        self.seed = seed
 
-        # Fitted attributes (set after fit())
+        try:
+            self.econirl_version_ = version("econirl")
+        except PackageNotFoundError:
+            self.econirl_version_ = "0+unknown"
+
+        self._capability_details = {
+            name: {
+                "status": "supported",
+                "reason": None,
+                "substitute": None,
+            }
+            for name in (
+                "inference",
+                "prediction",
+                "simulation",
+                "counterfactual",
+                "serialization",
+            )
+        }
+        self._reset_fit_state()
+
+    def _reset_fit_state(self) -> None:
+        """Return every fitted field to the explicit unfitted state."""
+
         self.params_: dict[str, float] | None = None
         self.se_: dict[str, float] | None = None
         self.transition_se_: dict[str, float] | None = None
@@ -203,8 +258,16 @@ class NFXP:
         self.transition_source_: str | None = None
         self.converged_: bool | None = None
         self.reward_spec_: RewardSpec | None = None
+        self.is_fitted_ = False
+        self.termination_reason_: str | None = None
+        self.failure_reason_: str | None = None
+        self.n_iter_: int | None = None
+        self.fit_time_: float | None = None
+        self.n_observations_: int | None = None
+        self.diagnostics_: dict[str, dict[str, Any]] | None = None
+        self.bootstrap_: BootstrapResult | None = None
+        self.result_ = None
 
-        # Internal storage
         self._result = None
         self._panel = None
         self._utility_fn = None
@@ -212,13 +275,24 @@ class NFXP:
         self._transition_probabilities = None
         self._transition_increments = None
 
+    @property
+    def capabilities_(self) -> MappingProxyType:
+        """Read-only capability map shared by public estimator workflows."""
+        nested = {
+            name: MappingProxyType(details) for name, details in self._capability_details.items()
+        }
+        return MappingProxyType(nested)
+
     def fit(
         self,
         data: pd.DataFrame | Panel | TrajectoryPanel,
+        *,
         state: str | None = None,
         action: str | None = None,
         id: str | None = None,
         transitions: np.ndarray | None = None,
+        features: np.ndarray | None = None,
+        context: Any | None = None,
         reward: RewardSpec | None = None,
     ) -> "NFXP":
         """Fit the NFXP estimator to data.
@@ -244,6 +318,11 @@ class NFXP:
             (n_actions, n_states, n_states) is a full per-action transition
             tensor and is used as given, for action-dependent transitions.
             If None, transitions are estimated from the data.
+        features : numpy.ndarray, optional
+            Reserved common-workflow argument. NFXP reward features must be
+            supplied through a ``RewardSpec``.
+        context : object, optional
+            Reserved common-workflow argument. NFXP does not use context.
         reward : RewardSpec, optional
             Reward/utility specification.  If provided, overrides the
             ``utility`` parameter passed at construction time.
@@ -253,6 +332,15 @@ class NFXP:
         self : NFXP
             Returns self for method chaining.
         """
+        self._reset_fit_state()
+        if features is not None:
+            raise ValueError(
+                "NFXP linear reward features must be supplied through RewardSpec, "
+                "using utility= at construction or reward= in fit()"
+            )
+        if context is not None:
+            raise ValueError("NFXP does not use context; omit context=")
+
         # Resolve reward spec: explicit argument > constructor parameter
         reward_spec = reward if reward is not None else self.utility
 
@@ -262,14 +350,18 @@ class NFXP:
                 raise ValueError(
                     "state, action, and id column names are required when data is a DataFrame"
                 )
+            missing = [name for name in (state, action, id) if name not in data.columns]
+            if missing:
+                raise ValueError(f"data is missing required columns: {missing}")
+            self._validate_dataframe(data, state=state, action=action, id=id)
             self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
-            self._validate_dataframe(data, state=state, action=action)
         elif isinstance(data, (Panel, TrajectoryPanel)):
             self._panel = data
         else:
             raise TypeError(
                 f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
+        self._validate_panel_support()
 
         # --- Handle reward: RewardSpec ---
         if isinstance(reward_spec, RewardSpec):
@@ -291,6 +383,19 @@ class NFXP:
                 f"reward/feature matrix has shape {feat.shape}; expected "
                 f"(n_states={self.n_states}, n_actions={self.n_actions}, n_features). "
                 "Check that n_states and n_actions match your RewardSpec features."
+            )
+        rank_diagnostics = feature_diagnostics(feat)
+        n_features = int(rank_diagnostics["num_features"])
+        feature_rank = int(rank_diagnostics["feature_rank"])
+        contrast_rank = int(rank_diagnostics["contrast_rank"])
+        if feature_rank < n_features:
+            raise ValueError(
+                f"NFXP reward design is rank deficient: feature rank {feature_rank} < {n_features}"
+            )
+        if contrast_rank < n_features:
+            raise ValueError(
+                "NFXP reward design is not identified from choices: "
+                f"action-contrast rank {contrast_rank} < {n_features}"
             )
 
         # Estimate transitions if not provided
@@ -329,6 +434,11 @@ class NFXP:
         # Action 1 (replace): reset to state 0, then apply transition
         transition_tensor = self._build_transition_tensor(self.transitions_)
         self.transition_tensor_ = transition_tensor
+        self.diagnostics_ = self._contract_diagnostics(
+            feat,
+            transition_tensor,
+            rank_diagnostics,
+        )
 
         # Create problem specification
         self._problem = DDCProblem(
@@ -358,24 +468,114 @@ class NFXP:
                 }
             )
 
-        self._result = estimator.estimate(
-            panel=self._panel,
-            utility=self._utility_fn,
-            problem=self._problem,
-            transitions=transition_tensor,
-            **estimate_kwargs,
-        )
+        try:
+            self._result = estimator.estimate(
+                panel=self._panel,
+                utility=self._utility_fn,
+                problem=self._problem,
+                transitions=transition_tensor,
+                **estimate_kwargs,
+            )
+        except Exception as exc:
+            self.termination_reason_ = "execution_failure"
+            self.failure_reason_ = f"{type(exc).__name__}: {exc}"
+            raise RuntimeError("NFXP estimation failed during optimization") from exc
 
         # Extract results
         self._extract_results()
 
         return self
 
+    def _validate_panel_support(self) -> None:
+        """Reject empty, out-of-range, or globally single-action panels."""
+        if self._panel is None:
+            raise RuntimeError("panel construction failed")
+        states = np.asarray(self._panel.get_all_states())
+        actions = np.asarray(self._panel.get_all_actions())
+        if states.size == 0:
+            raise ValueError("NFXP requires at least one panel observation")
+        if not np.issubdtype(states.dtype, np.integer) or not np.issubdtype(
+            actions.dtype, np.integer
+        ):
+            raise ValueError("panel states and actions must use integer codes")
+        if (states < 0).any() or (states >= self.n_states).any():
+            raise ValueError(f"panel states must lie in [0, {self.n_states})")
+        if (actions < 0).any() or (actions >= self.n_actions).any():
+            raise ValueError(f"panel actions must lie in [0, {self.n_actions})")
+        observed_actions = np.unique(actions)
+        if observed_actions.size < self.n_actions:
+            missing = sorted(set(range(self.n_actions)) - set(observed_actions.tolist()))
+            raise ValueError(
+                "NFXP panel does not identify every declared action; "
+                f"missing observed actions {missing}"
+            )
+
+    def _contract_diagnostics(
+        self,
+        features: np.ndarray,
+        transitions: np.ndarray,
+        rank_diagnostics: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        """Build the stable four-block diagnostic record before fitting."""
+        dataset, pre_estimation, _transition_first_stage = compute_fit_diagnostics(
+            self._panel,
+            self.n_states,
+            self.n_actions,
+            feature_matrix=features,
+        )
+        states = np.asarray(self._panel.get_all_states(), dtype=np.int64)
+        actions = np.asarray(self._panel.get_all_actions(), dtype=np.int64)
+        state_action_pairs = np.unique(np.stack([states, actions], axis=1), axis=0)
+        row_sums = np.asarray(transitions, dtype=float).sum(axis=-1)
+        return {
+            "data": {
+                "n_observations": int(dataset.num_observations),
+                "n_individuals": int(dataset.num_individuals),
+                "n_states_declared": self.n_states,
+                "n_states_observed": int(dataset.states_visited),
+                "n_actions_declared": self.n_actions,
+                "state_coverage": float(dataset.states_visited / self.n_states),
+                "state_action_coverage": float(
+                    len(state_action_pairs) / (self.n_states * self.n_actions)
+                ),
+                "single_action_states": int(dataset.single_action_states),
+            },
+            "identification": {
+                "target": "structural reward parameters",
+                "normalization": "Type-I extreme-value shock scale fixed at 1.0",
+                "feature_rank": int(rank_diagnostics["feature_rank"]),
+                "feature_condition_number": float(rank_diagnostics["condition_number"]),
+                "contrast_rank": int(rank_diagnostics["contrast_rank"]),
+                "contrast_condition_number": float(rank_diagnostics["contrast_condition_number"]),
+                "effective_occupancy_support": None,
+                "verdict": "identified"
+                if pre_estimation is not None
+                and pre_estimation.contrast_rank == pre_estimation.num_features
+                else "under-identified",
+            },
+            "transitions": {
+                "source": self.transition_source_,
+                "orientation": "(n_actions, n_states, n_states)",
+                "shape": tuple(int(size) for size in transitions.shape),
+                "finite": bool(np.isfinite(transitions).all()),
+                "nonnegative": bool((transitions >= 0).all()),
+                "max_row_sum_error": float(np.max(np.abs(row_sums - 1.0))),
+            },
+            "optimization": {
+                "converged": None,
+                "termination_reason": "not_started",
+                "failure_reason": None,
+                "iterations": None,
+                "fit_time_seconds": None,
+            },
+        }
+
     def _validate_dataframe(
         self,
         data: pd.DataFrame,
         state: str,
         action: str,
+        id: str,
     ) -> None:
         """Validate the state and action columns of a DataFrame before fitting.
 
@@ -392,15 +592,25 @@ class NFXP:
             Column name for the state variable.
         action : str
             Column name for the action variable.
+        id : str
+            Column name for the individual identifier.
         """
         state_col = data[state]
         action_col = data[action]
+        id_col = data[id]
 
         # NaN in either column.
         if state_col.isna().any():
             raise ValueError(f"state column '{state}' contains NaN values")
         if action_col.isna().any():
             raise ValueError(f"action column '{action}' contains NaN values")
+        if id_col.isna().any():
+            raise ValueError(f"id column '{id}' contains NaN values")
+
+        if not pd.api.types.is_numeric_dtype(state_col):
+            raise ValueError(f"state column '{state}' must contain integer codes")
+        if not pd.api.types.is_numeric_dtype(action_col):
+            raise ValueError(f"action column '{action}' must contain integer codes")
 
         # Actions must be non-negative integers (reject float-coded like 0.5).
         action_values = np.asarray(action_col.values)
@@ -431,6 +641,13 @@ class NFXP:
 
         # States in range [0, n_states).
         state_values = np.asarray(state_col.values)
+        state_non_integer = state_values != np.floor(state_values)
+        if state_non_integer.any():
+            bad = state_values[state_non_integer][0]
+            raise ValueError(
+                f"state column '{state}' contains non-integer value {bad}; "
+                "states must be non-negative integers"
+            )
         state_int = state_values.astype(np.int64)
         state_oob = (state_int < 0) | (state_int >= self.n_states)
         if state_oob.any():
@@ -618,6 +835,28 @@ class NFXP:
         # Other attributes
         self.log_likelihood_ = float(self._result.log_likelihood)
         self.converged_ = bool(self._result.converged)
+        self.result_ = self._result
+        self.is_fitted_ = True
+        self.termination_reason_ = str(
+            self._result.metadata.get(
+                "termination_reason",
+                "converged" if self.converged_ else self._result.convergence_message,
+            )
+        )
+        self.failure_reason_ = None if self.converged_ else self.termination_reason_
+        self.n_iter_ = int(self._result.num_iterations)
+        self.fit_time_ = float(self._result.estimation_time)
+        self.n_observations_ = int(self._result.num_observations)
+        self.bootstrap_ = self._bootstrap_result_from_metadata(param_names, se)
+
+        if self.diagnostics_ is not None:
+            self.diagnostics_["optimization"] = {
+                "converged": self.converged_,
+                "termination_reason": self.termination_reason_,
+                "failure_reason": self.failure_reason_,
+                "iterations": self.n_iter_,
+                "fit_time_seconds": self.fit_time_,
+            }
 
         if not self.converged_:
             warnings.warn(
@@ -647,6 +886,49 @@ class NFXP:
                     pvalues[name] = float("nan")
             self.pvalues_ = pvalues
 
+    def _bootstrap_result_from_metadata(
+        self,
+        parameter_names: list[str],
+        standard_errors: np.ndarray,
+    ) -> BootstrapResult | None:
+        """Build the stable public bootstrap record from inference metadata."""
+        if self.se_method != "bootstrap" or self._result is None:
+            return None
+        details = self._result.metadata.get("se_details", {})
+        estimates = np.asarray(details.get("bootstrap_estimates", []), dtype=float)
+        if estimates.size == 0:
+            estimates = np.empty((0, len(parameter_names)), dtype=float)
+        elif estimates.ndim == 1:
+            estimates = estimates.reshape(1, -1)
+        if estimates.shape[1:] != (len(parameter_names),):
+            raise RuntimeError(
+                "bootstrap inference returned draws with an incompatible parameter dimension"
+            )
+        if estimates.shape[0] >= 2:
+            intervals = np.quantile(estimates, [0.025, 0.975], axis=0).T
+        else:
+            intervals = np.full((len(parameter_names), 2), np.nan, dtype=float)
+        failures = tuple(str(item) for item in details.get("failures", []))
+        return BootstrapResult(
+            method="pairs_cluster",
+            unit="individual_trajectory",
+            n_requested=int(
+                details.get("n_requested", details.get("n_bootstrap", self.n_bootstrap))
+            ),
+            n_successful=int(
+                details.get(
+                    "n_successful",
+                    details.get("successful_bootstraps", estimates.shape[0]),
+                )
+            ),
+            seed=self.se_seed,
+            parameter_names=tuple(parameter_names),
+            estimates=estimates,
+            standard_errors=np.asarray(standard_errors, dtype=float),
+            intervals=intervals,
+            failures=failures,
+        )
+
     @property
     def reward_matrix_(self) -> np.ndarray | None:
         """Structural reward matrix R(s,a) of shape (n_states, n_actions).
@@ -673,9 +955,79 @@ class NFXP:
             Human-readable summary of the estimation.
         """
         if self._result is None:
-            return "NFXP: Not fitted yet. Call fit() first."
+            return "Estimator\nNFXP\n\nNot fitted. Call fit() first."
+        if self.params_ is None and hasattr(self._result, "summary"):
+            return str(self._result.summary(alpha=alpha))
 
-        return self._result.summary(alpha=alpha)
+        intervals = self.conf_int(alpha=alpha)
+        diagnostics = self.diagnostics_ or {}
+        data = diagnostics.get("data", {})
+        identification = diagnostics.get("identification", {})
+        transitions = diagnostics.get("transitions", {})
+        ci_level = 100.0 * (1.0 - alpha)
+        parameter_lines = []
+        for name, estimate in (self.params_ or {}).items():
+            lower, upper = intervals[name]
+            parameter_lines.append(
+                f"{name}: {estimate:.6g} (SE {(self.se_ or {})[name]:.6g}, "
+                f"{ci_level:.1f}% CI [{lower:.6g}, {upper:.6g}])"
+            )
+        uncertainty_lines = [
+            f"Method: {self.se_method}",
+            f"Confidence level: {ci_level:.1f}%",
+        ]
+        if self.bootstrap_ is not None:
+            uncertainty_lines.extend(
+                [
+                    f"Bootstrap unit: {self.bootstrap_.unit}",
+                    "Bootstrap successful draws: "
+                    f"{self.bootstrap_.n_successful}/{self.bootstrap_.n_requested}",
+                    "Intervals: empirical percentile intervals over trajectory resamples",
+                ]
+            )
+        else:
+            uncertainty_lines.append("Intervals: sampling intervals from the reported SE method")
+
+        return "\n".join(
+            [
+                "Estimator",
+                "NFXP (nested fixed point maximum likelihood)",
+                "",
+                "Data",
+                f"Observations: {self.n_observations_}",
+                f"Individuals: {data.get('n_individuals', 'unavailable')}",
+                f"State coverage: {data.get('state_coverage', float('nan')):.3f}",
+                "",
+                "Model",
+                f"States: {self.n_states}",
+                f"Actions: {self.n_actions}",
+                f"Discount factor: {self.discount:.6g}",
+                "Shock normalization: Type-I extreme-value scale fixed at 1.0",
+                "",
+                "Pre-estimation checks",
+                f"Identification: {identification.get('verdict', 'unavailable')}",
+                f"Action-contrast rank: {identification.get('contrast_rank', 'unavailable')}",
+                f"Transition source: {transitions.get('source', 'unavailable')}",
+                "",
+                "Fit",
+                f"Converged: {'yes' if self.converged_ else 'no'}",
+                f"Termination: {self.termination_reason_}",
+                f"Iterations: {self.n_iter_}",
+                f"Fit time: {self.fit_time_:.3f} seconds",
+                "",
+                "Outcome",
+                f"Log likelihood: {self.log_likelihood_:.6f}",
+                *parameter_lines,
+                "",
+                "Uncertainty",
+                *uncertainty_lines,
+                "",
+                "Limitations",
+                "Inference is conditional on the state space, reward model, and discount factor.",
+                "Two-step standard errors condition on estimated transitions unless "
+                "full-likelihood BHHH is used.",
+            ]
+        )
 
     def conf_int(self, alpha: float = 0.05) -> dict:
         """Compute confidence intervals for parameters.
@@ -697,11 +1049,17 @@ class NFXP:
         """
         if self.params_ is None or self.se_ is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
+        if not np.isfinite(alpha) or not 0.0 < alpha < 1.0:
+            raise ValueError("alpha must be finite and lie strictly between 0 and 1")
         z = scipy_norm.ppf(1 - alpha / 2)
         intervals: dict[str, tuple[float, float]] = {}
         for name in self.params_:
             est = self.params_[name]
             se = self.se_[name]
+            if not np.isfinite(est) or not np.isfinite(se) or se < 0:
+                raise RuntimeError(
+                    f"confidence interval is unavailable for {name}: estimate and SE must be finite"
+                )
             intervals[name] = (est - z * se, est + z * se)
         return intervals
 
@@ -722,13 +1080,25 @@ class NFXP:
         if self._result is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
-        states = np.asarray(states, dtype=np.int64)
+        raw_states = np.asarray(states)
+        if raw_states.ndim != 1:
+            raise ValueError("states must be a one-dimensional array of integer state codes")
+        if not np.issubdtype(raw_states.dtype, np.integer):
+            raise ValueError("states must contain integer state codes")
+        states = raw_states.astype(np.int64, copy=False)
+        if (states < 0).any() or (states >= self.n_states).any():
+            raise ValueError(f"states must lie in [0, {self.n_states})")
 
         # Get policy (choice probabilities) from result
         policy = np.asarray(self._result.policy)
 
         # Index into the policy for the requested states
         proba = policy[states]
+
+        if not np.isfinite(proba).all() or (proba < 0).any():
+            raise RuntimeError("fitted policy contains invalid probabilities")
+        if not np.allclose(proba.sum(axis=1), 1.0, atol=1e-6):
+            raise RuntimeError("fitted policy rows do not sum to 1")
 
         return proba
 
