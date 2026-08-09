@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from validation.estimators.nfxp.bootstrap_calibration import (
@@ -54,3 +57,22 @@ def test_smoke_gates_are_reported_but_not_enforced() -> None:
 
     assert gates
     assert all(gate["enforced"] is False for gate in gates)
+
+
+def test_release_artifact_records_full_trajectory_calibration() -> None:
+    payload = json.loads(
+        Path("validation/results/nfxp_bootstrap_calibration.json").read_text(encoding="utf-8")
+    )
+
+    assert payload["status"] == "ready"
+    assert payload["design"]["resampling_method"] == "pairs cluster bootstrap"
+    assert payload["design"]["resampling_unit"] == "whole individual trajectory"
+    assert payload["design"]["n_calibration_panels"] == 50
+    assert payload["design"]["n_bootstrap"] == 99
+    assert payload["summary"]["n_total"] == 50
+    assert payload["summary"]["n_usable"] == 50
+    assert payload["summary"]["minimum_success_fraction"] >= 0.95
+    assert payload["program_check"]["passed"] is True
+    assert payload["provenance"]["git_commit"] == ("d7fa16fb101b39ac7d5977ec2203d00ab30e4c2c")
+    assert payload["records_parquet"].endswith("bootstrap_records.parquet")
+    assert all(gate["passed"] for gate in payload["gates"] if gate["enforced"])

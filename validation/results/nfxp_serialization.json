@@ -1,9 +1,9 @@
 {
-  "econirl_module": "/private/tmp/econirl-nfxp-wheel.JaKrOQ/venv/lib/python3.13/site-packages/econirl/__init__.py",
+  "econirl_module": "/private/tmp/econirl-nfxp-wheel-final.kMsql6/venv/lib/python3.13/site-packages/econirl/__init__.py",
   "econirl_version": "0.0.10",
   "estimator": "NFXP",
   "fresh_process": true,
-  "git_commit": "8b94b3980a26905e1d8691f763320812c86ad3bb",
+  "git_commit": "d7fa16fb101b39ac7d5977ec2203d00ab30e4c2c",
   "maximum_absolute_gaps": {
     "coef": 0.0,
     "counterfactual_policy": 0.0,
@@ -11,7 +11,7 @@
     "predict_proba": 0.0
   },
   "module_outside_checkout": true,
-  "python_executable": "/tmp/econirl-nfxp-wheel.JaKrOQ/venv/bin/python",
+  "python_executable": "/tmp/econirl-nfxp-wheel-final.kMsql6/venv/bin/python",
   "python_version": "3.13.12",
   "status": "ready",
   "summary_equal": true,

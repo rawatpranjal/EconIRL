@@ -49,6 +49,36 @@ The reported standard errors closely match the observed variation across
 panels. Coverage remains near 95 percent. Misses below the interval range from
 1.6 to 2.8 percent, while misses above it range from 2.4 to 3.0 percent.
 
+## Bootstrap Intervals
+
+A separate experiment uses 50 independent panels. Each interval comes from 99
+pairs-cluster resamples of complete individual trajectories.
+
+| Parameter | Coverage | Mean interval width |
+| --- | ---: | ---: |
+| Reward feature 1 | 94.0% | 0.1324 |
+| Reward feature 2 | 96.0% | 0.1809 |
+| Reward feature 3 | 96.0% | 0.1955 |
+
+All 50 panels returned an estimate. Every panel completed all 99 resamples, and
+no bootstrap draw failed. Repeating the same 19-resample check produced the
+same estimates, standard errors, intervals, coverage indicators, and failure
+records.
+
+## Prediction on New Panels
+
+Each 200-state fit was evaluated on a new panel with 2,500 choices. The oracle
+uses the true reward parameters on those same choices.
+
+| Score | Fitted model | Excess over oracle |
+| --- | ---: | ---: |
+| Negative log likelihood | 0.5942 | 0.00038 |
+| Brier score | 0.4085 | 0.00031 |
+
+The excess is the fitted score minus the oracle score. Smaller values indicate
+that estimated choice probabilities remain close to the true probabilities on
+new trajectories.
+
 ## Counterfactuals
 
 The fitted model is solved again after changing either the reward or the engine
@@ -71,17 +101,25 @@ Run the study from the repository root:
 ```bash
 PYTHONPATH=src:. uv run python validation/estimators/nfxp/ready.py \
   --quiet --output validation/results/nfxp_ready.json
+
+PYTHONPATH=src:. uv run python \
+  validation/estimators/nfxp/bootstrap_calibration.py \
+  --quiet --output validation/results/nfxp_bootstrap_calibration.json
 ```
 
 **Result**
 
 ```text
 wrote validation/results/nfxp_ready.json
+wrote validation/results/nfxp_bootstrap_calibration.json
 ```
 
 The [simulation code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/ready.py)
 and [reported results](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp_ready.json)
-contain the full experiment configuration.
+contain the full experiment configuration. The bootstrap
+[code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/bootstrap_calibration.py)
+and [results](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp_bootstrap_calibration.json)
+contain the resampling design and interval results.
 
 ## Related Studies
 

@@ -108,11 +108,29 @@ def test_release_manifest_records_a_passing_full_run() -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
 
     assert payload["status"] == "ready"
-    assert payload["paper_target"] is None
+    assert payload["paper_target"] == {
+        "receipt": "docs/replications.md",
+        "relationship": "separate exact paper replication",
+        "runner": "src/econirl/replication/rust1987/table_ix.py",
+        "source": "Rust (1987), Table IX, Group 4",
+    }
+    assert payload["provenance"]["git_commit"] == ("d7fa16fb101b39ac7d5977ec2203d00ab30e4c2c")
     assert payload["inference"]["n_total"] == 1000
     assert payload["inference"]["n_usable"] == 1000
     assert payload["hard_problem"]["n_total"] == 20
     assert payload["hard_problem"]["n_usable"] == 20
+    assert payload["hard_problem"]["out_of_sample"]["excess_negative_log_likelihood_mean"] <= 0.02
+    assert payload["records_parquet"].endswith("ready_records.parquet")
     assert all(gate["passed"] for gate in payload["gates"] if gate["enforced"])
-    assert "[3] TRANSITION MODEL" in payload["summary_report"]
-    assert "Converged:   yes" in payload["summary_report"]
+    expected_sections = (
+        "Estimator\n",
+        "\nData\n",
+        "\nModel\n",
+        "\nPre-estimation checks\n",
+        "\nFit\n",
+        "\nOutcome\n",
+        "\nUncertainty\n",
+        "\nLimitations\n",
+    )
+    assert all(section in payload["summary_report"] for section in expected_sections)
+    assert "Converged: yes" in payload["summary_report"]
