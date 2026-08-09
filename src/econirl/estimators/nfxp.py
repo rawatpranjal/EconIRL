@@ -269,7 +269,7 @@ class NFXP:
         self.result_ = None
 
         self._result = None
-        self._panel = None
+        self._panel: Panel | TrajectoryPanel | None = None
         self._utility_fn = None
         self._problem = None
         self._transition_probabilities = None

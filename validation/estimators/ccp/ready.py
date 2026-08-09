@@ -41,6 +41,7 @@ from validation.benchmark.metrics import policy_tv, value_rmse  # noqa: E402
 from validation.estimators.nfxp.ready import (  # noqa: E402
     ProblemConfig,
     _oracle,
+    _out_of_sample_scores,
     _regret,
     _strict_json,
     build_problem,
@@ -151,6 +152,18 @@ def fit_once(
         }
         if not include_counterfactuals:
             return record
+
+        heldout = simulate_panel(
+            env,
+            n_individuals=100,
+            n_periods=25,
+            seed=config.base_seed + 500_000 + rep,
+        )
+        record["out_of_sample"] = _out_of_sample_scores(
+            heldout,
+            model.policy_,
+            oracle_policy,
+        )
 
         reward_theta = true_theta.copy()
         reward_theta[0] += 1.0

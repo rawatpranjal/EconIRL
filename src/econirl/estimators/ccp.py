@@ -153,7 +153,13 @@ class CCP(NFXP):
         n_actions: int = 2,
         discount: float = 0.9999,
         utility: RewardSpec | None = None,
-        se_method: Literal["asymptotic", "robust", "clustered", "bootstrap"] = "robust",
+        se_method: Literal[
+            "asymptotic",
+            "robust",
+            "clustered",
+            "bootstrap",
+            "full_likelihood_bhhh",
+        ] = "robust",
         n_bootstrap: int = 400,
         se_seed: int | None = None,
         verbose: bool = False,
@@ -200,8 +206,11 @@ class CCP(NFXP):
         )
         # CCP-specific parameter
         self.num_policy_iterations = num_policy_iterations
+
+    def _reset_fit_state(self) -> None:
+        """Reset shared and CCP-specific fitted fields."""
+        super()._reset_fit_state()
         self.npl_converged_: bool | None = None
-        self.termination_reason_: str | None = None
         self.npl_parameter_residual_: float | None = None
         self.npl_policy_residual_: float | None = None
 
@@ -247,6 +256,7 @@ class CCP(NFXP):
         self : CCP
             Returns self for method chaining.
         """
+        self._reset_fit_state()
         if features is not None:
             raise ValueError(
                 "CCP linear reward features must be supplied through RewardSpec, "
@@ -264,6 +274,9 @@ class CCP(NFXP):
                 raise ValueError(
                     "state, action, and id column names are required when data is a DataFrame"
                 )
+            missing = [name for name in (state, action, id) if name not in data.columns]
+            if missing:
+                raise ValueError(f"data is missing required columns: {missing}")
             self._validate_dataframe(data, state=state, action=action, id=id)
             self._panel = TrajectoryPanel.from_dataframe(data, state=state, action=action, id=id)
         elif isinstance(data, (Panel, TrajectoryPanel)):
@@ -272,6 +285,8 @@ class CCP(NFXP):
             raise TypeError(
                 f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
+        if self._panel is None:
+            raise RuntimeError("CCP panel initialization failed")
 
         # --- Handle reward: RewardSpec ---
         if isinstance(reward_spec, RewardSpec):
@@ -285,7 +300,10 @@ class CCP(NFXP):
                 "the Rust bus."
             )
 
-        feat = np.asarray(self._utility_fn.feature_matrix)
+        utility_fn = self._utility_fn
+        if utility_fn is None:
+            raise RuntimeError("CCP utility initialization failed")
+        feat = np.asarray(utility_fn.feature_matrix)
         expected_prefix = (self.n_states, self.n_actions)
         if feat.ndim != 3 or feat.shape[:2] != expected_prefix:
             raise ValueError(
@@ -308,6 +326,13 @@ class CCP(NFXP):
             self._transition_increments = trans_estimator.transition_increments_
             self.transition_source_ = "estimated from fitted panel"
         else:
+            if self.se_method == "full_likelihood_bhhh":
+                raise ValueError(
+                    "se_method='full_likelihood_bhhh' requires transitions to be "
+                    "estimated from the fitted panel by CCP.fit(). Use the core "
+                    "CCPEstimator API to pass transition_probabilities and "
+                    "transition_increments with an explicit transition matrix."
+                )
             self.transitions_ = np.asarray(transitions)
             self._transition_probabilities = None
             self._transition_increments = None
@@ -320,6 +345,11 @@ class CCP(NFXP):
         # Build full transition matrices (for both actions)
         transition_tensor = self._build_transition_tensor(self.transitions_)
         self.transition_tensor_ = transition_tensor
+        self.diagnostics_ = self._contract_diagnostics(
+            feat,
+            transition_tensor,
+            support,
+        )
 
         # Create problem specification
         self._problem = DDCProblem(
@@ -336,16 +366,32 @@ class CCP(NFXP):
             verbose=self.verbose,
         )
 
+        estimate_kwargs = {
+            "n_bootstrap": self.n_bootstrap,
+            "se_seed": self.se_seed,
+            "transition_source": self.transition_source_,
+        }
+        if self.se_method == "full_likelihood_bhhh":
+            estimate_kwargs.update(
+                {
+                    "transition_probabilities": self._transition_probabilities,
+                    "transition_increments": self._transition_increments,
+                }
+            )
+
         # Run estimation
-        self._result = estimator.estimate(
-            panel=self._panel,
-            utility=self._utility_fn,
-            problem=self._problem,
-            transitions=transition_tensor,
-            n_bootstrap=self.n_bootstrap,
-            se_seed=self.se_seed,
-            transition_source=self.transition_source_,
-        )
+        try:
+            self._result = estimator.estimate(
+                panel=self._panel,
+                utility=self._utility_fn,
+                problem=self._problem,
+                transitions=transition_tensor,
+                **estimate_kwargs,
+            )
+        except Exception as exc:
+            self.termination_reason_ = "execution_failure"
+            self.failure_reason_ = f"{type(exc).__name__}: {exc}"
+            raise RuntimeError("CCP estimation failed during optimization") from exc
         self._result.metadata["ccp_support"] = support
 
         # Extract results
@@ -358,6 +404,14 @@ class CCP(NFXP):
             None if parameter_residual is None else float(parameter_residual)
         )
         self.npl_policy_residual_ = None if policy_residual is None else float(policy_residual)
+        if self.diagnostics_ is not None:
+            self.diagnostics_["optimization"].update(
+                {
+                    "npl_converged": self.npl_converged_,
+                    "npl_parameter_residual": self.npl_parameter_residual_,
+                    "npl_policy_residual": self.npl_policy_residual_,
+                }
+            )
 
         return self
 
@@ -386,7 +440,7 @@ class CCP(NFXP):
         if (actions < 0).any() or (actions >= self.n_actions).any():
             raise ValueError(f"panel actions must lie in [0, {self.n_actions})")
 
-        counts = np.zeros((self.n_states, self.n_actions), dtype=np.int64)
+        counts: np.ndarray = np.zeros((self.n_states, self.n_actions), dtype=np.int64)
         np.add.at(counts, (states, actions), 1)
         action_totals = counts.sum(axis=0)
         missing_actions = np.flatnonzero(action_totals == 0)
@@ -442,9 +496,82 @@ class CCP(NFXP):
             Human-readable summary of the estimation.
         """
         if self._result is None:
-            return "CCP: Not fitted yet. Call fit() first."
+            return "Estimator\nCCP\n\nNot fitted. Call fit() first."
 
-        return self._result.summary(alpha=alpha)
+        intervals = self.conf_int(alpha=alpha)
+        diagnostics = self.diagnostics_ or {}
+        data = diagnostics.get("data", {})
+        identification = diagnostics.get("identification", {})
+        transitions = diagnostics.get("transitions", {})
+        ci_level = 100.0 * (1.0 - alpha)
+        parameter_lines = []
+        for name, estimate in (self.params_ or {}).items():
+            lower, upper = intervals[name]
+            parameter_lines.append(
+                f"{name}: {estimate:.6g} (SE {(self.se_ or {})[name]:.6g}, "
+                f"{ci_level:.1f}% CI [{lower:.6g}, {upper:.6g}])"
+            )
+        uncertainty_lines = [
+            f"Method: {self.se_method}",
+            f"Confidence level: {ci_level:.1f}%",
+        ]
+        if self.bootstrap_ is not None:
+            uncertainty_lines.extend(
+                [
+                    f"Bootstrap unit: {self.bootstrap_.unit}",
+                    "Bootstrap successful draws: "
+                    f"{self.bootstrap_.n_successful}/{self.bootstrap_.n_requested}",
+                    "Intervals: empirical percentile intervals over trajectory resamples",
+                ]
+            )
+        else:
+            uncertainty_lines.append("Intervals: sampling intervals from the reported SE method")
+
+        return "\n".join(
+            [
+                "Estimator",
+                "CCP (conditional choice probability estimation)",
+                "",
+                "Data",
+                f"Observations: {self.n_observations_}",
+                f"Individuals: {data.get('n_individuals', 'unavailable')}",
+                f"State coverage: {data.get('state_coverage', float('nan')):.3f}",
+                "",
+                "Model",
+                f"States: {self.n_states}",
+                f"Actions: {self.n_actions}",
+                f"Discount factor: {self.discount:.6g}",
+                "Shock normalization: Type-I extreme-value scale fixed at 1.0",
+                "",
+                "Pre-estimation checks",
+                f"Identification: {identification.get('verdict', 'unavailable')}",
+                f"Action-contrast rank: {identification.get('contrast_rank', 'unavailable')}",
+                f"Transition source: {transitions.get('source', 'unavailable')}",
+                "",
+                "Fit",
+                f"Converged: {'yes' if self.converged_ else 'no'}",
+                f"Termination: {self.termination_reason_}",
+                f"NPL fixed point: {'yes' if self.npl_converged_ else 'no'}",
+                "NPL residuals: "
+                f"parameter={self.npl_parameter_residual_}, "
+                f"policy={self.npl_policy_residual_}",
+                f"Policy iterations: {self.n_iter_}",
+                f"Fit time: {self.fit_time_:.3f} seconds",
+                "",
+                "Outcome",
+                f"Log likelihood: {self.log_likelihood_:.6f}",
+                *parameter_lines,
+                "",
+                "Uncertainty",
+                *uncertainty_lines,
+                "",
+                "Limitations",
+                "Inference is conditional on the state space, reward model, and discount factor.",
+                "Finite-stage standard errors condition on empirical CCPs and "
+                "supplied transitions.",
+                "A completed finite-stage fit does not imply NPL fixed-point convergence.",
+            ]
+        )
 
     def __repr__(self) -> str:
         if self.params_ is not None:
