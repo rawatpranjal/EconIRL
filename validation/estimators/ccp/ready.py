@@ -40,8 +40,10 @@ from econirl.simulation.synthetic import simulate_panel  # noqa: E402
 from validation.benchmark.metrics import policy_tv, value_rmse  # noqa: E402
 from validation.estimators.nfxp.ready import (  # noqa: E402
     ProblemConfig,
+    _git_commit,
     _oracle,
     _out_of_sample_scores,
+    _package_versions,
     _regret,
     _strict_json,
     build_problem,
@@ -448,6 +450,16 @@ def main() -> int:
         "hard_problem": hard,
         "alternate_standard_errors": alternate,
         "support_example": support_example,
+        "provenance": {
+            "git_commit": _git_commit(),
+            "package_versions": _package_versions(),
+            "base_seeds": {
+                "inference": inference_config.base_seed,
+                "hard_problem": hard_config.base_seed,
+                "heldout_offset": 500_000,
+                "standard_error_check": 62_001,
+            },
+        },
         "gates": gates,
         "summary_report": first_summary,
     }
