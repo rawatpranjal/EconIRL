@@ -377,7 +377,10 @@ class NFXP:
 
         # Validate the feature matrix matches the declared state/action space so a
         # mismatch raises a clear error instead of a cryptic broadcasting TypeError.
-        feat = np.asarray(self._utility_fn.feature_matrix)
+        utility_fn = self._utility_fn
+        if utility_fn is None:
+            raise RuntimeError("NFXP utility initialization failed")
+        feat = np.asarray(utility_fn.feature_matrix)
         if feat.ndim != 3 or feat.shape[0] != self.n_states or feat.shape[1] != self.n_actions:
             raise ValueError(
                 f"reward/feature matrix has shape {feat.shape}; expected "
@@ -517,14 +520,17 @@ class NFXP:
         rank_diagnostics: dict[str, Any],
     ) -> dict[str, dict[str, Any]]:
         """Build the stable four-block diagnostic record before fitting."""
+        panel = self._panel
+        if panel is None:
+            raise RuntimeError("NFXP panel initialization failed")
         dataset, pre_estimation, _transition_first_stage = compute_fit_diagnostics(
-            self._panel,
+            panel,
             self.n_states,
             self.n_actions,
             feature_matrix=features,
         )
-        states = np.asarray(self._panel.get_all_states(), dtype=np.int64)
-        actions = np.asarray(self._panel.get_all_actions(), dtype=np.int64)
+        states = np.asarray(panel.get_all_states(), dtype=np.int64)
+        actions = np.asarray(panel.get_all_actions(), dtype=np.int64)
         state_action_pairs = np.unique(np.stack([states, actions], axis=1), axis=0)
         row_sums = np.asarray(transitions, dtype=float).sum(axis=-1)
         return {
@@ -760,7 +766,7 @@ class NFXP:
         self._validate_transition_rows(keep_transitions)
 
         n = self.n_states
-        transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
+        transitions: np.ndarray = np.zeros((self.n_actions, n, n), dtype=np.float32)
 
         # Action 0 (keep): use provided transitions
         transitions[0] = np.array(keep_transitions, dtype=np.float32)

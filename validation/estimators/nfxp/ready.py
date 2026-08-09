@@ -91,7 +91,7 @@ HARD_CONFIG = ProblemConfig(
 def build_problem(config: ProblemConfig) -> ArrayMDP:
     """Build the frozen, identified action-dependent DGP."""
     states = config.num_states
-    transitions = np.zeros((2, states, states), dtype=np.float64)
+    transitions: np.ndarray = np.zeros((2, states, states), dtype=np.float64)
     drift = np.array([0.60, 0.30, 0.10])
     for state in range(states):
         for increment, probability in enumerate(drift):
@@ -103,7 +103,7 @@ def build_problem(config: ProblemConfig) -> ArrayMDP:
     raw -= raw.mean(axis=0)
     orthogonal, _ = np.linalg.qr(raw)
     contrasts = orthogonal / orthogonal.std(axis=0, keepdims=True)
-    features = np.zeros((states, 2, 3), dtype=np.float64)
+    features: np.ndarray = np.zeros((states, 2, 3), dtype=np.float64)
     features[:, 1, :] = contrasts
 
     initial = np.ones(states, dtype=np.float64) / states
@@ -121,7 +121,7 @@ def build_problem(config: ProblemConfig) -> ArrayMDP:
 
 def slower_deterioration(transitions: np.ndarray) -> np.ndarray:
     """Return a frozen transition intervention with less upward drift."""
-    changed = np.asarray(transitions, dtype=np.float64).copy()
+    changed: np.ndarray = np.asarray(transitions, dtype=np.float64).copy()
     states = changed.shape[1]
     changed[0] = 0.0
     drift = np.array([0.80, 0.15, 0.05])
