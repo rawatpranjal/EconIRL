@@ -8,9 +8,9 @@
 - [Simulation Study](validation.md)
 - [Counterfactuals](counterfactuals.md)
 
-Read this page as a runnable CCP smoke test, not as the main evidence page. It
-shows the wrapper on a familiar problem after the estimator assumptions have
-already been checked elsewhere.
+This runnable example fits CCP to the bundled bus panel. The panel has thin
+first-stage support, including 38 unvisited states. Inspect the
+[pre-estimation checks](pre_estimation.md) before interpreting the fit.
 
 The Rust bus-engine replacement problem is the canonical dynamic discrete
 choice example. A bus operator observes mileage and chooses whether to keep the
@@ -59,7 +59,10 @@ residuals did not both meet the fixed-point tolerance within those stages.
 
 The Rust bus reward specification estimates two parameters. The first is the
 operating cost slope over mileage states. The second is the replacement cost.
-The fitted policy gives the replacement probability by mileage state.
+The fitted policy gives a model-implied replacement probability by mileage
+state. State 50 has only three observations, all with action `keep`. State 89
+is unvisited. Their displayed probabilities therefore depend heavily on the
+structural specification.
 
 ```python
 for state, row in zip(
@@ -76,7 +79,7 @@ for state, row in zip(
 0: keep=0.955732, replace=0.044268
 10: keep=0.947600, replace=0.052400
 50: keep=0.912779, replace=0.087221
-89: keep=0.884699, replace=0.115301
+89: keep=0.884732, replace=0.115268
 ```
 
 ## Counterfactual Replacement Cost
@@ -98,10 +101,12 @@ probability at state 50 from 0.087221 to 0.054908.
 ## Replication Boundary
 
 This page is a package smoke example, not the full historical Rust
-replication. The printed robust standard errors are conditional
-pseudo-likelihood estimates. They hold the fitted transition model fixed. The
-reported simulation study is also synthetic and supplies the true transition
-tensor. The [replication ledger](../../replications.md) separates two results.
+replication. The printed standard errors use the robust sandwich covariance
+from the final fixed-CCP pseudo-likelihood. They condition on the policy held
+fixed in the third NPL stage and on the transition tensor estimated from the
+panel. The linked simulation study uses separate synthetic panels and supplies
+their true transition tensors. The [replication ledger](../../replications.md)
+separates two results.
 Its CCP/NPL section checks fixed-point equivalence to NFXP on bundled Group 4
 data. On the official STORDAT panel, converged NPL reproduces the Rust Table IX
 estimates and joint full-likelihood standard errors. The

@@ -8,10 +8,11 @@
 - [Counterfactuals](counterfactuals.md)
 - [Simulation Studies](../../simulation_studies/index.md)
 
-The study separates estimation, inference, and counterfactual analysis. Each
-experiment simulates a new panel from a specified reward and transition
-process. Every fit receives the data-generating transition tensor, so the
-results do not include uncertainty from transition estimation.
+The study separates estimation, inference, prediction on new panels, and
+counterfactual analysis. Each experiment simulates a new panel from a specified
+reward and transition process. Every fit receives the data-generating
+transition tensor, so the results do not include uncertainty from transition
+estimation.
 
 ## Estimation
 
@@ -26,7 +27,7 @@ independent panels.
 | Reward feature 3 | 0.20 | 0.052 | 0.095 |
 
 All 20 panels produced an estimate. The mean policy distance was 0.0028. The
-largest fit took 7.1 seconds. Policy distance is the average total variation
+largest fit took 8.8 seconds. Policy distance is the average total variation
 between the fitted and true action probabilities across states.
 
 ## Inference
@@ -59,10 +60,24 @@ All four standard-error methods were applied to one 40-state panel:
 | Pairs-cluster bootstrap | 0.0375 | 0.0508 | 0.0546 |
 
 The clustered estimates are between 0.99 and 1.05 times their bootstrap
-counterparts in this panel. The pairs-cluster bootstrap resamples individuals
-and re-estimates empirical CCPs. It keeps the true transition tensor fixed.
-This comparison does not test the full Hotz-Miller two-step covariance or the
-Kasahara-Shimotsu parametric bootstrap.
+counterparts in this panel. This single-panel comparison does not measure
+repeated-sample coverage or interval width. A separate calibration uses 50
+independent panels. Each interval uses 99 pairs-cluster resamples of complete
+individual trajectories. The bootstrap re-estimates empirical CCPs and keeps
+the supplied transition tensor fixed. This comparison does not test the full
+Hotz-Miller two-step covariance or the Kasahara-Shimotsu parametric bootstrap.
+
+All 50 calibration panels completed, with no failed resamples. Coverage was
+0.98, 0.98, and 0.90 across the three reward parameters. Mean interval widths
+were 0.1130, 0.1874, and 0.2103. Repeating the same 19-draw bootstrap program
+twice produced identical estimates, intervals, and failure records.
+
+## Prediction on New Panels
+
+Each 100-state fit was evaluated on a new panel with 2,500 choices. Across the
+20 panels, mean negative log likelihood was 0.682214 and mean Brier score was
+0.489172. The mean excess over oracle was 0.000039 for negative log likelihood
+and 0.000037 for Brier score.
 
 ## Counterfactuals
 
@@ -86,6 +101,10 @@ Run the study from the repository root:
 ```bash
 PYTHONPATH=src:. uv run python validation/estimators/ccp/ready.py \
   --quiet --output validation/results/ccp_ready.json
+
+PYTHONPATH=src:. uv run python \
+  validation/estimators/ccp/bootstrap_calibration.py \
+  --quiet --output validation/results/ccp_bootstrap_calibration.json
 ```
 
 **Result**
@@ -93,11 +112,15 @@ PYTHONPATH=src:. uv run python validation/estimators/ccp/ready.py \
 ```text
 wrote validation/results/ccp_ready.json
 status: ready
+wrote validation/results/ccp_bootstrap_calibration.json
 ```
 
 The [simulation code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/ccp/ready.py)
 and [reported results](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp_ready.json)
-contain the full experiment configuration.
+contain the full experiment configuration. The
+[bootstrap code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/ccp/bootstrap_calibration.py)
+and [bootstrap results](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/ccp_bootstrap_calibration.json)
+contain the repeated calibration.
 
 ## Related Studies
 

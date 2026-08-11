@@ -52,11 +52,11 @@
   },
   "command": "make ccp-table-ix",
   "environment": {
-    "git_sha": "bc59b9b0e02cb47728504549cb27f41cbae176dd",
+    "git_sha": "393e188a19d6d1b04f074952bc4580c85a16b71b",
     "platform": "macOS-14.5-arm64-arm-64bit-Mach-O",
     "python": "3.13.12",
     "versions": {
-      "econirl": "0.0.9",
+      "econirl": "0.0.10",
       "jax": "0.9.2",
       "numpy": "2.4.1",
       "pandas": "2.3.3",

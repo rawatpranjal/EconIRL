@@ -59,7 +59,7 @@ $\hat\pi(a \mid s)$, estimated from state-action frequencies. The Euler-Maschero
 constant $\gamma \approx 0.5772$ enters the logit emax correction. The
 policy-weighted transition matrix $F_{\hat\pi}$, augmented feature weights
 $W_\phi(s)$ and $W_e(s)$, and the pseudo choice-specific value
-$\tilde{Q}_\theta(s, a;\hat\pi)$ are defined in the Model section below.
+$\tilde{Q}_\theta(s, a;\hat\pi)$ are defined in the Model section.
 
 ## Model
 
@@ -79,15 +79,12 @@ F_{\hat\pi}(s, s') = \sum_a \hat\pi(a \mid s)\, P_a(s, s'),
 e_{\hat\pi}(s, a) = \gamma - \log \hat\pi(a \mid s).
 $$
 
-The normalized emax correction $e_{\hat\pi}$ is dimensionless. It enters flow
-payoffs as $\sigma e_{\hat\pi}$ before the softmax divides by $\sigma$.
-For Type-I extreme value shocks with scale
-$\sigma$, the Williams-Daly-Zachary theorem gives
-$E[\varepsilon_a \mid a\text{ is chosen in state }s] = \sigma(\gamma - \log \hat\pi(a \mid s))$.
-This is $\sigma \cdot e_{\hat\pi}(s,a)$ in utility units. The implementation
-stores the normalized correction $e_{\hat\pi}$, multiplies its contribution by
-$\sigma$, and computes choice probabilities from $\exp(\tilde Q / \sigma)$.
-See Rust (1994) or Hotz and Miller (1993) Lemma 1.
+The correction $e_{\hat\pi}$ is dimensionless. In the theoretical
+representation, it enters utility as $\sigma e_{\hat\pi}$. The Euler
+constant contributes the same value offset, $\sigma\gamma/(1-\beta)$, to every
+state. The implementation removes that offset before policy valuation and
+therefore uses $-\log\hat\pi(a\mid s)$. This normalization leaves choice
+probabilities unchanged. They are computed from $\exp(\tilde Q/\sigma)$.
 
 The integrated Bellman equation under $\hat\pi$ is:
 
@@ -241,11 +238,14 @@ $$
 
 which the inner L-BFGS-B step solves numerically.
 
-The score $\psi_i$ above drives the inner L-BFGS-B step and the reported
-sandwich standard errors. The Hessian and observation scores come from the same
-fixed-CCP pseudo-likelihood. The model-based, robust, and clustered standard
-errors condition on that policy object and the supplied transition model. They
-are not the full Hotz-Miller two-step covariance.
+The score $\psi_i$ drives the inner L-BFGS-B step. The asymptotic,
+robust, and clustered standard errors use the Hessian and observation scores
+from the same fixed-CCP pseudo-likelihood. They condition on the policy object
+and the supplied transition model. They are not the full Hotz-Miller two-step
+covariance. For a converged NPL fit with transitions estimated from the fitted
+panel, `se_method="full_likelihood_bhhh"` instead uses the joint
+reward-transition likelihood. It is unavailable for fixed-stage fits or
+supplied transitions.
 
 Pairs-cluster bootstrap standard errors resample individuals and repeat the
 empirical CCP and reward fit. The supplied transition tensor remains fixed.
@@ -296,7 +296,7 @@ Output  theta_hat, standard errors, policy pi^K, value V
 1   estimate pi^0(a | s) from state-action frequencies        # first-stage CCPs
 2   for k = 1, ..., K do                                      # outer NPL loop
 3       F_pi(s, s') := sum_a pi^{k-1}(a | s) * P_a(s, s')   # policy-weighted transitions
-4       e_pi(s, a) := gamma - log pi^{k-1}(a | s)            # normalized emax correction
+4       e_pi(s, a) := -log pi^{k-1}(a | s)                   # value-level normalization
 5       W_phi, W_e := (I - beta * F_pi)^{-1} applied to      # Hotz-Miller inversion
               (sum_a pi^{k-1} * phi, sum_a pi^{k-1} * sigma * e_pi)
 6       z-tilde(s, a) := phi(s, a) + beta * sum_{s'} P_a(s, s') W_phi(s')
@@ -424,6 +424,11 @@ The [Quick Start](ccp/quick_start.md) page documents the full set of fitted
 attributes and the full `CCPEstimator` API.
 
 ## Evidence
+
+On the official STORDAT Group-4 panel, converged NPL reproduces the published
+Rust Table IX point estimates, standard errors, transition probabilities,
+choice log likelihood, and full log likelihood to the reported precision. It
+also agrees with the reference NFXP fit.
 
 The inference experiment contains 1,000 independent 20-state panels. Every
 panel produced a finite estimate and robust standard errors. The study supplies

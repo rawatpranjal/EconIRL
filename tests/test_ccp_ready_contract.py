@@ -53,4 +53,5 @@ def test_committed_ccp_readiness_manifest() -> None:
     assert payload["inference"]["n_total"] == 1000
     assert payload["hard_problem"]["n_total"] == 20
     assert payload["support_example"]["state_action_coverage"] == 1.0
+    assert len(payload["provenance"]["git_commit"]) == 40
     assert all(gate["passed"] for gate in payload["gates"] if gate["enforced"])
