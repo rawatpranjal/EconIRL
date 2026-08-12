@@ -8,20 +8,21 @@ Tests cover:
 5. Parameter recovery on Rust bus (slow)
 """
 
-import pytest
+from types import SimpleNamespace
+
 import jax
 import jax.numpy as jnp
 import numpy as np
-from types import SimpleNamespace
+import pytest
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
-from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.environments.shapeshifter import ShapeshifterConfig, ShapeshifterEnvironment
+from econirl.core.types import DDCProblem
 from econirl.environments.rust_bus import RustBusEnvironment
+from econirl.environments.shapeshifter import ShapeshifterConfig, ShapeshifterEnvironment
 from econirl.estimation.td_ccp import (
-    TDCCPEstimator,
     TDCCPConfig,
+    TDCCPEstimator,
     _EVComponentNetwork,
     make_state_action_tabular_utility,
 )
@@ -35,7 +36,6 @@ from validation.estimators.tdccp.run import (
     tdccp_hard_case_gates,
     tdccp_paper_hard_case_gates,
 )
-
 
 # ============================================================================
 # Config tests
@@ -133,7 +133,9 @@ class TestCCPEstimation:
             small_panel, problem_spec_small.num_states, problem_spec_small.num_actions
         )
         row_sums = ccps.sum(axis=1)
-        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
+        np.testing.assert_allclose(
+            np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5
+        )
 
     def test_ccps_non_negative(self, rust_env_small, small_panel, problem_spec_small):
         """Estimated CCPs should be non-negative."""
@@ -172,23 +174,31 @@ class TestTransitionExtraction:
 
     def test_transition_lengths_match(self, rust_env_small, small_panel):
         """All transition arrays should have the same length."""
-        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(small_panel)
+        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(
+            small_panel
+        )
         assert len(actions) == len(states) == len(next_actions) == len(next_states)
 
     def test_transitions_non_empty(self, rust_env_small, small_panel):
         """Should extract at least one transition."""
-        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(small_panel)
+        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(
+            small_panel
+        )
         assert len(states) > 0
 
     def test_actions_valid(self, rust_env_small, small_panel, problem_spec_small):
         """All actions should be valid (0 or 1 for binary choice)."""
-        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(small_panel)
+        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(
+            small_panel
+        )
         assert np.all(actions >= 0) and np.all(actions < problem_spec_small.num_actions)
         assert np.all(next_actions >= 0) and np.all(next_actions < problem_spec_small.num_actions)
 
     def test_states_valid(self, rust_env_small, small_panel, problem_spec_small):
         """All states should be valid indices."""
-        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(small_panel)
+        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(
+            small_panel
+        )
         assert np.all(states >= 0) and np.all(states < problem_spec_small.num_states)
         assert np.all(next_states >= 0) and np.all(next_states < problem_spec_small.num_states)
 
@@ -208,14 +218,25 @@ class TestSemigradientSolve:
         ccps = estimator._estimate_ccps(
             small_panel, problem_spec_small.num_states, problem_spec_small.num_actions
         )
-        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(small_panel)
+        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(
+            small_panel
+        )
         h_table, g_table = estimator._semigradient_solve(
-            actions, states, next_actions, next_states,
-            np.array(utility.feature_matrix), np.array(ccps),
-            problem_spec_small.num_states, problem_spec_small.num_actions,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            np.array(utility.feature_matrix),
+            np.array(ccps),
+            problem_spec_small.num_states,
+            problem_spec_small.num_actions,
             problem_spec_small.discount_factor,
         )
-        assert h_table.shape == (problem_spec_small.num_states, problem_spec_small.num_actions, utility.num_parameters)
+        assert h_table.shape == (
+            problem_spec_small.num_states,
+            problem_spec_small.num_actions,
+            utility.num_parameters,
+        )
 
     def test_g_table_shape(self, rust_env_small, small_panel, problem_spec_small):
         """g_table should have shape (num_states, num_actions)."""
@@ -224,11 +245,18 @@ class TestSemigradientSolve:
         ccps = estimator._estimate_ccps(
             small_panel, problem_spec_small.num_states, problem_spec_small.num_actions
         )
-        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(small_panel)
+        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(
+            small_panel
+        )
         h_table, g_table = estimator._semigradient_solve(
-            actions, states, next_actions, next_states,
-            np.array(utility.feature_matrix), np.array(ccps),
-            problem_spec_small.num_states, problem_spec_small.num_actions,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            np.array(utility.feature_matrix),
+            np.array(ccps),
+            problem_spec_small.num_states,
+            problem_spec_small.num_actions,
             problem_spec_small.discount_factor,
         )
         assert g_table.shape == (problem_spec_small.num_states, problem_spec_small.num_actions)
@@ -240,11 +268,18 @@ class TestSemigradientSolve:
         ccps = estimator._estimate_ccps(
             small_panel, problem_spec_small.num_states, problem_spec_small.num_actions
         )
-        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(small_panel)
+        actions, states, next_actions, next_states = TDCCPEstimator._extract_transitions(
+            small_panel
+        )
         h_table, g_table = estimator._semigradient_solve(
-            actions, states, next_actions, next_states,
-            np.array(utility.feature_matrix), np.array(ccps),
-            problem_spec_small.num_states, problem_spec_small.num_actions,
+            actions,
+            states,
+            next_actions,
+            next_states,
+            np.array(utility.feature_matrix),
+            np.array(ccps),
+            problem_spec_small.num_states,
+            problem_spec_small.num_actions,
             problem_spec_small.discount_factor,
         )
         assert np.all(np.isfinite(h_table))
@@ -331,6 +366,97 @@ class TestSemigradientSolve:
 
 class TestTDCCPHardCaseComponents:
     """Component tests for the TD-CCP hard-case runner."""
+
+    def test_partial_mle_uses_transition_indexed_observations(
+        self,
+        monkeypatch,
+        small_panel,
+        utility,
+        problem_spec_small,
+    ):
+        """The paper criterion drops one terminal choice per trajectory."""
+        import econirl.estimation.td_ccp as td_ccp_module
+
+        estimator = TDCCPEstimator(config=TDCCPConfig())
+        observed_lengths = []
+
+        def fake_log_likelihood(
+            params,
+            h_table,
+            g_table,
+            feature_matrix,
+            obs_states,
+            obs_actions,
+            sigma,
+        ):
+            del h_table, g_table, feature_matrix, obs_actions, sigma
+            observed_lengths.append(int(obs_states.shape[0]))
+            return -jnp.sum(params**2)
+
+        def fake_minimize(objective, initial, **kwargs):
+            del kwargs
+            value = objective(initial)
+            return SimpleNamespace(
+                x=initial,
+                message="test optimizer",
+                success=True,
+                fun=float(value),
+                grad_norm=0.0,
+                projected_grad_norm=0.0,
+                final_rel_change=0.0,
+                convergence_reason="test",
+                nit=0,
+                nfev=1,
+            )
+
+        monkeypatch.setattr(estimator, "_pseudo_log_likelihood_jax", fake_log_likelihood)
+        monkeypatch.setattr(td_ccp_module, "minimize_lbfgsb", fake_minimize)
+        h_table = np.zeros((problem_spec_small.num_states, problem_spec_small.num_actions, 2))
+        g_table = np.zeros((problem_spec_small.num_states, problem_spec_small.num_actions))
+        estimator._partial_mle(
+            small_panel,
+            utility,
+            problem_spec_small,
+            h_table,
+            g_table,
+        )
+
+        expected = sum(len(trajectory.states) - 1 for trajectory in small_panel.trajectories)
+        assert observed_lengths
+        assert set(observed_lengths) == {expected}
+
+    def test_neural_backward_lambda_uses_avi_function_class(self, monkeypatch):
+        """Algorithm 5 must not silently fall back to the linear basis."""
+        problem = DDCProblem(
+            num_states=1,
+            num_actions=2,
+            discount_factor=0.4,
+            scale_parameter=1.0,
+        )
+        estimator = TDCCPEstimator(config=TDCCPConfig(method="neural"))
+        expected = np.full((1, 2, 1), 3.25, dtype=np.float64)
+        calls = []
+
+        def fake_backward_avi(*args, **kwargs):
+            calls.append((args, kwargs))
+            return expected
+
+        monkeypatch.setattr(estimator, "_compute_backward_value_avi", fake_backward_avi)
+        result = estimator._compute_backward_value(
+            np.array([0.7]),
+            np.array([[[0.0], [1.0]]]),
+            np.zeros((1, 2)),
+            np.array([[[0.0], [1.0]]]),
+            np.array([0, 1], dtype=np.int32),
+            np.array([0, 0], dtype=np.int32),
+            np.array([0, 1], dtype=np.int32),
+            np.array([0, 0], dtype=np.int32),
+            problem,
+            problem.discount_factor,
+        )
+
+        np.testing.assert_array_equal(result, expected)
+        assert len(calls) == 1
 
     def test_backward_lambda_solves_reversed_td_fixed_point(self):
         """Algorithm 5 lambda should solve the reversed TD recursion."""
@@ -433,8 +559,7 @@ class TestTDCCPHardCaseComponents:
         euler = 0.5772156649015329
         residual = (
             np.einsum("nk,k->n", feature_matrix[states, actions], tilde_params)
-            + problem.discount_factor
-            * (euler - np.log(ccps[next_states, next_actions]))
+            + problem.discount_factor * (euler - np.log(ccps[next_states, next_actions]))
             + problem.discount_factor * v_tilde[next_states, next_actions]
             - v_tilde[states, actions]
         )
@@ -950,7 +1075,10 @@ class TestTDCCPQuickIntegration:
         assert result is not None
         assert len(result.parameters) == utility.num_parameters
         assert jnp.isfinite(result.parameters).all()
-        assert result.policy.shape == (problem_spec_small.num_states, problem_spec_small.num_actions)
+        assert result.policy.shape == (
+            problem_spec_small.num_states,
+            problem_spec_small.num_actions,
+        )
         assert result.value_function.shape == (problem_spec_small.num_states,)
 
     def test_estimate_returns_summary(self, rust_env_small, problem_spec_small, transitions_small):
@@ -1006,7 +1134,9 @@ class TestTDCCPQuickIntegration:
         assert (result.policy >= 0).all()
         # Policy rows should sum to 1
         row_sums = result.policy.sum(axis=1)
-        np.testing.assert_allclose(np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5)
+        np.testing.assert_allclose(
+            np.asarray(row_sums), np.asarray(jnp.ones_like(row_sums)), atol=1e-5
+        )
 
 
 # ============================================================================
@@ -1018,7 +1148,7 @@ class TestImports:
     """Test that TDCCPEstimator and TDCCPConfig can be imported from estimation package."""
 
     def test_import_from_estimation(self):
-        from econirl.estimation import TDCCPEstimator, TDCCPConfig
+        from econirl.estimation import TDCCPConfig, TDCCPEstimator
 
         assert TDCCPEstimator is not None
         assert TDCCPConfig is not None
@@ -1082,7 +1212,7 @@ class TestParameterRecovery:
 
         estimated_params = result.parameters
         diff = estimated_params - true_params
-        rmse = float(jnp.sqrt((diff ** 2).mean()))
+        rmse = float(jnp.sqrt((diff**2).mean()))
 
         assert rmse < 0.5, (
             f"RMSE={rmse:.4f} exceeds 0.5 threshold. "

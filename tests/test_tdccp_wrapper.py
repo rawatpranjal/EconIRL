@@ -298,14 +298,17 @@ class TestPredictProba:
             model.predict_proba(np.array([0, 1]))
 
 
-class TestNoNFXPMethods:
-    """Test that NFXP-specific methods are NOT present."""
+class TestAppliedWorkflowMethods:
+    """Test the applied simulation and counterfactual workflow."""
 
-    def test_no_simulate(self, fitted_model):
-        assert not hasattr(fitted_model, "simulate")
+    def test_simulate(self, fitted_model):
+        simulated = fitted_model.simulate(n_agents=3, n_periods=4, seed=17)
+        assert list(simulated.columns) == ["agent_id", "period", "state", "action"]
+        assert len(simulated) == 12
 
-    def test_no_counterfactual(self, fitted_model):
-        assert not hasattr(fitted_model, "counterfactual")
+    def test_counterfactual(self, fitted_model):
+        result = fitted_model.counterfactual(replacement_cost=4.0)
+        assert result.counterfactual_policy.shape == (5, 2)
 
 
 class TestTrajectoryPanelInput:
