@@ -18,11 +18,10 @@ The simulation follows the data generating process:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Sequence
 
-import numpy as np
-import jax
 import jax.numpy as jnp
+import numpy as np
 
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
@@ -60,10 +59,6 @@ def simulate_panel(
         >>> print(f"Generated {panel.num_observations} observations")
     """
     rng = np.random.default_rng(seed)
-
-    # Get problem specification
-    problem = env.problem_spec
-    transitions = env.transition_matrices
 
     # Compute optimal policy if needed
     if policy is None and use_optimal_policy:
@@ -195,9 +190,7 @@ def simulate_mixture_panel(
             "num_segments": len(segment_envs),
             "segment_probabilities": probs.tolist(),
             "segment_labels": segment_labels,
-            "segment_true_parameters": [
-                dict(env.true_parameters) for env in segment_envs
-            ],
+            "segment_true_parameters": [dict(env.true_parameters) for env in segment_envs],
         },
     )
 
@@ -244,7 +237,6 @@ def _simulate_trajectory(
     Returns:
         Trajectory object
     """
-    num_states = env.num_states
     num_actions = env.num_actions
 
     states = []
@@ -307,6 +299,9 @@ def simulate_panel_from_policy(
 
     num_states = problem.num_states
     num_actions = problem.num_actions
+    transitions_np = np.asarray(transitions, dtype=np.float64)
+    policy_np = np.asarray(policy, dtype=np.float64)
+    initial_distribution_np = np.asarray(initial_distribution, dtype=np.float64)
 
     trajectories = []
 
@@ -316,19 +311,19 @@ def simulate_panel_from_policy(
         next_states = []
 
         # Sample initial state
-        state = rng.choice(num_states, p=initial_distribution)
+        state = rng.choice(num_states, p=initial_distribution_np)
 
         for t in range(n_periods):
             states.append(state)
 
             # Sample action (normalize for float32 rounding)
-            action_probs = np.asarray(policy[state], dtype=np.float64)
+            action_probs = policy_np[state]
             action_probs = action_probs / action_probs.sum()
             action = rng.choice(num_actions, p=action_probs)
             actions.append(action)
 
             # Sample next state (normalize for float32 rounding)
-            trans_probs = np.asarray(transitions[action, state], dtype=np.float64)
+            trans_probs = transitions_np[action, state]
             trans_probs = trans_probs / trans_probs.sum()
             next_state = rng.choice(num_states, p=trans_probs)
             next_states.append(next_state)
@@ -424,9 +419,7 @@ def run_monte_carlo(
 
         # Simulate data
         rep_seed = rng.integers(0, 2**31)
-        panel = simulate_panel(
-            env, n_individuals=n_individuals, n_periods=n_periods, seed=rep_seed
-        )
+        panel = simulate_panel(env, n_individuals=n_individuals, n_periods=n_periods, seed=rep_seed)
 
         # Estimate
         result = estimator.estimate(panel, utility, problem, transitions)
