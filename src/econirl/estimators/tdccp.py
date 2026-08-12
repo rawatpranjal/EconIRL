@@ -536,6 +536,15 @@ class TDCCP(NFXP):
         )
         if self.se_method == "robust" and not self.robust_se:
             raise ValueError("se_method='robust' requires robust_se=True")
+        if self.robust_se and not self.cross_fitting:
+            raise ValueError(
+                "robust_se=True requires cross_fitting=True; set robust_se=False for a plug-in fit"
+            )
+        if self.se_method == "asymptotic" and self.robust_se:
+            raise ValueError(
+                "se_method='asymptotic' requires robust_se=False; use "
+                "se_method='robust' for Algorithm 2 inference"
+            )
         effective_se_method = "asymptotic" if self.se_method == "robust" else self.se_method
         estimator = TDCCPEstimator(
             config=config,

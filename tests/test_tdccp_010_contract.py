@@ -183,6 +183,38 @@ def test_supplied_transitions_require_canonical_tensor() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("se_method", "cross_fitting", "robust_se", "message"),
+    [
+        ("robust", True, False, "requires robust_se=True"),
+        ("robust", False, True, "requires cross_fitting=True"),
+        ("asymptotic", True, True, "requires robust_se=False"),
+    ],
+)
+def test_inference_configuration_fails_closed(
+    se_method: str,
+    cross_fitting: bool,
+    robust_se: bool,
+    message: str,
+) -> None:
+    model = TDCCP(
+        n_states=8,
+        discount=0.9,
+        utility=rust_bus_reward_spec(8),
+        se_method=se_method,
+        cross_fitting=cross_fitting,
+        robust_se=robust_se,
+    )
+    with pytest.raises(ValueError, match=message):
+        model.fit(
+            _panel_frame(),
+            state="state",
+            action="action",
+            id="bus_id",
+            transitions=_transition_tensor(),
+        )
+
+
 def test_pickle_round_trip_preserves_supported_results(fitted_tdccp: TDCCP) -> None:
     states = np.array([0, 3, 7])
     restored = pickle.loads(pickle.dumps(fitted_tdccp))

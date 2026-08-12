@@ -2344,6 +2344,11 @@ class TDCCPEstimator(BaseEstimator):
         """
         start_time = time.time()
         cfg = self._config
+        if cfg.robust_se and not cfg.cross_fitting:
+            raise ValueError(
+                "TD-CCP locally robust inference requires cross_fitting=True; "
+                "set robust_se=False for the plug-in estimator"
+            )
         num_states = problem.num_states
         num_actions = problem.num_actions
         gamma = problem.discount_factor
