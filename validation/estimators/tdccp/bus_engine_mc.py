@@ -43,31 +43,56 @@ for path in (HERE.parent, ROOT, ROOT / "src"):
         sys.path.insert(0, str(path))
 
 import jax  # noqa: E402
+
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp  # noqa: E402
-from econirl.core.types import DDCProblem  # noqa: E402
+
 from econirl.core.bellman import SoftBellmanOperator  # noqa: E402
 from econirl.core.solvers import value_iteration  # noqa: E402
+from econirl.core.types import DDCProblem  # noqa: E402
 from econirl.estimation.td_ccp import TDCCPConfig, TDCCPEstimator  # noqa: E402
 from econirl.preferences.action_reward import ActionDependentReward  # noqa: E402
 from econirl.simulation.synthetic import simulate_panel_from_policy  # noqa: E402
 from validation.known_truth import to_jsonable  # noqa: E402
 
 # Paper Table B.1 DGP --------------------------------------------------------
-THETA_TRUE = np.array([2.0, -0.15, 1.0])          # theta0, theta1 (mileage), theta2 (type)
+THETA_TRUE = np.array([2.0, -0.15, 1.0])  # theta0, theta1 (mileage), theta2 (type)
 PARAM_NAMES = ["theta0_intercept", "theta1_mileage", "theta2_type"]
 BETA = 0.9
-X_MAX = 40                                          # mileage grid 0..X_MAX (replacement well before)
-MILEAGE_SCALE = 20.0                                # basis normalization (~replacement region), conditions the polynomial
-N_TYPES = 2                                         # s in {0, 1}
+# Mileage grid 0..X_MAX, with replacement occurring before the upper bound.
+X_MAX = 40
+# Normalize the polynomial basis near the replacement region.
+MILEAGE_SCALE = 20.0
+N_TYPES = 2  # s in {0, 1}
 # Paper Table B.1 reported values (not locally robust | locally robust)
 PAPER_TABLE_B1 = {
-    "theta0_intercept": {"true": 2.0, "mean_nlr": 1.9788, "mse_nlr": 0.0080, "sd_nlr": 0.0868,
-                         "mean_lr": 1.9778, "mse_lr": 0.0081, "sd_lr": 0.0870},
-    "theta1_mileage":   {"true": -0.15, "mean_nlr": -0.1492, "mse_nlr": 1.2e-05, "sd_nlr": 0.0033,
-                         "mean_lr": -0.1489, "mse_lr": 1.3e-05, "sd_lr": 0.0034},
-    "theta2_type":      {"true": 1.0, "mean_nlr": 1.0044, "mse_nlr": 0.0034, "sd_nlr": 0.0583,
-                         "mean_lr": 1.0032, "mse_lr": 0.0034, "sd_lr": 0.0584},
+    "theta0_intercept": {
+        "true": 2.0,
+        "mean_nlr": 1.9788,
+        "mse_nlr": 0.0080,
+        "sd_nlr": 0.0868,
+        "mean_lr": 1.9778,
+        "mse_lr": 0.0081,
+        "sd_lr": 0.0870,
+    },
+    "theta1_mileage": {
+        "true": -0.15,
+        "mean_nlr": -0.1492,
+        "mse_nlr": 1.2e-05,
+        "sd_nlr": 0.0033,
+        "mean_lr": -0.1489,
+        "mse_lr": 1.3e-05,
+        "sd_lr": 0.0034,
+    },
+    "theta2_type": {
+        "true": 1.0,
+        "mean_nlr": 1.0044,
+        "mse_nlr": 0.0034,
+        "sd_nlr": 0.0583,
+        "mean_lr": 1.0032,
+        "mse_lr": 0.0034,
+        "sd_lr": 0.0584,
+    },
 }
 
 
@@ -123,7 +148,7 @@ def build_dgp() -> dict[str, Any]:
         for s in range(N_TYPES):
             i = state_index(x, s)
             T[0, i, state_index(min(x + 1, X_MAX), s)] = 1.0  # keep
-            T[1, i, state_index(0, s)] = 1.0                  # replace
+            T[1, i, state_index(0, s)] = 1.0  # replace
     transitions = jnp.asarray(T)
 
     return {
@@ -158,14 +183,14 @@ def estimator_config(locally_robust: bool, verbose: bool = False) -> TDCCPConfig
     return TDCCPConfig(
         method="semigradient",
         basis_type="encoded",
-        basis_dim=3,             # third-order polynomial in (x, s)
+        basis_dim=3,  # third-order polynomial in (x, s)
         basis_ridge=1e-5,
         ccp_method="logit",
         ccp_poly_degree=3,
         ccp_use_encoder=True,
         cross_fitting=locally_robust,
         robust_se=locally_robust,
-        compute_se=locally_robust,   # MC needs only point estimates; SE sandwich is costly
+        compute_se=locally_robust,  # MC needs only point estimates; SE sandwich is costly
         n_policy_iterations=1,
         outer_max_iter=500,
         outer_tol=1e-8,
@@ -173,16 +198,24 @@ def estimator_config(locally_robust: bool, verbose: bool = False) -> TDCCPConfig
     )
 
 
-def run_one_rep(dgp, init_dist, seed: int, locally_robust: bool,
-                n_buses: int, n_periods: int) -> np.ndarray:
+def run_one_rep(
+    dgp, init_dist, seed: int, locally_robust: bool, n_buses: int, n_periods: int
+) -> np.ndarray:
     panel = simulate_panel_from_policy(
-        dgp["problem"], dgp["transitions"], dgp["_policy"], init_dist,
-        n_individuals=n_buses, n_periods=n_periods, seed=seed,
+        dgp["problem"],
+        dgp["transitions"],
+        dgp["_policy"],
+        init_dist,
+        n_individuals=n_buses,
+        n_periods=n_periods,
+        seed=seed,
     )
     est = TDCCPEstimator(config=estimator_config(locally_robust), seed=seed)
     summary = est.estimate(
-        panel=panel, utility=dgp["utility"],
-        problem=dgp["problem"], transitions=dgp["transitions"],
+        panel=panel,
+        utility=dgp["utility"],
+        problem=dgp["problem"],
+        transitions=dgp["transitions"],
     )
     return np.asarray(summary.parameters, dtype=np.float64)
 
@@ -205,9 +238,13 @@ def summarize(estimates: np.ndarray) -> dict[str, dict[str, float]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-reps", type=int, default=1000)
-    parser.add_argument("--lr-reps", type=int, default=None,
-                        help="Reps for the locally robust column (default: same as --n-reps). "
-                             "The robust SE / cross-fitting path is much slower.")
+    parser.add_argument(
+        "--lr-reps",
+        type=int,
+        default=None,
+        help="Reps for the locally robust column (default: same as --n-reps). "
+        "The robust SE / cross-fitting path is much slower.",
+    )
     parser.add_argument("--n-buses", type=int, default=1000)
     parser.add_argument("--n-periods", type=int, default=30)
     parser.add_argument("--base-seed", type=int, default=20250)
@@ -253,14 +290,22 @@ def main() -> None:
         "arxiv": "1912.09509",
         "dgp": {
             "model": "bus-engine replacement, deterministic mileage, permanent type",
-            "x_max": X_MAX, "n_types": N_TYPES, "beta": BETA,
-            "theta_true": THETA_TRUE.tolist(), "param_names": PARAM_NAMES,
-            "n_buses": args.n_buses, "n_periods": args.n_periods,
-            "n_reps": args.n_reps, "reps_by_column": reps_used,
+            "x_max": X_MAX,
+            "n_types": N_TYPES,
+            "beta": BETA,
+            "theta_true": THETA_TRUE.tolist(),
+            "param_names": PARAM_NAMES,
+            "n_buses": args.n_buses,
+            "n_periods": args.n_periods,
+            "n_reps": args.n_reps,
+            "reps_by_column": reps_used,
         },
         "estimator_config": {
-            "method": "semigradient", "basis_type": "encoded", "basis_dim": 3,
-            "ccp_method": "logit", "ccp_poly_degree": 3,
+            "method": "semigradient",
+            "basis_type": "encoded",
+            "basis_dim": 3,
+            "ccp_method": "logit",
+            "ccp_poly_degree": 3,
         },
         "paper_table_b1": PAPER_TABLE_B1,
         "results": results,
@@ -272,12 +317,17 @@ def main() -> None:
     )
 
     # Console comparison vs the paper
-    print("\n  parameter        true     pkg mean   paper mean   pkg MSE    paper MSE   pkg SD    paper SD")
+    print(
+        "\n  parameter        true     pkg mean   paper mean   pkg MSE    "
+        "paper MSE   pkg SD    paper SD"
+    )
     for name in PARAM_NAMES:
         r = results["not_locally_robust"][name]
         p = PAPER_TABLE_B1[name]
-        print(f"  {name:<16}{r['true']:>7.3f}{r['mean']:>11.4f}{p['mean_nlr']:>12.4f}"
-              f"{r['mse']:>11.5f}{p['mse_nlr']:>11.5f}{r['sd']:>10.4f}{p['sd_nlr']:>10.4f}")
+        print(
+            f"  {name:<16}{r['true']:>7.3f}{r['mean']:>11.4f}{p['mean_nlr']:>12.4f}"
+            f"{r['mse']:>11.5f}{p['mse_nlr']:>11.5f}{r['sd']:>10.4f}{p['sd_nlr']:>10.4f}"
+        )
     print(f"\n  wrote: {JSON_OUT}")
 
 

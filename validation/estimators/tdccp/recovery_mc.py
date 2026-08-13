@@ -45,17 +45,18 @@ for path in (HERE.parent, ROOT, ROOT / "src"):
         sys.path.insert(0, str(path))
 
 import jax.numpy as jnp  # noqa: E402
+
 from econirl.core.bellman import SoftBellmanOperator  # noqa: E402
 from econirl.core.solvers import value_iteration  # noqa: E402
 from econirl.estimation.td_ccp import TDCCPEstimator  # noqa: E402
 from econirl.simulation.synthetic import simulate_panel_from_policy  # noqa: E402
-from validation.known_truth import to_jsonable  # noqa: E402
 from validation.estimators.tdccp.run import (  # noqa: E402
-    build_paper_hard_case_dgp,
-    paper_hard_case_estimator_config,
     HARD_CASE_N_INDIVIDUALS,
     HARD_CASE_N_PERIODS,
+    build_paper_hard_case_dgp,
+    paper_hard_case_estimator_config,
 )
+from validation.known_truth import to_jsonable  # noqa: E402
 
 
 def run_one_rep(seed: int) -> tuple[list[str], list[float], list[float]]:
@@ -105,8 +106,8 @@ def main() -> None:
     base_seed = args.base_seed
 
     print("TD-CCP Monte-Carlo parameter recovery (Tier-3 bespoke)")
-    print(f"  DGP: build_paper_hard_case_dgp (seed varies per rep)")
-    print(f"  estimator: paper_hard_case_estimator_config (Algorithm 2, encoded, logit CCPs)")
+    print("  DGP: build_paper_hard_case_dgp (seed varies per rep)")
+    print("  estimator: paper_hard_case_estimator_config (Algorithm 2, encoded, logit CCPs)")
     print(f"  n_reps: {n_reps}  base_seed: {base_seed}")
     print(f"  panel per rep: {HARD_CASE_N_INDIVIDUALS} individuals x {HARD_CASE_N_PERIODS} periods")
 

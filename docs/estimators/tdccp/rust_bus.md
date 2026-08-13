@@ -1,53 +1,78 @@
 # Rust Bus Engine Example
 
-Read this page as a runnable TD-CCP smoke test. It shows usage on bundled data;
-the transition-density-free recovery claim is evaluated on the simulation page.
+## Important Links
 
-The Rust bus-engine replacement problem is the standard dynamic discrete
-choice example. A bus operator observes mileage and chooses whether to keep the
-current engine or replace it.
+- [TD-CCP overview](../tdccp.md)
+- [Quick Start](quick_start.md)
+- [Evidence](validation.md)
+- [Bus engine simulation study](../../simulation_studies/rust_bus.md)
 
-EconIRL ships a small Rust-style dataset for a public TD-CCP smoke test.
+The bundled synthetic Rust-style panel is a compact API example. It is not the
+original Rust sample or the paper replication. The exact paper comparison uses
+1,000 panels regenerated from the official Adusumilli and Eckardt (2025) code
+and seed schedule for Online Appendix Table E.1.
 
 ```python
-from econirl.datasets import load_rust_bus, rust_bus_reward_spec
+import numpy as np
+
 from econirl import TDCCP
+from econirl.datasets import load_rust_bus, rust_bus_reward_spec
 
-df = load_rust_bus()
-
+data = load_rust_bus()
 model = TDCCP(
     n_states=90,
     n_actions=2,
     discount=0.9999,
     utility=rust_bus_reward_spec(90),
     method="semigradient",
+    seed=7,
+    basis_dim=8,
+    cross_fitting=False,
+    robust_se=False,
+    se_method="asymptotic",
+    outer_max_iter=1000,
+    outer_tol=1e-7,
 )
-model.fit(df, state="mileage_bin", action="replaced", id="bus_id")
+model.fit(
+    data,
+    state="mileage_bin",
+    action="replaced",
+    id="bus_id",
+)
 
-print(model.params_)
-print(model.summary())
+print(data.shape)
+print(model.converged_)
+print(np.round(model.coef_, 4).tolist())
+print(model.policy_.shape)
+print(model.transition_source_)
 ```
 
-## Interpretation
+**Result**
 
-The `linear_cost` specification estimates two parameters: the mileage cost
-slope and the replacement cost. The fitted policy gives the replacement
-probability at each mileage state.
-
-```python
-states = [0, 10, 50, 89]
-print(model.predict_proba(states))
+```text
+(9410, 6)
+True
+[-0.0013, 2.922]
+(90, 2)
+estimated from fitted panel
 ```
 
-## Replication Boundary
+The parameter names come from `rust_bus_reward_spec(90)`. The first coefficient
+multiplies `-mileage` for keep. The second multiplies `-1` for replacement. The
+negative operating-cost estimate makes keep utility increase with mileage.
+Treat this run as an API example, not evidence of parameter recovery. The
+wrapper estimates a transition tensor from the panel because none was supplied.
+That tensor is used for the fitted policy and value, not for the TD parameter
+equations.
 
-This page is a package smoke test on the bundled dataset, not the simulation
-study. The estimator's recovery properties are established on a synthetic cell
-whose data-generating process is fully specified; see the
-[Simulation Study](validation.md) page. The
-[bus engine simulation page](../../simulation_studies/rust_bus.md) compares
-TD-CCP against the full estimator roster on a synthetic bus engine panel.
+This example turns off cross-fitting to keep the example fast. Use the default
+`se_method="robust"`, `cross_fitting=True`, and `robust_se=True` for Algorithm 2
+inference on an adequately supported panel.
 
-The structural parameter step does not use a transition model; the wrapper may
-estimate transitions from the panel for fitted policy and value outputs after
-`theta` is recovered.
+## Paper Comparison
+
+The official Table E.1 comparison is different from this bundled-data example.
+It uses the paper's state design, sample size, fold assignment, initial values,
+and 1,000 regenerated simulation panels. Both the plug-in and locally robust
+columns are compared with the published means and empirical standard
+deviations. See [Evidence](validation.md) for the result.

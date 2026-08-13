@@ -1,0 +1,1221 @@
+{
+  "design": {
+    "base_seed": 91000,
+    "method": "semigradient with Algorithm 2 locally robust inference",
+    "n_individuals": 2000,
+    "n_periods": 60,
+    "n_replications": 20,
+    "problem": "encoded-state three-action structural DDC"
+  },
+  "estimator": "TD-CCP",
+  "provenance": {
+    "git_commit": "1985e045647d06726acbf525b8600843f32a2b0a"
+  },
+  "records": [
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.0022370497589677863,
+          "regret": 0.000794395713972309
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.004268326870040249,
+          "regret": 0.0013792469573936255
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.47859746733941627,
+        "excess_brier_score": 7.700199665655605e-05,
+        "excess_negative_log_likelihood": 8.244748224173204e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8308452209707812,
+        "oracle_brier_score": 0.4785204653427597,
+        "oracle_negative_log_likelihood": 0.8307627734885394
+      },
+      "parameters": [
+        1.486769441053272,
+        -1.2016476547306985,
+        0.7993909855671524,
+        -0.45043135684801183,
+        0.3302401424621606,
+        -0.19797686177568485
+      ],
+      "policy_tv": 0.004132150787572378,
+      "relative_parameter_error": [
+        0.010658740048548119,
+        0.023061342688101942,
+        0.0300574870102972,
+        0.147023644408389,
+        0.13616806250225513,
+        0.30673639326977903
+      ],
+      "rep": 0,
+      "runtime_seconds": 31.736569416010752,
+      "seed": 91000,
+      "standard_errors": [
+        0.020485339310486562,
+        0.026313481820364585,
+        0.02223587807800036,
+        0.02642636773939086,
+        0.033122671620403124,
+        0.031973524909942895
+      ],
+      "summary": "Estimator\nTD-CCP (temporal-difference conditional choice probability estimation)\n\nData\nObservations: 120000\nIndividuals: 2000\nState coverage: 1.000\n\nModel\nStates: 81\nActions: 3\nDiscount factor: 0.95\nTD method: semigradient\nShock normalization: Type-I extreme-value scale fixed at 1.0\n\nPre-estimation checks\nIdentification: identified\nAction-contrast rank: 6\nTransition source: supplied action-specific tensor\n\nFit\nConverged: yes\nTermination: converged\nIterations: 116\nFit time: 30.590 seconds\n\nOutcome\nLog likelihood: -99710.396513\naction_1_intercept: 1.48677 (SE 0.0204853, 95.0% CI [1.44662, 1.52692])\naction_1_x0: -1.20165 (SE 0.0263135, 95.0% CI [-1.25322, -1.15007])\naction_1_x1: 0.799391 (SE 0.0222359, 95.0% CI [0.755809, 0.842973])\naction_2_intercept: -0.450431 (SE 0.0264264, 95.0% CI [-0.502226, -0.398637])\naction_2_x0: 0.33024 (SE 0.0331227, 95.0% CI [0.265321, 0.395159])\naction_2_x1: -0.197977 (SE 0.0319735, 95.0% CI [-0.260644, -0.13531])\n\nUncertainty\nMethod: Algorithm 2 locally robust\nConfidence level: 95.0%\n\nLimitations\nInference is conditional on the reward model and discount factor.\nThe TD parameter stage does not estimate a transition density.\nPrediction and counterfactuals use the stored transition tensor."
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.002536639456980764,
+          "regret": 0.0009513244779983924
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.004868105512525031,
+          "regret": 0.0016458800894680859
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4790525203229242,
+        "excess_brier_score": 0.00014299498601239025,
+        "excess_negative_log_likelihood": 0.0004091081148642761,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8322803259229278,
+        "oracle_brier_score": 0.47890952533691183,
+        "oracle_negative_log_likelihood": 0.8318712178080635
+      },
+      "parameters": [
+        1.4954086445318633,
+        -1.2106486534294394,
+        0.8052887993844644,
+        -0.4354331678369522,
+        0.3166464393213312,
+        -0.2022418194533725
+      ],
+      "policy_tv": 0.004678960478885683,
+      "relative_parameter_error": [
+        0.016531396737342236,
+        0.030724632154040688,
+        0.03765713147614626,
+        0.10883074962554119,
+        0.08939987967446139,
+        0.2918016179851017
+      ],
+      "rep": 1,
+      "runtime_seconds": 19.218397208023816,
+      "seed": 91001,
+      "standard_errors": [
+        0.02049695143380334,
+        0.026463297336705268,
+        0.02229162906972235,
+        0.027171307078571863,
+        0.034657857747840054,
+        0.032730747230835945
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.001354527558541954,
+          "regret": 0.0002660524908335556
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.002459850597241291,
+          "regret": 0.00042319437748637685
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4717584291628865,
+        "excess_brier_score": 2.8578532332235174e-05,
+        "excess_negative_log_likelihood": 1.5195438902715352e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8204413090038625,
+        "oracle_brier_score": 0.4717298506305543,
+        "oracle_negative_log_likelihood": 0.8204261135649598
+      },
+      "parameters": [
+        1.4739445112040668,
+        -1.1816355222676314,
+        0.7962297600377981,
+        -0.4264683476063176,
+        0.323714733658406,
+        -0.2518484170467439
+      ],
+      "policy_tv": 0.002513937586157293,
+      "relative_parameter_error": [
+        0.0019407592475529924,
+        0.006023370677657722,
+        0.025984081025703546,
+        0.08600183104321814,
+        0.11371785090071866,
+        0.1180921831716486
+      ],
+      "rep": 2,
+      "runtime_seconds": 19.70025979191996,
+      "seed": 91002,
+      "standard_errors": [
+        0.0204406740328506,
+        0.02598754677244302,
+        0.021836299937472155,
+        0.027006799769560257,
+        0.034180675178847965,
+        0.03137308768568333
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.003693251425604691,
+          "regret": 0.001837065721326372
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.005643174040667002,
+          "regret": 0.002193185244436741
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4723922953295719,
+        "excess_brier_score": -4.842798465021225e-07,
+        "excess_negative_log_likelihood": -1.6490425299942046e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8207803064270663,
+        "oracle_brier_score": 0.4723927796094184,
+        "oracle_negative_log_likelihood": 0.8207967968523663
+      },
+      "parameters": [
+        1.4823300931476378,
+        -1.243134794480575,
+        0.834026405321063,
+        -0.42757075778416753,
+        0.3013876239501596,
+        -0.2411756039599775
+      ],
+      "policy_tv": 0.005549852325056211,
+      "relative_parameter_error": [
+        0.0076410120558561955,
+        0.05838275219587467,
+        0.07468705386480481,
+        0.08880911903639627,
+        0.03690299493147444,
+        0.15546560564196024
+      ],
+      "rep": 3,
+      "runtime_seconds": 19.16076966607943,
+      "seed": 91003,
+      "standard_errors": [
+        0.0202477384871018,
+        0.026613631490922447,
+        0.022036141334674308,
+        0.027268015632190598,
+        0.03446496796404987,
+        0.03207795858976232
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.001073783229341296,
+          "regret": 0.00015124984227145514
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.0015036451466754498,
+          "regret": 0.00018613749395421072
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4764824668625707,
+        "excess_brier_score": -2.1452376623598557e-05,
+        "excess_negative_log_likelihood": 2.8904942425134195e-06,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8290739854453412,
+        "oracle_brier_score": 0.4765039192391943,
+        "oracle_negative_log_likelihood": 0.8290710949510987
+      },
+      "parameters": [
+        1.4648779402529246,
+        -1.1835063277036015,
+        0.7889717149953491,
+        -0.41747293108884154,
+        0.3140245267065028,
+        -0.2634463198040465
+      ],
+      "policy_tv": 0.0016095542082710972,
+      "relative_parameter_error": [
+        0.004222408302857925,
+        0.007616140999055126,
+        0.016631706815818856,
+        0.06309499900326238,
+        0.0803793731017903,
+        0.07747933668080942
+      ],
+      "rep": 4,
+      "runtime_seconds": 31.340209917048924,
+      "seed": 91004,
+      "standard_errors": [
+        0.020516387406091605,
+        0.026629183156610024,
+        0.02168632211569883,
+        0.026449537051172693,
+        0.03372761183317971,
+        0.03198541357093326
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.0022313286229193106,
+          "regret": 0.0006608687901758515
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.004332727709287559,
+          "regret": 0.0012518657177345183
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4796166015329643,
+        "excess_brier_score": 0.00013996770143392956,
+        "excess_negative_log_likelihood": 0.0002762148181641999,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8327333622820622,
+        "oracle_brier_score": 0.4794766338315304,
+        "oracle_negative_log_likelihood": 0.832457147463898
+      },
+      "parameters": [
+        1.5153282774728225,
+        -1.224675076133428,
+        0.7750228259078475,
+        -0.36162082049523675,
+        0.2847821326157698,
+        -0.30635826848334935
+      ],
+      "policy_tv": 0.003746004046712242,
+      "relative_parameter_error": [
+        0.030072131820030865,
+        0.042666477825823224,
+        0.0013421731746632837,
+        0.0791324247029292,
+        0.020227034069931517,
+        0.07278717449837425
+      ],
+      "rep": 5,
+      "runtime_seconds": 19.343269875040278,
+      "seed": 91005,
+      "standard_errors": [
+        0.02044223180456489,
+        0.026423732623942264,
+        0.022004248167380634,
+        0.027044234960577954,
+        0.03382505679963489,
+        0.031803618687312726
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.002569078059077656,
+          "regret": 0.0008375932199068667
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.004638386280752316,
+          "regret": 0.0013733393723844181
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4780563628910351,
+        "excess_brier_score": 0.00011469322201485,
+        "excess_negative_log_likelihood": 0.0001603658556517118,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8295293996224941,
+        "oracle_brier_score": 0.47794166966902024,
+        "oracle_negative_log_likelihood": 0.8293690337668423
+      },
+      "parameters": [
+        1.5022365444250614,
+        -1.2236534117448254,
+        0.7888937712611388,
+        -0.41630330784965525,
+        0.3330816931583428,
+        -0.2691932153044533
+      ],
+      "policy_tv": 0.004155785097325918,
+      "relative_parameter_error": [
+        0.021172786661491177,
+        0.041796651020049154,
+        0.01653127219941906,
+        0.06011655292041364,
+        0.14594421849865458,
+        0.05735519961560103
+      ],
+      "rep": 6,
+      "runtime_seconds": 19.659920792095363,
+      "seed": 91006,
+      "standard_errors": [
+        0.020042718796946548,
+        0.02575055510416451,
+        0.02197381101353449,
+        0.027267141273134843,
+        0.03395878930860285,
+        0.03097170369914477
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.003900875525706028,
+          "regret": 0.0019304598883559637
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.005260099480702896,
+          "regret": 0.002341282128774496
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.472424327688079,
+        "excess_brier_score": -8.222062668528096e-05,
+        "excess_negative_log_likelihood": -0.00013814586305727072,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8214943718069714,
+        "oracle_brier_score": 0.4725065483147643,
+        "oracle_negative_log_likelihood": 0.8216325176700287
+      },
+      "parameters": [
+        1.4840297054982385,
+        -1.2520580990755983,
+        0.8190353429901516,
+        -0.40700139086226816,
+        0.2727789088661494,
+        -0.24473985801345902
+      ],
+      "policy_tv": 0.005404657081499759,
+      "relative_parameter_error": [
+        0.00879635465935513,
+        0.06597989429011467,
+        0.05537027863092126,
+        0.03642921730168754,
+        0.061523284034303606,
+        0.14298451265838166
+      ],
+      "rep": 7,
+      "runtime_seconds": 8.009172333055176,
+      "seed": 91007,
+      "standard_errors": [
+        0.02052846872876899,
+        0.026035234142521884,
+        0.02186101013476191,
+        0.027189703513396373,
+        0.0341016495871664,
+        0.030906440484318547
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.0032257523707324757,
+          "regret": 0.0015479019532354296
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.0045438458632699194,
+          "regret": 0.0017653731867374922
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4747900640959382,
+        "excess_brier_score": 0.00014685020095089873,
+        "excess_negative_log_likelihood": 0.00019332557071660705,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8250521024291374,
+        "oracle_brier_score": 0.4746432138949873,
+        "oracle_negative_log_likelihood": 0.8248587768584208
+      },
+      "parameters": [
+        1.441122551100141,
+        -1.2006974556661603,
+        0.8336805640099124,
+        -0.47721060780786806,
+        0.33059733802718927,
+        -0.21912242705552676
+      ],
+      "policy_tv": 0.005188534581477674,
+      "relative_parameter_error": [
+        0.020370568876770946,
+        0.022252360182323006,
+        0.0742414190774481,
+        0.21521701852302846,
+        0.13739696880670152,
+        0.2326901096749707
+      ],
+      "rep": 8,
+      "runtime_seconds": 6.233249375014566,
+      "seed": 91008,
+      "standard_errors": [
+        0.020698016106237466,
+        0.02605466703306905,
+        0.022638297372977914,
+        0.02670619535315287,
+        0.0345875611101686,
+        0.03169060297448509
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.0015580568924442207,
+          "regret": 0.0005287916933024828
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.0031299689703877505,
+          "regret": 0.000977428271390889
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4641812667628852,
+        "excess_brier_score": 2.523057010517249e-05,
+        "excess_negative_log_likelihood": 6.794800475584672e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8083558105328308,
+        "oracle_brier_score": 0.46415603619278,
+        "oracle_negative_log_likelihood": 0.8082878625280749
+      },
+      "parameters": [
+        1.4585126461390805,
+        -1.1681026017613134,
+        0.7946403849221222,
+        -0.45688009895493664,
+        0.35601993233914087,
+        -0.21434559448093934
+      ],
+      "policy_tv": 0.0029773782131128175,
+      "relative_parameter_error": [
+        0.008549333481370278,
+        0.005498316040723786,
+        0.02393608728155554,
+        0.16344536896392572,
+        0.22486162258209924,
+        0.249417338047532
+      ],
+      "rep": 9,
+      "runtime_seconds": 6.614986749948002,
+      "seed": 91009,
+      "standard_errors": [
+        0.020111144253203588,
+        0.025575310968231225,
+        0.021071088367760067,
+        0.026931843360781107,
+        0.033180937841259375,
+        0.0312645536930935
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.003733469467672945,
+          "regret": 0.0018845804940323628
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.005648067782035251,
+          "regret": 0.002167430734055201
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4630182973925783,
+        "excess_brier_score": -0.00015809237343272775,
+        "excess_negative_log_likelihood": -0.0002800087505668847,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8078663727698892,
+        "oracle_brier_score": 0.46317638976601105,
+        "oracle_negative_log_likelihood": 0.808146381520456
+      },
+      "parameters": [
+        1.48329515631068,
+        -1.2437475980924733,
+        0.8379809861817198,
+        -0.41380996527507014,
+        0.29738138231351263,
+        -0.25001368350608355
+      ],
+      "policy_tv": 0.0055124734535584976,
+      "relative_parameter_error": [
+        0.008297031404583571,
+        0.05890448224172008,
+        0.07978274007724959,
+        0.05376725497927534,
+        0.02311980139149888,
+        0.12451694402692601
+      ],
+      "rep": 10,
+      "runtime_seconds": 8.019955959054641,
+      "seed": 91010,
+      "standard_errors": [
+        0.02066252817665862,
+        0.025429826261697645,
+        0.022480082919719348,
+        0.027103843760666144,
+        0.034330782985957826,
+        0.03292075345840646
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.001707325263242448,
+          "regret": 0.0004661820560656348
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.003162033516191527,
+          "regret": 0.0007993646018336987
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4814066904452551,
+        "excess_brier_score": 8.613239187837962e-05,
+        "excess_negative_log_likelihood": 0.00014825299569620753,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8340086255915721,
+        "oracle_brier_score": 0.4813205580533767,
+        "oracle_negative_log_likelihood": 0.8338603725958759
+      },
+      "parameters": [
+        1.4760205929040542,
+        -1.1875213244711,
+        0.7978667885834133,
+        -0.4465192673803745,
+        0.3419324966535838,
+        -0.2340827576536701
+      ],
+      "policy_tv": 0.0032107417962395535,
+      "relative_parameter_error": [
+        0.0033520137818543482,
+        0.01103443750858059,
+        0.02809347873008743,
+        0.13706150689242746,
+        0.17639478754153937,
+        0.18030291323533537
+      ],
+      "rep": 11,
+      "runtime_seconds": 7.91635345807299,
+      "seed": 91011,
+      "standard_errors": [
+        0.020280187020249637,
+        0.025671602953734583,
+        0.022071307889000056,
+        0.02666225931875332,
+        0.033470800928177113,
+        0.03158780923931598
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.002900175944892894,
+          "regret": 0.001225830866715904
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.004508577045165935,
+          "regret": 0.0017104028072991088
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.46402218896885356,
+        "excess_brier_score": -0.00018807148210719937,
+        "excess_negative_log_likelihood": -0.00031724223612528135,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8093327944742046,
+        "oracle_brier_score": 0.46421026045096075,
+        "oracle_negative_log_likelihood": 0.8096500367103299
+      },
+      "parameters": [
+        1.4568833695960213,
+        -1.2034791747665845,
+        0.8148854105933417,
+        -0.4853372305560651,
+        0.3539369591070449,
+        -0.21212893911531766
+      ],
+      "policy_tv": 0.004790388253029945,
+      "relative_parameter_error": [
+        0.00965686403232938,
+        0.024620666121803202,
+        0.05002287165098421,
+        0.2359114668549513,
+        0.21769529917965075,
+        0.25717949004784985
+      ],
+      "rep": 12,
+      "runtime_seconds": 7.847245292039588,
+      "seed": 91012,
+      "standard_errors": [
+        0.020189150040031387,
+        0.026348417031470093,
+        0.02163022208195601,
+        0.026528572736415,
+        0.03439441388304469,
+        0.03213680282550424
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.0021357294887062385,
+          "regret": 0.0008282680623080457
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.00421170201889716,
+          "regret": 0.001594148918708359
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.48010530719178596,
+        "excess_brier_score": 2.635805531192581e-05,
+        "excess_negative_log_likelihood": 9.475842594686146e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8345750379419299,
+        "oracle_brier_score": 0.48007894913647403,
+        "oracle_negative_log_likelihood": 0.834480279515983
+      },
+      "parameters": [
+        1.4659587284234692,
+        -1.1657971353744103,
+        0.7975129896094051,
+        -0.46717050379680225,
+        0.3804623091757553,
+        -0.21235232456816128
+      ],
+      "policy_tv": 0.004079573584989342,
+      "relative_parameter_error": [
+        0.003487722762154227,
+        0.007461148929401096,
+        0.027637590074031125,
+        0.18964988933024918,
+        0.30895390684032875,
+        0.2563972521472163
+      ],
+      "rep": 13,
+      "runtime_seconds": 6.2403015829622746,
+      "seed": 91013,
+      "standard_errors": [
+        0.020485863028750953,
+        0.025947066006742677,
+        0.02201823562232874,
+        0.0271809502875446,
+        0.034445023989915995,
+        0.03159663812155293
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.0016606415913886744,
+          "regret": 0.0004941432940552318
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.0031464782840664733,
+          "regret": 0.0009650426005555415
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4681294801022685,
+        "excess_brier_score": -7.107275721734974e-05,
+        "excess_negative_log_likelihood": -0.0001982482533007257,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.813272650175305,
+        "oracle_brier_score": 0.46820055285948586,
+        "oracle_negative_log_likelihood": 0.8134708984286058
+      },
+      "parameters": [
+        1.4735094725330367,
+        -1.193278806008283,
+        0.7855369048507049,
+        -0.4535001493193504,
+        0.33070630188142114,
+        -0.2549741062903508
+      ],
+      "policy_tv": 0.0030619382479253818,
+      "relative_parameter_error": [
+        0.0016450337483631412,
+        0.015936254417009122,
+        0.012205772611119891,
+        0.15483832575970427,
+        0.1377718513095444,
+        0.10714683037079462
+      ],
+      "rep": 14,
+      "runtime_seconds": 6.422252625110559,
+      "seed": 91014,
+      "standard_errors": [
+        0.01931929812461416,
+        0.024954459626597644,
+        0.021383023607643294,
+        0.026076291463000195,
+        0.03358326376240131,
+        0.03176731495765268
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.004307783840963412,
+          "regret": 0.0027434614822447793
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.007545319945123697,
+          "regret": 0.004264666510602374
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.47549919497231463,
+        "excess_brier_score": 6.666856658460452e-05,
+        "excess_negative_log_likelihood": 1.9263847566231007e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8261182718245887,
+        "oracle_brier_score": 0.47543252640573,
+        "oracle_negative_log_likelihood": 0.8260990079770225
+      },
+      "parameters": [
+        1.5131799198154747,
+        -1.2739504790071425,
+        0.8304014608171961,
+        -0.3680817391667931,
+        0.22894509960174964,
+        -0.20627354063888625
+      ],
+      "policy_tv": 0.006583977481390646,
+      "relative_parameter_error": [
+        0.028611746380839586,
+        0.08461867539972634,
+        0.07001612150051784,
+        0.06267969252030854,
+        0.2123304323498145,
+        0.2776835763850343
+      ],
+      "rep": 15,
+      "runtime_seconds": 6.4351877089357,
+      "seed": 91015,
+      "standard_errors": [
+        0.020657626288203588,
+        0.026400506744282872,
+        0.021697048946392582,
+        0.026982508562041374,
+        0.03448846471119932,
+        0.03211582368574513
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.003446074352050743,
+          "regret": 0.001955965633321654
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.005407401310726608,
+          "regret": 0.0023706527655597298
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.47071887386065947,
+        "excess_brier_score": 0.0001338343154953514,
+        "excess_negative_log_likelihood": 0.00036712180031217567,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8190028524801122,
+        "oracle_brier_score": 0.4705850395451641,
+        "oracle_negative_log_likelihood": 0.8186357306798
+      },
+      "parameters": [
+        1.4756342058402239,
+        -1.2289999895521078,
+        0.838024919127172,
+        -0.4358409376596387,
+        0.2870999549270744,
+        -0.156960748492015
+      ],
+      "policy_tv": 0.005553978150902214,
+      "relative_parameter_error": [
+        0.003089360103133886,
+        0.04634863183470027,
+        0.07983934999680901,
+        0.10986913565481467,
+        0.01225272887182493,
+        0.4503641807498644
+      ],
+      "rep": 16,
+      "runtime_seconds": 6.545167208998464,
+      "seed": 91016,
+      "standard_errors": [
+        0.02025792427289134,
+        0.026132305675005938,
+        0.022657817677488125,
+        0.027043169401561266,
+        0.03363042420826658,
+        0.03223171551919074
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.00290697347244506,
+          "regret": 0.0011161115587422557
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.005111392652387459,
+          "regret": 0.0016854114797450394
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.47696751294522416,
+        "excess_brier_score": 5.342876543246167e-06,
+        "excess_negative_log_likelihood": 1.0970310529878624e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.830262258540121,
+        "oracle_brier_score": 0.4769621700686809,
+        "oracle_negative_log_likelihood": 0.8302512882295912
+      },
+      "parameters": [
+        1.502842714077608,
+        -1.2363228161687458,
+        0.8045629783001726,
+        -0.39429596169351455,
+        0.30058999268128483,
+        -0.2584587769205862
+      ],
+      "policy_tv": 0.004480310644672202,
+      "relative_parameter_error": [
+        0.021584841577594622,
+        0.05258315557483014,
+        0.0367218726908921,
+        0.00407483644575193,
+        0.03415880045956069,
+        0.0949444178882638
+      ],
+      "rep": 17,
+      "runtime_seconds": 6.530139499926008,
+      "seed": 91017,
+      "standard_errors": [
+        0.020015699088653385,
+        0.025769652590051272,
+        0.021873635320824678,
+        0.026704292347684493,
+        0.033371527187579964,
+        0.031695398381749
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.0027926822648699943,
+          "regret": 0.0009987322924495138
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.0035909238619966904,
+          "regret": 0.0010363265423712022
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.4704290060888481,
+        "excess_brier_score": 1.2182141475580721e-06,
+        "excess_negative_log_likelihood": 1.5870285320240818e-05,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8194077850563857,
+        "oracle_brier_score": 0.4704277878747005,
+        "oracle_negative_log_likelihood": 0.8193919147710654
+      },
+      "parameters": [
+        1.460183912497633,
+        -1.194215171901542,
+        0.8310203554902045,
+        -0.40222245924112354,
+        0.3286349931512276,
+        -0.29353775579698016
+      ],
+      "policy_tv": 0.004263387394340594,
+      "relative_parameter_error": [
+        0.00741325958478573,
+        0.01673345960792628,
+        0.07081359995988619,
+        0.024259665868097136,
+        0.13064565880828696,
+        0.027893065230427137
+      ],
+      "rep": 18,
+      "runtime_seconds": 6.521501209004782,
+      "seed": 91018,
+      "standard_errors": [
+        0.01980878316018334,
+        0.025985635394153862,
+        0.02093200525107883,
+        0.027166990282807016,
+        0.03493730569485688,
+        0.03127710259964496
+      ],
+      "summary": null
+    },
+    {
+      "converged": true,
+      "counterfactuals": {
+        "reward": {
+          "oracle_effect_policy_tv": 0.16885065547032077,
+          "policy_tv": 0.002083022342495276,
+          "regret": 0.0005199650493222034
+        },
+        "transition": {
+          "oracle_effect_policy_tv": 0.049535302969456574,
+          "policy_tv": 0.00407214612151587,
+          "regret": 0.0010494041345324048
+        }
+      },
+      "error": null,
+      "out_of_sample": {
+        "brier_score": 0.48212468520877566,
+        "excess_brier_score": 6.76764953467246e-05,
+        "excess_negative_log_likelihood": 0.00013484947173880713,
+        "n_observations": 6000,
+        "negative_log_likelihood": 0.8363189300935343,
+        "oracle_brier_score": 0.48205700871342894,
+        "oracle_negative_log_likelihood": 0.8361840806217955
+      },
+      "parameters": [
+        1.505872061290404,
+        -1.206568660644722,
+        0.7783482067107717,
+        -0.39338407744353276,
+        0.30775813806467867,
+        -0.2989507575258826
+      ],
+      "policy_tv": 0.0037843815820006533,
+      "relative_parameter_error": [
+        0.023644095791943452,
+        0.027250999196777273,
+        0.002942755546145446,
+        0.00175272281003173,
+        0.05882030221178402,
+        0.04684799293338125
+      ],
+      "rep": 19,
+      "runtime_seconds": 6.309725958970375,
+      "seed": 91019,
+      "standard_errors": [
+        0.020419169043763376,
+        0.025863249540485415,
+        0.021249936308090498,
+        0.02634673846224325,
+        0.03397710958354265,
+        0.03166692220702658
+      ],
+      "summary": null
+    }
+  ],
+  "summary": {
+    "completed_replications": 20,
+    "counterfactuals": {
+      "reward": {
+        "oracle_effect_policy_tv": 0.16885065547032074,
+        "policy_tv": 0.002602711046452194,
+        "regret": 0.0010869472290318133
+      },
+      "transition": {
+        "oracle_effect_policy_tv": 0.04953530296945656,
+        "policy_tv": 0.0043526086504828065,
+        "regret": 0.0015589891967511759
+      }
+    },
+    "gates": [
+      {
+        "name": "replications",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 20,
+        "value": 20
+      },
+      {
+        "name": "usable_rate",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.95,
+        "value": 1.0
+      },
+      {
+        "name": "median_relative_parameter_error",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.1,
+        "value": 0.04818022501182201
+      },
+      {
+        "name": "p90_relative_parameter_error",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.25,
+        "value": 0.06852961286862332
+      },
+      {
+        "name": "mean_policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.004263898249756005
+      },
+      {
+        "name": "max_runtime_seconds",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 60.0,
+        "value": 31.736569416010752
+      },
+      {
+        "name": "mean_excess_nll",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.02,
+        "value": 5.242236941499501e-05
+      },
+      {
+        "name": "mean_excess_brier",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.02,
+        "value": 2.7057711445058195e-05
+      },
+      {
+        "name": "reward_oracle_effect_policy_tv",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.01,
+        "value": 0.16885065547032074
+      },
+      {
+        "name": "reward_policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.002602711046452194
+      },
+      {
+        "name": "reward_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.0010869472290318133
+      },
+      {
+        "name": "transition_oracle_effect_policy_tv",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.01,
+        "value": 0.04953530296945656
+      },
+      {
+        "name": "transition_policy_tv",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.03,
+        "value": 0.0043526086504828065
+      },
+      {
+        "name": "transition_regret",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.05,
+        "value": 0.0015589891967511759
+      }
+    ],
+    "max_runtime_seconds": 31.736569416010752,
+    "mean_excess_brier_score": 2.7057711445058195e-05,
+    "mean_excess_negative_log_likelihood": 5.242236941499501e-05,
+    "mean_policy_tv": 0.004263898249756005,
+    "median_relative_parameter_error": 0.04818022501182201,
+    "p90_relative_parameter_error": 0.06852961286862332,
+    "passed": true,
+    "status": "ready",
+    "usable_rate": 1.0,
+    "usable_replications": 20
+  }
+}
