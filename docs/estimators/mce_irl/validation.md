@@ -88,9 +88,10 @@ side:
 | Routes with at least 90 percent match | 30.15 | 52.98 | -22.83 pp |
 | Training-path average log probability | -3.86 | -6.85 | +2.99 |
 
-Distance match is similar. The generated sample has fewer near-exact route
-matches and a less negative training-path log probability. These paper values
-are comparison numbers, not fitting criteria. Reproducing Table 1 requires the
+The fitted routes have strong average overlap with held-out routes. Near-exact
+matches are less common than in the published application. The less negative
+log probability does not show superior performance because the generated
+network, trips, split, and choice sets differ. Reproducing Table 1 requires the
 original road graph, fitted routes, candidate path sets, and split.
 
 ## Controlled Estimation
