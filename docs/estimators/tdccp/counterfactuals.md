@@ -1,47 +1,76 @@
 # Counterfactuals
 
-Read this page as the boundary between estimation and policy evaluation. TD-CCP
-avoids transition-density modeling for reward estimation, but counterfactual
-evaluation still needs an environment.
+## Important Links
 
-TD-CCP estimates reward parameters without fitting a transition-density model
-for the original data-generating process. Counterfactual analysis is a separate
-step. Once `theta` is estimated, policy and value evaluation still need a
-transition environment for the counterfactual being studied.
+- [TD-CCP overview](../tdccp.md)
+- [Quick Start](quick_start.md)
+- [Evidence](validation.md)
+- [Applied workflow notebook](https://github.com/rawatpranjal/EconIRL/blob/main/examples/tdccp/tdccp_applied_workflow.ipynb)
 
-The public wrapper does not yet expose the same one-call parameter
-counterfactual interface as NFXP and CCP. The simulation harness evaluates
-counterfactuals after fitting the full estimator API.
+TD-CCP avoids a transition density in the reward-parameter stage.
+Counterfactual evaluation is a separate task. It needs a transition environment
+because the changed dynamic program must be solved.
 
-## Counterfactual Families
+## Reward Changes
 
-The simulation harness checks three common counterfactual types.
+Pass one or more fitted parameter names to `counterfactual`. The method holds
+the stored transition tensor fixed, changes the reward, and solves for a new
+policy and value function.
 
-| Type | Intervention | What it tests |
-| --- | --- | --- |
-| Type A | Shift rewards and hold transitions fixed | Payoff counterfactuals |
-| Type B | Change transitions and hold rewards fixed | State-dynamics counterfactuals |
-| Type C | Disable one non-baseline action | Action-set counterfactuals |
+The following continues the model from [Quick Start](quick_start.md).
 
-## Reported Results
+```python
+changed = model.counterfactual(
+    replacement_cost=model.params_["replacement_cost"] - 0.25
+)
 
-These rows come from the
-[results file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp.json)
-and the [Simulation Study](validation.md) page.
+print(f"{model.policy_[:, 1].mean():.3f}")
+print(f"{changed.policy[:, 1].mean():.3f}")
+print(f"{np.abs(changed.policy - model.policy_).mean():.3f}")
+```
 
-| Counterfactual | Policy TV | Value RMSE | Regret |
-| --- | ---: | ---: | ---: |
-| Type A | 0.004643 | 0.001885 | 0.001883 |
-| Type B | 0.004840 | 0.001867 | 0.001864 |
-| Type C | 0.006953 | 0.003208 | 0.003200 |
+**Result**
 
-Regret measures how much value is lost when the policy implied by the
-estimated reward is used instead of the oracle counterfactual policy.
+```text
+0.463
+0.493
+0.030
+```
 
-## Boundary
+The lower fitted replacement cost raises the mean replacement probability.
+The last line is the mean absolute change over all state-action probabilities.
 
-TD-CCP separates reward-parameter estimation from transition modeling. That is
-the computational advantage. It does not remove the need for transition
-information in counterfactual evaluation. If the counterfactual changes the
-transition process, that new process must still be supplied or estimated for
-the evaluation step.
+## Transition Changes
+
+Pass a new tensor through `transitions=` to hold fitted reward parameters fixed
+and change the state dynamics. The tensor must have shape
+`(n_actions, n_states, n_states)`. Every row must be finite, nonnegative, and
+sum to one.
+
+Reward and transition changes are separate calls. Mixing both in one call is
+rejected so the reported intervention remains clear.
+
+## Returned Quantities
+
+The result provides both baseline and changed objects.
+
+| Attribute | Meaning |
+| --- | --- |
+| `baseline_policy` | Policy under the fitted model |
+| `counterfactual_policy` | Policy after the intervention |
+| `baseline_value` | Value under the fitted model |
+| `counterfactual_value` | Value after the intervention |
+| `params` | Parameter values used for the changed model |
+
+The shared aliases `policy` and `value_function` point to the changed policy
+and value.
+
+## Interpretation Boundary
+
+The simulation evidence first measures the policy effect under the oracle
+intervention. It then compares the fitted counterfactual with the oracle
+changed policy and reports value regret. This separates the size of the
+intervention from counterfactual recovery error.
+
+TD-CCP does not infer a new transition law from a reward change. A transition
+intervention must be supplied explicitly or constructed from a separate model.

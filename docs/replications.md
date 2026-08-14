@@ -236,86 +236,49 @@ python validation/estimators/airl/run.py    # state-only recovers, state-action 
 
 ## TD-CCP (Adusumilli and Eckardt, 2025)
 
-Adusumilli and Eckardt estimate dynamic discrete choice models with
-temporal-difference learning on the conditional-choice-probability representation.
-Their linear semi-gradient estimator approximates the recursive value terms h(a, x)
-and g(a, x) with basis functions and needs no transition densities. Their bus-engine
-Monte Carlo (Online Appendix, Table B.1) is a Rust-style replacement problem with
-one mileage state and a permanent bus type s in {1, 2}. The manager keeps or replaces
-each period under Type-1 extreme-value shocks. The replacement payoff is set to zero,
-and the keep payoff is theta0 + theta1 times mileage + theta2 times type. The true
-values are theta0 = 2, theta1 = -0.15, theta2 = 1, with discount 0.9.
+Adusumilli and Eckardt estimate finite reward parameters with temporal-
+difference recursions. The parameter stage learns continuation terms from
+successor tuples without fitting a transition density.
 
-The package runs the same linear semi-gradient estimator on the same design, 1000
-buses over 30 periods, across 200 Monte Carlo draws, without the locally robust
-correction (columns 2 and 3 of Table B.1). Each parameter's mean, standard
-deviation, and mean-squared error sit next to the paper.
+### Official Table E.1 comparison
 
-### Bus-engine recovery, 1000 buses, T = 30, 200 draws
+The official Zenodo code deterministically generates 1,000 bus replacement
+panels. Each panel contains 1,000 buses and 30 retained periods after a
+1,000-period burn-in. EconIRL uses the paper's seed schedule, basis, logit first
+stage, fold assignment, and initial parameter values. The table compares all
+published means and empirical standard deviations for the plug-in and locally
+robust estimators.
 
-| Parameter | True | Package mean | Paper mean | Package SD | Paper SD | Package MSE | Paper MSE |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| theta0 (intercept) | 2.0 | 1.9533 | 1.9788 | 0.0904 | 0.0868 | 0.0103 | 0.0080 |
-| theta1 (mileage) | -0.15 | -0.1468 | -0.1492 | 0.0035 | 0.0033 | 0.00002 | 0.00001 |
-| theta2 (type) | 1.0 | 1.0029 | 1.0044 | 0.0628 | 0.0583 | 0.0039 | 0.0034 |
+| Method | Parameter | Package mean | Published mean | Package SD | Published SD |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Plug-in | $\theta_0$ | 1.978596 | 1.978589 | 0.086882 | 0.086880 |
+| Plug-in | $\theta_1$ | -0.149204 | -0.149203 | 0.003342 | 0.003342 |
+| Plug-in | $\theta_2$ | 1.004454 | 1.004448 | 0.058316 | 0.058315 |
+| Locally robust | $\theta_0$ | 1.977512 | 1.977513 | 0.087594 | 0.087594 |
+| Locally robust | $\theta_1$ | -0.148897 | -0.148897 | 0.003387 | 0.003387 |
+| Locally robust | $\theta_2$ | 1.003724 | 1.003724 | 0.058684 | 0.058684 |
 
-The means match the paper to two or three figures, and the standard deviations
-match to within a few percent. The linear semi-gradient reaches the paper's
-near-maximum-likelihood precision. The mean-squared errors sit within Monte Carlo
-noise of the paper, which reports 1000 draws. The nested fixed point reproduces the
-same Table B.1 numbers and serves as the oracle reference.
+All 12 quantities agree to four or more significant figures. The largest mean
+gap is $6.9\times10^{-6}$. The largest standard-deviation gap is
+$2.1\times10^{-6}$. This comparison reproduces the distribution of repeated
+point estimates. It does not assess standard-error calibration. The optimizer
+satisfied its stopping criteria for every locally robust fit. The plug-in
+optimizer stopped short of every success criterion in 318 panels. Those finite
+estimates remain in the summary and reproduce the published distribution.
 
-With the locally robust correction (two-fold cross-fitting, columns 4 and 5 of
-Table B.1), the same estimator recovers the parameters at the same precision, across
-50 draws.
+See the [Table E.1 result](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp_table_e1.json)
+and the [EconIRL replication runner](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/tdccp/paper_table_e1_mc.py).
 
-### Bus-engine recovery, locally robust, 1000 buses, T = 30, 50 draws
+### High-dimensional state check
 
-| Parameter | True | Package mean | Paper mean | Package SD | Paper SD |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| theta0 (intercept) | 2.0 | 2.0055 | 1.9778 | 0.1136 | 0.0870 |
-| theta1 (mileage) | -0.15 | -0.1502 | -0.1489 | 0.0045 | 0.0034 |
-| theta2 (type) | 1.0 | 1.0010 | 1.0032 | 0.0739 | 0.0584 |
+The bus state is augmented with 20 irrelevant variables. Thirty paired panels
+are fitted with zero and 20 nuisance variables. The mean parameter error ratio
+is 1.006, so the added variables barely change recovery. Shuffling successor
+links increases the dynamic coefficient error by a factor of 24.69. This shows
+that the result depends on the temporal link rather than a static choice fit.
 
-The paper notes the two versions differ little in practice, with slightly higher
-variance for the locally robust one from the sample splitting. The package shows the
-same pattern.
-
-Reproduce:
-
-```bash
-# columns 2-3 (not locally robust) and 4-5 (locally robust):
-PYTHONPATH=src python validation/estimators/tdccp/bus_engine_mc.py --n-reps 200 --lr-reps 50
-```
-
-### High-dimensional state, robustness to irrelevant variables
-
-Temporal-difference estimation is built for high-dimensional state spaces.
-Following the paper's high-dimensional design, the bus state is augmented with K
-dummy variables drawn uniformly from minus ten to ten that affect neither the
-reward nor the transitions. The estimator should recover the structural parameters
-regardless of K. Each observation is treated as its own point in feature space, so
-the policy solve over an enumerable state set is skipped. The parameters and
-standard errors do not need it.
-
-| K dummy variables | theta0 | theta1 | theta2 |
-| --- | ---: | ---: | ---: |
-| 0 | 1.897 | -0.1472 | 1.034 |
-| 5 | 1.913 | -0.1465 | 1.021 |
-| 10 | 1.889 | -0.1481 | 1.050 |
-| 20 | 1.902 | -0.1465 | 1.032 |
-
-True values are theta0 = 2, theta1 = -0.15, theta2 = 1. Five draws per cell, 150
-buses over 30 periods. The estimates stay on the true values as K grows to twenty
-irrelevant dimensions, with the mileage coefficient holding at about -0.147
-throughout. Recovery rests on the dynamic continuation, not a static fit. Breaking
-the state-to-successor link sends the mileage coefficient to about -0.35.
-
-Reproduce:
-
-```bash
-PYTHONPATH=src python validation/estimators/tdccp/highdim_dummies.py --ks 0,5,10,20 --seeds 5
-```
+See the [high-dimensional result](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/tdccp_highdim.json)
+and the [simulation program](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/tdccp/highdim_dummies.py).
 
 ## NNES (Nguyen, 2025)
 

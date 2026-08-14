@@ -1,65 +1,86 @@
 # Pre-Estimation Checks
 
-Read this page before fitting TD-CCP. The goal is to catch weak feature support,
-weak successor-tuple support, and unstable continuation bases before the
-transition-density-free shortcut is interpreted structurally.
+## Important Links
 
-TD-CCP is most reliable when the reward features, observed choices, and panel
-transitions support the structural parameter target. These checks are meant to
-catch problems before a result is treated as recovery.
+- [TD-CCP overview](../tdccp.md)
+- [Quick Start](quick_start.md)
+- [Evidence](validation.md)
+- [Identification and Anchors](../../theory/identification.md)
 
-## Before Fitting
+Run these checks before interpreting a TD-CCP fit. The parameter stage avoids a
+transition density, but it still needs reward identification and informative
+successor tuples.
 
-Confirm that the reward is written as a finite set of known features. The
-features should have enough variation to identify the parameters, and one
-action or reward level should be normalized so the model has an anchor.
+## Reward Design
 
-Check that every relevant state-action pair has enough observed support. TD-CCP
-uses observed successor tuples to learn continuation terms, so weak support in
-the current or next state-action data can make the recursion unstable.
+The reward must be linear in a finite set of known features. Check both the raw
+feature rank and the action-contrast rank. The contrast rank must equal the
+number of parameters. A state-only column repeated across all actions cannot be
+identified from choices.
 
-Finally, check the first-stage choice probabilities. The log correction used
-by TD-CCP is unstable when fitted choice probabilities are too close to zero.
+Choose an explicit reward normalization. A common design sets the baseline
+action's feature vector to zero. Keep the logit shock scale and discount factor
+fixed.
 
-## During Fitting
+## Panel Support
 
-Watch the conditioning of the basis used for the continuation terms. A nearly
-singular basis can make the projected TD equations unstable even when the
-likelihood optimizer appears to run.
+Inspect state coverage, state-action coverage, and action shares. Each recursive
+equation uses current and successor state-action pairs. Thin support can make
+the first-stage choice probabilities and TD projections unstable.
 
-For locally robust inference, split folds by individual rather than by row.
-This keeps the held-out moment evaluation separate from the quantities learned
-on the other fold and matches the covariance unit used in the simulation
-results file.
+The public wrapper rejects out-of-range states and actions. It also reports
+states with only one observed action. Treat those states as a design problem,
+not an optimizer problem.
 
-## After Fitting
+The backward correction learns the distribution of predecessor choices given
+the current choice and state. Simulated panels should start from the stationary
+distribution or discard a sufficient burn-in period. A short panel that starts
+from an arbitrary state distribution can distort this backward recursion.
 
-Do not judge the run only by a returned parameter vector. Check that the final
-moment is small, the correction recursion is stable, the optimizer reached a
-stationary point, and reported standard errors are finite and positive.
+## Choice Probabilities
 
-Also keep estimation and evaluation separate. The parameter-estimation step
-should not silently use a transition tensor. Transition tensors may enter later
-for policy values, Q functions, or counterfactual evaluation.
+`ccp_method="frequency"` estimates tabular choice frequencies with smoothing.
+It is appropriate when each state has strong support. `ccp_method="logit"`
+fits a shared polynomial model. Set `ccp_use_encoder=True` to build that model
+from encoded state coordinates. The paper recommends second- or third-order
+polynomial terms for this first stage.
 
-## Current Simulation Case
+Choice probabilities near zero make the term
+$\gamma_{\mathrm E}-\log P(a\mid x)$ unstable. Review minimum fitted
+probabilities and action support before trusting the recursive shock term.
 
-The simulation study uses two encoded state coordinates and a finite linear
-reward. Action 0 is fixed as the baseline action, leaving six reward
-parameters for the two non-baseline actions.
+## TD Basis
 
-| Check | Current results file |
-| --- | --- |
-| States and actions | 81 states, 3 actions |
-| Reward target | 6 finite reward parameters |
-| Reward form | Linear in encoded state features |
-| Choice model | Logit with degree-2 state features |
-| TD basis | Encoded semigradient basis, degree 2 |
-| Fold split | By individual |
-| Inference | Cross-fitted locally robust standard errors |
-| Max moment norm | 7.91e-06 |
-| Max correction residual norm | 0.002610 |
-| Optimizer status | Preliminary and final robust folds converged |
+For `basis_type="polynomial"`, inspect the conditioning of the
+action-interacted state-index basis. For `basis_type="encoded"`, scale each
+state coordinate and avoid redundant polynomial columns. A small ridge can
+stabilize the normal equation. A pseudoinverse cutoff is available for weak
+empirical directions.
 
-See the [simulation study page](validation.md) for the full results file,
-numerical checks, and Monte Carlo standard-error check.
+The high-dimensional check appends 20 irrelevant state variables and compares
+the resulting parameter error with the zero-nuisance design. It also shuffles
+the next-state links. The shuffled design must produce a much larger dynamic
+parameter error.
+
+## Inference
+
+Algorithm 2 must split by individual. A row split leaks transitions from the
+same trajectory across folds and does not support the paper's inference
+argument.
+
+After fitting, inspect the following outputs.
+
+- All point estimates and standard errors are finite.
+- Standard errors are positive.
+- The corrected moment norm is small.
+- In each fold, the preliminary and locally robust optimizers meet their
+  recorded stationarity tolerances.
+- The covariance matrix is positive semidefinite up to numerical tolerance.
+- The manager summary states the uncertainty method and its limitations.
+
+## Transition Boundary
+
+The transition tensor is not used in the structural parameter equations. The
+public wrapper stores a supplied `(A, S, S)` tensor for policy, value,
+simulation, and counterfactual methods. If no tensor is supplied, it estimates
+one from the fitted panel for those post-fit tasks.

@@ -134,6 +134,22 @@ class TransitionFirstStage:
     note: str = "Held fixed in stage two (block-diagonal information)."
 
 
+@dataclass(frozen=True)
+class BootstrapResult:
+    """Stable public record of trajectory-bootstrap inference."""
+
+    method: str
+    unit: str
+    n_requested: int
+    n_successful: int
+    seed: int | None
+    parameter_names: tuple[str, ...]
+    estimates: np.ndarray
+    standard_errors: np.ndarray
+    intervals: np.ndarray
+    failures: tuple[str, ...] = ()
+
+
 def _quantiles(values: Any) -> dict[str, float]:
     """max, p95, p50, p5, min of a 1-D array; zeros for an empty input."""
     v = np.asarray(values, dtype=np.float64)

@@ -12,6 +12,7 @@ theta = (2, -0.15, 1), 1000 buses, T=30).
 Usage:
     PYTHONPATH=src:. python validation/estimators/tdccp/bus_engine_nfxp.py --n-reps 1000
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,14 +31,15 @@ for path in (HERE.parent, ROOT, ROOT / "src"):
         sys.path.insert(0, str(path))
 
 import jax  # noqa: E402
+
 jax.config.update("jax_enable_x64", True)
+import bus_engine_mc as B  # noqa: E402  (shared DGP)
 import jax.numpy as jnp  # noqa: E402
 
-import bus_engine_mc as B  # noqa: E402  (shared DGP)
 from econirl.core.bellman import SoftBellmanOperator  # noqa: E402
 from econirl.core.solvers import value_iteration  # noqa: E402
-from econirl.simulation.synthetic import simulate_panel_from_policy  # noqa: E402
 from econirl.estimation.nfxp import NFXPEstimator  # noqa: E402
+from econirl.simulation.synthetic import simulate_panel_from_policy  # noqa: E402
 from validation.known_truth import to_jsonable  # noqa: E402
 
 
@@ -66,7 +68,10 @@ def main() -> None:
     args = parser.parse_args()
 
     print("NFXP bus-engine Monte Carlo (Adusumilli-Eckardt 2025, Table B.1 reference)")
-    print(f"  DGP: X_MAX={B.X_MAX}, types={B.N_TYPES}, beta={B.BETA}, theta_true={B.THETA_TRUE.tolist()}")
+    print(
+        f"  DGP: X_MAX={B.X_MAX}, types={B.N_TYPES}, beta={B.BETA}, "
+        f"theta_true={B.THETA_TRUE.tolist()}"
+    )
     print(f"  panel: {args.n_buses} buses x {args.n_periods} periods   reps: {args.n_reps}")
 
     dgp = B.build_dgp()
@@ -75,7 +80,8 @@ def main() -> None:
     truth = value_iteration(operator, true_reward, tol=1e-12, max_iter=20_000)
     policy = truth.policy
     init_dist = B.stationary_initial_distribution(dgp["problem"], dgp["transitions"], policy)
-    print(f"  stationary replacement share: {float(np.asarray(init_dist) @ np.asarray(policy)[:, 1]):.4f}")
+    replacement_share = float(np.asarray(init_dist) @ np.asarray(policy)[:, 1])
+    print(f"  stationary replacement share: {replacement_share:.4f}")
 
     # Checkpoint/resume: append each rep to a JSONL so a killed run resumes.
     ckpt = JSON_OUT.with_suffix(".checkpoint.jsonl")
@@ -95,23 +101,35 @@ def main() -> None:
                 continue
             seed = args.base_seed + rep
             panel = simulate_panel_from_policy(
-                dgp["problem"], dgp["transitions"], policy, init_dist,
-                n_individuals=args.n_buses, n_periods=args.n_periods, seed=seed,
+                dgp["problem"],
+                dgp["transitions"],
+                policy,
+                init_dist,
+                n_individuals=args.n_buses,
+                n_periods=args.n_periods,
+                seed=seed,
             )
             s = NFXPEstimator().estimate(
-                panel=panel, utility=dgp["utility"], problem=dgp["problem"],
+                panel=panel,
+                utility=dgp["utility"],
+                problem=dgp["problem"],
                 transitions=dgp["transitions"],
             )
             params = np.asarray(s.parameters, dtype=np.float64)
-            se = (np.asarray(s.standard_errors, dtype=np.float64)
-                  if s.standard_errors is not None else [float("nan")] * 3)
-            rec = {"rep": rep, "params": [float(x) for x in params],
-                   "ses": [float(x) for x in se]}
+            se = (
+                np.asarray(s.standard_errors, dtype=np.float64)
+                if s.standard_errors is not None
+                else [float("nan")] * 3
+            )
+            rec = {"rep": rep, "params": [float(x) for x in params], "ses": [float(x) for x in se]}
             done[rep] = rec
             fh.write(json.dumps(rec) + "\n")
             fh.flush()
             if (len(done)) % 25 == 0 or rep == 0:
-                print(f"  rep {rep + 1}/{args.n_reps}  done={len(done)}  ({time.time() - t0:.0f}s)", flush=True)
+                print(
+                    f"  rep {rep + 1}/{args.n_reps}  done={len(done)}  ({time.time() - t0:.0f}s)",
+                    flush=True,
+                )
 
     order = sorted(done)
     estimates = np.array([done[r]["params"] for r in order], dtype=np.float64)
@@ -123,9 +141,14 @@ def main() -> None:
         "arxiv": "1912.09509",
         "dgp": {
             "model": "bus-engine replacement, deterministic mileage, permanent type s in {1,2}",
-            "x_max": B.X_MAX, "n_types": B.N_TYPES, "beta": B.BETA,
-            "theta_true": B.THETA_TRUE.tolist(), "param_names": B.PARAM_NAMES,
-            "n_buses": args.n_buses, "n_periods": args.n_periods, "n_reps": len(order),
+            "x_max": B.X_MAX,
+            "n_types": B.N_TYPES,
+            "beta": B.BETA,
+            "theta_true": B.THETA_TRUE.tolist(),
+            "param_names": B.PARAM_NAMES,
+            "n_buses": args.n_buses,
+            "n_periods": args.n_periods,
+            "n_reps": len(order),
         },
         "paper_table_b1": B.PAPER_TABLE_B1,
         "results": {"nfxp_mle": results},
@@ -137,12 +160,16 @@ def main() -> None:
     )
     ckpt.unlink(missing_ok=True)
 
-    print("\n  parameter        true   pkg mean  paper mean   pkg SD   paper SD   pkg MSE   paper MSE")
+    print(
+        "\n  parameter        true   pkg mean  paper mean   pkg SD   paper SD   pkg MSE   paper MSE"
+    )
     for name in B.PARAM_NAMES:
         r = results[name]
         p = B.PAPER_TABLE_B1[name]
-        print(f"  {name:<16}{r['true']:>6.2f}{r['mean']:>10.4f}{p['mean_nlr']:>11.4f}"
-              f"{r['sd']:>10.4f}{p['sd_nlr']:>10.4f}{r['mse']:>10.5f}{p['mse_nlr']:>11.5f}")
+        print(
+            f"  {name:<16}{r['true']:>6.2f}{r['mean']:>10.4f}{p['mean_nlr']:>11.4f}"
+            f"{r['sd']:>10.4f}{p['sd_nlr']:>10.4f}{r['mse']:>10.5f}{p['mse_nlr']:>11.5f}"
+        )
     print(f"\n  wrote: {JSON_OUT}")
 
 

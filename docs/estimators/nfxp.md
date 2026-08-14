@@ -40,16 +40,15 @@ for the final step from recovered reward contrasts to finite parameters.
 
 ## Notation
 
-Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed
-for individual $i$ in period $t$. The index $b$ is a dummy action variable used
-in sums over the action set. The vector $\phi(s, a)$ collects the known
-reward features and $\theta$ the reward parameters to be estimated. The discount
-factor is $\beta$ and the logit shock scale is $\sigma$. The transition kernel
-$P_a(s, s')$ gives the probability of moving to $s'$ from $s$ under action $a$,
-stored in $(A, S, S)$ orientation, with $S$ states and $A$ actions. The
-integrated value function is
-$V_\theta(s)$, the choice-specific value is $Q_\theta(s, a)$, and the conditional
-choice probability, the policy, is $\pi_\theta(a \mid s)$.
+The discrete state is $s$ and the action is $a$. Individual $i$ is observed in
+period $t$. The index $b$ denotes an action inside a sum. The vector
+$\phi(s, a)$ contains the known reward features. The parameter vector is
+$\theta$, the discount factor is $\beta$, and the logit shock scale is $\sigma$.
+
+The transition kernel $P_a(s, s')$ gives the probability of moving from $s$ to
+$s'$ under action $a$. It is stored in $(A, S, S)$ orientation. The integrated
+value is $V_\theta(s)$. The choice-specific value is $Q_\theta(s, a)$. The
+policy is $\pi_\theta(a \mid s)$.
 
 ## Model
 
@@ -95,7 +94,7 @@ observed choices carry information about the structural costs.
 This section states when the estimated parameters can be interpreted as
 primitive reward parameters rather than only as an in-sample choice fit.
 
-NFXP point-identifies the reward parameters $\theta$ under the following
+Interpreting $\theta$ as structural reward parameters requires the following
 assumptions.
 
 - **Conditional independence (CI).** The observed state transition is Markov in
@@ -104,20 +103,22 @@ assumptions.
   plus an additive choice-specific shock, drawn independently across choices as
   Type-I extreme value with fixed scale $\sigma$.
 - **Exogenous transitions.** The transition kernel $P_a(s, s')$ is supplied or
-  estimated in a first stage, outside the payoff likelihood.
-- **Reward normalization.** The reward level and scale need an anchor. An exit or
-  absorbing action with payoff fixed to zero pins the level, and the logit scale
-  $\sigma$ is held fixed.
+  estimated from observed transitions. The default standard errors condition
+  on this estimate. Full-likelihood BHHH also incorporates transition-score
+  uncertainty.
+- **Reward normalization.** The Type-I extreme-value shock scale is fixed at 1.
+  The supplied reward specification must exclude reward components that are
+  common to every action. NFXP rejects rank-deficient action contrasts.
 - **Action-dependent feature rank.** The reward features must vary across
   actions. The feature rank must equal the number of parameters. State-only
   features copied across actions collapse the action contrasts and leave $\theta$
   unidentified.
 
 These assumptions apply within a finite discrete state space and a stationary
-environment with expected-utility maximization and a known, fixed discount
-factor $\beta$. Under these conditions, $\theta$ is point-identified.
-Identification weakens under thin action support, an invalid normalization, or
-a transition tensor supplied in the wrong orientation.
+environment. The model also assumes expected-utility maximization and a known
+discount factor $\beta$. Thin action support, an invalid normalization, or an
+incorrectly oriented transition tensor can make the estimates hard to
+interpret.
 
 ## Estimator
 
@@ -144,7 +145,8 @@ $$
   \right].
 $$
 
-Applying the chain rule and the log-sum-exp derivative $\partial \log\sum_b e^{f_b}/\partial\theta = \sum_b \pi_b \,\partial f_b/\partial\theta$:
+Apply the chain rule. The log-sum-exp derivative is
+$\sum_b \pi_b\,\partial f_b/\partial\theta$:
 
 $$
 = \frac{1}{\sigma}\frac{\partial Q_\theta(s,a)}{\partial\theta}
@@ -178,8 +180,7 @@ $$
   + \beta \sum_{s'} P_a(s,s')\frac{\partial V_\theta(s')}{\partial\theta}.
 $$
 
-The soft Bellman value $V_\theta(s) = \sigma \log \sum_a \exp(Q_\theta(s,a)/\sigma)$
-differentiates by the log-sum-exp envelope (soft-max envelope theorem):
+Differentiate the soft Bellman value with the log-sum-exp derivative:
 
 $$
 \frac{\partial V_\theta(s)}{\partial\theta}
@@ -187,7 +188,7 @@ $$
   \frac{\partial Q_\theta(s,a)}{\partial\theta}.
 $$
 
-Substituting the Q-gradient into this envelope equation and collecting
+Substituting the Q-gradient into this value derivative and collecting
 $\partial V/\partial\theta$ terms on the left yields the linear system:
 
 $$
@@ -225,9 +226,9 @@ Score the observed actions under those probabilities
 Update theta and repeat until the likelihood is maximized
 ```
 
-Use NFXP when that inside solve is affordable. Its advantage is clarity: the
-estimated reward, value function, policy, and counterfactuals all come from the
-same fully specified dynamic choice model.
+Use NFXP when that inside solve is affordable. The estimated reward, value
+function, policy, and counterfactuals all come from the same fully specified
+dynamic choice model.
 
 ## Algorithm
 
@@ -246,32 +247,30 @@ Output  theta_hat, standard errors, policy pi, value V
 7       L(theta) := sum_{i,t} log pi_theta(a_it | s_it)
 8a      H <- sum_i psi_i(theta) psi_i(theta)^T   # BHHH information matrix
 8b      theta <- theta + H^{-1} (sum_i psi_i(theta))  # Newton-like ascent step
-9   until the gradient norm is below tolerance
-10  return theta_hat, standard errors from the information matrix, pi_theta, V_theta
+9   until g(theta)' H(theta)^{-1} g(theta) is below tolerance
+10  return theta_hat, standard errors from the selected covariance method, pi_theta, V_theta
 ```
 
 The inner solve in step 4 defaults to `inner_solver="polyalgorithm"`. Following
 Iskhakov et al. (2016), it uses successive approximation far from the fixed
-point and Newton-Kantorovich steps near the solution. This polyalgorithm makes
-the nested fixed-point method computationally competitive with the
-constrained-optimization alternative and narrows the speed gap reported in
-earlier comparisons. Two pure variants are
-also available. `sa` (successive approximation) is a contraction iteration that
-converges linearly and is robust from any start. `nk` (Newton-Kantorovich)
-converges quadratically near the solution but needs a good starting point. The
-outer optimizer is BHHH, which builds a positive semi-definite Hessian
-approximation from the outer products of the per-observation scores.
+point and Newton-Kantorovich steps near the solution. The pure `sa` and `nk`
+variants are also available. Successive approximation is linearly convergent
+and robust from any start. Newton-Kantorovich is quadratically convergent near
+the solution and needs a good starting point. The outer optimizer is BHHH. It
+approximates the information matrix with outer products of the per-observation
+scores.
 
 The standard errors come from maximum-likelihood asymptotics. The `se_method`
 argument selects the covariance estimator. `asymptotic` inverts the
 observed-information matrix. `robust`, the default, returns the sandwich
-covariance: the inverse information matrix with the outer product of the
-per-observation scores in the middle. `clustered` sums scores by individual
+covariance. It places the outer product of the per-observation scores between
+two copies of the inverse information matrix. `clustered` sums scores by individual
 before forming the middle matrix. `bootstrap` resamples whole trajectories. For
 the Rust Table IX replication, `full_likelihood_bhhh` forms the BHHH outer
 product for the joint structural and transition-probability likelihood and
-reports the structural covariance block. The conditional and robust SEs agree
-under correct specification and separate under misspecification.
+reports the structural covariance block. Under correct specification, the
+`asymptotic` and `robust` covariance estimators have the same large-sample
+limit. They can differ under misspecification.
 
 ## Applicability
 
@@ -283,12 +282,9 @@ under correct specification and separate under misspecification.
 | A structural reference estimate is required. | Only a fast imitation baseline is required. |
 | Counterfactual policy analysis is central. | Only fitted choice probabilities are required. |
 
-NFXP is the reference estimator for tabular structural estimation. CCP and MPEC
-target the same structural object with different computational strategies. NNES
-and TD-CCP become attractive when exact nested Bellman solves are too expensive.
-UFXP eliminates value-function dependence before the parameter search and
-attains the same asymptotic efficiency at a fraction of the cost. It is
-asymptotically equivalent to NFXP, but it is not the exact finite-sample MLE.
+NFXP is the reference estimator for tabular structural estimation. CCP, MPEC,
+NNES, TD-CCP, and UFXP use different computational strategies. Their estimator
+pages describe the corresponding assumptions and finite-sample objectives.
 
 ## Usage
 
@@ -320,14 +316,15 @@ Counterfactual analysis re-solves the fitted dynamic program after changing a
 model parameter:
 
 ```python
-cf = model.counterfactual(replacement_cost=4.0)   # raise the replacement cost
+replacement_cost = 4.0
+cf = model.counterfactual(replacement_cost=replacement_cost)
 print(
     f"replacement_cost: {model.params_['replacement_cost']:.6f}"
-    f" -> {cf.params['replacement_cost']:.6f}"
+    f" -> {replacement_cost:.6f}"
 )
 print(
     f"P(replace | state=50): {model.predict_proba([50])[0, 1]:.6f}"
-    f" -> {cf.policy[50, 1]:.6f}"
+    f" -> {cf.counterfactual_policy[50, 1]:.6f}"
 )
 ```
 
@@ -335,7 +332,7 @@ print(
 
 ```text
 replacement_cost: 3.072264 -> 4.000000
-P(replace | state=50): 0.086333 -> 0.055196
+P(replace | state=50): 0.086333 -> 0.055197
 ```
 
 Transition counterfactuals use a complete action-specific transition model.
@@ -351,13 +348,13 @@ Three experiments assess NFXP estimation, inference, and counterfactual
 performance.
 
 - **Estimation.** Twenty independent panels have 200 states, two actions, three
-  reward parameters, and 7,500 observations each. The mean distance between
-  the estimated and true policies is 0.0085 on a scale from 0 to 1.
+  reward parameters, and 7,500 observations each. The mean policy
+  total-variation distance from the true policy is 0.0085.
 - **Inference.** In one thousand independent 40-state panels, coverage of the
   three nominal 95 percent intervals ranges from 94.8 to 95.4 percent.
-- **Counterfactuals.** After a reward change and slower engine deterioration,
-  the estimated policies are 0.0064 and 0.0067 away from the corresponding
-  true-parameter policies.
+- **Counterfactuals.** The interventions change the reward and slow engine
+  deterioration. The mean policy total-variation distances from the
+  corresponding true-parameter policies are 0.0064 and 0.0067.
 
 The [Simulation Study](nfxp/validation.md) reports the estimation, inference,
 and counterfactual results in detail. The
@@ -366,7 +363,7 @@ with other estimators on a shared problem.
 
 ## References
 
-Source papers:
+### Source Papers
 
 - Rust, J. (1987). Optimal Replacement of GMC Bus Engines: An Empirical Model of
   Harold Zurcher. _Econometrica_, 55(5), 999-1033.
@@ -375,14 +372,14 @@ Source papers:
   "Constrained Optimization Approaches to Estimation of Structural Models."
   _Econometrica_, 84(1), 365-370. {ref}`reference entry <iskhakov-2016>`.
 
-Code and results:
+### Code and Results
 
 - Estimator source: [`econirl.estimation.nfxp`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/nfxp.py).
 - sklearn wrapper: [`econirl.NFXP`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/nfxp.py).
 - Simulation code: [`validation/estimators/nfxp/ready.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/ready.py).
 - Simulation results: [`validation/results/nfxp_ready.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp_ready.json).
 
-Pages:
+### Pages
 
 - [Quick Start](nfxp/quick_start.md)
 - [Pre-Estimation Checks](nfxp/pre_estimation.md)

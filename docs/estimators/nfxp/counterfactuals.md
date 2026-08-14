@@ -10,28 +10,30 @@
 Counterfactual analysis re-solves the structural model. NFXP estimates reward
 parameters in a model that can be solved again after a primitive changes.
 
-NFXP recovers the utility parameters using the same parameterization as the
-data-generating process. For a counterfactual, change a parameter, re-solve the
-dynamic program once, and read off the new policy and value function.
+NFXP estimates utility parameters under the supplied reward specification and
+normalization. For a counterfactual, change one model primitive and solve the
+dynamic program again. The result contains the baseline and counterfactual
+policies and value functions.
 
 ```python
-cf = model.counterfactual(replacement_cost=4.0)
+replacement_cost = 4.0
+cf = model.counterfactual(replacement_cost=replacement_cost)
 
 print(
     f"replacement_cost: {model.params_['replacement_cost']:.6f}"
-    f" -> {cf.params['replacement_cost']:.6f}"
+    f" -> {replacement_cost:.6f}"
 )
 print(
     f"P(replace | state=50): {model.predict_proba([50])[0, 1]:.6f}"
-    f" -> {cf.policy[50, 1]:.6f}"
+    f" -> {cf.counterfactual_policy[50, 1]:.6f}"
 )
 ```
 
 **Result**
 
 ```text
-replacement_cost: 3.072264 -> 4.000000
-P(replace | state=50): 0.086333 -> 0.055196
+replacement_cost: 3.072221 -> 4.000000
+P(replace | state=50): 0.086336 -> 0.055197
 ```
 
 The environment can change as well. For example, a new maintenance technology
@@ -50,14 +52,14 @@ cf_transition = model.counterfactual(transitions=alternative_transitions)
 
 print(
     f"P(replace | state=50): {model.predict_proba([50])[0, 1]:.6f}"
-    f" -> {cf_transition.policy[50, 1]:.6f}"
+    f" -> {cf_transition.counterfactual_policy[50, 1]:.6f}"
 )
 ```
 
 **Result**
 
 ```text
-P(replace | state=50): 0.086333 -> 0.088450
+P(replace | state=50): 0.086336 -> 0.088453
 ```
 
 ## Results
@@ -69,9 +71,10 @@ The 200-state study evaluates both kinds of change:
 | Increase the first reward parameter by 1.0 | 0.0829 | 0.0064 | 0.0030 |
 | Slow engine deterioration | 0.0454 | 0.0067 | 0.0018 |
 
-Policy distance ranges from zero to one. Zero means the two policies choose
-each action with the same probability in every state. For both changes, the
-fitted-model policy is within 0.0067 of the true-parameter policy.
+`True shift` compares the baseline policy with the true counterfactual policy.
+`Policy error` compares the fitted counterfactual policy with the true
+counterfactual policy. Both distances range from zero to one. The largest
+policy error in the study is 0.0067.
 
 Expected-value loss compares the fitted counterfactual policy with the policy
 computed from the true parameters. It is 0.0030 for the reward change and

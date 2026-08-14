@@ -3,44 +3,44 @@
     "asymptotic": {
       "converged": true,
       "standard_errors": [
-        0.038579145695579214,
-        0.05218857200572872,
-        0.05362677799371915
+        0.03857914155840508,
+        0.05218856394778237,
+        0.053626779789877815
       ]
     },
     "bootstrap": {
       "converged": true,
       "standard_errors": [
-        0.037524156509175136,
-        0.05081556825830685,
-        0.05461055169315494
+        0.03752410285984837,
+        0.05081558717218813,
+        0.054610669520134394
       ]
     },
     "clustered": {
       "converged": true,
       "standard_errors": [
-        0.03787869797868567,
-        0.05319867394367366,
-        0.054042660028719706
+        0.03787870991383925,
+        0.05319866551460867,
+        0.054042660658429775
       ]
     },
     "clustered_to_bootstrap_ratio": [
-      1.0094483528077132,
-      1.046897157053385,
-      0.9896010634057297
+      1.0094501141123968,
+      1.0468966015160959,
+      0.9895989397915146
     ],
     "passed": true,
     "ratio_check_passed": true,
     "robust": {
       "converged": true,
       "standard_errors": [
-        0.03867885690724071,
-        0.05228040157092574,
-        0.05327069311860456
+        0.03867884816818626,
+        0.05228038355548002,
+        0.05327069216131768
       ]
     }
   },
-  "checkpoint": "/tmp/econirl-ccp-ecc-final.F8ErsN/ccp_ready_final.jsonl",
+  "checkpoint": "/Users/pranjal/Code/econirl-release-0.1.0-wt/validation/results/ccp_ready.jsonl",
   "configs": {
     "hard_problem": {
       "base_seed": 51000,
@@ -93,7 +93,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.2,
-      "value": 0.12409019426834483
+      "value": 0.12410292992340267
     },
     {
       "enforced": true,
@@ -101,7 +101,7 @@
       "operator": ">=",
       "passed": true,
       "threshold": 0.8,
-      "value": 0.9686937618257692
+      "value": 0.9686934481979766
     },
     {
       "enforced": true,
@@ -109,7 +109,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 1.2,
-      "value": 0.9686937618257692
+      "value": 0.9686934481979766
     },
     {
       "enforced": true,
@@ -165,7 +165,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.2,
-      "value": 0.03211240491428595
+      "value": 0.032115033011368394
     },
     {
       "enforced": true,
@@ -173,7 +173,7 @@
       "operator": ">=",
       "passed": true,
       "threshold": 0.8,
-      "value": 0.9863213171373798
+      "value": 0.9863214671066166
     },
     {
       "enforced": true,
@@ -181,7 +181,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 1.2,
-      "value": 0.9863213171373798
+      "value": 0.9863214671066166
     },
     {
       "enforced": true,
@@ -237,7 +237,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.2,
-      "value": 0.058604897903396895
+      "value": 0.05861068732384386
     },
     {
       "enforced": true,
@@ -245,7 +245,7 @@
       "operator": ">=",
       "passed": true,
       "threshold": 0.8,
-      "value": 1.0429694628140964
+      "value": 1.0429675769421358
     },
     {
       "enforced": true,
@@ -253,7 +253,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 1.2,
-      "value": 1.0429694628140964
+      "value": 1.0429675769421358
     },
     {
       "enforced": true,
@@ -317,7 +317,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.1,
-      "value": 0.02879525933946882
+      "value": 0.028792704854692732
     },
     {
       "enforced": true,
@@ -325,7 +325,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.1,
-      "value": 0.018946588039398193
+      "value": 0.018926560878753662
     },
     {
       "enforced": true,
@@ -333,7 +333,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.1,
-      "value": 0.05230208486318583
+      "value": 0.05228863656520838
     },
     {
       "enforced": true,
@@ -341,7 +341,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.25,
-      "value": 0.06276568855558119
+      "value": 0.06276582479476925
     },
     {
       "enforced": true,
@@ -349,7 +349,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.25,
-      "value": 0.06440912485122684
+      "value": 0.06441246271133426
     },
     {
       "enforced": true,
@@ -357,7 +357,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.25,
-      "value": 0.09496306329965588
+      "value": 0.09495495706796643
     },
     {
       "enforced": true,
@@ -365,7 +365,23 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.03,
-      "value": 0.002757652597892661
+      "value": 0.0027576144285682636
+    },
+    {
+      "enforced": true,
+      "name": "hard_oos_excess_negative_log_likelihood",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.02,
+      "value": 3.891108308792246e-05
+    },
+    {
+      "enforced": true,
+      "name": "hard_oos_excess_brier_score",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.02,
+      "value": 3.7155019401910463e-05
     },
     {
       "enforced": true,
@@ -373,7 +389,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 60.0,
-      "value": 7.0876058749854565
+      "value": 8.792486874968745
     },
     {
       "enforced": true,
@@ -381,7 +397,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.03,
-      "value": 0.0022277966761871854
+      "value": 0.002227789530627709
     },
     {
       "enforced": true,
@@ -389,7 +405,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.05,
-      "value": 0.00018445532595828774
+      "value": 0.00018445806719721516
     },
     {
       "enforced": true,
@@ -397,7 +413,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.03,
-      "value": 0.001903201038076575
+      "value": 0.001903192922322962
     },
     {
       "enforced": true,
@@ -405,7 +421,7 @@
       "operator": "<=",
       "passed": true,
       "threshold": 0.05,
-      "value": 8.25685107518339e-05
+      "value": 8.256758508970918e-05
     },
     {
       "enforced": true,
@@ -419,28 +435,34 @@
   "hard_problem": {
     "counterfactuals": {
       "reward": {
-        "policy_tv_mean": 0.0022277966761871854,
-        "regret_mean": 0.00018445532595828774
+        "policy_tv_mean": 0.002227789530627709,
+        "regret_mean": 0.00018445806719721516
       },
       "transition": {
-        "policy_tv_mean": 0.001903201038076575,
-        "regret_mean": 8.25685107518339e-05
+        "policy_tv_mean": 0.001903192922322962,
+        "regret_mean": 8.256758508970918e-05
       }
     },
     "median_relative_error": {
-      "theta_0": 0.02879525933946882,
-      "theta_1": 0.018946588039398193,
-      "theta_2": 0.05230208486318583
+      "theta_0": 0.028792704854692732,
+      "theta_1": 0.018926560878753662,
+      "theta_2": 0.05228863656520838
     },
     "n_total": 20,
     "n_usable": 20,
-    "p90_relative_error": {
-      "theta_0": 0.06276568855558119,
-      "theta_1": 0.06440912485122684,
-      "theta_2": 0.09496306329965588
+    "out_of_sample": {
+      "brier_score_mean": 0.4891718458533843,
+      "excess_brier_score_mean": 3.7155019401910463e-05,
+      "excess_negative_log_likelihood_mean": 3.891108308792246e-05,
+      "negative_log_likelihood_mean": 0.6822137146809971
     },
-    "policy_tv_mean": 0.002757652597892661,
-    "runtime_seconds_max": 7.0876058749854565,
+    "p90_relative_error": {
+      "theta_0": 0.06276582479476925,
+      "theta_1": 0.06441246271133426,
+      "theta_2": 0.09495495706796643
+    },
+    "policy_tv_mean": 0.0027576144285682636,
+    "runtime_seconds_max": 8.792486874968745,
     "usable_rate": 1.0
   },
   "inference": {
@@ -448,47 +470,64 @@
     "n_usable": 1000,
     "parameters": {
       "theta_0": {
-        "bias": 0.003789305493235584,
+        "bias": 0.0037896957099438078,
         "coverage_95": 0.942,
-        "empirical_sd": 0.03053670369023049,
+        "empirical_sd": 0.030536714260355,
         "left_miss": 0.036,
-        "mean_estimate": 0.35378930549323556,
-        "mean_reported_se": 0.02958071437144822,
+        "mean_estimate": 0.3537896957099438,
+        "mean_reported_se": 0.029580715033499613,
         "right_miss": 0.022,
-        "se_ratio": 0.9686937618257692,
-        "standardized_bias": 0.12409019426834483,
+        "se_ratio": 0.9686934481979766,
+        "standardized_bias": 0.12410292992340267,
         "true": 0.35
       },
       "theta_1": {
-        "bias": 0.0016246624812483734,
+        "bias": 0.0016247952133417176,
         "coverage_95": 0.954,
-        "empirical_sd": 0.05059298690287767,
+        "empirical_sd": 0.050592979704132846,
         "left_miss": 0.024,
-        "mean_estimate": -0.24837533751875163,
-        "mean_reported_se": 0.049900941479960506,
+        "mean_estimate": -0.24837520478665828,
+        "mean_reported_se": 0.049900941967075584,
         "right_miss": 0.022,
-        "se_ratio": 0.9863213171373798,
-        "standardized_bias": 0.03211240491428595,
+        "se_ratio": 0.9863214671066166,
+        "standardized_bias": 0.032115033011368394,
         "true": -0.25
       },
       "theta_2": {
-        "bias": 0.003053717451170085,
+        "bias": 0.0030540247866883696,
         "coverage_95": 0.963,
-        "empirical_sd": 0.05210686410893113,
+        "empirical_sd": 0.05210696079733462,
         "left_miss": 0.025,
-        "mean_estimate": 0.2030537174511701,
-        "mean_reported_se": 0.05434586806861902,
+        "mean_estimate": 0.20305402478668838,
+        "mean_reported_se": 0.054345870644614956,
         "right_miss": 0.012,
-        "se_ratio": 1.0429694628140964,
-        "standardized_bias": 0.058604897903396895,
+        "se_ratio": 1.0429675769421358,
+        "standardized_bias": 0.05861068732384386,
         "true": 0.2
       }
     },
     "usable_rate": 1.0
   },
   "paper_target": null,
+  "provenance": {
+    "base_seeds": {
+      "hard_problem": 51000,
+      "heldout_offset": 500000,
+      "inference": 41000,
+      "standard_error_check": 62001
+    },
+    "git_commit": "a94394ee8740e076ecc51606446a85af113c42e3",
+    "package_versions": {
+      "econirl": "0.0.10",
+      "jax": "0.9.2",
+      "jaxlib": "0.9.2",
+      "numpy": "2.4.1",
+      "pandas": "2.3.3",
+      "scipy": "1.17.0"
+    }
+  },
   "status": "ready",
-  "summary_report": "================================================================================\n                   Dynamic Discrete Choice Estimation Results                   \n================================================================================\nMethod:      Hotz-Miller (CCP)            Observations:  10,000\nOptimizer:   L-BFGS-B                     Individuals:   250\nFamily:      structural (linear utility)  Discount (\u03b2):  0.95\n                                          Scale (\u03c3):     1.0\n                                          Date:          2026-07-25\n\n[1] DATA\n  State space:          20 states x 2 actions\n  Periods per individual: ~40\n  Obs per state:        max 6,454 . p95 1,677 . p50 40 . p5 23 . min 22\n  State coverage:       20/20 visited (100%)\n  Single-action states: 0\n\n[2] PRE-ESTIMATION CHECKS\n  Reward features (K):  3\n  Design rank:          3/3         Condition:          1.0e+00\n  Contrast rank:        3/3       Contrast condition: 1.0e+00\n  Verdict:              identified -- every reward parameter varies across actions\n\n[3] TRANSITION MODEL\n  Transition source: supplied action-specific tensor\n--------------------------------------------------------------------------------\n[4] RESULTS\n  4a. Estimation\n                          coef   std err       t   P>|t|   [0.025   0.975]\n    theta_0             0.3344    0.0288   11.61   0.000   0.2780   0.3909\n    theta_1            -0.2303    0.0498   -4.62   0.000  -0.3279  -0.1327\n    theta_2             0.2881    0.0529    5.45   0.000   0.1844   0.3918\n  4b. Identification\n    Hessian condition:  6.0     Min eigenvalue: 291.82\n    Status:             Well-identified\n  4c. Inference & fit\n    Converged:   yes\n    Iterations:  1\n    Estimation time: 2.76 seconds\n    Message:     Hotz-Miller one-step estimation completed\n    NPL residuals: parameter 4.902e-01, policy 1.756e-01\n    NPL tolerance: 1.000e-10\n    SE method:  robust (sandwich)\n    Log-lik:    -6,810.02\n    AIC/BIC:    13,626.0 / 13,647.7\n    accuracy 56.5%\n================================================================================",
+  "summary_report": "Estimator\nCCP (conditional choice probability estimation)\n\nData\nObservations: 10000\nIndividuals: 250\nState coverage: 1.000\n\nModel\nStates: 20\nActions: 2\nDiscount factor: 0.95\nShock normalization: Type-I extreme-value scale fixed at 1.0\n\nPre-estimation checks\nIdentification: identified\nAction-contrast rank: 3\nTransition source: supplied action-specific tensor\n\nFit\nConverged: yes\nTermination: one_step_complete\nNPL fixed point: no\nNPL residuals: parameter=0.4902413785457611, policy=0.1756149521965109\nPolicy iterations: 1\nFit time: 3.322 seconds\n\nOutcome\nLog likelihood: -6810.013672\ntheta_0: 0.334424 (SE 0.0288131, 95.0% CI [0.277951, 0.390897])\ntheta_1: -0.230298 (SE 0.0497954, 95.0% CI [-0.327895, -0.132701])\ntheta_2: 0.288105 (SE 0.0528962, 95.0% CI [0.18443, 0.39178])\n\nUncertainty\nMethod: robust\nConfidence level: 95.0%\nIntervals: sampling intervals from the reported SE method\n\nLimitations\nInference is conditional on the state space, reward model, and discount factor.\nFinite-stage standard errors condition on empirical CCPs and supplied transitions.\nA completed finite-stage fit does not imply NPL fixed-point convergence.",
   "support_example": {
     "action_counts": [
       5605,

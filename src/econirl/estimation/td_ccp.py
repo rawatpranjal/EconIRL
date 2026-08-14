@@ -165,6 +165,12 @@ class TDCCPConfig:
     basis_include_rewards: bool = False
     basis_ridge: float = 1e-8
     basis_pinv_rcond: float | None = None
+    basis_action_coding: Literal["separate", "reference"] = "separate"
+    """Action coding for non-tabular semi-gradient bases. ``"separate"``
+    creates one state-basis block per action. ``"reference"`` creates a
+    shared state-basis block plus interactions for actions 1 through A-1.
+    The spaces are equivalent. Reference coding matches the basis layout in
+    the paper's Table E.1 program and can be better conditioned."""
 
     # --- Neural AVI specific ---
     hidden_dim: int = 64
@@ -203,6 +209,16 @@ class TDCCPConfig:
     # --- Inference ---
     cross_fitting: bool = True
     split_unit: Literal["individual", "row"] = "individual"
+    cross_fit_shuffle: bool = True
+    """Shuffle units before the two-fold split. Disable only when a
+    published unit ordering is part of the replication specification."""
+    cross_fit_ccp: bool = True
+    """Estimate first-stage CCPs within each fold. Disable only when a
+    replication's published program estimates CCPs on the full panel."""
+    linear_robust_correction: Literal["sensitivity", "backward"] = "sensitivity"
+    """Locally robust correction for linear semi-gradient fits. The closed-form
+    sensitivity expression is the paper's Appendix B.5 path. ``"backward"``
+    retains the generic Algorithm 5 approximation used by neural AVI."""
     robust_se: bool = True
 
     # --- NPL iteration (not in paper, optional) ---
@@ -328,6 +344,7 @@ class TDCCPEstimator(BaseEstimator):
             config = TDCCPConfig()
         self._config = config
         self._seed = seed
+        self._last_semigradient_coefficients: tuple[np.ndarray, np.ndarray] | None = None
 
         super().__init__(
             se_method=se_method,
@@ -426,6 +443,7 @@ class TDCCPEstimator(BaseEstimator):
 
         def poly_design(state_idx: np.ndarray) -> np.ndarray:
             if use_encoder:
+                assert problem is not None and problem.state_encoder is not None
                 feats = np.asarray(
                     problem.state_encoder(jnp.asarray(state_idx, dtype=jnp.int32)),
                     dtype=np.float64,
@@ -439,7 +457,22 @@ class TDCCPEstimator(BaseEstimator):
             x_norm = np.asarray(state_idx, dtype=np.float64) / max(num_states - 1, 1)
             return np.column_stack([x_norm**p for p in range(degree + 1)])
 
-        X_poly = poly_design(all_states)
+        X_poly_raw = poly_design(all_states)
+        # Polynomial and encoded designs can span several orders of magnitude
+        # (Table E.1 includes x, x^2, and x^3). Optimize on standardized
+        # non-intercept columns, then apply the same transform at prediction
+        # time. This leaves the logit model unchanged while avoiding premature
+        # convergence on the largest columns.
+        design_mean = np.zeros(X_poly_raw.shape[1], dtype=np.float64)
+        design_scale = np.ones(X_poly_raw.shape[1], dtype=np.float64)
+        if X_poly_raw.shape[1] > 1:
+            design_mean[1:] = X_poly_raw[:, 1:].mean(axis=0)
+            raw_scale = X_poly_raw[:, 1:].std(axis=0)
+            design_scale[1:] = np.where(raw_scale > 1e-12, raw_scale, 1.0)
+        X_poly = (X_poly_raw - design_mean) / design_scale
+
+        def standardized_design(state_idx: np.ndarray) -> np.ndarray:
+            return (poly_design(state_idx) - design_mean) / design_scale
 
         # Fit logistic regression via iterative reweighted least squares.
         # For binary actions, this is standard logistic regression.
@@ -462,9 +495,11 @@ class TDCCPEstimator(BaseEstimator):
             beta = np.asarray(result.x)
 
             # Predict P(a=1|s) for all states
-            X_all = poly_design(np.arange(num_states))
+            X_all = standardized_design(np.arange(num_states))
             logits_all = X_all @ beta
-            p1 = 1.0 / (1.0 + np.exp(-logits_all))
+            from scipy.special import expit
+
+            p1 = expit(logits_all)
             ccps = np.column_stack([1.0 - p1, p1])
         else:
             # Multinomial logit for A > 2 actions.
@@ -489,7 +524,7 @@ class TDCCPEstimator(BaseEstimator):
             )
             beta = np.asarray(result.x).reshape(num_actions - 1, X_poly.shape[1])
 
-            X_all = poly_design(np.arange(num_states))
+            X_all = standardized_design(np.arange(num_states))
             logits = X_all @ beta.T  # (S, A-1)
             logits_full = np.column_stack([np.zeros(num_states), logits])
             exp_logits = np.exp(logits_full - logits_full.max(axis=1, keepdims=True))
@@ -661,10 +696,17 @@ class TDCCPEstimator(BaseEstimator):
             n_basis_per_action = state_basis.shape[1]
             total_basis = num_actions * n_basis_per_action
             phi = np.zeros((n, total_basis), dtype=np.float64)
-            for a in range(num_actions):
-                mask = actions == a
-                offset = a * n_basis_per_action
-                phi[mask, offset : offset + n_basis_per_action] = state_basis[mask]
+            if cfg.basis_action_coding == "reference":
+                phi[:, :n_basis_per_action] = state_basis
+                for a in range(1, num_actions):
+                    mask = actions == a
+                    offset = a * n_basis_per_action
+                    phi[mask, offset : offset + n_basis_per_action] = state_basis[mask]
+            else:
+                for a in range(num_actions):
+                    mask = actions == a
+                    offset = a * n_basis_per_action
+                    phi[mask, offset : offset + n_basis_per_action] = state_basis[mask]
             return phi
 
         # Normalize states to [0, 1]
@@ -804,6 +846,7 @@ class TDCCPEstimator(BaseEstimator):
         )
         b_g = (phi.T @ e_vals) / n_samples
         g_omega = A_inv @ b_g
+        self._last_semigradient_coefficients = (h_omega.copy(), g_omega.copy())
 
         # -----------------------------------------------------------------
         # Evaluate h and g on all (state, action) pairs to build tables.
@@ -1321,8 +1364,14 @@ class TDCCPEstimator(BaseEstimator):
         feature_matrix_jax = jnp.array(utility.feature_matrix, dtype=jnp.float64)
         h_table_jax = jnp.array(h_table, dtype=jnp.float64)
         g_table_jax = jnp.array(g_table, dtype=jnp.float64)
-        obs_states_jax = jnp.array(panel.get_all_states())
-        obs_actions_jax = jnp.array(panel.get_all_actions())
+        # The paper's empirical criterion is indexed by the same T-1
+        # transition tuples used to estimate h and g. Do not add each
+        # trajectory's terminal choice to the parameter criterion. The
+        # official Table E.1 code makes this restriction explicitly before
+        # constructing Q_data.
+        obs_actions, obs_states, _, _ = self._extract_transitions(panel)
+        obs_states_jax = jnp.array(obs_states)
+        obs_actions_jax = jnp.array(obs_actions)
 
         n_obs = max(int(obs_states_jax.shape[0]), 1)
 
@@ -1430,6 +1479,7 @@ class TDCCPEstimator(BaseEstimator):
         next_states: np.ndarray,
         problem: DDCProblem,
         gamma: float,
+        key: jax.Array | None = None,
     ) -> np.ndarray:
         """Estimate the backward value function lambda (Algorithm 5).
 
@@ -1457,6 +1507,20 @@ class TDCCPEstimator(BaseEstimator):
 
         score_table = self._score_table(params, h_table, g_table, sigma)
         psi_table = -score_table
+
+        if self._config.method == "neural":
+            if key is None:
+                key = jax.random.PRNGKey(self._seed)
+            return self._compute_backward_value_avi(
+                psi_table,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                problem,
+                gamma,
+                key,
+            )
 
         phi = self._build_basis_functions(
             actions, states, num_states, num_actions, problem, feature_matrix
@@ -1494,6 +1558,68 @@ class TDCCPEstimator(BaseEstimator):
                 )
                 lambda_table[:, a, j] = phi_sa @ lambda_omega_j
 
+        return lambda_table
+
+    def _compute_backward_value_avi(
+        self,
+        psi_table: np.ndarray,
+        actions: np.ndarray,
+        states: np.ndarray,
+        next_actions: np.ndarray,
+        next_states: np.ndarray,
+        problem: DDCProblem,
+        gamma: float,
+        key: jax.Array,
+    ) -> np.ndarray:
+        """Estimate Algorithm 5 lambda with the configured AVI function class."""
+        num_states = problem.num_states
+        num_actions = problem.num_actions
+        num_params = psi_table.shape[2]
+        backward_features = self._build_action_state_features(next_actions, next_states, problem)
+        predecessor_features = self._build_action_state_features(actions, states, problem)
+        evaluation_features = [
+            self._build_action_state_features(
+                np.full(num_states, action, dtype=np.int32),
+                np.arange(num_states),
+                problem,
+            )
+            for action in range(num_actions)
+        ]
+        lambda_table = np.zeros((num_states, num_actions, num_params), dtype=np.float64)
+        make_regressor = (
+            self._avi_regressor_factory() if self._config.avi_functional_class == "gbm" else None
+        )
+        for parameter in range(num_params):
+            reward = np.asarray(psi_table[next_states, next_actions, parameter], dtype=np.float64)
+            init_value = float(np.mean(reward)) / (1.0 - gamma)
+            if make_regressor is not None:
+                regressor, _losses = self._train_single_avi_gbm(
+                    np.asarray(backward_features, dtype=np.float64),
+                    np.asarray(predecessor_features, dtype=np.float64),
+                    reward,
+                    init_value,
+                    gamma,
+                    make_regressor,
+                )
+                for action, features in enumerate(evaluation_features):
+                    lambda_table[:, action, parameter] = regressor.predict(
+                        np.asarray(features, dtype=np.float64)
+                    )
+            else:
+                key, network_key = jax.random.split(key)
+                network, _losses = self._train_single_avi_network(
+                    feat_ax=backward_features,
+                    feat_ax_next=predecessor_features,
+                    reward_values=jnp.asarray(reward),
+                    init_value=init_value,
+                    gamma=gamma,
+                    key=network_key,
+                    input_dim=int(backward_features.shape[1]),
+                )
+                for action, features in enumerate(evaluation_features):
+                    lambda_table[:, action, parameter] = np.asarray(
+                        jax.vmap(network)(features), dtype=np.float64
+                    )
         return lambda_table
 
     @staticmethod
@@ -1623,6 +1749,106 @@ class TDCCPEstimator(BaseEstimator):
             G -= cov / (sigma * sigma)
         return G / max(len(states), 1)
 
+    def _linear_sensitivity_correction(
+        self,
+        h_table: np.ndarray,
+        g_table: np.ndarray,
+        tilde_params: np.ndarray,
+        feature_matrix: np.ndarray,
+        actions: np.ndarray,
+        states: np.ndarray,
+        next_actions: np.ndarray,
+        next_states: np.ndarray,
+        ccps: np.ndarray,
+        problem: DDCProblem,
+        gamma: float,
+        coefficients: tuple[np.ndarray, np.ndarray],
+    ) -> np.ndarray:
+        """Appendix B.5 closed-form correction for a binary linear basis."""
+        if problem.num_actions != 2:
+            raise ValueError("linear sensitivity correction currently requires two actions")
+        h_omega, g_omega = coefficients
+        phi = self._build_basis_functions(
+            actions,
+            states,
+            problem.num_states,
+            problem.num_actions,
+            problem,
+            feature_matrix,
+        )
+        phi_next = self._build_basis_functions(
+            next_actions,
+            next_states,
+            problem.num_states,
+            problem.num_actions,
+            problem,
+            feature_matrix,
+        )
+        delta_basis = gamma * phi_next - phi
+        derivative_matrix = (phi.T @ delta_basis) / max(len(states), 1)
+
+        z_rows = feature_matrix[states, actions]
+        h_residual = z_rows + delta_basis @ h_omega
+        h_rhs = (phi.T @ h_residual) / max(len(states), 1)
+        try:
+            h_sensitivity = np.linalg.solve(derivative_matrix, h_rhs)
+        except np.linalg.LinAlgError:
+            rcond = self._config.basis_pinv_rcond or 1e-12
+            h_sensitivity = np.linalg.pinv(derivative_matrix, rcond=rcond) @ h_rhs
+
+        safe_ccps = np.clip(np.asarray(ccps), 1e-10, 1.0)
+        euler = 0.5772156649015329
+        e_next = euler - np.log(safe_ccps[next_states, next_actions])
+        g_residual = gamma * e_next + delta_basis @ g_omega
+        g_rhs = (phi.T @ g_residual) / max(len(states), 1)
+        try:
+            g_sensitivity = np.linalg.solve(derivative_matrix, g_rhs)
+        except np.linalg.LinAlgError:
+            rcond = self._config.basis_pinv_rcond or 1e-12
+            g_sensitivity = np.linalg.pinv(derivative_matrix, rcond=rcond) @ g_rhs
+
+        action0 = np.zeros(len(states), dtype=np.int64)
+        action1 = np.ones(len(states), dtype=np.int64)
+        phi0 = self._build_basis_functions(
+            action0,
+            states,
+            problem.num_states,
+            problem.num_actions,
+            problem,
+            feature_matrix,
+        )
+        phi1 = self._build_basis_functions(
+            action1,
+            states,
+            problem.num_states,
+            problem.num_actions,
+            problem,
+            feature_matrix,
+        )
+        basis_contrast = phi1 - phi0
+        h_contrast = h_table[states, 1] - h_table[states, 0]
+        g_contrast = g_table[states, 1] - g_table[states, 0]
+        probability = np.asarray(
+            jax.nn.sigmoid(jnp.asarray(h_contrast @ tilde_params + g_contrast))
+        )
+        outcome = (actions == 1).astype(np.float64)
+        variance = probability * (1.0 - probability)
+
+        adjustment = np.zeros(len(tilde_params), dtype=np.float64)
+        for q in range(len(tilde_params)):
+            for j in range(len(tilde_params)):
+                derivative = -h_contrast[:, q] * variance * tilde_params[j]
+                if q == j:
+                    derivative = derivative + outcome - probability
+                gradient = np.mean(derivative[:, None] * basis_contrast, axis=0)
+                adjustment[q] += float(gradient @ h_sensitivity[:, j])
+            g_derivative = -h_contrast[:, q] * variance
+            g_gradient = np.mean(g_derivative[:, None] * basis_contrast, axis=0)
+            adjustment[q] += float(g_gradient @ g_sensitivity)
+
+        # The official estimating equation is mean(score) - adjustment = 0.
+        return -adjustment
+
     def _solve_locally_robust_theta(
         self,
         panel: Panel,
@@ -1639,21 +1865,43 @@ class TDCCPEstimator(BaseEstimator):
         next_states: np.ndarray,
         ccps: np.ndarray,
         gamma: float,
+        linear_coefficients: tuple[np.ndarray, np.ndarray] | None = None,
     ) -> tuple[np.ndarray, float, int, int, str, bool, float, dict[str, Any]]:
         """Solve the held-out locally robust moment equation."""
-        residual = self._paper_value_residuals(
-            tilde_params,
-            h_table,
-            g_table,
-            feature_matrix,
-            actions,
-            states,
-            next_actions,
-            next_states,
-            ccps,
-            gamma,
-        )
-        correction_mean = np.mean(lambda_table[states, actions] * residual[:, None], axis=0)
+        if (
+            self._config.method == "semigradient"
+            and self._config.linear_robust_correction == "sensitivity"
+            and linear_coefficients is not None
+            and problem.num_actions == 2
+        ):
+            correction_mean = self._linear_sensitivity_correction(
+                h_table,
+                g_table,
+                tilde_params,
+                feature_matrix,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                ccps,
+                problem,
+                gamma,
+                linear_coefficients,
+            )
+        else:
+            residual = self._paper_value_residuals(
+                tilde_params,
+                h_table,
+                g_table,
+                feature_matrix,
+                actions,
+                states,
+                next_actions,
+                next_states,
+                ccps,
+                gamma,
+            )
+            correction_mean = np.mean(lambda_table[states, actions] * residual[:, None], axis=0)
 
         h_table_jax = jnp.asarray(h_table, dtype=jnp.float64)
         g_table_jax = jnp.asarray(g_table, dtype=jnp.float64)
@@ -2096,6 +2344,11 @@ class TDCCPEstimator(BaseEstimator):
         """
         start_time = time.time()
         cfg = self._config
+        if cfg.robust_se and not cfg.cross_fitting:
+            raise ValueError(
+                "TD-CCP locally robust inference requires cross_fitting=True; "
+                "set robust_se=False for the plug-in estimator"
+            )
         num_states = problem.num_states
         num_actions = problem.num_actions
         gamma = problem.discount_factor
@@ -2252,7 +2505,7 @@ class TDCCPEstimator(BaseEstimator):
         # Standard errors
         # -----------------------------------------------------------------
         hessian = None
-        if cfg.compute_se:
+        if cfg.compute_se and self._compute_hessian:
             self._last_h_table = h_table
             self._last_g_table = g_table
             if paper_inference is not None and paper_inference.get("sample_covariance") is not None:
@@ -2334,12 +2587,16 @@ class TDCCPEstimator(BaseEstimator):
                 "basis_include_rewards": cfg.basis_include_rewards,
                 "basis_ridge": cfg.basis_ridge,
                 "basis_pinv_rcond": cfg.basis_pinv_rcond,
+                "basis_action_coding": cfg.basis_action_coding,
                 "ccp_method": cfg.ccp_method,
                 "ccp_poly_degree": cfg.ccp_poly_degree,
                 "ccp_smoothing": cfg.ccp_smoothing,
                 "theta_l2_penalty": cfg.theta_l2_penalty,
                 "cross_fitting": cfg.cross_fitting,
                 "split_unit": cfg.split_unit,
+                "cross_fit_shuffle": cfg.cross_fit_shuffle,
+                "cross_fit_ccp": cfg.cross_fit_ccp,
+                "linear_robust_correction": cfg.linear_robust_correction,
                 "robust_se": cfg.robust_se,
                 "compute_se": cfg.compute_se,
                 "paper_inference": paper_inference,
@@ -2452,8 +2709,11 @@ class TDCCPEstimator(BaseEstimator):
             # the same fold, preserving the orthogonality condition required
             # by Adusumilli and Eckardt (2025) Theorem 5.
             half_ind = n_ind // 2
-            key, perm_key = jax.random.split(key)
-            ind_perm = np.array(jax.random.permutation(perm_key, n_ind))
+            if self._config.cross_fit_shuffle:
+                key, perm_key = jax.random.split(key)
+                ind_perm = np.array(jax.random.permutation(perm_key, n_ind))
+            else:
+                ind_perm = np.arange(n_ind)
             fold1_inds = ind_perm[:half_ind]
             fold2_inds = ind_perm[half_ind:]
 
@@ -2495,9 +2755,18 @@ class TDCCPEstimator(BaseEstimator):
         if not np.any(fold1_trans_mask) or not np.any(fold2_trans_mask):
             raise ValueError("TD-CCP cross-fitting produced an empty fold")
 
-        ccps1 = self._estimate_ccps(fold1_panel, problem.num_states, problem.num_actions, problem)
-        ccps2 = self._estimate_ccps(fold2_panel, problem.num_states, problem.num_actions, problem)
+        if self._config.cross_fit_ccp:
+            ccps1 = self._estimate_ccps(
+                fold1_panel, problem.num_states, problem.num_actions, problem
+            )
+            ccps2 = self._estimate_ccps(
+                fold2_panel, problem.num_states, problem.num_actions, problem
+            )
+        else:
+            ccps1 = ccps
+            ccps2 = ccps
 
+        self._last_semigradient_coefficients = None
         key, k1 = jax.random.split(key)
         h1, g1, losses1 = self._estimate_h_g(
             actions[fold1_trans_mask],
@@ -2510,7 +2779,9 @@ class TDCCPEstimator(BaseEstimator):
             gamma,
             k1,
         )
+        coefficients1 = self._last_semigradient_coefficients
 
+        self._last_semigradient_coefficients = None
         key, k2 = jax.random.split(key)
         h2, g2, losses2 = self._estimate_h_g(
             actions[fold2_trans_mask],
@@ -2523,6 +2794,7 @@ class TDCCPEstimator(BaseEstimator):
             gamma,
             k2,
         )
+        coefficients2 = self._last_semigradient_coefficients
 
         (
             tilde1,
@@ -2558,6 +2830,7 @@ class TDCCPEstimator(BaseEstimator):
         )
 
         if self._config.robust_se:
+            key, lambda_key1, lambda_key2 = jax.random.split(key, 3)
             lambda1 = self._compute_backward_value(
                 tilde1,
                 h1,
@@ -2569,6 +2842,7 @@ class TDCCPEstimator(BaseEstimator):
                 next_states[fold1_trans_mask],
                 problem,
                 gamma,
+                lambda_key1,
             )
             lambda2 = self._compute_backward_value(
                 tilde2,
@@ -2581,6 +2855,7 @@ class TDCCPEstimator(BaseEstimator):
                 next_states[fold2_trans_mask],
                 problem,
                 gamma,
+                lambda_key2,
             )
 
             theta1, ll1, nit1, nfev1, msg1, success1, moment_norm1, diag1 = (
@@ -2599,6 +2874,7 @@ class TDCCPEstimator(BaseEstimator):
                     next_states[fold1_trans_mask],
                     np.array(ccps2),
                     gamma,
+                    coefficients2,
                 )
             )
             theta2, ll2, nit2, nfev2, msg2, success2, moment_norm2, diag2 = (
@@ -2617,6 +2893,7 @@ class TDCCPEstimator(BaseEstimator):
                     next_states[fold2_trans_mask],
                     np.array(ccps1),
                     gamma,
+                    coefficients1,
                 )
             )
 
@@ -2692,6 +2969,15 @@ class TDCCPEstimator(BaseEstimator):
 
             paper_inference = {
                 "method": "tdccp_algorithm2_locally_robust",
+                "recursive_method": self._config.method,
+                "avi_functional_class": (
+                    self._config.avi_functional_class if self._config.method == "neural" else None
+                ),
+                "backward_correction": (
+                    "avi"
+                    if self._config.method == "neural"
+                    else self._config.linear_robust_correction
+                ),
                 "split_unit": split_unit,
                 "preliminary_stationarity_tol": preliminary_stationarity_tol,
                 "robust_stationarity_tol": robust_stationarity_tol,

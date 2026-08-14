@@ -1,0 +1,128 @@
+{
+  "claim": "official_table_e1_exact_replication",
+  "completed_replications": 1000,
+  "exact_replication_passed": true,
+  "git_sha": "1985e045647d06726acbf525b8600843f32a2b0a",
+  "inference_calibration_passed": false,
+  "modes": {
+    "nonrobust": {
+      "all_converged": false,
+      "empirical_sd": [
+        0.08688185301570185,
+        0.0033416650964051774,
+        0.05831609065716667
+      ],
+      "empirical_sd_absolute_error": [
+        2.1180499420458965e-06,
+        1.0555330572266375e-09,
+        1.2050148174708175e-06
+      ],
+      "matches_four_significant_figures": true,
+      "mean": [
+        1.9785956248669014,
+        -0.14920426348625565,
+        1.0044542145460849
+      ],
+      "mean_absolute_error": [
+        6.877321121478985e-06,
+        1.2617981446638726e-06,
+        6.401903774877482e-06
+      ],
+      "n_replications": 1000,
+      "published_empirical_sd": [
+        0.0868797349657598,
+        0.00334166404087212,
+        0.0583148856423492
+      ],
+      "published_mean": [
+        1.97858874754578,
+        -0.149203001688111,
+        1.00444781264231
+      ],
+      "total_fit_time_seconds": 2098.2942826196086
+    },
+    "robust": {
+      "all_converged": true,
+      "empirical_sd": [
+        0.08759357169369267,
+        0.003387305330330648,
+        0.05868449024940412
+      ],
+      "empirical_sd_absolute_error": [
+        1.0338470772530695e-07,
+        2.270515398090922e-09,
+        6.592577032199509e-08
+      ],
+      "inference": {
+        "coverage_95": [
+          0.92,
+          0.959,
+          0.953
+        ],
+        "lower_tail_miss_rate": [
+          0.015,
+          0.035,
+          0.026
+        ],
+        "mean_se_to_empirical_sd": [
+          0.9517922082982286,
+          1.0922802109101175,
+          0.9920811372103533
+        ],
+        "mean_standard_error": [
+          0.08337087903506896,
+          0.0036998865806305258,
+          0.05821977582323873
+        ],
+        "passed": false,
+        "standardized_bias": [
+          0.25672624927402626,
+          0.32555839637303335,
+          0.06345602056799078
+        ],
+        "true_parameters": [
+          2.0,
+          -0.15,
+          1.0
+        ],
+        "upper_tail_miss_rate": [
+          0.065,
+          0.006,
+          0.021
+        ],
+        "usable_rate": 1.0,
+        "usable_replications": 1000
+      },
+      "matches_four_significant_figures": true,
+      "mean": [
+        1.9775124308785628,
+        -0.14889723430863172,
+        1.0037238842202882
+      ],
+      "mean_absolute_error": [
+        7.053827721925643e-08,
+        9.900017278186013e-09,
+        1.2077911781815942e-08
+      ],
+      "n_replications": 1000,
+      "published_empirical_sd": [
+        0.0875936750784004,
+        0.00338730305981525,
+        0.0586844243236338
+      ],
+      "published_mean": [
+        1.97751250141684,
+        -0.148897244208649,
+        1.0037238962982
+      ],
+      "total_fit_time_seconds": 5319.874854276655
+    }
+  },
+  "parameter_names": [
+    "theta_0",
+    "theta_1",
+    "theta_2"
+  ],
+  "requested_replications": 1000,
+  "schema_version": 1
+}

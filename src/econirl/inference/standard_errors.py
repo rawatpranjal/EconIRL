@@ -222,7 +222,7 @@ def _bootstrap_se(
     n_individuals = panel.num_individuals
     n_params = len(parameters)
     bootstrap_estimates: list[np.ndarray] = []
-    failed_bootstraps = 0
+    failures: list[str] = []
 
     # Pairs cluster bootstrap: resample whole individuals (clusters), not
     # observations (Cameron and Miller 2015, p.12). B>=400 advised for SEs.
@@ -234,8 +234,8 @@ def _bootstrap_se(
         try:
             bootstrap_params = estimate_fn(bootstrap_panel)
             bootstrap_estimates.append(np.asarray(bootstrap_params, dtype=float))
-        except Exception:
-            failed_bootstraps += 1
+        except Exception as exc:  # noqa: BLE001 - failures are part of the public result
+            failures.append(f"{type(exc).__name__}: {exc}")
 
     if len(bootstrap_estimates) > 1:
         boot_matrix = np.stack(bootstrap_estimates)
@@ -255,8 +255,12 @@ def _bootstrap_se(
         details={
             "n_bootstrap": n_bootstrap,
             "successful_bootstraps": len(bootstrap_estimates),
-            "failed_bootstraps": failed_bootstraps,
+            "failed_bootstraps": len(failures),
+            "n_requested": n_bootstrap,
+            "n_successful": len(bootstrap_estimates),
             "seed": seed,
+            "bootstrap_estimates": [estimate.tolist() for estimate in bootstrap_estimates],
+            "failures": failures,
         },
     )
 

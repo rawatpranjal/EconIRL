@@ -32,19 +32,22 @@ operating_cost: estimate=0.001003, se=0.000389
 replacement_cost: estimate=3.072264, se=0.073965
 ```
 
-Fitted attributes follow the same convention as CCP and UFXP:
+The fitted object exposes estimates, diagnostics, and workflow state:
 
 | Attribute | Meaning |
 | --- | --- |
-| `params_` | Estimated structural reward parameters. |
-| `se_` | Standard errors for the structural parameters. |
-| `coef_` | Coefficients as a numpy array. |
-| `policy_` | Estimated action probabilities by state. |
-| `value_` | Estimated value function by state. |
-| `transition_tensor_` | Transition probabilities used for each action. |
-| `transition_source_` | Whether those probabilities came from the panel or were supplied. |
+| `params_`, `se_`, `coef_` | Structural estimates and standard errors. |
+| `policy_`, `value_` | Estimated policy and value function. |
+| `transition_tensor_` | Action-specific transitions with shape `(n_actions, n_states, n_states)`. |
+| `transition_source_` | Whether transitions were estimated or supplied. |
 | `log_likelihood_` | Maximized conditional choice log likelihood. |
-| `converged_` | Whether the outer optimizer reported convergence. |
+| `is_fitted_`, `result_` | Fit state and complete estimation result. |
+| `converged_`, `termination_reason_`, `failure_reason_` | Optimization outcome. |
+| `n_iter_`, `fit_time_`, `n_observations_` | Iterations, elapsed time, and sample size. |
+| `diagnostics_` | Data, identification, transition, and optimization checks. |
+| `capabilities_` | Read-only support status for inference, prediction, simulation, counterfactuals, and serialization. |
+| `bootstrap_` | Bootstrap draws and intervals when `se_method="bootstrap"`. |
+| `econirl_version_` | Package version stored with the fitted object. |
 
 ## Custom Reward Features
 
@@ -97,7 +100,7 @@ print(f"P(replace | state=50) = {cf.policy[50, 1]:.6f}")
 
 ```text
 replacement_cost = 4.000000
-P(replace | state=50) = 0.055196
+P(replace | state=50) = 0.055197
 ```
 
 This solves the fitted model again with a higher replacement cost and returns
@@ -105,10 +108,11 @@ the new value function and policy. The [Counterfactuals](counterfactuals.md)
 page shows how to change the transition model and reports the resulting policy
 change.
 
-`summary(alpha=0.10)` reports 90 percent confidence intervals. The report also
-shows whether estimation converged, how many iterations it took, elapsed time,
-and where the transition probabilities came from. The
-[Simulation Study](validation.md) shows the complete report.
+`summary(alpha=0.10)` reports 90 percent confidence intervals. Its eight
+sections cover the estimator, data, model, pre-estimation checks, fit, outcome,
+uncertainty, and limitations. The fit section reports convergence, termination,
+iterations, and elapsed time. The pre-estimation section reports the transition
+source.
 
 ## Advanced API
 

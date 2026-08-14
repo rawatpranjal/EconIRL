@@ -1,0 +1,1100 @@
+{
+  "checkpoints": [
+    "/tmp/tdccp_neural_v2_0.jsonl",
+    "/tmp/tdccp_neural_v2_1.jsonl",
+    "/tmp/tdccp_neural_v2_2.jsonl"
+  ],
+  "design": {
+    "base_seed": 151000,
+    "comparison": "paired plug-in and Algorithm 2 locally robust estimates",
+    "initial_distribution": "stationary under the oracle policy",
+    "method": "neural AVI",
+    "n_individuals": 400,
+    "n_periods": 40,
+    "stationarity_residual_max_abs": 4.551914400963142e-15
+  },
+  "estimator": "TD-CCP",
+  "provenance": {
+    "git_commit": "1985e045647d06726acbf525b8600843f32a2b0a"
+  },
+  "records": [
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 4.522869026412813e-07,
+        "parameters": [
+          1.426378122776241,
+          2.194282257736627
+        ],
+        "relative_error": [
+          0.04908125148250594,
+          0.002598973756078719
+        ],
+        "runtime_seconds": 23.147120500099845
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.2803603435654736,
+          2.149855995410531
+        ],
+        "relative_error": [
+          0.14642643762301763,
+          0.022792729358849642
+        ],
+        "runtime_seconds": 11.90439433301799
+      },
+      "rep": 0,
+      "seed": 151000,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 6.569021887361702e-07,
+        "parameters": [
+          1.3002318505821517,
+          2.1334290158897313
+        ],
+        "relative_error": [
+          0.1331787662785655,
+          0.030259538231940383
+        ],
+        "runtime_seconds": 20.028545167064294
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.2912515934223627,
+          2.1653440970510474
+        ],
+        "relative_error": [
+          0.1391656043850915,
+          0.015752683158614916
+        ],
+        "runtime_seconds": 8.948481291998178
+      },
+      "rep": 1,
+      "seed": 151001,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 4.353875851342139e-07,
+        "parameters": [
+          1.380870066659615,
+          2.1322564816276834
+        ],
+        "relative_error": [
+          0.07941995556025667,
+          0.030792508351053058
+        ],
+        "runtime_seconds": 19.680713666020893
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.429647680052637,
+          2.2053522745627863
+        ],
+        "relative_error": [
+          0.04690154663157534,
+          0.002432852073993675
+        ],
+        "runtime_seconds": 8.297857375000603
+      },
+      "rep": 2,
+      "seed": 151002,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.1168909362078579e-06,
+        "parameters": [
+          1.6848897469631745,
+          2.307759468882054
+        ],
+        "relative_error": [
+          0.123259831308783,
+          0.0489815767645699
+        ],
+        "runtime_seconds": 20.11422837502323
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4013864271975127,
+          2.2169753064048843
+        ],
+        "relative_error": [
+          0.06574238186832486,
+          0.007716048365856406
+        ],
+        "runtime_seconds": 9.135405208100565
+      },
+      "rep": 3,
+      "seed": 151003,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 6.589712563061898e-07,
+        "parameters": [
+          1.3590271342623552,
+          2.1375385694181346
+        ],
+        "relative_error": [
+          0.09398191049176319,
+          0.02839155935539345
+        ],
+        "runtime_seconds": 18.992606249987148
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.3458431909095123,
+          2.151488387544709
+        ],
+        "relative_error": [
+          0.10277120606032512,
+          0.022050732934223334
+        ],
+        "runtime_seconds": 9.215558207943104
+      },
+      "rep": 4,
+      "seed": 151004,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.569643154458468e-06,
+        "parameters": [
+          1.4502752087306836,
+          2.142533369016443
+        ],
+        "relative_error": [
+          0.03314986084621093,
+          0.026121195901616906
+        ],
+        "runtime_seconds": 17.968446291983128
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.5274203565047797,
+          2.170624935835442
+        ],
+        "relative_error": [
+          0.018280237669853133,
+          0.013352301892980926
+        ],
+        "runtime_seconds": 6.490432666963898
+      },
+      "rep": 5,
+      "seed": 151005,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 4.440689082169931e-07,
+        "parameters": [
+          1.4800573955441312,
+          2.184481579178893
+        ],
+        "relative_error": [
+          0.013295069637245879,
+          0.0070538276459577234
+        ],
+        "runtime_seconds": 18.403219750034623
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.413970553958071,
+          2.1848909847998477
+        ],
+        "relative_error": [
+          0.05735296402795272,
+          0.006867734181887504
+        ],
+        "runtime_seconds": 8.395983417052776
+      },
+      "rep": 6,
+      "seed": 151006,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.096570426266222e-06,
+        "parameters": [
+          1.2321850478317435,
+          2.065079582116989
+        ],
+        "relative_error": [
+          0.17854330144550432,
+          0.06132746267409591
+        ],
+        "runtime_seconds": 20.048448249930516
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.2662885945150295,
+          2.0660665389110227
+        ],
+        "relative_error": [
+          0.155807603656647,
+          0.060878845949535236
+        ],
+        "runtime_seconds": 10.124442375032231
+      },
+      "rep": 7,
+      "seed": 151007,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.0504745021935123e-06,
+        "parameters": [
+          1.3359379506548654,
+          2.1443347664644876
+        ],
+        "relative_error": [
+          0.10937469956342305,
+          0.025302378879778435
+        ],
+        "runtime_seconds": 22.73582287505269
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.3625410163180922,
+          2.180829048048617
+        ],
+        "relative_error": [
+          0.0916393224546052,
+          0.008714069068810438
+        ],
+        "runtime_seconds": 9.308959415997379
+      },
+      "rep": 8,
+      "seed": 151008,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.7481320203653329e-06,
+        "parameters": [
+          1.5354743955937424,
+          2.197539360485929
+        ],
+        "relative_error": [
+          0.02364959706249496,
+          0.0011184725063959824
+        ],
+        "runtime_seconds": 19.909660540986806
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4107741139851706,
+          2.168972212172773
+        ],
+        "relative_error": [
+          0.05948392400988626,
+          0.014103539921466986
+        ],
+        "runtime_seconds": 9.042376249912195
+      },
+      "rep": 9,
+      "seed": 151009,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.5793921958115095e-06,
+        "parameters": [
+          1.4329197183455928,
+          2.127678682345126
+        ],
+        "relative_error": [
+          0.04472018776960477,
+          0.03287332620676092
+        ],
+        "runtime_seconds": 21.920309124980122
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4225827858615074,
+          2.121041606938957
+        ],
+        "relative_error": [
+          0.05161147609232838,
+          0.03589017866411061
+        ],
+        "runtime_seconds": 11.979256958002225
+      },
+      "rep": 10,
+      "seed": 151010,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.1437794200969426e-06,
+        "parameters": [
+          1.3216628552211858,
+          2.1059217875490512
+        ],
+        "relative_error": [
+          0.11889142985254282,
+          0.042762823841340426
+        ],
+        "runtime_seconds": 19.685319292009808
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.3774785117645174,
+          2.1853600437542617
+        ],
+        "relative_error": [
+          0.08168099215698839,
+          0.006654525566244744
+        ],
+        "runtime_seconds": 7.978923499933444
+      },
+      "rep": 11,
+      "seed": 151011,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 2.500300277523499e-06,
+        "parameters": [
+          1.4975240343266099,
+          2.2064455952737
+        ],
+        "relative_error": [
+          0.0016506437822600972,
+          0.0029298160334999645
+        ],
+        "runtime_seconds": 19.00423045794014
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.5708217052312765,
+          2.280535628708998
+        ],
+        "relative_error": [
+          0.04721447015418434,
+          0.03660710395863545
+        ],
+        "runtime_seconds": 9.107191374991089
+      },
+      "rep": 12,
+      "seed": 151012,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 2.9851736524973074e-06,
+        "parameters": [
+          1.5780288948137366,
+          2.246303207276128
+        ],
+        "relative_error": [
+          0.052019263209157764,
+          0.021046912398239907
+        ],
+        "runtime_seconds": 21.10070412501227
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.5387181484809564,
+          2.2183094038542204
+        ],
+        "relative_error": [
+          0.0258120989873043,
+          0.008322456297372816
+        ],
+        "runtime_seconds": 7.964454417000525
+      },
+      "rep": 13,
+      "seed": 151013,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.1932077439211273e-06,
+        "parameters": [
+          1.5144185385813005,
+          2.2329899893157434
+        ],
+        "relative_error": [
+          0.009612359054200326,
+          0.014995449688974209
+        ],
+        "runtime_seconds": 19.6093442090787
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4391392448111764,
+          2.2334169936141675
+        ],
+        "relative_error": [
+          0.04057383679254908,
+          0.015189542551894216
+        ],
+        "runtime_seconds": 8.271708291955292
+      },
+      "rep": 14,
+      "seed": 151014,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.0972346846406268e-06,
+        "parameters": [
+          1.3612830983997117,
+          2.1422840145636224
+        ],
+        "relative_error": [
+          0.09247793440019218,
+          0.026234538834717176
+        ],
+        "runtime_seconds": 17.703398249926977
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.3602467988177278,
+          2.1421851297457812
+        ],
+        "relative_error": [
+          0.09316880078818146,
+          0.026279486479190425
+        ],
+        "runtime_seconds": 7.558779834071174
+      },
+      "rep": 15,
+      "seed": 151015,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.0310463911833962e-06,
+        "parameters": [
+          1.502322638589121,
+          2.2375987596554436
+        ],
+        "relative_error": [
+          0.0015484257260807155,
+          0.017090345297928845
+        ],
+        "runtime_seconds": 18.59580895898398
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.426473861553951,
+          2.2400758623879478
+        ],
+        "relative_error": [
+          0.049017425630699364,
+          0.018216301085430715
+        ],
+        "runtime_seconds": 7.9328993749804795
+      },
+      "rep": 16,
+      "seed": 151016,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 3.1873958370674626e-06,
+        "parameters": [
+          1.3689169147488456,
+          2.1665087252455497
+        ],
+        "relative_error": [
+          0.08738872350076961,
+          0.015223306706568391
+        ],
+        "runtime_seconds": 19.911918666912243
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.3570243469594216,
+          2.217995522014095
+        ],
+        "relative_error": [
+          0.09531710202705224,
+          0.008179782733679364
+        ],
+        "runtime_seconds": 9.346422791015357
+      },
+      "rep": 17,
+      "seed": 151017,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 8.191058989076977e-07,
+        "parameters": [
+          1.5148468053180224,
+          2.1704100615197017
+        ],
+        "relative_error": [
+          0.009897870212014936,
+          0.013449972036499294
+        ],
+        "runtime_seconds": 23.528257584082894
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4022109395956854,
+          2.165500507166021
+        ],
+        "relative_error": [
+          0.06519270693620971,
+          0.015681587651808743
+        ],
+        "runtime_seconds": 8.001512916991487
+      },
+      "rep": 18,
+      "seed": 151018,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.6646080709091249e-06,
+        "parameters": [
+          1.5960706205890003,
+          2.2950556846765773
+        ],
+        "relative_error": [
+          0.06404708039266686,
+          0.043207129398444136
+        ],
+        "runtime_seconds": 21.445723582990468
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.5018300666183264,
+          2.2498246048846156
+        ],
+        "relative_error": [
+          0.0012200444122176062,
+          0.02264754767482517
+        ],
+        "runtime_seconds": 8.167179000098258
+      },
+      "rep": 19,
+      "seed": 151019,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.3806318141339633e-06,
+        "parameters": [
+          1.472307680641753,
+          2.2196441362378803
+        ],
+        "relative_error": [
+          0.01846154623883134,
+          0.008929152835400037
+        ],
+        "runtime_seconds": 22.223803458968177
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.31103665153265,
+          2.1835055514004558
+        ],
+        "relative_error": [
+          0.12597556564490006,
+          0.007497476636156549
+        ],
+        "runtime_seconds": 12.23014920798596
+      },
+      "rep": 20,
+      "seed": 151020,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 5.594169263008608e-07,
+        "parameters": [
+          1.4754017248389224,
+          2.1785756286298827
+        ],
+        "relative_error": [
+          0.016398850107385066,
+          0.009738350622780651
+        ],
+        "runtime_seconds": 19.235477500013076
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.45131309688381,
+          2.1550380495652353
+        ],
+        "relative_error": [
+          0.03245793541079337,
+          0.020437250197620417
+        ],
+        "runtime_seconds": 8.943541459040716
+      },
+      "rep": 21,
+      "seed": 151021,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.0225329980240543e-06,
+        "parameters": [
+          1.517140660169402,
+          2.203897133754607
+        ],
+        "relative_error": [
+          0.011427106779601312,
+          0.0017714244339121648
+        ],
+        "runtime_seconds": 20.811632959055714
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.3970123738949074,
+          2.165730699797881
+        ],
+        "relative_error": [
+          0.06865841740339507,
+          0.015576954637326938
+        ],
+        "runtime_seconds": 7.678643124992959
+      },
+      "rep": 22,
+      "seed": 151022,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 1.2961653427213468e-07,
+        "parameters": [
+          1.4825248010939573,
+          2.25539571714398
+        ],
+        "relative_error": [
+          0.011650132604028437,
+          0.02517987142908164
+        ],
+        "runtime_seconds": 20.42046295804903
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.2239599323503472,
+          2.140381443343569
+        ],
+        "relative_error": [
+          0.18402671176643523,
+          0.027099343934741418
+        ],
+        "runtime_seconds": 9.130224832915701
+      },
+      "rep": 23,
+      "seed": 151023,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 9.122109163748551e-07,
+        "parameters": [
+          1.327438230241576,
+          2.1133797003779407
+        ],
+        "relative_error": [
+          0.11504117983894939,
+          0.039372863464572506
+        ],
+        "runtime_seconds": 20.38406724995002
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.3579036837852936,
+          2.173136426620023
+        ],
+        "relative_error": [
+          0.09473087747647095,
+          0.01221071517271698
+        ],
+        "runtime_seconds": 9.106981125078164
+      },
+      "rep": 24,
+      "seed": 151024,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 9.483951793717039e-07,
+        "parameters": [
+          1.5539416778073802,
+          2.248861183814771
+        ],
+        "relative_error": [
+          0.03596111853825349,
+          0.02220962900671409
+        ],
+        "runtime_seconds": 18.351807957980782
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4052647659211794,
+          2.2021383217676136
+        ],
+        "relative_error": [
+          0.0631568227192137,
+          0.0009719644398242798
+        ],
+        "runtime_seconds": 7.102462999988347
+      },
+      "rep": 25,
+      "seed": 151025,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 8.932580462301493e-07,
+        "parameters": [
+          1.3167670161926894,
+          2.152128842967251
+        ],
+        "relative_error": [
+          0.12215532253820705,
+          0.021759616833067836
+        ],
+        "runtime_seconds": 18.666410291101784
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.2110221224112308,
+          2.1398405773454505
+        ],
+        "relative_error": [
+          0.19265191839251283,
+          0.027345192115704388
+        ],
+        "runtime_seconds": 9.141395708080381
+      },
+      "rep": 26,
+      "seed": 151026,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 4.0579845520213197e-07,
+        "parameters": [
+          1.2737346338834026,
+          2.164422159398744
+        ],
+        "relative_error": [
+          0.15084357741106494,
+          0.016171745727843693
+        ],
+        "runtime_seconds": 19.940607959055342
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.2652612741082496,
+          2.165766651248221
+        ],
+        "relative_error": [
+          0.15649248392783358,
+          0.01556061306899044
+        ],
+        "runtime_seconds": 9.638819999992847
+      },
+      "rep": 27,
+      "seed": 151027,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 3.3641898981887416e-07,
+        "parameters": [
+          1.44757966068518,
+          2.2124088927584564
+        ],
+        "relative_error": [
+          0.03494689287654662,
+          0.005640405799298294
+        ],
+        "runtime_seconds": 23.007210209034383
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4510235304020356,
+          2.237480259408445
+        ],
+        "relative_error": [
+          0.03265097973197628,
+          0.017036481549293138
+        ],
+        "runtime_seconds": 9.453192916931584
+      },
+      "rep": 28,
+      "seed": 151028,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    },
+    {
+      "error": null,
+      "locally_robust": {
+        "converged": true,
+        "moment_norm_max": 3.7917766137974146e-07,
+        "parameters": [
+          1.4459536712914511,
+          2.200556467705911
+        ],
+        "relative_error": [
+          0.03603088580569924,
+          0.0002529398663231319
+        ],
+        "runtime_seconds": 20.326694749994203
+      },
+      "plugin": {
+        "converged": true,
+        "parameters": [
+          1.4494704866635706,
+          2.1984254997721737
+        ],
+        "relative_error": [
+          0.03368634222428627,
+          0.0007156819217392993
+        ],
+        "runtime_seconds": 8.300458083045669
+      },
+      "rep": 29,
+      "seed": 151029,
+      "truth": [
+        1.5,
+        2.2
+      ]
+    }
+  ],
+  "status": "ready",
+  "summary": {
+    "completed_replications": 30,
+    "gates": [
+      {
+        "name": "stationarity_residual_max_abs",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 1e-10,
+        "value": 4.551914400963142e-15
+      },
+      {
+        "name": "paired_replications",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 30,
+        "value": 30
+      },
+      {
+        "name": "usable_rate",
+        "operator": ">=",
+        "passed": true,
+        "threshold": 0.9,
+        "value": 1.0
+      },
+      {
+        "name": "mean_parameter_relative_error_max",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.25,
+        "value": 0.06240349247716036
+      },
+      {
+        "name": "locally_robust_aggregate_bias_vs_plugin",
+        "operator": "<=",
+        "passed": true,
+        "threshold": 0.11304777646136915,
+        "value": 0.06254670564171325
+      }
+    ],
+    "locally_robust_aggregate_bias": 0.06254670564171325,
+    "locally_robust_bias": [
+      0.06046297348741558,
+      0.016009972632431424
+    ],
+    "mean_locally_robust_relative_error": [
+      0.06240349247716036,
+      0.02142623715096159
+    ],
+    "passed": true,
+    "plugin_aggregate_bias": 0.11304777646136915,
+    "plugin_bias": [
+      0.11169072673078473,
+      0.017463714530673524
+    ],
+    "usable_rate": 1.0,
+    "usable_replications": 30
+  }
+}

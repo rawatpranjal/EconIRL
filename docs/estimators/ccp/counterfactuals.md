@@ -7,8 +7,11 @@
 - [Simulation Study](validation.md)
 - [Bus Engine Example](rust_bus.md)
 
-Use the public `counterfactual` method to solve a fitted CCP model under new
-reward parameters or a replacement transition tensor.
+## Quick Start
+
+Use the public `counterfactual` method to solve a fitted conditional choice
+probability (CCP) model under new reward parameters or a replacement transition
+tensor.
 
 ```python
 cf = model.counterfactual(replacement_cost=4.0)
@@ -27,13 +30,14 @@ P(replace | state=50)=0.054908
 The method returns a parameter dictionary, value function, and policy. Pass
 `transitions=new_tensor` to change the transition law. A single call can change
 reward parameters or transitions, but not both. The tensor orientation is
-`(n_actions, n_states, n_states)`. Removing an action requires a model with a
-reduced action space.
+`(n_actions, n_states, n_states)`. The method does not support changes to the
+action space.
 
 ## Results
 
-The 100-state study evaluates reward and transition changes over 20
-independent panels:
+The counterfactual experiment fits a three-stage nested pseudo-likelihood (NPL)
+model to 20 independently generated panels. Each panel contains 160,000 choices
+across 100 states. Every fit uses the transition tensor that generated its panel.
 
 | Change | Mean policy TV | Mean value loss |
 | --- | ---: | ---: |
@@ -41,7 +45,8 @@ independent panels:
 | Slow deterioration | 0.0019 | 0.000083 |
 
 Policy TV is the state-averaged total-variation distance between the fitted
-counterfactual policy and the policy from the true parameters. Value loss
-measures the cost of using the fitted policy instead of the true-parameter
-policy. See the
+counterfactual policy and the policy from the true parameters. Value loss is
+the expected discounted loss from following the fitted counterfactual policy.
+It is evaluated under the true counterfactual reward and transitions from the
+study's initial state distribution. See the
 [Simulation Study](validation.md) for the estimation and inference results.

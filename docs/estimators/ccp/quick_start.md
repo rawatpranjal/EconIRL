@@ -8,12 +8,9 @@
 - [Counterfactuals](counterfactuals.md)
 - [Bus Engine Example](rust_bus.md)
 
-This page shows the public CCP wrapper. The snippet checks that the estimator
-runs and returns the structural objects. The pre-estimation page covers support
-and first-stage CCP quality.
-
-The public API follows the same sklearn convention as NFXP. Create an
-estimator, call `fit`, and read fitted attributes.
+This quick start fits CCP, then inspects its parameter estimates, standard
+errors, policy shape, transition source, and NPL stopping diagnostics. It is a usage
+example, not a substitute for the pre-estimation checks.
 
 ```python
 from econirl.datasets import load_rust_bus, rust_bus_reward_spec
@@ -69,13 +66,17 @@ a value function, and a likelihood.
 | `npl_parameter_residual_` | Final L2 change in reward parameters. |
 | `npl_policy_residual_` | Final maximum absolute policy change. |
 
-Set `num_policy_iterations=1` for a one-step Hotz-Miller estimate. Set it to a
-larger positive integer for a maximum number of NPL updates. The run can stop
-early only when both residuals meet the tolerance. Set it to `-1` to require
-that joint fixed point before the iteration cap.
+Set `num_policy_iterations=1` for a one-step Hotz-Miller estimate. A larger
+positive value sets the maximum number of NPL stages. A successful run stops
+before that maximum only when both residuals meet the tolerance. An inner
+optimizer failure stops the run with `converged_=False` and
+`termination_reason_="inner_optimizer_failed"`. Set the iteration count to
+`-1` to continue until the joint fixed point. Reaching the safety cap first
+returns `converged_=False` with
+`termination_reason_="iteration_cap_reached"`.
 
-Model-based, robust, and clustered standard errors are conditional on the
-policy object used in the final pseudo-likelihood and on the transition tensor.
+The `asymptotic`, `robust`, and `clustered` standard errors condition on the
+policy used in the final pseudo-likelihood and on the transition tensor.
 The pairs-cluster bootstrap repeats empirical CCP estimation after resampling
 individuals, but it still holds the transition tensor fixed.
 

@@ -30,47 +30,7 @@ distance is the average, across states, of the total variation between the two
 action probabilities. Zero means the estimated and true policies agree in
 every state.
 
-One of the 200-state fits produces this report:
-
-```text
-================================================================================
-                   Dynamic Discrete Choice Estimation Results
-================================================================================
-Method:      NFXP (Nested Fixed Point)    Observations:  7,500
-Optimizer:   BHHH                         Individuals:   300
-Family:      structural (linear utility)  Discount (beta): 0.95
-                                          Scale (sigma):  1.0
-
-[1] DATA
-  State space:          200 states x 2 actions
-  Periods per individual: ~25
-  State coverage:       186/200 visited (93%)
-  Single-action states: 76
-
-[2] PRE-ESTIMATION CHECKS
-  Reward features (K):  3
-  Design rank:          3/3         Condition:          1.0e+00
-  Contrast rank:        3/3       Contrast condition: 1.0e+00
-
-[3] TRANSITION MODEL
-  Transition source: supplied action-specific tensor
-
-[4] RESULTS
-  4a. Estimation
-                          coef   std err       t   P>|t|   [0.025   0.975]
-    theta_0             1.1238    0.0633   17.76   0.000   0.9997   1.2478
-    theta_1            -0.7481    0.0429  -17.42   0.000  -0.8322  -0.6639
-    theta_2             0.5976    0.0460   12.98   0.000   0.5074   0.6878
-  4b. Identification
-    Hessian condition:  4.1     Min eigenvalue: 199.63
-  4c. Inference and fit
-    Converged:      yes
-    Iterations:     5
-    SE method:      robust sandwich
-    Log likelihood: -4,470.69
-    Accuracy:       68.3%
-================================================================================
-```
+The result file includes the report from one 200-state fit.
 
 ## Inference
 
@@ -88,6 +48,36 @@ NFXP reports for the individual panels.
 The reported standard errors closely match the observed variation across
 panels. Coverage remains near 95 percent. Misses below the interval range from
 1.6 to 2.8 percent, while misses above it range from 2.4 to 3.0 percent.
+
+## Bootstrap Intervals
+
+A separate experiment uses 50 independent panels. Each interval comes from 99
+pairs-cluster resamples of complete individual trajectories.
+
+| Parameter | Coverage | Mean interval width |
+| --- | ---: | ---: |
+| Reward feature 1 | 94.0% | 0.1324 |
+| Reward feature 2 | 96.0% | 0.1809 |
+| Reward feature 3 | 96.0% | 0.1955 |
+
+All 50 panels returned an estimate. Every panel completed all 99 resamples, and
+no bootstrap draw failed. Repeating the same 19-resample check produced the
+same estimates, standard errors, intervals, coverage indicators, and failure
+records.
+
+## Prediction on New Panels
+
+Each 200-state fit was evaluated on a new panel with 2,500 choices. The oracle
+uses the true reward parameters on those same choices.
+
+| Score | Fitted model | Excess over oracle |
+| --- | ---: | ---: |
+| Negative log likelihood | 0.5942 | 0.00038 |
+| Brier score | 0.4085 | 0.00031 |
+
+The excess is the fitted score minus the oracle score. Smaller values indicate
+that estimated choice probabilities remain close to the true probabilities on
+new trajectories.
 
 ## Counterfactuals
 
@@ -111,17 +101,25 @@ Run the study from the repository root:
 ```bash
 PYTHONPATH=src:. uv run python validation/estimators/nfxp/ready.py \
   --quiet --output validation/results/nfxp_ready.json
+
+PYTHONPATH=src:. uv run python \
+  validation/estimators/nfxp/bootstrap_calibration.py \
+  --quiet --output validation/results/nfxp_bootstrap_calibration.json
 ```
 
 **Result**
 
 ```text
 wrote validation/results/nfxp_ready.json
+wrote validation/results/nfxp_bootstrap_calibration.json
 ```
 
 The [simulation code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/ready.py)
 and [reported results](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp_ready.json)
-contain the full experiment configuration.
+contain the full experiment configuration. The bootstrap
+[code](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/nfxp/bootstrap_calibration.py)
+and [results](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/nfxp_bootstrap_calibration.json)
+contain the resampling design and interval results.
 
 ## Related Studies
 

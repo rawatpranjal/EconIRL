@@ -8,8 +8,9 @@
 - [Counterfactuals](counterfactuals.md)
 - [Rust Replication](../../replications.md)
 
-This example uses the bundled bus engine replacement dataset to load the panel,
-estimate the costs, inspect uncertainty, and run a counterfactual.
+This example uses the bundled synthetic bus engine replacement panel. It
+follows the Rust setting but is not the original Rust sample. The example
+estimates costs, inspects uncertainty, and runs a counterfactual.
 
 ```python
 from econirl.datasets import load_rust_bus, rust_bus_reward_spec
@@ -75,9 +76,9 @@ panels.
 ## Counterfactual
 
 Increasing the fitted replacement cost by 50 percent lowers the long-run
-replacement rate from 5.3 percent to 2.2 percent. Mean long-run mileage rises
-from 10.5 to 20.6 states. Under this counterfactual, buses run longer before
-engine replacement.
+replacement rate from 5.3 percent to 2.2 percent. The stationary mean state
+index rises from 10.5 to 20.6. Under this counterfactual, buses run longer
+before engine replacement.
 
 ```python
 cf = model.counterfactual(

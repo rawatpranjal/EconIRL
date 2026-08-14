@@ -452,9 +452,9 @@ class TestExistingMethodsStillWork:
         summary = fitted_model.summary()
         assert isinstance(summary, str)
         assert len(summary) > 0
-        assert "[1] DATA" in summary
-        assert "[2] PRE-ESTIMATION CHECKS" in summary
-        assert "[3] FIRST-STAGE TRANSITION ESTIMATION" in summary
+        assert "Data" in summary
+        assert "Pre-estimation checks" in summary
+        assert "Transition source: estimated from fitted panel" in summary
         assert fitted_model.transition_source_ == "estimated from fitted panel"
         assert fitted_model.transition_tensor_.shape == (2, _N_STATES, _N_STATES)
 

@@ -17,7 +17,7 @@ next-state link theta1 recovers to ~-0.15, and breaking that link (shuffle s' or
 beta=0) sends theta1 to ~-0.35. ``--check-dynamics`` runs that guard.
 
 Usage:
-  PYTHONPATH=src python validation/estimators/tdccp/highdim_dummies.py --ks 0,5,10,20 --seeds 5
+  PYTHONPATH=src python validation/estimators/tdccp/highdim_dummies.py --ks 0,20 --seeds 30
   PYTHONPATH=src python validation/estimators/tdccp/highdim_dummies.py --check-dynamics
 """
 
@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -55,6 +56,7 @@ from econirl.simulation.synthetic import simulate_panel_from_policy  # noqa: E40
 NT = be.N_TYPES
 SCALE = be.MILEAGE_SCALE
 THETA = be.THETA_TRUE
+FINAL_SEEDS = 30
 
 
 def _relevant_truth():
@@ -160,8 +162,8 @@ def fit(panel, utility, problem, basis_dim=2, beta_override=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ks", type=str, default="0,5,10,20")
-    ap.add_argument("--seeds", type=int, default=5)
+    ap.add_argument("--ks", type=str, default="0,20")
+    ap.add_argument("--seeds", type=int, default=FINAL_SEEDS)
     ap.add_argument("--n-buses", type=int, default=150)
     ap.add_argument("--basis-dim", type=int, default=2)
     ap.add_argument(
@@ -207,12 +209,15 @@ def main():
             ths.append(fit(p, u, pr, args.basis_dim))
         a = np.array(ths)
         m, se = a.mean(0), a.std(0, ddof=1) / np.sqrt(args.seeds)
+        parameter_rmse = np.sqrt(np.mean((a - THETA[None, :]) ** 2, axis=1))
         rec = {
             "K": K,
             "n_obs": int(n_obs),
             "mean": m.tolist(),
             "sem": se.tolist(),
             "theta1_abs_err": float(abs(m[1] - THETA[1])),
+            "mean_parameter_rmse": float(np.mean(parameter_rmse)),
+            "parameter_estimates": a.tolist(),
         }
         records.append(rec)
         print(
@@ -221,23 +226,104 @@ def main():
             f"({(time.time() - t0) / args.seeds:.0f}s/seed)",
             flush=True,
         )
+    record_by_k = {record["K"]: record for record in records}
+    shuffled_theta = []
+    shuffled_started = time.time()
+    if 20 in record_by_k:
+        for seed in range(args.seeds):
+            panel, utility, problem, _ = build_highdim(
+                dgp,
+                truth,
+                init,
+                20,
+                seed,
+                args.n_buses,
+                shuffle=True,
+            )
+            shuffled_theta.append(fit(panel, utility, problem, args.basis_dim))
+    shuffled = np.asarray(shuffled_theta, dtype=float)
+    shuffled_theta1_error = (
+        float(np.mean(np.abs(shuffled[:, 1] - THETA[1]))) if len(shuffled) else float("nan")
+    )
+    correct_theta1_error = (
+        float(
+            np.mean(
+                np.abs(
+                    np.asarray(record_by_k[20]["parameter_estimates"], dtype=float)[:, 1] - THETA[1]
+                )
+            )
+        )
+        if 20 in record_by_k
+        else float("nan")
+    )
+    nuisance_ratio = (
+        record_by_k[20]["mean_parameter_rmse"] / max(record_by_k[0]["mean_parameter_rmse"], 1e-12)
+        if 0 in record_by_k and 20 in record_by_k
+        else float("nan")
+    )
+    shuffle_ratio = shuffled_theta1_error / max(correct_theta1_error, 1e-12)
+    final_run = args.seeds >= FINAL_SEEDS and 0 in record_by_k and 20 in record_by_k
+    gates = [
+        {
+            "name": "paired_seeds",
+            "value": args.seeds,
+            "operator": ">=",
+            "threshold": FINAL_SEEDS,
+            "passed": args.seeds >= FINAL_SEEDS,
+        },
+        {
+            "name": "twenty_nuisance_error_ratio",
+            "value": nuisance_ratio,
+            "operator": "<=",
+            "threshold": 1.5,
+            "passed": bool(nuisance_ratio <= 1.5),
+        },
+        {
+            "name": "shuffled_next_state_dynamic_error_ratio",
+            "value": shuffle_ratio,
+            "operator": ">=",
+            "threshold": 2.0,
+            "passed": bool(shuffle_ratio >= 2.0),
+        },
+    ]
+    passed = bool(final_run and all(gate["passed"] for gate in gates))
+    payload = {
+        "schema_version": 1,
+        "estimator": "TD-CCP",
+        "status": "ready" if passed else "smoke_only" if not final_run else "not_ready",
+        "regime": "high-dimensional (bus + K irrelevant dummy state vars)",
+        "paper": "Adusumilli and Eckardt (2025), high-dimensional setup",
+        "true_theta": THETA.tolist(),
+        "basis_dim": args.basis_dim,
+        "n_buses": args.n_buses,
+        "seeds": args.seeds,
+        "records": records,
+        "negative_control": {
+            "description": "shuffle next-state links with K=20",
+            "parameter_estimates": shuffled.tolist(),
+            "mean_theta1_absolute_error": shuffled_theta1_error,
+            "correct_mean_theta1_absolute_error": correct_theta1_error,
+            "error_ratio": shuffle_ratio,
+            "runtime_seconds": time.time() - shuffled_started,
+        },
+        "nuisance_error_ratio": nuisance_ratio,
+        "gates": gates,
+        "passed": passed,
+        "provenance": {
+            "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        },
+    }
     args.out.write_text(
         json.dumps(
-            {
-                "estimator": "TD-CCP",
-                "regime": "high-dimensional (bus + K irrelevant dummy state vars)",
-                "paper": "Adusumilli and Eckardt (2025), high-dimensional setup",
-                "true_theta": THETA.tolist(),
-                "basis_dim": args.basis_dim,
-                "n_buses": args.n_buses,
-                "seeds": args.seeds,
-                "records": records,
-            },
+            payload,
             indent=2,
+            allow_nan=False,
         )
         + "\n"
     )
     print(f"wrote {args.out}")
+    if final_run and not passed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

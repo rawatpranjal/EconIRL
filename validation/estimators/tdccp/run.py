@@ -65,6 +65,7 @@ from validation_display import (  # noqa: E402
     validation_display_name,
     validation_role,
 )
+
 from econirl.core.bellman import SoftBellmanOperator  # noqa: E402
 from econirl.core.solvers import value_iteration  # noqa: E402
 from econirl.environments.shapeshifter import (  # noqa: E402
@@ -191,7 +192,8 @@ def main() -> None:
     if raw_neural_record is not None:
         raw_payload = raw_neural_record["payload"]
         failed = [gate for gate in raw_payload["gates"] if not gate.passed]
-        print(f"  diagnostic ({raw_payload['case_id']}): {raw_neural_record['run_dir'] / 'result.json'}")
+        result_path = raw_neural_record["run_dir"] / "result.json"
+        print(f"  diagnostic ({raw_payload['case_id']}): {result_path}")
         print(
             f"  raw-neural diagnostic gates ({raw_payload['case_id']}): "
             f"{len(raw_payload['gates']) - len(failed)} pass, {len(failed)} fail"
@@ -214,14 +216,8 @@ def main() -> None:
         and hard_record is not None
         and any(not gate.passed for gate in hard_record["payload"]["gates"])
     ):
-        failed_names = [
-            gate.name
-            for gate in hard_record["payload"]["gates"]
-            if not gate.passed
-        ]
-        raise RuntimeError(
-            "TD-CCP hard-case gates failed: " + ", ".join(failed_names)
-        )
+        failed_names = [gate.name for gate in hard_record["payload"]["gates"] if not gate.passed]
+        raise RuntimeError("TD-CCP hard-case gates failed: " + ", ".join(failed_names))
 
 
 def run_validation_cell(cell_id: str, args: argparse.Namespace) -> dict[str, Any]:
@@ -539,29 +535,20 @@ def run_monte_carlo_coverage(args: argparse.Namespace) -> dict[str, Any]:
         se_hat = np.asarray(summary.standard_errors, dtype=np.float64)
         covered = (ci_low <= true_params) & (true_params <= ci_high)
         paper_inference = summary.metadata.get("paper_inference") or {}
-        prelim = [
-            bool(value)
-            for value in paper_inference.get("preliminary_optimizer_success", [])
-        ]
-        robust = [
-            bool(value)
-            for value in paper_inference.get("robust_optimizer_success", [])
-        ]
+        prelim = [bool(value) for value in paper_inference.get("preliminary_optimizer_success", [])]
+        robust = [bool(value) for value in paper_inference.get("robust_optimizer_success", [])]
         prelim_stationary = [
-            bool(value)
-            for value in paper_inference.get("preliminary_optimizer_stationary", [])
+            bool(value) for value in paper_inference.get("preliminary_optimizer_stationary", [])
         ]
         robust_is_stationary = [
-            bool(value)
-            for value in paper_inference.get("robust_optimizer_stationary", [])
+            bool(value) for value in paper_inference.get("robust_optimizer_stationary", [])
         ]
         preliminary_success.append(prelim)
         preliminary_stationary.append(prelim_stationary)
         robust_success.append(robust)
         robust_stationary.append(robust_is_stationary)
         preliminary_messages.extend(
-            str(message)
-            for message in paper_inference.get("preliminary_optimizer_messages", [])
+            str(message) for message in paper_inference.get("preliminary_optimizer_messages", [])
         )
         covariance_units.append(str(paper_inference.get("covariance_unit", "unknown")))
         preliminary_projected_gradient_norms.append(
@@ -647,16 +634,10 @@ def run_monte_carlo_coverage(args: argparse.Namespace) -> dict[str, Any]:
         if args.mc_replications > 1
         else np.zeros_like(true_params)
     )
-    preliminary_all_success = [
-        bool(values) and all(values) for values in preliminary_success
-    ]
-    preliminary_all_stationary = [
-        bool(values) and all(values) for values in preliminary_stationary
-    ]
+    preliminary_all_success = [bool(values) and all(values) for values in preliminary_success]
+    preliminary_all_stationary = [bool(values) and all(values) for values in preliminary_stationary]
     robust_all_success = [bool(values) and all(values) for values in robust_success]
-    robust_all_stationary = [
-        bool(values) and all(values) for values in robust_stationary
-    ]
+    robust_all_stationary = [bool(values) and all(values) for values in robust_stationary]
     message_counts = {
         message: preliminary_messages.count(message)
         for message in sorted(set(preliminary_messages))
@@ -705,18 +686,14 @@ def run_monte_carlo_coverage(args: argparse.Namespace) -> dict[str, Any]:
         "lambda_fixed_point_residual_rms_max": float(np.nanmax(lambda_residual_rms)),
         "lambda_fixed_point_residual_max_abs": float(np.nanmax(lambda_residual_max_abs)),
         "preliminary_optimizer_all_success_count": int(sum(preliminary_all_success)),
-        "preliminary_optimizer_all_stationary_count": int(
-            sum(preliminary_all_stationary)
-        ),
+        "preliminary_optimizer_all_stationary_count": int(sum(preliminary_all_stationary)),
         "preliminary_projected_gradient_norm_max": float(
             np.nanmax(preliminary_projected_gradient_norms)
         ),
         "preliminary_optimizer_message_counts": message_counts,
         "robust_optimizer_all_success_count": int(sum(robust_all_success)),
         "robust_optimizer_all_stationary_count": int(sum(robust_all_stationary)),
-        "robust_projected_gradient_norm_max": float(
-            np.nanmax(robust_projected_gradient_norms)
-        ),
+        "robust_projected_gradient_norm_max": float(np.nanmax(robust_projected_gradient_norms)),
         "covariance_units": sorted(set(covariance_units)),
         "runtime_seconds": {
             "mean": float(np.mean(estimation_times)),
@@ -1267,9 +1244,13 @@ def render_results_tex(
         dgp = record["dgp"]
         gates = payload["gates"]
         passed = sum(gate.passed for gate in gates)
+        role = validation_role(
+            payload["cell"].cell_id,
+            CELL_ROLES.get(payload["cell"].cell_id, "diagnostic"),
+        )
         add(
             f"{tex_text(validation_display_name(payload['cell'].cell_id))} & "
-            f"{tex_text(validation_role(payload['cell'].cell_id, CELL_ROLES.get(payload['cell'].cell_id, 'diagnostic')))} & "
+            f"{tex_text(role)} & "
             f"{dgp.problem.num_states} & {dgp.problem.state_dim} & "
             f"{dgp.feature_matrix.shape[-1]} & {int(payload['summary'].num_iterations)} & "
             f"{passed} & {len(gates) - passed} \\\\"
@@ -1438,7 +1419,10 @@ def add_hard_case_tex(lines: list[str], payload: dict[str, Any]) -> None:
     add(r"\caption{TD-CCP locally robust inference diagnostics.}")
     add(r"\begin{tabular}{lrrrrrrr}")
     add(r"\toprule")
-    add(r"Case & Cov. unit & Prelim. stat. & Prelim. pgrad & Robust OK & Max. zeta norm & Lambda max abs & Max SE \\")
+    add(
+        r"Case & Cov. unit & Prelim. stat. & Prelim. pgrad & Robust OK & "
+        r"Max. zeta norm & Lambda max abs & Max SE \\"
+    )
     add(r"\midrule")
     standard_errors = np.asarray(summary.standard_errors, dtype=float)
     prelim = paper_inference.get("preliminary_optimizer_stationary", [])
@@ -1463,7 +1447,10 @@ def add_hard_case_tex(lines: list[str], payload: dict[str, Any]) -> None:
     add(r"\caption{Hard flexible DGP recovery metrics. Normalized RMSE divides by the truth RMS.}")
     add(r"\begin{tabular}{lrrrrrrr}")
     add(r"\toprule")
-    add(r"Case & Param. cos. & Param. rel. RMSE & Reward nRMSE & Policy TV & Value nRMSE & Q nRMSE \\")
+    add(
+        r"Case & Param. cos. & Param. rel. RMSE & Reward nRMSE & Policy TV & "
+        r"Value nRMSE & Q nRMSE \\"
+    )
     add(r"\midrule")
     param_metrics = metrics["parameters"]
     add(
@@ -1704,9 +1691,7 @@ def compact_payload(
     release_status = RELEASE_STATUS
     if primary_result is None:
         primary_result = supporting_results[0] if supporting_results else None
-        primary_cell_id = (
-            primary_result["cell_id"] if primary_result is not None else "none"
-        )
+        primary_cell_id = primary_result["cell_id"] if primary_result is not None else "none"
         release_status = "Diagnostic only"
 
     return {
@@ -1787,15 +1772,9 @@ def compact_monte_carlo_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "gate_passing_replications": payload["gate_passing_replications"],
         "mean_gate_pass_count": payload["mean_gate_pass_count"],
         "zeta_moment_norm_max": payload["zeta_moment_norm_max"],
-        "lambda_fixed_point_residual_norm_max": payload[
-            "lambda_fixed_point_residual_norm_max"
-        ],
-        "lambda_fixed_point_residual_rms_max": payload[
-            "lambda_fixed_point_residual_rms_max"
-        ],
-        "lambda_fixed_point_residual_max_abs": payload[
-            "lambda_fixed_point_residual_max_abs"
-        ],
+        "lambda_fixed_point_residual_norm_max": payload["lambda_fixed_point_residual_norm_max"],
+        "lambda_fixed_point_residual_rms_max": payload["lambda_fixed_point_residual_rms_max"],
+        "lambda_fixed_point_residual_max_abs": payload["lambda_fixed_point_residual_max_abs"],
         "preliminary_optimizer_all_success_count": payload[
             "preliminary_optimizer_all_success_count"
         ],
@@ -1805,18 +1784,10 @@ def compact_monte_carlo_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "preliminary_projected_gradient_norm_max": payload[
             "preliminary_projected_gradient_norm_max"
         ],
-        "preliminary_optimizer_message_counts": payload[
-            "preliminary_optimizer_message_counts"
-        ],
-        "robust_optimizer_all_success_count": payload[
-            "robust_optimizer_all_success_count"
-        ],
-        "robust_optimizer_all_stationary_count": payload[
-            "robust_optimizer_all_stationary_count"
-        ],
-        "robust_projected_gradient_norm_max": payload[
-            "robust_projected_gradient_norm_max"
-        ],
+        "preliminary_optimizer_message_counts": payload["preliminary_optimizer_message_counts"],
+        "robust_optimizer_all_success_count": payload["robust_optimizer_all_success_count"],
+        "robust_optimizer_all_stationary_count": payload["robust_optimizer_all_stationary_count"],
+        "robust_projected_gradient_norm_max": payload["robust_projected_gradient_norm_max"],
         "covariance_units": payload["covariance_units"],
         "runtime_seconds": payload["runtime_seconds"],
         "replications": payload["replications"],
@@ -1847,12 +1818,8 @@ def compact_hard_case_payload(
                 "tilde_theta": fold.get("tilde_theta"),
                 "zeta_mean": fold.get("zeta_mean"),
                 "zeta_norm": fold.get("zeta_norm"),
-                "lambda_fixed_point_residual_norm": fold.get(
-                    "lambda_fixed_point_residual_norm"
-                ),
-                "lambda_fixed_point_residual_rms": fold.get(
-                    "lambda_fixed_point_residual_rms"
-                ),
+                "lambda_fixed_point_residual_norm": fold.get("lambda_fixed_point_residual_norm"),
+                "lambda_fixed_point_residual_rms": fold.get("lambda_fixed_point_residual_rms"),
                 "lambda_fixed_point_residual_max_abs": fold.get(
                     "lambda_fixed_point_residual_max_abs"
                 ),
@@ -1898,12 +1865,8 @@ def compact_hard_case_payload(
                 "method": paper_inference.get("method"),
                 "split_unit": paper_inference.get("split_unit"),
                 "covariance_unit": paper_inference.get("covariance_unit"),
-                "preliminary_stationarity_tol": paper_inference.get(
-                    "preliminary_stationarity_tol"
-                ),
-                "robust_stationarity_tol": paper_inference.get(
-                    "robust_stationarity_tol"
-                ),
+                "preliminary_stationarity_tol": paper_inference.get("preliminary_stationarity_tol"),
+                "robust_stationarity_tol": paper_inference.get("robust_stationarity_tol"),
                 "moment_norm_max": paper_inference.get("moment_norm_max"),
                 "preliminary_projected_gradient_norm_max": paper_inference.get(
                     "preliminary_projected_gradient_norm_max"
@@ -1932,18 +1895,10 @@ def compact_hard_case_payload(
                 "preliminary_optimizer_stationary": paper_inference.get(
                     "preliminary_optimizer_stationary"
                 ),
-                "robust_optimizer_success": paper_inference.get(
-                    "robust_optimizer_success"
-                ),
-                "robust_optimizer_messages": paper_inference.get(
-                    "robust_optimizer_messages"
-                ),
-                "robust_optimizer_diagnostics": paper_inference.get(
-                    "robust_optimizer_diagnostics"
-                ),
-                "robust_optimizer_stationary": paper_inference.get(
-                    "robust_optimizer_stationary"
-                ),
+                "robust_optimizer_success": paper_inference.get("robust_optimizer_success"),
+                "robust_optimizer_messages": paper_inference.get("robust_optimizer_messages"),
+                "robust_optimizer_diagnostics": paper_inference.get("robust_optimizer_diagnostics"),
+                "robust_optimizer_stationary": paper_inference.get("robust_optimizer_stationary"),
                 "standard_errors": finite_list(paper_inference.get("standard_errors", [])),
                 "sample_covariance_diag": np.diag(
                     np.asarray(paper_inference.get("sample_covariance_pd"))
