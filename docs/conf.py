@@ -35,6 +35,7 @@ exclude_patterns = [
     "**.ipynb_checkpoints",
     "archive/**",
     "research/**",  # local research archive (papers, literature, internal docs); never built
+    "theory/**",  # retained for audit, but not published until its claims are reverified
     "estimators/sees.md",
     "estimators/sees/**",
     # Auto-generated partials are pulled in via {include}, not built as pages.

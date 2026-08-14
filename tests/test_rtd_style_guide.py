@@ -452,8 +452,8 @@ def test_references_page_is_in_public_navigation() -> None:
     assert missing_ids == []
 
 
-def test_theory_section_is_public_and_sourced() -> None:
-    """Keep the public Theory section visible, ordered, and source-backed."""
+def test_theory_section_is_preserved_but_not_published() -> None:
+    """Retain the theory sources for audit without emitting or linking them."""
 
     index = (DOCS / "index.rst").read_text(encoding="utf-8")
     expected_pages = [
@@ -467,20 +467,16 @@ def test_theory_section_is_public_and_sourced() -> None:
     ]
     pages = [DOCS / "theory" / name for name in expected_pages]
 
-    assert "Theory\n------" in index
-    assert "See `Theory <theory/index.html>`__" in index
-    assert "   theory/index\n" in index
-    assert index.index("   theory/index\n") < index.index("   replications\n")
     assert all(page.exists() for page in pages)
+    assert "theory/**" in _exclude_patterns()
+    assert "Theory\n------" not in index
+    assert "theory/index" not in index
 
-    offenders = []
-    for page in pages:
-        text = page.read_text(encoding="utf-8")
-        if not re.search(r"\{ref\}`Kang \(2026\)\s*<kang-2026-lecture>`", text):
-            offenders.append(f"{page.relative_to(ROOT)}: missing Kang source note")
-        if not re.search(r"\{ref\}`Rawat and Rust \(2026\)\s*<rawat-rust-2026>`", text):
-            offenders.append(f"{page.relative_to(ROOT)}: missing Rawat-Rust source note")
-
+    offenders = [
+        str(page.relative_to(ROOT))
+        for page in _public_doc_sources()
+        if "theory/" in page.read_text(encoding="utf-8")
+    ]
     assert offenders == []
 
 

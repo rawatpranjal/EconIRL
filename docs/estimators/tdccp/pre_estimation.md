@@ -5,7 +5,7 @@
 - [TD-CCP overview](../tdccp.md)
 - [Quick Start](quick_start.md)
 - [Evidence](validation.md)
-- [Identification and Anchors](../../theory/identification.md)
+- [Bus Engine Example](rust_bus.md)
 
 Run these checks before interpreting a TD-CCP fit. The parameter stage avoids a
 transition density, but it still needs reward identification and informative

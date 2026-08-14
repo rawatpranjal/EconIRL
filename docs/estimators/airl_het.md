@@ -24,16 +24,6 @@ normalization that uniquely identifies action-dependent rewards in dynamic
 discrete choice environments with absorbing exits, and the EM algorithm that
 discovers latent segments from pooled trajectory data.
 
-## Theory Connections
-
-For the proof route behind this page, start with
-[Identification and Anchors](../theory/identification.md) for potential-based
-reward ambiguity and [IRL Identification Boundaries](../theory/irl_boundaries.md)
-for why action-dependent AIRL needs stronger anchors than the original
-state-only AIRL theorem. Use
-[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
-feature-rank condition behind segment-specific parameter recovery.
-
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed
