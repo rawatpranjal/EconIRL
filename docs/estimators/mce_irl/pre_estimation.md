@@ -17,17 +17,17 @@ fit as reward recovery.
 
 | Check | Why it matters |
 | --- | --- |
-| Action-contrast rank | Rank below the number of reward features means some reward directions are unidentified from choices. |
+| Action-contrast rank | For action-dependent features, rank below the number of reward parameters causes the fit to stop. |
 | Feature condition number | A high condition number signals unstable feature matching. |
 | Feature occupancy variation | Reward recovery needs feasible policies to induce different expected feature counts. State-only features can be informative through the dynamics. |
 | Transition row sums | Occupancy measures require valid probability rows. |
 | State coverage | Unobserved states weaken the occupancy comparison. |
 | Action support | Rare actions make action-specific rewards weakly pinned down. |
 | Reward normalization | Fix an additive reward reference. The entropy temperature, fixed at one by this estimator, determines the reward scale. |
-| Task membership | Each trajectory must belong to one supplied task. |
-| Deterministic successor | Every observed next state must match `next_state[s, a]`. |
-| Horizon | No demonstration can exceed the task horizon. |
-| Terminal features | Terminal states contribute zero reward features. |
+| Compiled task membership | For a task-conditioned fit, each trajectory must belong to one supplied task. |
+| Deterministic successor | For deterministic transitions, every observed next state must match `next_state[s, a]`. |
+| Finite horizon | For a finite-horizon fit, no demonstration should exceed the supplied horizon. |
+| Compiled terminal features | Task compilation sets terminal-state reward features to zero. |
 
 For `DeterministicTransitions`, inspect `next_state.shape` and
 `valid_action.shape`. Both must be `(S, A)`. Every nonterminal state needs at
@@ -35,8 +35,9 @@ least one legal action. A terminal state uses an absorbing action in the
 compiled task.
 
 For destination-specific route data, transform the observations into task
-views over one fixed global transition system. `active_states` defines the
-candidate path set. The reward features and parameter names remain shared.
+views over one fixed global transition system. `active_states` defines each
+task-specific state subgraph. The reward features and parameter names remain
+shared.
 Do not create a separate estimator or reward vector for each destination.
 
 ## Canonical Simulation Checks
@@ -60,12 +61,14 @@ Values from the primary `mce_low_high_reward` synthetic run (see
 
 ## Common Risk Patterns
 
-A state-only feature matrix can produce a plausible reward vector while still
-failing to identify action-specific payoffs. Sparse demonstrations can match
+State-only features can affect choices through continuation values, but they
+cannot represent action-specific payoffs. Sparse demonstrations can match
 the dominant actions while leaving rare-action rewards weak. Transition tensors
 with the wrong orientation can have valid row sums and still produce the wrong
 occupancy measure.
 
 For action-dependent linear features, the wrapper checks the action-contrast
-rank at fit time and warns when it is deficient. Support, conditioning, and
-reward-normalization checks remain the user's responsibility.
+rank at fit time. It raises `ValueError` when the rank is below the number of
+reward parameters. It also rejects invalid transition rows and unsupported
+state or action identifiers. Inspect `diagnostics_` after fitting for the
+measured ranks, conditioning, coverage, and transition source.

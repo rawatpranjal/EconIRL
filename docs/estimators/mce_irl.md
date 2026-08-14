@@ -6,6 +6,7 @@
 - [Pre-estimation checks](mce_irl/pre_estimation.md)
 - [Simulation Study](mce_irl/validation.md)
 - [Counterfactuals](mce_irl/counterfactuals.md)
+- [Applied notebook](https://github.com/rawatpranjal/EconIRL/blob/main/examples/mce-irl/mce_irl_applied_workflow.ipynb)
 
 Maximum causal entropy inverse reinforcement learning recovers reward
 parameters from demonstrated state-action trajectories by matching discounted
@@ -24,15 +25,15 @@ normalization.
 The estimator follows {ref}`Ziebart et al. (2008) <ziebart-2008>`, which
 introduces maximum-entropy inverse reinforcement learning through feature-count
 matching, and {ref}`Ziebart (2010) <ziebart-2010>`, which formulates the
-maximum causal entropy objective. The causal entropy conditions each action only
-on information available when the choice is made, the current state and
-continuation values, not on the states the action later reaches. Trajectory
-maximum-entropy IRL instead scores the whole trajectory, which ties the entropy
-to the transition dynamics and biases the recovered policy toward actions with
-uncertain outcomes. The two coincide under deterministic dynamics and separate
-under stochastic ones. The causal form matches the logit dynamic-discrete-choice
-structure, which is why MCE-IRL is the reference entropy IRL route for these
-comparisons.
+maximum causal entropy objective. Causal entropy conditions each action on
+information available when the choice is made. This includes the current state
+and continuation values. It excludes subsequently realized states. Trajectory
+maximum-entropy IRL instead scores the whole trajectory. Its entropy therefore
+depends on the transition dynamics and can favor actions with uncertain
+outcomes. The two formulations coincide under deterministic dynamics but differ
+under stochastic dynamics. The causal form has the same soft choice structure
+as logit dynamic discrete choice. MCE-IRL estimates reward parameters through
+feature matching rather than a conditional likelihood.
 
 ## Theory Connections
 
@@ -53,9 +54,9 @@ the action-dependent reward features and $\theta$ the reward parameters to be
 estimated. The subscript $k$ indexes the $k$-th component of $\phi$, so
 $\phi_k(s, a)$ denotes the $k$-th feature value at $(s, a)$. The discount
 factor is $\beta$ and the logit shock scale is $\sigma$. Setting $\sigma = 1$
-recovers the unit-scale convention used in the internal derivation and in
-Ziebart (2010). The public page keeps $\sigma$ explicit for the DDC
-comparison. The transition kernel $P_a(s, s')$ gives the probability of
+gives the unit-scale convention used by Ziebart (2010). Keeping $\sigma$
+explicit makes the connection to logit dynamic discrete choice clear. The
+transition kernel $P_a(s, s')$ gives the probability of
 moving to $s'$ from $s$ under action $a$. A dense kernel uses $(A, S, S)$
 orientation. A deterministic system stores one successor in
 `next_state[s, a]` and one legality flag in `valid_action[s, a]`.
@@ -125,8 +126,8 @@ transition system.
 
 ## Identification
 
-This is the section that says when matching feature moments is enough to recover
-the intended reward representation, rather than only reproducing behavior.
+Identification requires feature matching to recover the intended reward
+representation, not merely reproduce observed behavior.
 
 MCE-IRL identifies a reward representation under the following assumptions.
 
@@ -203,11 +204,10 @@ $$
 
 Its gradient is $\nabla_\theta L(\theta) = \mu_E - \mu_\theta$
 (Ziebart, 2010, ch. 3). The inner minimization is equivalent to maximizing
-causal entropy plus expected reward. Its solution is the soft-optimal policy,
-which is precisely the softmax of $Q_\theta / \sigma$ derived above.
-This equivalence follows from differentiating $\log \pi_\theta(a \mid s)$
-directly. Since the policy is the softmax of $Q_\theta / \sigma$, the score has
-the logit form
+causal entropy plus expected reward. Its dynamic-programming solution is the
+soft-optimal policy, which is the softmax of $Q_\theta / \sigma$ derived above.
+Differentiating the resulting log policy gives the score below. Since the
+policy is the softmax of $Q_\theta / \sigma$, the score has the logit form
 
 $$
 \frac{\partial \log \pi_\theta(a \mid s)}{\partial \theta_k}
@@ -225,13 +225,16 @@ $$
   + \beta \sum_{s'} P_a(s, s')\,\frac{\partial V_\theta(s')}{\partial \theta_k}.
 $$
 
-Aggregated over the discounted state-action occupancy of the expert and the
-model, the continuation terms telescope and the gradient reduces to the
-feature-expectation difference (Ziebart, 2010, §3.4):
+For the causal-entropy dual, summing the occupancy recursion under the expert
+and model distributions gives the feature-expectation gradient
+(Ziebart, 2010, §3.4):
 
 $$
 \nabla_\theta L(\theta) = \mu_E - \mu_\theta.
 $$
+
+The infinite-horizon conditional log-likelihood fit uses the related score
+described below.
 
 For an infinite-horizon fit, the default L-BFGS-B path maximizes the
 conditional log likelihood under $\pi_\theta$. Its gradient uses implicit
@@ -359,7 +362,7 @@ fit behavior without recovering the intended reward.
 | Transitions are known or can be supplied. | Transition estimation is the main modeling challenge. |
 | Reward features are supplied and action-dependent. | Reward features are unknown or require a neural representation. |
 | The behavioral model is maximum causal entropy. | The target is deterministic control without entropy regularization. |
-| Reward, policy, value, and counterfactual recovery are the goals. | Only fitted conditional choice probabilities are required. |
+| Normalized reward comparisons, policy recovery, and counterfactual policy changes are the goals. | Only fitted conditional choice probabilities are required. |
 
 MCE-IRL is the reference entropy IRL estimator for tabular discrete choice.
 The structural estimators (NFXP, CCP, MPEC, NNES, TD-CCP) target the same
@@ -375,7 +378,10 @@ small stochastic MDP. Use `DeterministicTransitions` for a large sparse system.
 
 The fitted model exposes shared reward parameters, standard errors,
 period-specific policies, task-specific policy views, simulation, and
-counterfactual re-solving. The
+counterfactual re-solving. `diagnostics_` records the rank, support, and
+transition checks used by the fit. `capabilities_` states which fitted
+operations are available. `summary()` reports the data, model, fit, outcome,
+uncertainty, and interpretation limits in one fixed layout. The
 [Pre-Estimation Checks](mce_irl/pre_estimation.md) page covers rank, support,
 transition alignment, terminal states, and task membership.
 
@@ -386,9 +392,14 @@ percent intervals cover the true reward parameter in 96.0 percent of runs.
 The asymptotic standard error is 1.057 times the trajectory-bootstrap standard
 error computed from 200 resamples. All fits pass the joint convergence checks.
 
-A separate generated road study constructs arrays with 300,001 states,
-900,003 valid deterministic state-action links, and 22 feature counts. The
-fitted problem contains 25 destination tasks with 48 active states each and
+A separate calibration resamples whole individual trajectories. It completes
+50 independently generated panels with 99 bootstrap draws per panel. All
+4,950 draws succeed. The percentile intervals cover the true parameter in
+92.0 percent of panels. Their mean width is 0.383.
+
+A separate generated road study constructs arrays with 302,500 states,
+907,500 valid deterministic state-action links, and 22 raw reward features. The
+fitted problem contains 64 destination tasks and 7,552 compiled states. It
 evaluates 7,403 held-out routes. This checks paper-scale sparse storage and
 shared-reward task compilation. It does not reproduce the Pittsburgh graph,
 data, or Table 1 results. See [Simulation Study](mce_irl/validation.md) for
@@ -444,6 +455,8 @@ Implementation and reproduction:
 - Validation runner: [`validation/estimators/mce_irl/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/run.py).
 - Results file: [`mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json).
 - Inference runner: [`validation/estimators/mce_irl/ready.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/ready.py).
+- Bootstrap calibration: [`validation/estimators/mce_irl/bootstrap_calibration.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/bootstrap_calibration.py).
+- Applied notebook: [`mce_irl_applied_workflow.ipynb`](https://github.com/rawatpranjal/EconIRL/blob/main/examples/mce-irl/mce_irl_applied_workflow.ipynb).
 - Road generator: [`validation/estimators/mce_irl/ziebart_road_synthetic.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/mce_irl/ziebart_road_synthetic.py).
 
 Pages:
@@ -452,7 +465,7 @@ Pages:
 - [Pre-Estimation Checks](mce_irl/pre_estimation.md)
 - [Simulation Study](mce_irl/validation.md)
 - [Counterfactuals](mce_irl/counterfactuals.md)
-- [Rust Bus Engine Example](mce_irl/rust_bus.md)
+- [Bus Engine Wiring Example](mce_irl/rust_bus.md)
 
 ```{toctree}
 :hidden:

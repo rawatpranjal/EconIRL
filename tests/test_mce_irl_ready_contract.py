@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 
 def test_ziebart_smoke_run_renders_real_route_comparison(tmp_path: Path) -> None:
@@ -54,11 +55,40 @@ def test_mce_irl_repeated_run_receipt_is_ready() -> None:
     assert repeated["n_successful"] == payload["n_replications"]
     assert repeated["coverage_selfcheck_passed"]
     assert 0.91 <= repeated["coverage"] <= 0.99
+    assert repeated["lower_tail_miss_rate"] + repeated["upper_tail_miss_rate"] == pytest.approx(
+        1.0 - repeated["coverage"]
+    )
     assert abs(repeated["bias"]) <= 0.05
     assert repeated["max_stationarity_residual"] <= 1e-6
+    assert repeated["mean_asymptotic_se"] > 0
+    assert 0.75 <= repeated["mean_se_to_empirical_sd"] <= 1.25
     assert payload["standard_error_check"]["passed"]
     assert payload["intervention_check"]["passed"]
     assert all(gate["passed"] for gate in payload["gates"])
+    assert payload["thresholds"]["coverage_low"] == 0.91
+    assert payload["provenance"]["git_commit"]
+    assert payload["provenance"]["package_versions"]["econirl"]
+
+
+def test_mce_irl_bootstrap_calibration_receipt_is_ready() -> None:
+    payload = json.loads(
+        Path("validation/results/mce_irl_bootstrap_calibration.json").read_text(encoding="utf-8")
+    )
+
+    assert payload["status"] == "ready"
+    assert payload["design"]["resampling_unit"] == "whole individual trajectory"
+    summary = payload["summary"]
+    assert summary["n_total"] == 50
+    assert summary["n_usable"] == 50
+    assert summary["total_successful_draws"] == 4_950
+    assert summary["total_failed_draws"] == 0
+    assert 0.86 <= summary["coverage_95"] <= 1.0
+    assert summary["lower_tail_miss_rate"] + summary["upper_tail_miss_rate"] == pytest.approx(
+        1.0 - summary["coverage_95"]
+    )
+    assert summary["minimum_interval_width"] > 0
+    assert payload["program_check"]["passed"]
+    assert all(gate["passed"] for gate in payload["gates"] if gate["enforced"])
 
 
 def test_ziebart_synthetic_receipt_separates_shape_from_replication() -> None:

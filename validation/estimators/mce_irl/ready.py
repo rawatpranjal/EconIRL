@@ -38,11 +38,26 @@ from econirl.evaluation.selfcheck import (  # noqa: E402
     check_se_ratio,
 )
 from econirl.transitions import DeterministicTransitions  # noqa: E402
+from validation.estimators.nfxp.ready import (  # noqa: E402
+    _git_commit,
+    _package_versions,
+    _strict_json,
+)
 
 TRUE_THETA = 0.4
 N_OBSERVATIONS = 400
 FULL_REPLICATIONS = 300
 FULL_BOOTSTRAPS = 200
+THRESHOLDS = {
+    "usable_rate_min": 1.0,
+    "coverage_low": 0.91,
+    "coverage_high": 0.99,
+    "absolute_bias_max": 0.05,
+    "rmse_max": 0.15,
+    "stationarity_max": 1e-6,
+    "se_ratio_tolerance": 0.25,
+    "counterfactual_effect_min": 0.1,
+}
 
 
 def make_panel(*, seed: int, n_observations: int = N_OBSERVATIONS) -> Panel:
@@ -75,7 +90,7 @@ def model_spec(
         next_state=np.array([[1, 1], [1, -1]]),
         valid_action=np.array([[True, True], [True, False]]),
     )
-    features = np.zeros((2, 2, 1), dtype=np.float32)
+    features: np.ndarray = np.zeros((2, 2, 1), dtype=np.float32)
     features[0, 1, 0] = 1.0
     tasks = [
         MCEIRLTask(
@@ -194,6 +209,8 @@ def coverage_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
 
     estimates = np.asarray([record["estimate"] for record in successful])
     standard_errors = np.asarray([record["standard_error"] for record in successful])
+    lower_tail = np.asarray([TRUE_THETA < record["lower"] for record in successful])
+    upper_tail = np.asarray([TRUE_THETA > record["upper"] for record in successful])
     return {
         "n_successful": len(successful),
         "coverage": coverage,
@@ -204,6 +221,9 @@ def coverage_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         "rmse": float(np.sqrt(np.mean((estimates - TRUE_THETA) ** 2))),
         "monte_carlo_sd": float(estimates.std(ddof=1)),
         "mean_asymptotic_se": float(standard_errors.mean()),
+        "mean_se_to_empirical_sd": float(standard_errors.mean() / estimates.std(ddof=1)),
+        "lower_tail_miss_rate": float(lower_tail.mean()),
+        "upper_tail_miss_rate": float(upper_tail.mean()),
         "convergence_rate": len(successful) / len(records),
         "max_stationarity_residual": float(
             max(record["stationarity_residual"] for record in successful)
@@ -286,30 +306,51 @@ def main() -> int:
     gates = [
         {
             "name": "all_fits_converged",
-            "passed": repeated["convergence_rate"] == 1.0,
+            "value": repeated["convergence_rate"],
+            "operator": ">=",
+            "threshold": THRESHOLDS["usable_rate_min"],
+            "passed": repeated["convergence_rate"] >= THRESHOLDS["usable_rate_min"],
         },
         {
             "name": "coverage_selfcheck",
+            "value": repeated["coverage"],
+            "operator": "between",
+            "threshold": [THRESHOLDS["coverage_low"], THRESHOLDS["coverage_high"]],
             "passed": repeated["coverage_selfcheck_passed"],
         },
         {
             "name": "absolute_bias",
-            "passed": abs(repeated["bias"]) <= 0.05,
+            "value": abs(repeated["bias"]),
+            "operator": "<=",
+            "threshold": THRESHOLDS["absolute_bias_max"],
+            "passed": abs(repeated["bias"]) <= THRESHOLDS["absolute_bias_max"],
         },
         {
             "name": "rmse",
-            "passed": repeated["rmse"] <= 0.15,
+            "value": repeated["rmse"],
+            "operator": "<=",
+            "threshold": THRESHOLDS["rmse_max"],
+            "passed": repeated["rmse"] <= THRESHOLDS["rmse_max"],
         },
         {
             "name": "stationarity",
-            "passed": repeated["max_stationarity_residual"] <= 1e-6,
+            "value": repeated["max_stationarity_residual"],
+            "operator": "<=",
+            "threshold": THRESHOLDS["stationarity_max"],
+            "passed": repeated["max_stationarity_residual"] <= THRESHOLDS["stationarity_max"],
         },
         {
             "name": "asymptotic_bootstrap_se_ratio",
+            "value": bootstrap["ratio"],
+            "operator": "within",
+            "threshold": THRESHOLDS["se_ratio_tolerance"],
             "passed": bootstrap["passed"],
         },
         {
             "name": "counterfactual_effect",
+            "value": intervention["max_policy_change"],
+            "operator": ">=",
+            "threshold": THRESHOLDS["counterfactual_effect_min"],
             "passed": intervention["passed"],
         },
     ]
@@ -329,6 +370,11 @@ def main() -> int:
         "standard_error_check": bootstrap,
         "intervention_check": intervention,
         "gates": gates,
+        "thresholds": THRESHOLDS,
+        "provenance": {
+            "git_commit": _git_commit(),
+            "package_versions": _package_versions(),
+        },
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),
@@ -338,7 +384,7 @@ def main() -> int:
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        json.dumps(_strict_json(payload), indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
     display_output = output.relative_to(ROOT) if output.is_relative_to(ROOT) else output

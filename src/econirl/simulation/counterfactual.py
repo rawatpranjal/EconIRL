@@ -94,7 +94,7 @@ class CounterfactualResult:
     counterfactual_value: jnp.ndarray
     policy_change: jnp.ndarray
     value_change: jnp.ndarray
-    welfare_change: float
+    welfare_change: float | None
     counterfactual_type: CounterfactualType = CounterfactualType.REWARD_CHANGE
     description: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
