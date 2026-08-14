@@ -6,6 +6,7 @@
 - [Pre-estimation checks](pre_estimation.md)
 - [Simulation evidence](validation.md)
 - [Counterfactuals](counterfactuals.md)
+- [Applied notebook](https://github.com/rawatpranjal/EconIRL/blob/main/examples/mce-irl/mce_irl_applied_workflow.ipynb)
 
 MCE-IRL estimates one reward from demonstrated trajectories and a fixed
 transition system. A task supplies the start distribution, destination,
@@ -56,7 +57,9 @@ model = MCEIRL(
     horizon=1,
     feature_matrix=features,
     feature_names=["action_one"],
-    compute_se=False,
+    se_method="bootstrap",
+    n_bootstrap=19,
+    se_seed=13003,
 )
 model.fit(
     Panel(trajectories),
@@ -79,6 +82,8 @@ counterfactual = model.counterfactual(
 )
 print(round(float(np.abs(counterfactual.policy_change).max()), 3))
 print(model.termination_reason_)
+print(f"{model.bootstrap_.n_successful}/{model.bootstrap_.n_requested}")
+print(model.counterfactual(params={"action_one": 1.0}).welfare_change)
 ```
 
 **Result**
@@ -88,11 +93,13 @@ print(model.termination_reason_)
 [[0.3, 0.7]]
 0.164
 joint_convergence
+19/19
+None
 ```
 
 `next_state[s, a]` stores the deterministic successor of state `s` under
 action `a`. `valid_action[s, a]` marks legal actions. Use `-1` for an invalid
-successor only when the corresponding action is false. The estimator never
+successor only when the matching `valid_action` entry is false. The estimator never
 constructs an `(A, S, S)` tensor for this representation.
 
 Each trajectory carries its task identifier in `metadata["task_id"]`. For
@@ -101,9 +108,9 @@ data-frame input, pass `state`, `action`, `id`, `next_state`, and `task` to
 id="route_id", next_state="next_state", task="task_id")`. State and next-state
 values must use the same global indexing as the fixed transition system.
 
-`MCEIRLTask.active_states` can restrict a destination to a compact candidate
-path set. The compiler removes transitions that leave that set. It rejects
-demonstrations that use an invalid action or disagree with the supplied
+`MCEIRLTask.active_states` can restrict a task to a compact candidate path set.
+The compiler disables actions whose successors leave that set. It rejects
+demonstrations that use a disabled action or disagree with the supplied
 successor.
 
 The main fitted attributes are:
@@ -112,6 +119,10 @@ The main fitted attributes are:
 | --- | --- |
 | `params_` | Shared reward parameters. |
 | `se_` | Standard errors when requested. |
+| `bootstrap_` | Trajectory-bootstrap draws, failures, and percentile intervals. |
+| `diagnostics_` | Rank, support, and transition checks used by the fit. |
+| `capabilities_` | Read-only map of supported fitted operations. |
+| `is_fitted_` | Whether the fit produced usable outputs. |
 | `time_policy_` | Period-specific policy for a finite horizon. |
 | `task_policy_` | Policy slices by task. |
 | `reward_matrix_` | Fitted state-action reward. |
@@ -121,4 +132,6 @@ The main fitted attributes are:
 Use `simulate(..., task_id=...)` to draw routes from the fitted model.
 Use `counterfactual(params=...)` for a reward change or
 `counterfactual(transitions=...)` for a transition change. Exactly one
-primitive can change in each call.
+primitive can change in each call. The fitted policy and normalized value
+changes remain available. `welfare_change` is `None` because reward levels are
+not identified without an external normalization.

@@ -14,6 +14,7 @@ Known changes to rewards and environments test counterfactual behavior.
 
 The numerical results are in
 [`mce_irl_ready.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl_ready.json),
+[`mce_irl_bootstrap_calibration.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl_bootstrap_calibration.json),
 [`mce_irl_ziebart_synthetic.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl_ziebart_synthetic.json),
 and
 [`mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json).
@@ -22,9 +23,9 @@ and
 
 | Capability | Study design | Main result |
 | --- | --- | ---: |
-| Estimation | Controlled recovery and generated road tasks | 14 of 14 estimation checks pass |
-| Inference | 300 independent generated panels | 0.960 interval coverage |
-| Counterfactuals | Reward, dynamics, and choice-set changes | 6 of 6 pass, maximum regret 0.000433 |
+| Estimation | Controlled recovery and generated road tasks | Policy TV 0.00698 |
+| Inference | 300 asymptotic panels and 50 bootstrap panels | Coverage 0.960 and 0.920 |
+| Counterfactuals | Reward, dynamics, and choice-set changes | Maximum regret 0.000433 |
 
 The studies use different scales for different questions. The road study checks
 the application structure and route predictions. The smaller controlled
@@ -46,8 +47,8 @@ It does not select the best-matching route.
 | Road-study quantity | Generated value |
 | --- | ---: |
 | Directed road-segment states | 302,500 |
-| Intersection transition actions | 907,500 |
-| Raw feature counts | 22 |
+| Valid deterministic state-action links | 907,500 |
+| Raw reward features | 22 |
 | Identified fit features | 19 |
 | Raw trips | 13,220 |
 | Generated drivers | 25 |
@@ -105,7 +106,8 @@ transition law, and the supplied reward features.
 | Reward normalized RMSE | 0.0823 |
 | Policy total variation | 0.00698 |
 
-The full result file also reports value and Q recovery.
+The [`mce_irl.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/mce_irl.json)
+result also reports normalized value and Q RMSE.
 
 ## Monte Carlo Inference
 
@@ -120,7 +122,7 @@ has 400 trajectories.
 | Mean estimate | 0.4058 |
 | Bias | 0.00584 |
 | RMSE | 0.0986 |
-| 95 percent interval coverage | 0.960 |
+| 95 percent asymptotic interval coverage | 0.960 |
 | Mean asymptotic SE | 0.1022 |
 | Monte Carlo SD | 0.0985 |
 | Asymptotic / bootstrap SE ratio | 1.057 |
@@ -128,6 +130,19 @@ has 400 trajectories.
 
 The standard-error comparison uses 200 bootstrap refits of one generated
 panel. A reward intervention changes the action probability by 0.205.
+
+The trajectory-bootstrap calibration uses 50 new panels. It resamples whole
+individual trajectories 99 times in each panel. Failed draws are recorded and
+are not retried.
+
+| Bootstrap check | Result |
+| --- | ---: |
+| Usable panels | 50 / 50 |
+| Successful draws | 4,950 / 4,950 |
+| 95 percent bootstrap percentile coverage | 0.920 |
+| Lower-tail miss rate | 0.060 |
+| Upper-tail miss rate | 0.020 |
+| Mean interval width | 0.383 |
 
 ```bash
 PYTHONPATH=src:. uv run python validation/estimators/mce_irl/ready.py --quiet
@@ -138,6 +153,18 @@ PYTHONPATH=src:. uv run python validation/estimators/mce_irl/ready.py --quiet
 ```text
 wrote validation/results/mce_irl_ready.json
 status: ready
+```
+
+Run the separate trajectory-bootstrap calibration with:
+
+```bash
+PYTHONPATH=src:. uv run python validation/estimators/mce_irl/bootstrap_calibration.py --quiet
+```
+
+**Result**
+
+```text
+wrote validation/results/mce_irl_bootstrap_calibration.json
 ```
 
 ## Counterfactuals

@@ -171,7 +171,7 @@
     "summary": {
       "converged": true,
       "convergence_message": "The solution converged.",
-      "estimation_time": 3.698246955871582,
+      "estimation_time": 3.0069239139556885,
       "log_likelihood": -329244.27539614483,
       "metadata": {
         "empirical_features": [
@@ -402,7 +402,7 @@
       "summary": {
         "converged": true,
         "convergence_message": "The solution converged.",
-        "estimation_time": 3.7878808975219727,
+        "estimation_time": 2.9765918254852295,
         "log_likelihood": -174876.26565584447,
         "metadata": {
           "empirical_features": [
@@ -612,7 +612,7 @@
       "summary": {
         "converged": true,
         "convergence_message": "The solution converged.",
-        "estimation_time": 3.698246955871582,
+        "estimation_time": 3.0069239139556885,
         "log_likelihood": -329244.27539614483,
         "metadata": {
           "empirical_features": [

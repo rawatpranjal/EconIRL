@@ -1,5 +1,5 @@
 {
-  "checkpoint": "validation/results/mce_irl_ready.jsonl",
+  "checkpoint": "experiments/2026-08-13_mce-irl-010-qualification/ready_records.jsonl",
   "environment": {
     "jax": "0.9.2",
     "jax_enable_x64": true,
@@ -10,31 +10,55 @@
   "gates": [
     {
       "name": "all_fits_converged",
-      "passed": true
+      "operator": ">=",
+      "passed": true,
+      "threshold": 1.0,
+      "value": 1.0
     },
     {
       "name": "coverage_selfcheck",
-      "passed": true
+      "operator": "between",
+      "passed": true,
+      "threshold": [
+        0.91,
+        0.99
+      ],
+      "value": 0.96
     },
     {
       "name": "absolute_bias",
-      "passed": true
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.005844293534755685
     },
     {
       "name": "rmse",
-      "passed": true
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.15,
+      "value": 0.09855388595416968
     },
     {
       "name": "stationarity",
-      "passed": true
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1e-06,
+      "value": 6.6186605085505335e-09
     },
     {
       "name": "asymptotic_bootstrap_se_ratio",
-      "passed": true
+      "operator": "within",
+      "passed": true,
+      "threshold": 0.25,
+      "value": 1.0565020021692384
     },
     {
       "name": "counterfactual_effect",
-      "passed": true
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.20540917801020545
     }
   ],
   "intervention_check": {
@@ -44,18 +68,32 @@
   },
   "n_observations_per_fit": 400,
   "n_replications": 300,
+  "provenance": {
+    "git_commit": "2c3aad25926279cb6800996f1cbd73f1949a0c41",
+    "package_versions": {
+      "econirl": "0.0.10",
+      "jax": "0.9.2",
+      "jaxlib": "0.9.2",
+      "numpy": "2.4.1",
+      "pandas": "2.3.3",
+      "scipy": "1.17.0"
+    }
+  },
   "repeated_run_inference": {
     "bias": 0.005844293534755685,
     "convergence_rate": 1.0,
     "coverage": 0.96,
     "coverage_error": null,
     "coverage_selfcheck_passed": true,
+    "lower_tail_miss_rate": 0.023333333333333334,
     "max_stationarity_residual": 6.6186605085505335e-09,
     "mean_asymptotic_se": 0.10219074296600344,
     "mean_estimate": 0.4058442935347557,
+    "mean_se_to_empirical_sd": 1.036997536892336,
     "monte_carlo_sd": 0.09854482709018543,
     "n_successful": 300,
-    "rmse": 0.09855388595416968
+    "rmse": 0.09855388595416968,
+    "upper_tail_miss_rate": 0.016666666666666666
   },
   "standard_error_check": {
     "asymptotic_se": 0.06528589794344061,
@@ -66,5 +104,15 @@
     "ratio": 1.0565020021692384
   },
   "status": "ready",
+  "thresholds": {
+    "absolute_bias_max": 0.05,
+    "counterfactual_effect_min": 0.1,
+    "coverage_high": 0.99,
+    "coverage_low": 0.91,
+    "rmse_max": 0.15,
+    "se_ratio_tolerance": 0.25,
+    "stationarity_max": 1e-06,
+    "usable_rate_min": 1.0
+  },
   "truth": 0.4
 }

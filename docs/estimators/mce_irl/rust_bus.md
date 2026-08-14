@@ -1,4 +1,4 @@
-# Rust Bus Engine Example
+# Bus Engine Wiring Example
 
 ## Important Links
 
@@ -10,6 +10,11 @@
 The bus replacement problem is a compact wiring example for MCE-IRL. It is not
 a Ziebart paper replication. It also does not replace the Rust Table IX NFXP
 replication.
+
+This page remains because the bus model makes the connection between entropy
+IRL and dynamic discrete choice concrete. The generated road study is the
+application-shaped evidence for MCE-IRL. The bus example only explains how to
+encode a small stochastic problem through the same public estimator.
 
 Use an action-dependent reward matrix. One feature can assign mileage cost to
 the keep action. A second can assign a fixed cost to replacement. The fitted

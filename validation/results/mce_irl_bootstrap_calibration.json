@@ -1,0 +1,106 @@
+{
+  "checkpoint": "experiments/2026-08-13_mce-irl-010-qualification/bootstrap_records.jsonl",
+  "design": {
+    "bootstrap_base_seed": 92000,
+    "failure_policy": "record failure and do not retry",
+    "n_bootstrap": 99,
+    "n_calibration_panels": 50,
+    "n_observations_per_panel": 400,
+    "panel_base_seed": 91000,
+    "resampling_method": "pairs cluster bootstrap",
+    "resampling_unit": "whole individual trajectory",
+    "transition_policy": "supplied deterministic transitions held fixed",
+    "truth": 0.4
+  },
+  "estimator": "MCE-IRL",
+  "gates": [
+    {
+      "enforced": true,
+      "name": "usable_rate",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.95,
+      "value": 1.0
+    },
+    {
+      "enforced": true,
+      "name": "minimum_success_fraction",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.95,
+      "value": 1.0
+    },
+    {
+      "enforced": true,
+      "name": "coverage_low",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.86,
+      "value": 0.92
+    },
+    {
+      "enforced": true,
+      "name": "coverage_high",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 1.0,
+      "value": 0.92
+    },
+    {
+      "enforced": true,
+      "name": "mean_interval_width_positive",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 1e-12,
+      "value": 0.38313679504208265
+    },
+    {
+      "enforced": true,
+      "name": "program_reproducibility",
+      "operator": "is",
+      "passed": true,
+      "threshold": true,
+      "value": true
+    }
+  ],
+  "program_check": {
+    "bootstrap_seed": 102000,
+    "fields_compared": [
+      "estimate",
+      "standard_error",
+      "interval",
+      "covered",
+      "failures"
+    ],
+    "n_bootstrap": 19,
+    "passed": true
+  },
+  "provenance": {
+    "git_commit": "2c3aad25926279cb6800996f1cbd73f1949a0c41",
+    "package_versions": {
+      "econirl": "0.0.10",
+      "jax": "0.9.2",
+      "jaxlib": "0.9.2",
+      "numpy": "2.4.1",
+      "pandas": "2.3.3",
+      "scipy": "1.17.0"
+    }
+  },
+  "status": "ready",
+  "summary": {
+    "coverage_95": 0.92,
+    "lower_tail_miss_rate": 0.06,
+    "maximum_interval_width": 0.5024203322827815,
+    "mean_interval_width": 0.38313679504208265,
+    "median_interval_width": 0.3848474165424704,
+    "minimum_interval_width": 0.3162315785884857,
+    "minimum_success_fraction": 1.0,
+    "n_total": 50,
+    "n_usable": 50,
+    "total_failed_draws": 0,
+    "total_requested_draws": 4950,
+    "total_successful_draws": 4950,
+    "upper_tail_miss_rate": 0.02,
+    "usable_rate": 1.0
+  }
+}

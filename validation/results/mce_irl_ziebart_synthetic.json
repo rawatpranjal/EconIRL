@@ -173,7 +173,7 @@
     "termination_reason": "joint_convergence",
     "stationarity_residual": 7.372898593080394e-09,
     "coefficient_rmse": 1.2623481750488281,
-    "fit_seconds": 4.738439125008881
+    "fit_seconds": 3.887586083030328
   },
   "figure": {
     "path": "docs/_static/estimators/mce_irl_ziebart_road.png",
@@ -202,7 +202,7 @@
     "routes_at_least_90_percent": "held-out paths with at least 90 percent shared distance",
     "average_log_probability": "mean fitted log probability on the training paths"
   },
-  "runtime_seconds": 8.848098832997493,
+  "runtime_seconds": 7.592430290998891,
   "environment": {
     "python": "3.13.12",
     "numpy": "2.4.1",

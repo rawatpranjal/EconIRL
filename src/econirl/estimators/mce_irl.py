@@ -6,7 +6,9 @@ Maximum Causal Entropy Inverse Reinforcement Learning with sklearn-style API.
 from __future__ import annotations
 
 import warnings
-from typing import Hashable, Literal
+from importlib.metadata import PackageNotFoundError, version
+from types import MappingProxyType
+from typing import Any, Hashable, Literal, cast
 
 import jax.numpy as jnp
 import numpy as np
@@ -23,8 +25,10 @@ from econirl.core.tasks import (
 from econirl.core.transition_models import DeterministicTransitions, TransitionModel
 from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.mce_irl import MCEIRLConfig, MCEIRLEstimator
+from econirl.inference.results import BootstrapResult, compute_fit_diagnostics
 from econirl.preferences.action_reward import ActionDependentReward
 from econirl.preferences.reward import LinearReward
+from econirl.preprocessing.diagnostics import feature_diagnostics
 from econirl.simulation.counterfactual import (
     CounterfactualResult,
     CounterfactualType,
@@ -61,7 +65,7 @@ def estimate_empirical_transitions(
     if trajectories is None:
         raise TypeError("panel must be a Panel/TrajectoryPanel with .trajectories")
 
-    counts = np.zeros((n_actions, n_states, n_states), dtype=np.float64)
+    counts: np.ndarray = np.zeros((n_actions, n_states, n_states), dtype=np.float64)
     for traj in trajectories:
         s = np.asarray(traj.states, dtype=int)
         a = np.asarray(traj.actions, dtype=int)
@@ -73,7 +77,7 @@ def estimate_empirical_transitions(
     empty = row_sums[..., 0] == 0
     rows, cols = np.nonzero(empty)
     kernel[rows, cols, cols] = 1.0  # unobserved (a, s): stay in place
-    return kernel
+    return cast(np.ndarray, kernel)
 
 
 class MCEIRL:
@@ -205,6 +209,27 @@ class MCEIRL:
         se_seed: int | None = None,
         verbose: bool = False,
     ):
+        if n_states < 1:
+            raise ValueError("n_states must be positive")
+        if n_actions < 2:
+            raise ValueError("n_actions must be at least 2")
+        if not np.isfinite(discount) or not 0.0 < discount <= 1.0:
+            raise ValueError("discount must be finite and lie in (0, 1]")
+        if discount == 1.0 and horizon is None:
+            raise ValueError("discount=1 requires a finite horizon")
+        if horizon is not None and horizon < 1:
+            raise ValueError("horizon must be positive")
+        if se_method not in {"bootstrap", "asymptotic", "hessian"}:
+            raise ValueError("se_method must be 'bootstrap', 'asymptotic', or 'hessian'")
+        if n_bootstrap < 0:
+            raise ValueError("n_bootstrap must be nonnegative")
+        if se_method == "bootstrap" and compute_se and n_bootstrap < 2:
+            raise ValueError("n_bootstrap must be at least 2 when se_method='bootstrap'")
+        if inner_max_iter < 1:
+            raise ValueError("inner_max_iter must be positive")
+        if not np.isfinite(l2_regularization) or l2_regularization < 0:
+            raise ValueError("l2_regularization must be finite and nonnegative")
+
         self.n_states = n_states
         self.n_actions = n_actions
         self.discount = discount
@@ -220,7 +245,29 @@ class MCEIRL:
         self.se_seed = se_seed
         self.verbose = verbose
 
-        # Fitted attributes
+        try:
+            self.econirl_version_ = version("econirl")
+        except PackageNotFoundError:
+            self.econirl_version_ = "0+unknown"
+
+        self._capability_details = {
+            name: {
+                "status": "supported",
+                "reason": None,
+                "substitute": None,
+            }
+            for name in (
+                "inference",
+                "prediction",
+                "simulation",
+                "counterfactual",
+                "serialization",
+            )
+        }
+        self._reset_fit_state()
+
+    def _reset_fit_state(self) -> None:
+        """Return every fitted field to the explicit unfitted state."""
         self.params_: dict | None = None
         self.se_: dict | None = None
         self.pvalues_: dict | None = None
@@ -243,6 +290,16 @@ class MCEIRL:
         self.feature_residual_: float | None = None
         self.occupancy_residual_: float | None = None
         self.bellman_residual_: float | None = None
+        self.is_fitted_ = False
+        self.failure_reason_: str | None = None
+        self.n_iter_: int | None = None
+        self.fit_time_: float | None = None
+        self.n_observations_: int | None = None
+        self.diagnostics_: dict[str, dict[str, Any]] | None = None
+        self.bootstrap_: BootstrapResult | None = None
+        self.result_ = None
+        self.transition_source_: str | None = None
+        self.transition_tensor_: np.ndarray | None = None
 
         # Internal
         self._result = None
@@ -255,9 +312,18 @@ class MCEIRL:
         self._source_panel: Panel | None = None
         self._source_feature_matrix: np.ndarray | jnp.ndarray | None = None
 
+    @property
+    def capabilities_(self) -> MappingProxyType:
+        """Read-only capability map shared by public estimator workflows."""
+        nested = {
+            name: MappingProxyType(details) for name, details in self._capability_details.items()
+        }
+        return MappingProxyType(nested)
+
     def fit(
         self,
         data: pd.DataFrame | Panel | TrajectoryPanel,
+        *,
         state: str | None = None,
         action: str | None = None,
         id: str | None = None,
@@ -311,6 +377,8 @@ class MCEIRL:
         self : MCEIRL
             Fitted estimator.
         """
+        self._reset_fit_state()
+
         # --- Handle reward spec ---
         if reward is not None:
             self.reward_spec_ = reward
@@ -321,6 +389,7 @@ class MCEIRL:
                 raise ValueError(
                     "state, action, and id column names are required when data is a DataFrame"
                 )
+            self._validate_dataframe(data, state, action, id, next_state, task)
             self._panel = self._dataframe_to_panel(
                 data,
                 state,
@@ -335,6 +404,7 @@ class MCEIRL:
             raise TypeError(
                 f"data must be a DataFrame, Panel, or TrajectoryPanel, got {type(data)}"
             )
+        self._validate_panel_support(self._panel)
         self._compiled_tasks = None
         self._tasks = tasks
         self._source_panel = self._panel
@@ -354,12 +424,19 @@ class MCEIRL:
             trans_est = TransitionEstimator(n_states=self.n_states, max_increase=2)
             trans_est.fit(self._panel)
             self.transitions_ = trans_est.matrix_
+            self.transition_source_ = "estimated Rust-bus keep kernel"
         else:
             self.transitions_ = (
                 transitions
                 if isinstance(transitions, DeterministicTransitions)
                 else np.asarray(transitions)
             )
+            if isinstance(transitions, DeterministicTransitions):
+                self.transition_source_ = "supplied deterministic transitions"
+            elif np.asarray(transitions).ndim == 3:
+                self.transition_source_ = "supplied action-specific tensor"
+            else:
+                self.transition_source_ = "supplied keep-transition matrix"
 
         # Create reward function (RewardSpec overrides feature_matrix)
         if self.reward_spec_ is not None:
@@ -373,6 +450,9 @@ class MCEIRL:
         )
 
         transition_tensor = self._build_transition_tensor(self.transitions_)
+        self._validate_transition_model(transition_tensor)
+        if not isinstance(transition_tensor, DeterministicTransitions):
+            self.transition_tensor_ = np.asarray(transition_tensor)
         effective_n_states = self.n_states
         effective_horizon = self.horizon
         effective_terminal_states = self.terminal_states
@@ -402,6 +482,7 @@ class MCEIRL:
             effective_horizon = compiled.horizon
             effective_terminal_states = np.asarray(compiled.terminal_states)
             self._reward_fn = self._reward_with_features(compiled.feature_matrix)
+            self.transition_source_ = "compiled deterministic task views"
 
         self.transition_model_ = transition_tensor
         self._effective_terminal_states = (
@@ -417,7 +498,12 @@ class MCEIRL:
             num_periods=effective_horizon,
         )
 
-        self._warn_if_unidentified()
+        rank_diagnostics = self._identification_diagnostics()
+        self.diagnostics_ = self._contract_diagnostics(
+            effective_n_states,
+            transition_tensor,
+            rank_diagnostics,
+        )
 
         # Create estimator with config
         config = MCEIRLConfig(
@@ -431,23 +517,213 @@ class MCEIRL:
         estimator = MCEIRLEstimator(config=config)
 
         # Estimate
-        self._result = estimator.estimate(
-            panel=self._panel,
-            utility=self._reward_fn,
-            problem=self._problem,
-            transitions=transition_tensor,
-            n_bootstrap=self.n_bootstrap,
-            se_seed=self.se_seed,
-            terminal_states=effective_terminal_states,
-            initial_dist=(
-                None if self._compiled_tasks is None else self._compiled_tasks.initial_state_dist
-            ),
-        )
+        try:
+            self._result = estimator.estimate(
+                panel=self._panel,
+                utility=self._reward_fn,
+                problem=self._problem,
+                transitions=transition_tensor,
+                n_bootstrap=self.n_bootstrap,
+                se_seed=self.se_seed,
+                terminal_states=effective_terminal_states,
+                initial_dist=(
+                    None
+                    if self._compiled_tasks is None
+                    else self._compiled_tasks.initial_state_dist
+                ),
+            )
+        except Exception as exc:
+            self.termination_reason_ = "execution_failure"
+            self.failure_reason_ = f"{type(exc).__name__}: {exc}"
+            raise RuntimeError("MCE-IRL estimation failed during optimization") from exc
 
         # Extract results
         self._extract_results()
 
         return self
+
+    def _validate_dataframe(
+        self,
+        data: pd.DataFrame,
+        state: str,
+        action: str,
+        id: str,
+        next_state: str | None,
+        task: str | None,
+    ) -> None:
+        """Reject missing, non-integer, or out-of-support table fields."""
+        required = [state, action, id]
+        if next_state is not None:
+            required.append(next_state)
+        if task is not None:
+            required.append(task)
+        missing = [column for column in required if column not in data.columns]
+        if missing:
+            raise ValueError(f"data is missing required columns {missing}")
+        if data.empty:
+            raise ValueError("MCEIRL requires at least one observation")
+        for column in required:
+            if data[column].isna().any():
+                raise ValueError(f"column '{column}' contains missing values")
+        for column, upper in ((state, self.n_states), (action, self.n_actions)):
+            values = np.asarray(data[column])
+            if not np.issubdtype(values.dtype, np.number):
+                raise ValueError(f"column '{column}' must contain integer codes")
+            if np.any(values != np.floor(values)):
+                raise ValueError(f"column '{column}' must contain integer codes")
+            coded = values.astype(np.int64)
+            if (coded < 0).any() or (coded >= upper).any():
+                raise ValueError(f"column '{column}' must lie in [0, {upper})")
+        if next_state is not None:
+            values = np.asarray(data[next_state])
+            if not np.issubdtype(values.dtype, np.number) or np.any(values != np.floor(values)):
+                raise ValueError(f"column '{next_state}' must contain integer codes")
+            coded = values.astype(np.int64)
+            if (coded < 0).any() or (coded >= self.n_states).any():
+                raise ValueError(f"column '{next_state}' must lie in [0, {self.n_states})")
+
+    def _validate_panel_support(self, panel: Panel | TrajectoryPanel) -> None:
+        """Reject empty, non-integer, or out-of-support panel codes."""
+        states = np.asarray(panel.get_all_states())
+        actions = np.asarray(panel.get_all_actions())
+        next_states = np.asarray(panel.get_all_next_states())
+        if states.size == 0:
+            raise ValueError("MCEIRL requires at least one panel observation")
+        for name, values, upper in (
+            ("states", states, self.n_states),
+            ("actions", actions, self.n_actions),
+            ("next_states", next_states, self.n_states),
+        ):
+            if not np.issubdtype(values.dtype, np.integer):
+                raise ValueError(f"panel {name} must use integer codes")
+            if (values < 0).any() or (values >= upper).any():
+                raise ValueError(f"panel {name} must lie in [0, {upper})")
+        observed_actions = np.unique(actions)
+        if observed_actions.size < self.n_actions:
+            missing = sorted(set(range(self.n_actions)) - set(observed_actions.tolist()))
+            raise ValueError(
+                "MCEIRL panel does not identify every declared action; "
+                f"missing observed actions {missing}"
+            )
+
+    def _validate_transition_model(self, transitions: TransitionModel) -> None:
+        """Validate finite, nonnegative, row-stochastic transition dynamics."""
+        if isinstance(transitions, DeterministicTransitions):
+            return
+        tensor = np.asarray(transitions, dtype=float)
+        if not np.isfinite(tensor).all():
+            raise ValueError("transitions must contain only finite values")
+        if (tensor < 0).any():
+            raise ValueError("transitions must be nonnegative")
+        row_sums = tensor.sum(axis=-1)
+        if not np.allclose(row_sums, 1.0, atol=1e-6, rtol=0.0):
+            raise ValueError("every transition row must sum to one within 1e-6")
+
+    def _identification_diagnostics(self) -> dict[str, Any]:
+        """Return rank diagnostics and stop on unidentified action features."""
+        features = np.asarray(
+            getattr(
+                self._reward_fn,
+                "feature_matrix",
+                getattr(self._reward_fn, "state_features", None),
+            ),
+            dtype=float,
+        )
+        if features.ndim == 3:
+            diagnostics = dict(feature_diagnostics(features))
+            if diagnostics["contrast_rank"] < diagnostics["num_features"]:
+                raise ValueError(
+                    "action-contrast rank "
+                    f"{diagnostics['contrast_rank']} is below the "
+                    f"{diagnostics['num_features']} reward features"
+                )
+            diagnostics["verdict"] = "identified"
+            return diagnostics
+
+        design = features.reshape(features.shape[0], -1)
+        singular_values = np.linalg.svd(design, compute_uv=False)
+        positive = singular_values[singular_values > 1e-12]
+        condition = float(positive.max() / positive.min()) if positive.size else float("inf")
+        return {
+            "num_features": int(design.shape[1]),
+            "feature_rank": int(np.linalg.matrix_rank(design)),
+            "condition_number": condition,
+            "contrast_rank": None,
+            "contrast_condition_number": None,
+            "verdict": "identified through supplied dynamics and normalization",
+        }
+
+    def _contract_diagnostics(
+        self,
+        effective_n_states: int,
+        transitions: TransitionModel,
+        rank_diagnostics: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        """Build the stable four-block diagnostic record before fitting."""
+        if self._panel is None:
+            raise RuntimeError("MCEIRL panel initialization failed")
+        dataset, _pre_estimation, _transition_first_stage = compute_fit_diagnostics(
+            self._panel,
+            effective_n_states,
+            self.n_actions,
+        )
+        states = np.asarray(self._panel.get_all_states(), dtype=np.int64)
+        actions = np.asarray(self._panel.get_all_actions(), dtype=np.int64)
+        state_action_pairs = np.unique(np.stack([states, actions], axis=1), axis=0)
+        if isinstance(transitions, DeterministicTransitions):
+            transition_shape = tuple(int(size) for size in transitions.next_state.shape)
+            orientation = "next_state[state, action]"
+            finite = True
+            nonnegative = True
+            max_row_sum_error = 0.0
+        else:
+            tensor = np.asarray(transitions, dtype=float)
+            transition_shape = tuple(int(size) for size in tensor.shape)
+            orientation = "(n_actions, n_states, n_states)"
+            finite = bool(np.isfinite(tensor).all())
+            nonnegative = bool((tensor >= 0).all())
+            max_row_sum_error = float(np.max(np.abs(tensor.sum(axis=-1) - 1.0)))
+        return {
+            "data": {
+                "n_observations": int(dataset.num_observations),
+                "n_individuals": int(dataset.num_individuals),
+                "n_states_declared": int(effective_n_states),
+                "n_states_observed": int(dataset.states_visited),
+                "n_actions_declared": self.n_actions,
+                "state_coverage": float(dataset.states_visited / effective_n_states),
+                "state_action_coverage": float(
+                    len(state_action_pairs) / (effective_n_states * self.n_actions)
+                ),
+                "single_action_states": int(dataset.single_action_states),
+            },
+            "identification": {
+                "target": "normalized linear reward representation and induced behavior",
+                "normalization": "Type-I extreme-value shock scale fixed at 1.0",
+                "feature_rank": int(rank_diagnostics["feature_rank"]),
+                "feature_condition_number": float(rank_diagnostics["condition_number"]),
+                "contrast_rank": rank_diagnostics["contrast_rank"],
+                "contrast_condition_number": rank_diagnostics["contrast_condition_number"],
+                "effective_occupancy_support": float(
+                    len(state_action_pairs) / (effective_n_states * self.n_actions)
+                ),
+                "verdict": rank_diagnostics["verdict"],
+            },
+            "transitions": {
+                "source": self.transition_source_,
+                "orientation": orientation,
+                "shape": transition_shape,
+                "finite": finite,
+                "nonnegative": nonnegative,
+                "max_row_sum_error": max_row_sum_error,
+            },
+            "optimization": {
+                "converged": None,
+                "termination_reason": "not_started",
+                "failure_reason": None,
+                "iterations": None,
+                "fit_time_seconds": None,
+            },
+        }
 
     def _dataframe_to_panel(
         self,
@@ -504,6 +780,7 @@ class MCEIRL:
         feature_matrix: jnp.ndarray,
     ) -> LinearReward | ActionDependentReward:
         """Rebuild the linear reward on compiled task-state features."""
+        assert self._reward_fn is not None
         parameter_names = list(self._reward_fn.parameter_names)
         if feature_matrix.ndim == 3:
             return ActionDependentReward(
@@ -522,20 +799,20 @@ class MCEIRL:
     ) -> TransitionModel:
         """Build transition tensor for both actions."""
         if isinstance(keep_transitions, DeterministicTransitions):
-            expected_shape = (self.n_states, self.n_actions)
-            if keep_transitions.next_state.shape != expected_shape:
+            deterministic_shape = (self.n_states, self.n_actions)
+            if keep_transitions.next_state.shape != deterministic_shape:
                 raise ValueError(
                     "deterministic transitions must have shape "
-                    f"{expected_shape}, got {keep_transitions.next_state.shape}"
+                    f"{deterministic_shape}, got {keep_transitions.next_state.shape}"
                 )
             return keep_transitions
 
         keep_transitions = np.asarray(keep_transitions, dtype=np.float32)
         if keep_transitions.ndim == 3:
-            expected_shape = (self.n_actions, self.n_states, self.n_states)
-            if keep_transitions.shape != expected_shape:
+            dense_shape = (self.n_actions, self.n_states, self.n_states)
+            if keep_transitions.shape != dense_shape:
                 raise ValueError(
-                    f"3D transitions must have shape {expected_shape}, got {keep_transitions.shape}"
+                    f"3D transitions must have shape {dense_shape}, got {keep_transitions.shape}"
                 )
             return jnp.array(keep_transitions)
 
@@ -558,7 +835,7 @@ class MCEIRL:
         )
 
         n = self.n_states
-        transitions = np.zeros((self.n_actions, n, n), dtype=np.float32)
+        transitions: np.ndarray = np.zeros((self.n_actions, n, n), dtype=np.float32)
 
         # Action 0 (keep): use provided transitions
         transitions[0] = keep_transitions
@@ -569,35 +846,6 @@ class MCEIRL:
                 transitions[action, s, :] = transitions[0, 0, :]
 
         return jnp.array(transitions)
-
-    def _warn_if_unidentified(self) -> None:
-        """Warn when action-dependent features have a rank-deficient contrast.
-
-        Action-specific reward parameters are identified only if the
-        action-contrast design phi(s, a) - phi(s, 0) has full column rank.
-        When it does not, the parameters lie on a ridge and recovery can fail
-        even with correct transitions, which is a feature-design problem rather
-        than an estimator bug.
-        """
-        feature_matrix = getattr(self._reward_fn, "feature_matrix", None)
-        if feature_matrix is None:
-            return  # state-only reward: identification is through the dynamics
-        fm = np.asarray(feature_matrix)
-        if fm.ndim != 3:
-            return
-        _, _, k = fm.shape
-        contrast = (fm[:, 1:, :] - fm[:, :1, :]).reshape(-1, k)
-        rank = int(np.linalg.matrix_rank(contrast))
-        if rank < k:
-            warnings.warn(
-                f"Action-contrast feature rank is {rank} < {k} features. "
-                "Action-specific reward parameters are not identified (they lie "
-                "on a ridge); recovered coefficients and per-action feature "
-                "residuals may be unreliable even with correct transitions. "
-                "Check the feature design before trusting parameter estimates.",
-                UserWarning,
-                stacklevel=2,
-            )
 
     def _create_reward(self) -> LinearReward | ActionDependentReward:
         """Create reward function."""
@@ -667,7 +915,9 @@ class MCEIRL:
         self.coef_ = params.copy()
 
         # Standard errors from metadata
-        if self._result.metadata and "standard_errors" in self._result.metadata:
+        if not self.compute_se:
+            self.se_ = None
+        elif self._result.metadata and "standard_errors" in self._result.metadata:
             se_values = self._result.metadata["standard_errors"]
             if se_values is not None:
                 self.se_ = {name: float(val) for name, val in zip(param_names, se_values)}
@@ -743,6 +993,84 @@ class MCEIRL:
 
         self.log_likelihood_ = float(self._result.log_likelihood)
         self.converged_ = bool(self._result.converged)
+        self.result_ = self._result
+        self.is_fitted_ = True
+        if self.termination_reason_ is None:
+            self.termination_reason_ = str(
+                self._result.metadata.get(
+                    "termination_reason",
+                    "converged" if self.converged_ else self._result.convergence_message,
+                )
+            )
+        self.failure_reason_ = None if self.converged_ else self.termination_reason_
+        self.n_iter_ = int(self._result.num_iterations)
+        self.fit_time_ = float(self._result.estimation_time)
+        self.n_observations_ = int(self._result.num_observations)
+        standard_errors = (
+            np.asarray(list(self.se_.values()), dtype=float)
+            if self.se_ is not None
+            else np.empty(0, dtype=float)
+        )
+        self.bootstrap_ = self._bootstrap_result_from_metadata(param_names, standard_errors)
+
+        if self.diagnostics_ is not None:
+            self.diagnostics_["optimization"] = {
+                "converged": self.converged_,
+                "termination_reason": self.termination_reason_,
+                "failure_reason": self.failure_reason_,
+                "iterations": self.n_iter_,
+                "fit_time_seconds": self.fit_time_,
+            }
+
+        if not self.converged_:
+            warnings.warn(
+                "MCEIRL optimization did not converge; fitted outputs may be unreliable.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+    def _bootstrap_result_from_metadata(
+        self,
+        parameter_names: list[str],
+        standard_errors: np.ndarray,
+    ) -> BootstrapResult | None:
+        """Build the stable public bootstrap record from inference metadata."""
+        if self.se_method != "bootstrap" or self._result is None:
+            return None
+        details = self._result.metadata.get("se_details", {})
+        estimates = np.asarray(details.get("bootstrap_estimates", []), dtype=float)
+        if estimates.size == 0:
+            estimates = np.empty((0, len(parameter_names)), dtype=float)
+        elif estimates.ndim == 1:
+            estimates = estimates.reshape(1, -1)
+        if estimates.shape[1:] != (len(parameter_names),):
+            raise RuntimeError(
+                "bootstrap inference returned draws with an incompatible parameter dimension"
+            )
+        if estimates.shape[0] >= 2:
+            intervals = np.quantile(estimates, [0.025, 0.975], axis=0).T
+        else:
+            intervals = np.full((len(parameter_names), 2), np.nan, dtype=float)
+        failures = tuple(str(item) for item in details.get("failures", []))
+        return BootstrapResult(
+            method="pairs_cluster",
+            unit="individual_trajectory",
+            n_requested=int(
+                details.get("n_requested", details.get("n_bootstrap", self.n_bootstrap))
+            ),
+            n_successful=int(
+                details.get(
+                    "n_successful",
+                    details.get("successful_bootstraps", estimates.shape[0]),
+                )
+            ),
+            seed=self.se_seed,
+            parameter_names=tuple(parameter_names),
+            estimates=estimates,
+            standard_errors=standard_errors,
+            intervals=intervals,
+            failures=failures,
+        )
 
     @property
     def reward_matrix_(self) -> np.ndarray | None:
@@ -783,28 +1111,36 @@ class MCEIRL:
         if self.policy_ is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
-        states = np.asarray(states, dtype=np.int64)
+        raw_states = np.asarray(states)
+        if raw_states.ndim != 1:
+            raise ValueError("states must be a one-dimensional array of integer state codes")
+        if not np.issubdtype(raw_states.dtype, np.integer):
+            raise ValueError("states must contain integer state codes")
+        states = raw_states.astype(np.int64, copy=False)
+        if (states < 0).any() or (states >= self.n_states).any():
+            raise ValueError(f"states must lie in [0, {self.n_states})")
         if self._compiled_tasks is not None:
             if task_id is None:
                 raise ValueError("task_id is required for a multi-task fit")
             if task_id not in self._compiled_tasks.global_to_local:
-                raise KeyError(f"unknown task_id {task_id!r}")
+                raise ValueError(f"unknown task_id {task_id!r}")
             mapping = self._compiled_tasks.global_to_local[task_id]
             try:
                 local_states = np.asarray([mapping[int(s)] for s in states])
             except KeyError as exc:
                 raise ValueError(f"state {exc.args[0]} is not active for task {task_id!r}") from exc
+            assert self.task_policy_ is not None
             task_policy = self.task_policy_[task_id]
             if task_policy.ndim == 3:
                 if period < 0 or period >= task_policy.shape[0]:
                     raise ValueError(f"period must lie in [0, {task_policy.shape[0]})")
-                return task_policy[period, local_states]
-            return task_policy[local_states]
+                return cast(np.ndarray, task_policy[period, local_states])
+            return cast(np.ndarray, task_policy[local_states])
         if self.time_policy_ is not None:
             if period < 0 or period >= self.time_policy_.shape[0]:
                 raise ValueError(f"period must lie in [0, {self.time_policy_.shape[0]})")
-            return self.time_policy_[period, states]
-        return self.policy_[states]
+            return cast(np.ndarray, self.time_policy_[period, states])
+        return cast(np.ndarray, self.policy_[states])
 
     def simulate(
         self,
@@ -815,7 +1151,12 @@ class MCEIRL:
         seed: int | None = None,
     ) -> TrajectoryPanel:
         """Simulate trajectories from the fitted policy and dynamics."""
-        if self.policy_ is None or self.transition_model_ is None:
+        if (
+            self.policy_ is None
+            or self.transition_model_ is None
+            or self._problem is None
+            or self._panel is None
+        ):
             raise RuntimeError("Model not fitted. Call fit() first.")
         if n_trajectories < 1:
             raise ValueError("n_trajectories must be positive")
@@ -905,7 +1246,14 @@ class MCEIRL:
         description: str | None = None,
     ) -> CounterfactualResult:
         """Re-solve one reward or transition counterfactual."""
-        if self.params_ is None or self.transition_model_ is None:
+        if (
+            self.params_ is None
+            or self.coef_ is None
+            or self.transition_model_ is None
+            or self._result is None
+            or self._problem is None
+            or self._reward_fn is None
+        ):
             raise RuntimeError("Model not fitted. Call fit() first.")
         if (params is None) == (transitions is None):
             raise ValueError("supply exactly one of params or transitions")
@@ -987,12 +1335,13 @@ class MCEIRL:
             counterfactual_value=counterfactual_value,
             policy_change=counterfactual_policy - baseline_policy,
             value_change=value_change,
-            welfare_change=float(jnp.mean(value_change)),
+            welfare_change=None,
             counterfactual_type=counterfactual_type,
             description=description or "MCE-IRL counterfactual",
             metadata={
                 "reward_level_identified": False,
                 "changed_primitive": ("reward_parameters" if params is not None else "transitions"),
+                "normalization": "Type-I extreme-value shock scale fixed at 1.0",
             },
             params=result_params,
         )
@@ -1017,82 +1366,121 @@ class MCEIRL:
         """
         if self.params_ is None or self.se_ is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
+        if not np.isfinite(alpha) or not 0.0 < alpha < 1.0:
+            raise ValueError("alpha must be finite and lie strictly between 0 and 1")
+        if self.bootstrap_ is not None:
+            lower_q = alpha / 2.0
+            upper_q = 1.0 - lower_q
+            bootstrap_intervals = np.quantile(
+                self.bootstrap_.estimates,
+                [lower_q, upper_q],
+                axis=0,
+            ).T
+            return {
+                name: (float(lower), float(upper))
+                for name, (lower, upper) in zip(self.params_, bootstrap_intervals)
+            }
         z = scipy_norm.ppf(1 - alpha / 2)
         intervals: dict[str, tuple[float, float]] = {}
         for name in self.params_:
             est = self.params_[name]
             se = self.se_[name]
+            if not np.isfinite(est) or not np.isfinite(se) or se < 0:
+                raise RuntimeError(
+                    f"confidence interval is unavailable for {name}: estimate and SE must be finite"
+                )
             intervals[name] = (est - z * se, est + z * se)
         return intervals
 
-    def summary(self) -> str:
-        """Generate formatted summary of results."""
+    def summary(self, alpha: float = 0.05) -> str:
+        """Generate the shared manager-readable estimation summary."""
         if self._result is None:
-            return "MCEIRL: Not fitted yet. Call fit() first."
+            return "Estimator\nMCE-IRL\n\nNot fitted. Call fit() first."
 
-        lines = []
-        lines.append("=" * 70)
-        lines.append("Maximum Causal Entropy IRL Results".center(70))
-        lines.append("=" * 70)
-        lines.append(f"{'Method:':<25} MCE IRL (Ziebart 2010)")
-        lines.append(f"{'Discount Factor (β):':<25} {self.discount}")
+        diagnostics = self.diagnostics_ or {}
+        data = diagnostics.get("data", {})
+        identification = diagnostics.get("identification", {})
+        transitions = diagnostics.get("transitions", {})
         fitted_states = self._problem.num_states if self._problem is not None else self.n_states
-        lines.append(f"{'No. States:':<25} {fitted_states}")
-        lines.append(f"{'No. Actions:':<25} {self.n_actions}")
-        if self._compiled_tasks is not None:
-            lines.append(f"{'No. Tasks:':<25} {len(self._compiled_tasks.task_slices)}")
-        lines.append(f"{'Log-Likelihood:':<25} {self.log_likelihood_:,.2f}")
-        lines.append(f"{'Converged:':<25} {'Yes' if self.converged_ else 'No'}")
-        if self.termination_reason_ is not None:
-            lines.append(f"{'Termination:':<25} {self.termination_reason_}")
-        if self.feature_residual_ is not None:
-            lines.append(f"{'Feature residual:':<25} {self.feature_residual_:.6g}")
-        if self.occupancy_residual_ is not None:
-            lines.append(f"{'Occupancy residual:':<25} {self.occupancy_residual_:.6g}")
-        if self.bellman_residual_ is not None:
-            lines.append(f"{'Bellman residual:':<25} {self.bellman_residual_:.6g}")
-        lines.append("-" * 70)
-        lines.append("")
-        lines.append("Parameter Estimates:")
-        lines.append("-" * 70)
-        lines.append(
-            f"{'Parameter':<20} {'Estimate':>12} {'Std Err':>12} {'t-stat':>10} {'95% CI':>20}"
+        task_line = (
+            f"Tasks: {len(self._compiled_tasks.task_slices)}"
+            if self._compiled_tasks is not None
+            else "Tasks: one"
         )
-        lines.append("-" * 70)
-
-        for name in self.params_:
-            param = self.params_[name]
-            se = self.se_.get(name, float("nan")) if self.se_ else float("nan")
-
-            if np.isfinite(se) and se > 0:
-                t_stat = param / se
-                ci_low = param - 1.96 * se
-                ci_high = param + 1.96 * se
-                ci_str = f"[{ci_low:.4f}, {ci_high:.4f}]"
+        outcome_lines = [f"Log likelihood: {self.log_likelihood_:.6f}"]
+        uncertainty_lines: list[str]
+        if self.se_ is None:
+            for name, estimate in (self.params_ or {}).items():
+                outcome_lines.append(f"{name}: {estimate:.6g}")
+            uncertainty_lines = ["Method: not computed for this fit"]
+        else:
+            intervals = self.conf_int(alpha=alpha)
+            ci_level = 100.0 * (1.0 - alpha)
+            for name, estimate in (self.params_ or {}).items():
+                lower, upper = intervals[name]
+                outcome_lines.append(
+                    f"{name}: {estimate:.6g} (SE {self.se_[name]:.6g}, "
+                    f"{ci_level:.1f}% CI [{lower:.6g}, {upper:.6g}])"
+                )
+            uncertainty_lines = [
+                f"Method: {self.se_method}",
+                f"Confidence level: {ci_level:.1f}%",
+            ]
+            if self.bootstrap_ is not None:
+                uncertainty_lines.extend(
+                    [
+                        f"Bootstrap unit: {self.bootstrap_.unit}",
+                        "Bootstrap successful draws: "
+                        f"{self.bootstrap_.n_successful}/{self.bootstrap_.n_requested}",
+                        "Intervals: empirical percentile intervals over trajectory resamples",
+                    ]
+                )
             else:
-                t_stat = float("nan")
-                ci_str = "[nan, nan]"
+                uncertainty_lines.append(
+                    "Intervals: sampling intervals from the reported standard errors"
+                )
 
-            lines.append(f"{name:<20} {param:>12.4f} {se:>12.4f} {t_stat:>10.2f} {ci_str:>20}")
-
-        lines.append("-" * 70)
-
-        # Feature matching diagnostics
-        if self._result.metadata:
-            emp = self._result.metadata.get("empirical_features", [])
-            exp = self._result.metadata.get("final_expected_features", [])
-            diff = self._result.metadata.get("feature_difference", 0)
-
-            lines.append("")
-            lines.append("Feature Matching Diagnostics:")
-            lines.append(f"  Feature difference (||μ_D - μ_π||): {diff:.6f}")
-            if emp and exp:
-                lines.append(f"  Empirical features: {[f'{x:.4f}' for x in emp]}")
-                lines.append(f"  Expected features:  {[f'{x:.4f}' for x in exp]}")
-
-        lines.append("=" * 70)
-
-        return "\n".join(lines)
+        return "\n".join(
+            [
+                "Estimator",
+                "MCE-IRL (Maximum Causal Entropy feature matching)",
+                "",
+                "Data",
+                f"Observations: {self.n_observations_}",
+                f"Individuals: {data.get('n_individuals', 'unavailable')}",
+                f"State coverage: {data.get('state_coverage', float('nan')):.3f}",
+                "",
+                "Model",
+                f"States: {fitted_states}",
+                f"Actions: {self.n_actions}",
+                f"Discount factor: {self.discount:.6g}",
+                task_line,
+                "",
+                "Pre-estimation checks",
+                f"Identification: {identification.get('verdict', 'unavailable')}",
+                f"Action-contrast rank: {identification.get('contrast_rank', 'not applicable')}",
+                f"Transition source: {transitions.get('source', 'unavailable')}",
+                "",
+                "Fit",
+                f"Converged: {'yes' if self.converged_ else 'no'}",
+                f"Termination: {self.termination_reason_}",
+                f"Iterations: {self.n_iter_}",
+                f"Fit time: {self.fit_time_:.3f} seconds",
+                f"Feature residual: {self.feature_residual_:.6g}",
+                "",
+                "Outcome",
+                *outcome_lines,
+                "",
+                "Uncertainty",
+                *uncertainty_lines,
+                "",
+                "Limitations",
+                "Reward levels are normalized and are not identified without the supplied basis.",
+                "Transitions are treated as known inputs during reward estimation.",
+                "Counterfactual welfare in levels is withheld; policy and normalized "
+                "values remain available.",
+            ]
+        )
 
     def __repr__(self) -> str:
         fitted = self.params_ is not None
