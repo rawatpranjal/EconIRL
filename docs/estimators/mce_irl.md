@@ -35,17 +35,6 @@ under stochastic dynamics. The causal form has the same soft choice structure
 as logit dynamic discrete choice. MCE-IRL estimates reward parameters through
 feature matching rather than a conditional likelihood.
 
-## Theory Connections
-
-For the proof route behind this page, start with
-[Soft Bellman and DDC-MaxEnt Equivalence](../theory/soft_bellman_equivalence.md)
-for the maximum-causal-entropy and logit-DDC equivalence,
-[Identification and Anchors](../theory/identification.md) for reward
-normalization, and [IRL Identification Boundaries](../theory/irl_boundaries.md)
-for what feature matching can and cannot identify. Use
-[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
-feature-rank condition behind finite reward parameters.
-
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action,

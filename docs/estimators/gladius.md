@@ -24,16 +24,6 @@ identification strategy. The package implementation adapts the paper's
 Algorithm 1 to a latent-reward IRL setting where the anchor reward is
 supplied by the researcher rather than observed directly.
 
-## Theory Connections
-
-For the proof route behind this page, start with
-[Identification and Anchors](../theory/identification.md) for the state-shift
-non-identification problem and [GLADIUS and ERM](../theory/gladius_erm.md) for
-the empirical-risk objective, the sampled squared-TD bias, and the anchor-action
-identification argument. Use
-[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
-final projection from anchored reward contrasts to structural parameters.
-
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action,

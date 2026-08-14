@@ -33,15 +33,6 @@ estimator. Additional stages can improve finite-sample precision.
 <magnac-thesmar-2002>` gives the identification boundary for dynamic
 primitives.
 
-## Theory Connections
-
-For the proof route behind this page, start with
-[Identification and Anchors](../theory/identification.md) for the normalization
-problem and [Classical DDC Estimators](../theory/classical_ddc.md) for the
-Hotz-Miller inversion and nested pseudo-likelihood argument. Use
-[Reward Projection and Feature Rank](../theory/reward_projection.md) for the
-rank condition that turns recovered reward contrasts into parameters.
-
 ## Notation
 
 Throughout, $s$ indexes the discrete state and $a$ the discrete action, observed for
