@@ -9,13 +9,12 @@
 - [Counterfactuals](deep_mce_irl/counterfactuals.md)
 
 Neural MCE-IRL (also called Deep MCE-IRL) recovers a neural reward map from
-observed choices by matching
-the discounted state-action occupancy of an entropy-regularized policy to the
-occupancy observed in demonstrations. It uses the same soft Bellman planning
-and occupancy-matching objective as MCE-IRL, but the reward is a feedforward
-network rather than a dot product with fixed features. The validated object is
-the anchored reward matrix and the behavior it induces; raw network weights are
-not a structural estimand.
+observed choices. It matches the discounted state-action occupancy of an
+entropy-regularized policy to the occupancy observed in demonstrations. It uses
+the same soft Bellman planning and occupancy-matching objective as MCE-IRL. Its
+reward is a feedforward network rather than a dot product with fixed features.
+The validated object is the anchored reward matrix and the behavior it induces.
+Raw network weights are not a structural estimand.
 
 For a runnable fit with exact output, start with the
 [Quick Start](deep_mce_irl/quick_start.md).
@@ -69,10 +68,10 @@ V(s) = \log \sum_a \exp\bigl(Q(s, a)\bigr).
 $$
 
 The log-sum-exp form of $V$ follows from entropy-regularized planning
-(Ziebart 2010, ch. 5): the agent maximizes expected reward minus the KL
-divergence to a uniform policy, and the resulting soft Bellman backup has
-log-sum-exp as its fixed-point operator. The conditional choice probability
-follows the logit form:
+(Ziebart 2010, ch. 5). The agent maximizes expected reward minus the
+Kullback-Leibler divergence to a uniform policy. The resulting soft Bellman
+backup has log-sum-exp as its fixed-point operator. The conditional choice
+probability follows the logit form:
 
 $$
 \pi(a \mid s) = \exp\bigl(Q(s, a) - V(s)\bigr).
@@ -85,8 +84,8 @@ following the package convention throughout.
 
 ## Identification
 
-This is the section that says when an anchored neural reward map is interpretable,
-and when it is only a behavior-fitting object.
+An anchored neural reward map is interpretable only under specific conditions.
+Otherwise, it is a behavior-fitting object.
 
 Deep MCE-IRL identifies the anchored reward map $r_\eta$ under the following
 conditions.
@@ -108,7 +107,8 @@ conditions.
   $$
 
   These rewards induce the same policy under the observed transition law. For
-  state-action rewards, the package imposes the DDC normalization
+  state-action rewards, the package imposes the dynamic discrete choice (DDC)
+  normalization
 
   $$r_\eta(s, a_0) = 0 \quad \text{for all } s.$$
 
@@ -283,30 +283,40 @@ the thing to interpret.
 | Applicable when | Prefer an alternative when |
 | --- | --- |
 | Transitions are known or supplied. | Transitions must be estimated jointly. |
-| The reward is nonlinear in the available state encodings. | A linear reward table is adequate (use MCE-IRL). |
+| The reward is nonlinear in the available state encodings. | A linear reward basis is adequate (use MCE-IRL). |
 | Behavioral recovery (policy, value, and Q) matters more than a structural parameter vector. | Identified structural parameters are required (use the structural family). |
 | A normalization anchor can be fixed before estimation. | The reward normalization cannot be fixed in advance. |
 | Counterfactual re-solving under the learned reward is the goal. | Policy-only imitation is sufficient (use BC). |
 
-Deep MCE-IRL occupies the same position as MCE-IRL in the IRL family, with
-greater reward capacity at the cost of interpretability. Against GLADIUS, the
-distinction is the planning method: Deep MCE-IRL solves the soft Bellman
-explicitly each epoch using supplied transitions, while GLADIUS trains Q and
-value networks with a Bellman consistency penalty and does not require
-transitions to be supplied. Against the structural family (NFXP, CCP, MPEC),
-Deep MCE-IRL does not identify a finite parameter vector; it identifies the
-anchored reward matrix and the behavior it induces.
+Neural MCE-IRL occupies the same position as MCE-IRL in the IRL family. It has
+greater reward capacity but less interpretability. Neural MCE-IRL solves the
+soft Bellman program each epoch using supplied transitions. GLADIUS instead
+trains Q and value networks with a Bellman consistency penalty and does not
+require supplied transitions. Unlike NFXP, CCP, and MPEC, Neural MCE-IRL does
+not identify a finite structural parameter vector. It identifies the anchored
+reward matrix and the behavior it induces.
 
 ## Usage
 
 The [Quick Start](deep_mce_irl/quick_start.md) page gives a complete runnable
 fit with exact output. The fitted estimator provides `reward_matrix_`,
-`policy_`, `value_`, `simulate()`, and `counterfactual()`.
+`policy_`, `value_`, `simulate()`, `counterfactual()`, and pickle
+serialization.
+
+Set `se_method="bootstrap"` to request whole-trajectory sampling uncertainty.
+`conf_int()` then returns percentile intervals for anchored reward cells and
+policy probabilities. It does not return intervals for network weights or
+descriptive projection coordinates. The fitted `bootstrap_` object retains the
+successful reward and policy draws.
 
 `counterfactual()` accepts one reward, transition, or action-availability
 change. It re-solves the learned reward map without retraining the network.
 The [Counterfactuals](deep_mce_irl/counterfactuals.md) page shows the supported
 inputs and result object.
+
+The complete applied workflow is available as a
+[`neural_mce_irl_applied_workflow.ipynb`](https://github.com/rawatpranjal/EconIRL/blob/main/examples/neural-mce-irl/neural_mce_irl_applied_workflow.ipynb)
+notebook.
 
 ## Evidence
 
@@ -331,8 +341,9 @@ shows the primary nonlinear reward cell.
 Policy total variation below 0.005 and counterfactual regrets below 0.002
 across all three families indicate that the learned reward map reproduces the
 demonstrator's behavior and supports counterfactual re-solving with low error.
-There is no parameter-recovery table: the reward is identified only up to the
-chosen normalization, not as a unique finite vector.
+The page omits a parameter-recovery table. The anchor fixes the reward
+normalization. The neural-network weights remain non-unique, so they are not
+reported as a structural parameter vector.
 
 The separate [Simulation Study](deep_mce_irl/validation.md) varies both the
 generated panel and neural initialization. All 300 fits converged. Median

@@ -150,6 +150,30 @@ class BootstrapResult:
     failures: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class FunctionalBootstrapResult:
+    """Trajectory-bootstrap draws for neural reward and policy functionals.
+
+    Neural reward networks do not expose a finite structural parameter vector.
+    This record therefore stores draws of the identified, user-facing
+    functionals instead of treating network weights or descriptive projection
+    coordinates as economic parameters.
+    """
+
+    method: str
+    unit: str
+    n_requested: int
+    n_successful: int
+    seed: int | None
+    estimand_names: tuple[str, ...]
+    estimates: np.ndarray
+    standard_errors: np.ndarray
+    intervals: np.ndarray
+    reward_draws: np.ndarray
+    policy_draws: np.ndarray
+    failures: tuple[str, ...] = ()
+
+
 def _quantiles(values: Any) -> dict[str, float]:
     """max, p95, p50, p5, min of a 1-D array; zeros for an empty input."""
     v = np.asarray(values, dtype=np.float64)

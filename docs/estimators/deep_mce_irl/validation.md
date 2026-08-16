@@ -6,6 +6,7 @@
 - [Wulfmeier-Shaped Study](wulfmeier_objectworld.md)
 - [Counterfactuals](counterfactuals.md)
 - [Result file](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl_ready.json)
+- [Bootstrap result](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/deep_mce_irl_bootstrap_calibration.json)
 
 The controlled study uses a nonlinear state-action reward over 32 states and
 three actions. Action 0 anchors the reward map. The transitions and true reward
@@ -21,8 +22,8 @@ are not compared.
 
 ## Stability Results
 
-All 300 fits completed and met the estimator convergence test. All 18 study
-checks passed.
+All 300 fits completed and satisfied the estimator's convergence criterion.
+The results met all 18 study criteria.
 
 | Metric | Median | 95th percentile |
 | --- | ---: | ---: |
@@ -37,9 +38,58 @@ checks use reward recovery, policy recovery, training-seed stability, and
 counterfactual regret. The complete value distribution remains in the result
 file.
 
+## Sampling Uncertainty
+
+The estimator can also report percentile bootstrap intervals. Resampling is
+at the individual-trajectory level. Each draw refits the neural reward map.
+
+The calibration uses 50 generated panels. Each panel has 300 individuals and
+one observation per individual. Each panel requests 99 bootstrap draws. The
+reward map has three states and two actions. Action 0 is fixed at zero. Reward
+and policy coverage is measured at all three states. Counterfactual coverage
+uses mean policy movement and mean value change.
+
+All 50 point fits were usable. A total of 4,948 of 4,950 bootstrap refits
+converged. Every panel retained at least 98 draws.
+
+| Function | Coverage | Lower-tail miss | Upper-tail miss | Width ratio |
+| --- | ---: | ---: | ---: | ---: |
+| Reward map | 0.940 | 0.020 | 0.040 | 1.199 |
+| Policy | 0.940 | 0.020 | 0.040 | 1.147 |
+| Reward change | 0.920 | 0.010 | 0.070 | 1.323 |
+| Transition change | 0.920 | 0.050 | 0.030 | 1.300 |
+| Action removal | 0.960 | 0.020 | 0.020 | 1.297 |
+
+The width ratio is the largest ratio of the 95th-percentile width to the
+median width among the reported quantities in each row. Every interval had
+positive width. Two short runs with the same seed produced identical records.
+These are generated-data sampling results, not a reproduction of published
+paper numbers.
+
+The runnable program is
+[`bootstrap_calibration.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/deep_mce_irl/bootstrap_calibration.py).
+
+```bash
+PYTHONPATH=src:. python \
+  validation/estimators/deep_mce_irl/bootstrap_calibration.py \
+  --checkpoint validation/results/deep_mce_irl_bootstrap_calibration.jsonl \
+  --output validation/results/deep_mce_irl_bootstrap_calibration.json \
+  --quiet --jobs 2
+```
+
+**Result**
+
+```text
+wrote validation/results/deep_mce_irl_bootstrap_calibration.json
+status: ready
+usable panels: 50/50
+minimum successful draws: 98/99
+```
+
 ## Counterfactual Design
 
-Three interventions are re-solved against their oracle versions.
+For each intervention, the fitted counterfactual is compared with an oracle
+solution computed under the same change and the simulator's true reward map.
 
 | Family | Changed primitive |
 | --- | --- |

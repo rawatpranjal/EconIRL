@@ -24,11 +24,11 @@ The study varies the number of demonstrations over 8, 16, 32, 64, and 128.
 Five generated panels are fitted at each sample size. Neural MCE-IRL uses three
 training seeds per panel. Linear MCE-IRL is fitted once to each panel.
 
-Each neural fit uses a 200-epoch budget. The 30 percent random-action
-contamination means exact occupancy matching is not the target in this
-comparison. The result file records strict convergence and termination counts.
-Every linear fit used by a headline comparison must meet the optimizer,
-occupancy, and Bellman checks.
+Each neural fit uses a 200-epoch budget. Because 30 percent of demonstration
+actions are random, exact occupancy matching is not expected. The result file
+reports convergence and termination counts. A linear fit enters the comparison
+only when optimization succeeds and its occupancy and Bellman residuals are
+within the reported tolerances.
 
 The controlled [Simulation Study](validation.md) provides the estimator
 convergence evidence.
@@ -47,10 +47,12 @@ value difference among the 15 fits at 128 demonstrations. Neural curves pool
 five generated panels and three training seeds. Linear curves use the five
 generated panels.
 
-All 200 requested fits produced finite results. The linked result file reports
-aggregate convergence and termination counts. Per-fit records were written to
-the run's JSONL checkpoint. Of the 200 fits, 143 met the strict stopping rules.
-All 9 study checks passed.
+All 200 requested fits produced finite results. Of these, 143 met the stated
+stopping tolerances. The linked result file reports aggregate convergence and
+termination counts. The JSONL checkpoint retains one record for each fit. The
+result file records nine criteria covering completeness, finite results,
+optimizer solutions, and the reported neural-linear comparisons. All nine were
+satisfied.
 
 | Environment and demonstrations | Metric | Neural | Linear |
 | --- | --- | ---: | ---: |
@@ -61,9 +63,9 @@ All 9 study checks passed.
 | Binaryworld, 128 | EVD | 1.684 | 5.352 |
 | Binaryworld, 128 | Transfer EVD | 2.403 | 5.396 |
 
-The table contains the predeclared headline cells. Each linear entry has five
-fits that meet the optimizer, occupancy, and Bellman checks. The neural entries
-summarize 15 fits.
+The table reports the comparison cells selected before fitting. Each linear
+entry summarizes five fits that completed optimization and met the occupancy
+and Bellman tolerances. Each neural entry summarizes 15 fits.
 
 ## Scope
 

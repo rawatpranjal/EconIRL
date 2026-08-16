@@ -543,7 +543,9 @@ class TestCompletionContract:
 
     def test_diagnostics_and_normalization(self, fitted_model_state_action):
         model = fitted_model_state_action
-        assert model.diagnostics_["transition_orientation"] == ("(n_actions, n_states, n_states)")
+        assert model.diagnostics_["transitions"]["orientation"] == (
+            "(n_actions, n_states, n_states)"
+        )
         assert model.n_observations_ == 600
         np.testing.assert_allclose(model.reward_[:, 0], 0.0, atol=1e-8)
         assert model.termination_reason_ is not None
