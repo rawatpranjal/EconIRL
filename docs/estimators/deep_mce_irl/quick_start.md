@@ -47,7 +47,7 @@ print(data.shape)
 ```
 
 The generated panel follows one fixed expert policy under known stochastic
-dynamics. The seed fixes both actions and state transitions.
+dynamics. The seed fixes the sampled actions and state sequence.
 
 ## Fit the Reward Map
 
@@ -96,8 +96,8 @@ policy_row_sums=[1.0, 1.0, 1.0]
 ```
 
 `reward_` is the anchored reward matrix. `policy_` contains the induced choice
-probabilities. This fit meets the estimator's Bellman, finiteness, and
-occupancy requirements. Check `converged_`, `termination_reason_`, and
+probabilities. The maximum occupancy residual for this fit is 0.004053. Check
+`converged_`, `termination_reason_`, and
 `occupancy_moment_residual_` before using any fitted policy. Raw network
 weights are not an identified economic parameter.
 
@@ -109,3 +109,21 @@ Feature inputs passed through `features=` provide a descriptive linear
 projection of the fitted reward map. `projection_diagnostics_` reports its
 rank, condition number, residual scale, and R-squared. The projection does not
 provide sampling standard errors.
+
+## Sampling Uncertainty
+
+Set `se_method="bootstrap"` and choose `n_bootstrap` to request sampling
+uncertainty. Each draw resamples complete individual trajectories and refits
+the reward network. `se_seed` controls resampling. `seed` continues to control
+network initialization.
+
+`conf_int()` reports percentile intervals for supported reward cells and policy
+probabilities. Fixed anchor cells and unavailable actions are omitted.
+`bootstrap_` retains the successful reward and policy draws. `se_` and
+`pvalues_` remain `None` because network weights and descriptive projection
+coordinates are not structural parameters.
+
+The
+[`neural_mce_irl_applied_workflow.ipynb`](https://github.com/rawatpranjal/EconIRL/blob/main/examples/neural-mce-irl/neural_mce_irl_applied_workflow.ipynb)
+notebook shows fitting, held-out prediction, bootstrap intervals, a reward
+counterfactual, and serialization in one workflow.

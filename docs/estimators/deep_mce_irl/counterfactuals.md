@@ -17,9 +17,9 @@ changes. It does not retrain the neural network.
 | `transitions=` | Replace the transition tensor |
 | `action_mask=` | Remove actions that were available during fitting |
 
-Supply exactly one input. The result contains baseline and changed policies,
-values, their differences, and `welfare_change`, the unweighted mean of the
-state-level value changes.
+Supply exactly one input. The result contains the baseline and changed policies
+and values, together with their differences. It also contains `welfare_change`,
+the unweighted mean of the state-level value changes.
 
 ```python
 mask = np.ones((model.n_states, model.n_actions), dtype=bool)
@@ -46,3 +46,9 @@ least one available action.
 
 The reward map remains identified only under its fitted normalization. Compare
 counterfactual values within a fitted model, not across separate fits.
+
+When the model was fitted with `se_method="bootstrap"`,
+`result.metadata["bootstrap_intervals"]` contains percentile intervals. The
+intervals cover the mean policy total variation and the mean value change under
+the requested intervention. Each interval is computed by applying the same
+intervention and re-solving the model for every successful fitted reward draw.

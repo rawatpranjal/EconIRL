@@ -16,7 +16,7 @@ Check the transition model, normalization, and support before fitting.
 | Transition rows | Finite, nonnegative, and row-stochastic |
 | State indices | Integers in `[0, n_states)` |
 | Action indices | Integers in `[0, n_actions)` |
-| Action availability | If actions differ by state, pass `action_mask`; retain at least one action per state |
+| Action availability | If actions differ by state, pass `action_mask`. Retain at least one action per state |
 | Demonstrations | When `action_mask` is supplied, every observed action must be available |
 | State-action reward | A valid anchored action |
 | State-only reward | A valid reference state for the global additive normalization |
@@ -28,9 +28,10 @@ demonstrations, and anchors before training. Projection shape and rank are
 checked after the reward fit. Detected violations raise a specific `ValueError`.
 
 Thin support is still a scientific limitation when the input passes. The
-fitted `diagnostics_` mapping records observed state coverage, observed
-state-action coverage, the smallest marginal action share across the full
-panel, and the number of states with only one available action under
+fitted `diagnostics_` mapping has `data`, `identification`, `transitions`, and
+`optimization` blocks. The data block records observed state coverage,
+observed state-action coverage, the smallest marginal action share across the
+full panel, and the number of states with only one available action under
 `action_mask`. A neural reward surface outside the observed support is an
 extrapolation.
 

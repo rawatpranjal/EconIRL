@@ -16,7 +16,11 @@ from econirl.inference.hypothesis_tests import (
 from econirl.inference.identifiability import check_reward_identifiability
 from econirl.inference.identification import check_identification
 from econirl.inference.profile_likelihood import profile_likelihood
-from econirl.inference.results import BootstrapResult, EstimationSummary
+from econirl.inference.results import (
+    BootstrapResult,
+    EstimationSummary,
+    FunctionalBootstrapResult,
+)
 from econirl.inference.reward_comparison import (
     detect_reward_shaping,
     epic_distance,
@@ -27,6 +31,7 @@ from econirl.inference.standard_errors import compute_standard_errors
 __all__ = [
     "EstimationSummary",
     "BootstrapResult",
+    "FunctionalBootstrapResult",
     "compute_standard_errors",
     "check_identification",
     # Hypothesis tests
