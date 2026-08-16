@@ -1,11 +1,11 @@
 {
   "confidence_intervals_equal": true,
   "counterfactual_intervals_equal": true,
-  "econirl_module": "/private/tmp/econirl-neural-wheel.xzqrcD/venv/lib/python3.13/site-packages/econirl/__init__.py",
+  "econirl_module": "/private/tmp/econirl-neural-final-wheel.wKPF62/venv/lib/python3.13/site-packages/econirl/__init__.py",
   "econirl_version": "0.0.10",
   "estimator": "MCEIRLNeural",
   "fresh_process": true,
-  "git_commit": "85eafbeed4046dd3146787ba55c692422eec7254",
+  "git_commit": "dc618c5f2fbcdc06c217f3391f37a186cda24206",
   "maximum_absolute_gaps": {
     "bootstrap_estimates": 0.0,
     "counterfactual_policy": 0.0,
@@ -14,7 +14,7 @@
     "reward": 0.0
   },
   "module_outside_checkout": true,
-  "python_executable": "/tmp/econirl-neural-wheel.xzqrcD/venv/bin/python",
+  "python_executable": "/tmp/econirl-neural-final-wheel.wKPF62/venv/bin/python",
   "python_version": "3.13.12",
   "status": "passed",
   "summary_equal": true,
