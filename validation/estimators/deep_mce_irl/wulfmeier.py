@@ -20,6 +20,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 DEFAULT_OUTPUT = ROOT / "validation" / "results" / "deep_mce_irl_wulfmeier.json"
+DEFAULT_FIGURE = ROOT / "docs" / "_static" / "estimators" / "deep_mce_irl_wulfmeier.png"
 EXAMPLE = ROOT / "examples" / "wulfmeier-deep-maxent" / "replicate.py"
 FULL_GRID = 32
 FULL_DEMO_COUNTS = (8, 16, 32, 64, 128)
@@ -54,6 +55,11 @@ def git_sha() -> str:
         cwd=ROOT,
         text=True,
     ).strip()
+
+
+def resolve_figure_output(*, smoke: bool) -> Path | None:
+    """Keep bounded smoke runs from rewriting the tracked public figure."""
+    return None if smoke else DEFAULT_FIGURE
 
 
 def make_environment(name: str, grid_size: int, seed: int):
@@ -482,6 +488,7 @@ def main() -> int:
             ]
         )
     status = "ready" if all(check["passed"] for check in checks) else "incomplete"
+    figure_output = resolve_figure_output(smoke=args.smoke)
     payload = {
         "study": "Wulfmeier-shaped generated Objectworld and Binaryworld",
         "paper_replication": False,
@@ -504,19 +511,20 @@ def main() -> int:
         "checks": checks,
         "status": status,
         "checkpoint": str(checkpoint),
-        "figure": "docs/_static/estimators/deep_mce_irl_wulfmeier.png",
+        "figure": (
+            "docs/_static/estimators/deep_mce_irl_wulfmeier.png"
+            if figure_output is not None
+            else None
+        ),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
         json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
-    if summary["n_successful"] == summary["n_requested"]:
-        render_figure(
-            summary,
-            grid_size,
-            ROOT / "docs" / "_static" / "estimators" / "deep_mce_irl_wulfmeier.png",
-        )
+    if final_run and summary["n_successful"] == summary["n_requested"]:
+        assert figure_output is not None
+        render_figure(summary, grid_size, figure_output)
     print(f"wrote {output}")
     print(f"status: {status}")
     return 0 if (args.smoke or status == "ready") else 1

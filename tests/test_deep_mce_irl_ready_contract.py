@@ -72,6 +72,16 @@ def test_wulfmeier_shaped_study_is_ready() -> None:
     assert all(check["passed"] for check in payload["checks"])
 
 
+def test_wulfmeier_smoke_does_not_target_tracked_figure() -> None:
+    from validation.estimators.deep_mce_irl.wulfmeier import (
+        DEFAULT_FIGURE,
+        resolve_figure_output,
+    )
+
+    assert resolve_figure_output(smoke=True) is None
+    assert resolve_figure_output(smoke=False) == DEFAULT_FIGURE
+
+
 def test_quick_start_reports_a_usable_fit() -> None:
     text = (DOCS / "quick_start.md").read_text(encoding="utf-8")
     assert "converged=True" in text
