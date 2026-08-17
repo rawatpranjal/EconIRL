@@ -1,69 +1,64 @@
 # Identification Boundary
 
-Read this page before using AIRL outside the state-only setting. It explains
-why matching behavior with a discriminator is weaker than recovering an
-action-dependent structural reward.
+## Important Links
 
-## Potential-Based Shaping
+- [AIRL Overview](../airl.md)
+- [Pre-Estimation Checks](pre_estimation.md)
+- [Counterfactuals](counterfactuals.md)
+- [AIRL-Het](../airl_het.md)
 
-Any reward function of the form
+AIRL separates a reward candidate from potential-based shaping. That
+separation has a narrow positive result.
+
+## Potential-based shaping
+
+The transformed reward
 
 $$
-r'(s, a, s') = r(s, a, s') + \beta\, h(s') - h(s)
+r'(s,a,s') = r(s,a,s') + \beta h(s') - h(s)
 $$
 
-is observationally equivalent to $r$ under the original dynamics: the optimal
-policy is unchanged and so is the agent's value function. AIRL's discriminator
-is structured to absorb this shaping term into $h_\phi$ and isolate $g_\theta$
-as the transferable reward. Whether that separation succeeds depends on what
-$g_\theta$ is allowed to depend on.
+can preserve optimal behavior under the original dynamics. Behavior matching
+alone therefore does not identify the reward used for a new transition system.
 
-## The State-Only Guarantee
+AIRL constrains its discriminator score to
 
-Fu et al. (2018) Theorems 5.1-5.2 give the positive result: when (i) the reward
-is a function of state only, $g_\theta(s)$, and (ii) the MDP satisfies
-decomposability, the discriminator at the adversarial optimum recovers the true
-reward up to a constant. The shaping potential $h_\phi$ absorbs the
-continuation-value terms that would otherwise contaminate $g_\theta$.
+$$
+f(s,a,s') = g(s) + \beta h(s') - h(s).
+$$
 
-The package implements this setting directly: `reward_arg="state"` projects the
-reward matrix onto the state subspace by averaging across actions before
-computing the discriminator logit.
+Both the true reward and the recovered reward must depend only on state. Under
+deterministic, decomposable dynamics, Fu et al. show that if AIRL recovers the
+optimal discriminator score, $g$ equals the true reward up to a constant.
 
-## Why Action-Dependent Rewards Break the Guarantee
+## Why state-only matters
 
-When payoffs differ by action, the reward signal sits in the action-contrast
-direction. A state-only $g_\theta(s)$ assigns the same flow utility to every
-action at a state, so the discriminator cannot represent the action contrast.
-In practice, the policy collapses toward uniform across actions and policy TV
-stays far from the oracle regardless of training length.
+An action-dependent payoff contains a within-state action contrast. A
+state-only reward assigns the same current reward to every action. It cannot
+represent that contrast directly.
 
-Setting `reward_arg="state_action"` lets $g_\theta(s, a)$ differ by action, but
-the shaping structure then cannot separate $g_\theta$ from an action-dependent
-shaping term $\beta h(s', a') - h(s, a)$, because the potential is defined on
-states, not state-action pairs. The disentanglement guarantee no longer applies.
+Allowing an unrestricted $g(s,a)$ removes the original disentanglement result.
+The state potential no longer separates every action-dependent reward term from
+shaping. A fitted policy can look reasonable while the recovered reward fails
+under new dynamics.
 
-The action-dependent diagnostic cell `airl_anchor_action_dependent` confirms
-this: all eight numerical checks fail, with policy TV of 0.40 and regret values
-in double digits.
+For this reason, the public `AIRL` class rejects action-dependent features. It
+does not expose a switch that disables this scientific boundary.
 
-## Connection to AIRL-Het
+## Context and heterogeneity
 
-AIRL-Het (Lee, Sudhir, and Wang 2026) adds two design elements to recover
-action-dependent rewards in dynamic discrete choice: an anchor action whose
-reward is pinned to zero to fix the reward normalization, and an absorbing-state row
-pinned to zero to fix the level. These anchors turn the adversarial game into
-one that can identify an action-dependent reward surface. The implementation is
-in `econirl.estimation.adversarial.airl_het`, documented separately.
+Observed context and latent segments change the reward target. The public AIRL
+class rejects `context=` before optimization. AIRL-Het provides the separate
+anchored heterogeneous design. Its assumptions and evidence are documented on
+the [AIRL-Het page](../airl_het.md).
 
-## Practical Guidance
+## What is reported
 
-Use the state-only mode when the DGP or theory supports a state-only reward. If
-the empirical setting has action-dependent payoffs (entry/exit, product choice,
-capital investment), a state-only reward cannot match the data by construction,
-not by tuning. Switching to AIRL-Het or MCE-IRL is the right move, not
-increasing training length or reward learning rate.
+The fitted `reward_` is centered over states. Normalized reward RMSE compares
+reward shape after removing location and positive scale differences. Policy,
+value, Q, transfer policy, and regret measures remain necessary because reward
+shape alone does not establish useful behavior.
 
-A quick diagnostic: fit with `reward_arg="state"` and inspect policy TV. If TV
-stays above 0.10 after 200 rounds and the discriminator loss plateaus above
-log(2), the reward argument is almost certainly misspecified.
+Raw discriminator weights are descriptive optimizer coordinates. Do not label
+them structural preference coefficients or attach structural coefficient
+standard errors to them.

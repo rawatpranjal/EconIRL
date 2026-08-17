@@ -31,16 +31,12 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-import numpy as np  # noqa: E402
-
 from econirl.environments.road_network import road_network  # noqa: E402
 from validation.benchmark.harness import Cell, RosterEntry, main_cli  # noqa: E402
 from validation.benchmark.runner import _action_reward, _linear_utility  # noqa: E402
 
-RESULTS_JSON = os.path.join(_ROOT, "validation", "results",
-                            "study_highdim_route_choice.json")
-PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies",
-                         "highdim_route_choice.md")
+RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "study_highdim_route_choice.json")
+PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "highdim_route_choice.md")
 _STATIC = os.path.join(_ROOT, "docs", "_static", "simulation_studies")
 FIGURE_PNG = os.path.join(_STATIC, "highdim_route_choice_dgp.png")
 RESULTS_FIG = os.path.join(_STATIC, "highdim_route_choice_results.png")
@@ -58,8 +54,7 @@ SCALING_NODES = (75,)
 
 
 def _env(num_nodes=HEADLINE_NODES):
-    return road_network(num_nodes=num_nodes, num_actions=4, seed=0,
-                        discount_factor=0.95)
+    return road_network(num_nodes=num_nodes, num_actions=4, seed=0, discount_factor=0.95)
 
 
 # ---------------------------------------------------------------------------
@@ -79,8 +74,11 @@ def _mce_config():
 
     return MCEIRLConfig(
         optimizer="gradient",
-        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,
-        compute_se=False, verbose=False,
+        learning_rate=0.05,
+        outer_max_iter=80,
+        inner_max_iter=1000,
+        compute_se=False,
+        verbose=False,
     )
 
 
@@ -89,15 +87,16 @@ def _run_rhip(env, panel, horizon):
 
     config = RHIPConfig(
         horizon=horizon,
-        learning_rate=0.05, outer_max_iter=80,
-        compute_se=False, verbose=False,
+        learning_rate=0.05,
+        outer_max_iter=80,
+        compute_se=False,
+        verbose=False,
     )
     if horizon == float("inf"):
         # Exact MCE-IRL endpoint: delegate to the same config MCE-IRL uses.
         config.mce_config = _mce_config()
     est = RHIPEstimator(config=config)
-    return est.estimate(panel, _action_reward(env), env.problem_spec,
-                        env.transition_matrices)
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_rhip_h0(env, panel):
@@ -120,53 +119,27 @@ def _run_mce_irl(env, panel):
     from econirl.estimation import MCEIRLEstimator
 
     est = MCEIRLEstimator(config=_mce_config())
-    return est.estimate(panel, _action_reward(env), env.problem_spec,
-                        env.transition_matrices)
-
-
-def _run_airl(env, panel):
-    from types import SimpleNamespace
-
-    from econirl.estimators.neural_airl import NeuralAIRL
-
-    ps = env.problem_spec
-    m = NeuralAIRL(
-        n_actions=int(env.num_actions),
-        discount=float(ps.discount_factor),
-        max_epochs=200,
-        verbose=False,
-    )
-    m.fit(
-        panel,
-        features=np.asarray(env.feature_matrix),
-        transitions=np.asarray(env.transition_matrices),
-    )
-    return SimpleNamespace(
-        parameters=None,
-        standard_errors=None,
-        policy=m.policy_,
-        value_function=getattr(m, "value_", None),
-        converged=bool(getattr(m, "converged_", True)),
-    )
+    return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_nfxp(env, panel):
     from econirl.estimation import NFXPEstimator
 
     est = NFXPEstimator(
-        inner_solver="hybrid", inner_tol=1e-10,
-        inner_max_iter=100_000, compute_hessian=True, verbose=False,
+        inner_solver="hybrid",
+        inner_tol=1e-10,
+        inner_max_iter=100_000,
+        compute_hessian=True,
+        verbose=False,
     )
-    return est.estimate(panel, _linear_utility(env), env.problem_spec,
-                        env.transition_matrices)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_ccp(env, panel):
     from econirl.estimation import CCPEstimator
 
     est = CCPEstimator(num_policy_iterations=5, compute_hessian=True, verbose=False)
-    return est.estimate(panel, _linear_utility(env), env.problem_spec,
-                        env.transition_matrices)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_mpec(env, panel):
@@ -175,28 +148,25 @@ def _run_mpec(env, panel):
     # solver="sqp" is the real constrained MLE; "slsqp" is a legacy alias for
     # the augmented-Lagrangian penalty solver and does not check optimality.
     est = MPECEstimator(
-        config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8,
-                          constraint_tol=1e-6),
-        compute_hessian=True, verbose=False,
+        config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
+        compute_hessian=True,
+        verbose=False,
     )
-    return est.estimate(panel, _linear_utility(env), env.problem_spec,
-                        env.transition_matrices)
+    return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
 # Full roster on the headline cell. The four RHIP horizon variants are the
-# spectrum (H=0 -> MMP, H=1 -> BIRL, H=inf -> MCE-IRL); MCE-IRL and AIRL are the
-# IRL baselines; NFXP / CCP / MPEC the structural reference.
+# spectrum (H=0 -> MMP, H=1 -> BIRL, H=inf -> MCE-IRL); MCE-IRL is the
+# IRL baseline; NFXP / CCP / MPEC are the structural reference.
 ROSTER = (
-    RosterEntry("RHIP-H0",   "behavioral", _run_rhip_h0,   uses_transitions=True),
-    RosterEntry("RHIP-H1",   "behavioral", _run_rhip_h1,   uses_transitions=True),
-    RosterEntry("RHIP-H3",   "behavioral", _run_rhip_h3,   uses_transitions=True),
+    RosterEntry("RHIP-H0", "behavioral", _run_rhip_h0, uses_transitions=True),
+    RosterEntry("RHIP-H1", "behavioral", _run_rhip_h1, uses_transitions=True),
+    RosterEntry("RHIP-H3", "behavioral", _run_rhip_h3, uses_transitions=True),
     RosterEntry("RHIP-Hinf", "behavioral", _run_rhip_hinf, uses_transitions=True),
-    RosterEntry("MCE-IRL",   "behavioral", _run_mce_irl,   uses_transitions=True),
-    RosterEntry("AIRL",      "behavioral", _run_airl,      uses_transitions=False),
-    RosterEntry("NFXP",      "structural", _run_nfxp,      uses_transitions=True),
-    RosterEntry("CCP",       "structural", _run_ccp,       uses_transitions=True),
-    RosterEntry("MPEC",      "structural", _run_mpec, timeout=300,
-                uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC", "structural", _run_mpec, timeout=300, uses_transitions=True),
 )
 
 # Scaling sweep roster: a strict subset of ROSTER. Two RHIP horizon endpoints
@@ -204,9 +174,9 @@ ROSTER = (
 # anchor the structural and IRL families.
 SCALING_ROSTER = (
     RosterEntry("RHIP-Hinf", "behavioral", _run_rhip_hinf, uses_transitions=True),
-    RosterEntry("RHIP-H0",   "behavioral", _run_rhip_h0,   uses_transitions=True),
-    RosterEntry("NFXP",      "structural", _run_nfxp,      uses_transitions=True),
-    RosterEntry("MCE-IRL",   "behavioral", _run_mce_irl,   uses_transitions=True),
+    RosterEntry("RHIP-H0", "behavioral", _run_rhip_h0, uses_transitions=True),
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
 )
 
 # ---------------------------------------------------------------------------
@@ -240,11 +210,6 @@ DIAGNOSES = {
         "often plateaus before that, so it can read False while the recovered "
         "policy is accurate. It is the H=inf endpoint of the RHIP spectrum."
     ),
-    "AIRL": (
-        "Adversarial IRL. A model-free neural reward learner trained against a "
-        "policy network. It reads the feature matrix and the panel, not the "
-        "transition kernel. Capped at 200 epochs here for short compute."
-    ),
     "NFXP": (
         "Full-solution MLE with a nested Bellman fixed-point inner loop. "
         "Quadratic convergence near the optimum. All three parameters are "
@@ -276,6 +241,13 @@ EXCLUDED = [
             "model-free policy learner, coverage-fragile at this size; "
             "peripheral nodes go unvisited and its policy estimate degrades "
             "where the panel does not reach"
+        ),
+    },
+    {
+        "name": "AIRL",
+        "reason": (
+            "the public estimator requires a state-only reward, while this "
+            "route problem is identified through within-state edge contrasts"
         ),
     },
     {
@@ -393,8 +365,7 @@ NARRATIVE = {
                 "linear features but their weights stay out of the recovery table, "
                 "because an IRL reward is only partially identified in general. "
                 "RHIP-Hinf and MCE-IRL match by construction. Policy TV and regret "
-                "are the right scorecards for the behavioral family. AIRL learns a "
-                "model-free policy with no reward weights to compare."
+                "are the right scorecards for the behavioral family."
             ),
         },
     },

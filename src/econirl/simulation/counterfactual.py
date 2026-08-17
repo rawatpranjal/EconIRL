@@ -1066,7 +1066,7 @@ def demand_function(
 # Neural reward counterfactuals
 #
 # These functions accept a raw (S, A) reward matrix from any neural
-# estimator (NeuralGLADIUS, NeuralAIRL, or a tabularized neural reward),
+# estimator (such as NeuralGLADIUS or a tabularized neural reward),
 # instead of requiring EstimationSummary + UtilityFunction. The reward
 # matrix is the only structural object needed. All Bellman re-solving
 # happens in JAX regardless of the estimator's framework.

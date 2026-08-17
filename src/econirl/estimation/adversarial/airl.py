@@ -68,6 +68,7 @@ class AIRLConfig:
         compute_se: Whether to compute standard errors
         se_method: Method for standard errors
         n_bootstrap: Number of bootstrap samples
+        seed: Random seed for policy-transition sampling
         verbose: Whether to print progress
     """
 
@@ -101,6 +102,7 @@ class AIRLConfig:
     compute_se: bool = True
     se_method: Literal["bootstrap", "asymptotic"] = "bootstrap"
     n_bootstrap: int = 100
+    seed: int = 42
     verbose: bool = False
 
 
@@ -202,9 +204,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
         else:
             # Tabular reward: one parameter per (state, action) pair
             param_names = [
-                f"R({s},{a})"
-                for s in range(problem.num_states)
-                for a in range(problem.num_actions)
+                f"R({s},{a})" for s in range(problem.num_states) for a in range(problem.num_actions)
             ]
 
         # Create standard errors (NaN for adversarial methods)
@@ -221,9 +221,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
             num_observations=n_obs,
             aic=-2 * ll + 2 * n_params,
             bic=-2 * ll + n_params * jnp.log(jnp.array(n_obs)).item(),
-            prediction_accuracy=self._compute_prediction_accuracy(
-                panel, result.policy
-            ),
+            prediction_accuracy=self._compute_prediction_accuracy(panel, result.policy),
         )
 
         total_time = time_module.time() - start_time
@@ -295,9 +293,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
         else:
             r_sa = reward_matrix[states, actions]
         if self.config.use_shaping:
-            shaping_coef = (
-                self.config.shaping_coef if self.config.shaping_coef else gamma
-            )
+            shaping_coef = self.config.shaping_coef if self.config.shaping_coef else gamma
             f = r_sa + shaping_coef * V[next_states] - V[states]
         else:
             f = r_sa
@@ -369,17 +365,11 @@ class AIRLEstimator(AdversarialEstimatorBase):
             shaped_score = reward_matrix
         else:
             shaping_coef = (
-                self.config.shaping_coef
-                if self.config.shaping_coef is not None
-                else gamma
+                self.config.shaping_coef if self.config.shaping_coef is not None else gamma
             )
-            expected_next_potential = jnp.einsum(
-                "ast,t->sa", transitions, shaping_potential
-            )
+            expected_next_potential = jnp.einsum("ast,t->sa", transitions, shaping_potential)
             shaped_score = (
-                reward_matrix
-                + shaping_coef * expected_next_potential
-                - shaping_potential[:, None]
+                reward_matrix + shaping_coef * expected_next_potential - shaping_potential[:, None]
             )
 
         if self.config.generator_reward == "recovered":
@@ -405,16 +395,12 @@ class AIRLEstimator(AdversarialEstimatorBase):
 
         anchor_action = int(self.config.anchor_action)
         if not 0 <= anchor_action < reward_matrix.shape[1]:
-            raise ValueError(
-                f"anchor_action={anchor_action} is outside the action space"
-            )
+            raise ValueError(f"anchor_action={anchor_action} is outside the action space")
         anchored = reward_matrix.at[:, anchor_action].set(0.0)
         if self.config.absorbing_state is not None:
             absorbing = int(self.config.absorbing_state)
             if not 0 <= absorbing < reward_matrix.shape[0]:
-                raise ValueError(
-                    f"absorbing_state={absorbing} is outside the state space"
-                )
+                raise ValueError(f"absorbing_state={absorbing} is outside the state space")
             anchored = anchored.at[absorbing, :].set(0.0)
         return anchored
 
@@ -504,8 +490,8 @@ class AIRLEstimator(AdversarialEstimatorBase):
         initial_dist = self._compute_initial_distribution(panel, n_states)
 
         # Sample expert transitions once
-        expert_states, expert_actions, expert_next_states = (
-            self._sample_transitions_from_panel(panel)
+        expert_states, expert_actions, expert_next_states = self._sample_transitions_from_panel(
+            panel
         )
         n_expert = len(expert_states)
 
@@ -543,11 +529,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
                 r_sa = reward_matrix[states, actions]
                 if use_shaping:
                     sc = shaping_coef if shaping_coef is not None else gamma
-                    f = (
-                        r_sa
-                        + sc * shaping_potential[next_states]
-                        - shaping_potential[states]
-                    )
+                    f = r_sa + sc * shaping_potential[next_states] - shaping_potential[states]
                 else:
                     f = r_sa
                 log_pi = jnp.log(policy_fixed[states, actions] + 1e-10)
@@ -570,7 +552,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
         policy_changes = []
         converged = False
         round_idx = 0
-        key = jax.random.key(42)
+        key = jax.random.key(self.config.seed)
 
         pbar = tqdm(
             range(self.config.max_rounds),
@@ -593,13 +575,16 @@ class AIRLEstimator(AdversarialEstimatorBase):
             disc_loss = 0.0
             for _ in range(self.config.discriminator_steps):
                 loss, grads = disc_loss_and_grad(
-                    disc_params, policy,
-                    expert_states, expert_actions, expert_next_states,
-                    policy_states, policy_actions, policy_next_states,
+                    disc_params,
+                    policy,
+                    expert_states,
+                    expert_actions,
+                    expert_next_states,
+                    policy_states,
+                    policy_actions,
+                    policy_next_states,
                 )
-                updates, opt_state = optimizer.update(
-                    grads, opt_state, params=disc_params
-                )
+                updates, opt_state = optimizer.update(grads, opt_state, params=disc_params)
                 disc_params = optax.apply_updates(disc_params, updates)
                 disc_loss = float(loss)
 
@@ -644,12 +629,14 @@ class AIRLEstimator(AdversarialEstimatorBase):
             policy_changes.append(policy_change)
 
             r_range = float(jnp.max(current_reward) - jnp.min(current_reward))
-            pbar.set_postfix({
-                "d_loss": f"{disc_loss:.4f}",
-                "d_pol": f"{policy_change:.4f}",
-                "R_rng": f"{r_range:.2f}",
-                "P(R|hi)": f"{float(policy[-10:, 1].mean()):.3f}",
-            })
+            pbar.set_postfix(
+                {
+                    "d_loss": f"{disc_loss:.4f}",
+                    "d_pol": f"{policy_change:.4f}",
+                    "R_rng": f"{r_range:.2f}",
+                    "P(R|hi)": f"{float(policy[-10:, 1].mean()):.3f}",
+                }
+            )
 
             if (
                 round_idx + 1 >= self.config.min_rounds

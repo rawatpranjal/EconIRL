@@ -12,10 +12,9 @@
 
 Alias handling
 --------------
-GLADIUS and AIRL are aliases of NeuralGLADIUS and NeuralAIRL in the capability
-registry (same underlying class, same path).  The loader skips the alias names
-to avoid double-running: if NeuralGLADIUS is in the roster, GLADIUS is skipped
-with reason ``"alias of NeuralGLADIUS (already run)"``, and likewise for AIRL.
+``NeuralAIRL`` is a compatibility name for ``AIRL``. ``GLADIUS`` is a
+compatibility name for ``NeuralGLADIUS``. The loader skips compatibility names
+when their canonical name is already in the roster.
 
 Import hygiene
 --------------
@@ -26,13 +25,13 @@ helper to avoid circular imports and keep the module load cheap.
 
 from __future__ import annotations
 
-import numpy as np
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 from econirl.forms.base import Form
 from econirl.forms.capabilities import CAPABILITIES, EstimatorCapability
-
 
 # ---------------------------------------------------------------------------
 # Public data carriers
@@ -65,7 +64,7 @@ class RunResult:
 #: Aliases in the capability registry.  Skipped when their canonical
 #: counterpart is present in the roster.
 _ALIASES: dict[str, str] = {
-    "AIRL": "NeuralAIRL",
+    "NeuralAIRL": "AIRL",
     "GLADIUS": "NeuralGLADIUS",
 }
 
@@ -88,6 +87,7 @@ def _spec_names(env) -> list[str]:
 def _linear_utility(env):
     """Build a :class:`~econirl.preferences.linear.LinearUtility` from the env."""
     from econirl.preferences.linear import LinearUtility
+
     return LinearUtility(
         feature_matrix=env.feature_matrix,
         parameter_names=_spec_names(env),
@@ -97,6 +97,7 @@ def _linear_utility(env):
 def _action_reward(env):
     """Build an :class:`~econirl.preferences.action_reward.ActionDependentReward`."""
     from econirl.preferences.action_reward import ActionDependentReward
+
     return ActionDependentReward(env.feature_matrix, _spec_names(env))
 
 
@@ -111,84 +112,130 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
 
     if name == "NFXP":
         from econirl.estimation import NFXPEstimator
+
         return NFXPEstimator(
-            inner_solver="hybrid", inner_tol=1e-10, inner_max_iter=100_000,
-            compute_hessian=True, verbose=False,
+            inner_solver="hybrid",
+            inner_tol=1e-10,
+            inner_max_iter=100_000,
+            compute_hessian=True,
+            verbose=False,
         )
 
     if name == "CCP":
         from econirl.estimation import CCPEstimator
+
         return CCPEstimator(num_policy_iterations=1, compute_hessian=True, verbose=False)
 
     if name == "NNES":
         from econirl.estimation.nnes import NNESEstimator
+
         return NNESEstimator(
-            hidden_dim=64, v_epochs=800, n_outer_iterations=5,
-            compute_se=False, verbose=False,
+            hidden_dim=64,
+            v_epochs=800,
+            n_outer_iterations=5,
+            compute_se=False,
+            verbose=False,
         )
 
     if name == "SEES":
         from econirl.estimation.sees import SEESEstimator
+
         # The basis must span the value function (basis_dim >= num_states), so
         # the basis dimension tracks the state count rather than a fixed cap.
         basis_dim = num_states
         return SEESEstimator(
-            basis_type="bspline", basis_dim=basis_dim,
-            warm_start_value=True, penalty_weight=10.0,
-            compute_se=False, verbose=False,
+            basis_type="bspline",
+            basis_dim=basis_dim,
+            warm_start_value=True,
+            penalty_weight=10.0,
+            compute_se=False,
+            verbose=False,
         )
 
     if name == "TDCCP":
-        from econirl.estimation import TDCCPEstimator, TDCCPConfig
-        return TDCCPEstimator(config=TDCCPConfig(
-            hidden_dim=64, avi_iterations=15, epochs_per_avi=15,
-            compute_se=False, verbose=False,
-        ))
+        from econirl.estimation import TDCCPConfig, TDCCPEstimator
+
+        return TDCCPEstimator(
+            config=TDCCPConfig(
+                hidden_dim=64,
+                avi_iterations=15,
+                epochs_per_avi=15,
+                compute_se=False,
+                verbose=False,
+            )
+        )
 
     if name == "UFXP":
         from econirl.estimation import UFXPEstimator
+
         return UFXPEstimator(weights="optimal", verbose=False)
 
     if name == "MCEIRL":
-        from econirl.estimation import MCEIRLEstimator, MCEIRLConfig
-        return MCEIRLEstimator(config=MCEIRLConfig(
-            learning_rate=0.05, outer_max_iter=100,
-            inner_max_iter=2000, compute_se=False, verbose=False,
-        ))
+        from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
+
+        return MCEIRLEstimator(
+            config=MCEIRLConfig(
+                learning_rate=0.05,
+                outer_max_iter=100,
+                inner_max_iter=2000,
+                compute_se=False,
+                verbose=False,
+            )
+        )
 
     if name == "RHIP":
         from econirl.estimators.rhip import RHIPEstimator
+
         # Default to the H=inf endpoint (= MCE-IRL) for the registry roster; a
         # study sweeping the horizon constructs RHIPEstimator(horizon=...)
         # directly rather than through this generic recipe.
         return RHIPEstimator(
-            horizon=float("inf"), learning_rate=0.05, outer_max_iter=100,
-            inner_max_iter=2000, compute_se=False, verbose=False,
+            horizon=float("inf"),
+            learning_rate=0.05,
+            outer_max_iter=100,
+            inner_max_iter=2000,
+            compute_se=False,
+            verbose=False,
         )
 
     if name == "MaxEntIRL":
         from econirl.contrib.maxent_irl import MaxEntIRLEstimator
+
         return MaxEntIRLEstimator(
-            inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,
-            learning_rate=0.05, compute_hessian=False, verbose=False,
+            inner_tol=1e-8,
+            inner_max_iter=5000,
+            outer_max_iter=500,
+            learning_rate=0.05,
+            compute_hessian=False,
+            verbose=False,
         )
 
     if name == "MaxMarginIRL":
         from econirl.contrib.max_margin_irl import MaxMarginIRLEstimator
+
         return MaxMarginIRLEstimator(
-            max_iterations=50, margin_tol=1e-4,
-            compute_hessian=False, verbose=False,
+            max_iterations=50,
+            margin_tol=1e-4,
+            compute_hessian=False,
+            verbose=False,
         )
 
     if name == "IQLearn":
-        from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
-        return IQLearnEstimator(config=IQLearnConfig(
-            q_type="linear", divergence="chi2", alpha=3.0,
-            max_iter=2000, verbose=False,
-        ))
+        from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
+
+        return IQLearnEstimator(
+            config=IQLearnConfig(
+                q_type="linear",
+                divergence="chi2",
+                alpha=3.0,
+                max_iter=2000,
+                verbose=False,
+            )
+        )
 
     if name == "MCEIRLNeural":
         from econirl.estimators import MCEIRLNeural
+
         ps = form.env.problem_spec
         return MCEIRLNeural(
             n_states=num_states,
@@ -200,6 +247,7 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
 
     if name == "NeuralUFXP":
         from econirl.estimators import NeuralUFXP
+
         ps = form.env.problem_spec
         return NeuralUFXP(
             discount=float(ps.discount_factor),
@@ -210,16 +258,21 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
 
     if name in ("NeuralAIRL", "AIRL"):
         from econirl.estimators import NeuralAIRL
+
         ps = form.env.problem_spec
         return NeuralAIRL(
+            n_states=num_states,
             n_actions=form.spec.num_actions,
             discount=float(ps.discount_factor),
-            max_epochs=300,
+            max_rounds=200,
+            min_rounds=150,
+            compute_se=False,
             verbose=False,
         )
 
     if name in ("NeuralGLADIUS", "GLADIUS"):
         from econirl.estimators import NeuralGLADIUS
+
         ps = form.env.problem_spec
         return NeuralGLADIUS(
             n_actions=form.spec.num_actions,
@@ -322,41 +375,49 @@ def run_form(
         if name in _ALIASES:
             canonical = _ALIASES[name]
             if canonical in roster:
-                result.skipped.append({
-                    "name": name,
-                    "reason": f"alias of {canonical} (already in roster; skipped to avoid double-run)",
-                })
+                result.skipped.append(
+                    {
+                        "name": name,
+                        "reason": (
+                            f"alias of {canonical} (already in roster; skipped to avoid double-run)"
+                        ),
+                    }
+                )
                 continue
 
         # --- Compatibility checks ---
         if form.spec.reward_form not in cap.reward_forms:
-            result.skipped.append({
-                "name": name,
-                "reason": (
-                    f"form reward {form.spec.reward_form!r} not in supported "
-                    f"{cap.reward_forms}"
-                ),
-            })
+            result.skipped.append(
+                {
+                    "name": name,
+                    "reason": (
+                        f"form reward {form.spec.reward_form!r} not in supported {cap.reward_forms}"
+                    ),
+                }
+            )
             continue
 
         if cap.needs_transitions and not form.spec.has_transitions:
-            result.skipped.append({
-                "name": name,
-                "reason": (
-                    f"estimator needs transition matrices but "
-                    f"form.spec.has_transitions=False"
-                ),
-            })
+            result.skipped.append(
+                {
+                    "name": name,
+                    "reason": (
+                        "estimator needs transition matrices but form.spec.has_transitions=False"
+                    ),
+                }
+            )
             continue
 
         # --- Build and run ---
         try:
             est = _build_estimator(name, cap, form)
         except Exception as exc:
-            result.skipped.append({
-                "name": name,
-                "reason": f"build error: {type(exc).__name__}: {exc}",
-            })
+            result.skipped.append(
+                {
+                    "name": name,
+                    "reason": f"build error: {type(exc).__name__}: {exc}",
+                }
+            )
             continue
 
         try:
@@ -366,9 +427,11 @@ def run_form(
                 res = _run_fit_features(est, panel, form)
             result.results[name] = res
         except Exception as exc:  # noqa: BLE001 - failure is a data point
-            result.skipped.append({
-                "name": name,
-                "reason": f"run error: {type(exc).__name__}: {exc}",
-            })
+            result.skipped.append(
+                {
+                    "name": name,
+                    "reason": f"run error: {type(exc).__name__}: {exc}",
+                }
+            )
 
     return result

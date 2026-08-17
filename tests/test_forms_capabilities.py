@@ -78,7 +78,13 @@ def test_support_matrix_matches_verified_rows():
         assert c.needs_transitions
         assert "neural" in c.reward_forms
         assert not c.model_free
-    for n in ("NeuralAIRL", "NeuralGLADIUS", "AIRL", "GLADIUS"):
+    for n in ("NeuralAIRL", "AIRL"):
+        c = CAPABILITIES[n]
+        assert c.path == "fit_features"
+        assert c.needs_transitions
+        assert c.reward_forms == ("linear",)
+        assert not c.model_free
+    for n in ("NeuralGLADIUS", "GLADIUS"):
         c = CAPABILITIES[n]
         assert c.path == "fit_features"
         assert c.model_free
@@ -93,8 +99,12 @@ def test_aliases_match_canonical():
     def _fields_minus_name(c):
         return {k: v for k, v in dataclasses.asdict(c).items() if k != "name"}
 
-    assert _fields_minus_name(CAPABILITIES["GLADIUS"]) == _fields_minus_name(CAPABILITIES["NeuralGLADIUS"])
-    assert _fields_minus_name(CAPABILITIES["AIRL"]) == _fields_minus_name(CAPABILITIES["NeuralAIRL"])
+    assert _fields_minus_name(CAPABILITIES["GLADIUS"]) == _fields_minus_name(
+        CAPABILITIES["NeuralGLADIUS"]
+    )
+    assert _fields_minus_name(CAPABILITIES["AIRL"]) == _fields_minus_name(
+        CAPABILITIES["NeuralAIRL"]
+    )
 
 
 def test_formspec_finite_theta_and_validation():
@@ -113,8 +123,11 @@ def test_form_wraps_env_and_delegates():
 
     env = RustBusEnvironment()
     spec = FormSpec(
-        topology="tabular", reward_form="linear",
-        num_states=env.num_states, num_actions=env.num_actions, name="rust-bus",
+        topology="tabular",
+        reward_form="linear",
+        num_states=env.num_states,
+        num_actions=env.num_actions,
+        name="rust-bus",
     )
     form = Form(spec=spec, env=env)
     assert form.transition_matrices.shape[0] == env.num_actions

@@ -41,8 +41,9 @@ Linear-utility dynamic discrete choice estimators with statistical inference.
 Inverse reinforcement learning estimators
 ----------------------------------------------------------
 
-Reward-learning estimators. ``GLADIUS`` and ``AIRL`` are the neural-reward
-estimators; they are also importable as ``NeuralGLADIUS`` and ``NeuralAIRL``.
+Reward-learning estimators. ``AIRL`` is the tabular state-only adversarial
+estimator. ``NeuralAIRL`` remains a compatibility name for the same class.
+``GLADIUS`` is also importable as ``NeuralGLADIUS``.
 
 .. autosummary::
    :toctree: generated/
