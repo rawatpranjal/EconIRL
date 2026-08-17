@@ -1,0 +1,209 @@
+{
+  "checks": [
+    {
+      "name": "all_fits_converged",
+      "operator": "is",
+      "passed": true,
+      "threshold": true,
+      "value": true
+    },
+    {
+      "name": "median_reward_nrmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.15,
+      "value": 0.13966424916490502
+    },
+    {
+      "name": "p95_reward_nrmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.2,
+      "value": 0.14216160757951926
+    },
+    {
+      "name": "p95_policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.05,
+      "value": 0.008311881909666665
+    },
+    {
+      "name": "p95_value_nrmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.2,
+      "value": 0.15229922559281714
+    },
+    {
+      "name": "p95_q_nrmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.2,
+      "value": 0.16456493511351222
+    },
+    {
+      "name": "p95_transfer_policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.08,
+      "value": 0.010144725765500101
+    },
+    {
+      "name": "p95_transfer_regret",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.08,
+      "value": 0.0070250866207317575
+    },
+    {
+      "name": "minimum_state_action_coverage",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 0.95,
+      "value": 1.0
+    }
+  ],
+  "configuration": {
+    "actions": 4,
+    "cell": "airl_paper_identification",
+    "features": 4,
+    "individuals": 300,
+    "n_replications": 3,
+    "periods": 80,
+    "states": 16
+  },
+  "environment": {
+    "git_sha": "37f5e240760105b261630fc0e6d09eaac9d445df",
+    "packages": {
+      "econirl": "0.0.10",
+      "jax": "0.9.2",
+      "jaxlib": "0.9.2",
+      "numpy": "2.4.1",
+      "optax": "0.2.8"
+    },
+    "platform": "macOS-14.5-arm64-arm-64bit-Mach-O",
+    "python": "3.13.12"
+  },
+  "estimator": "AIRL",
+  "frozen_thresholds": {
+    "maximum_median_reward_nrmse": 0.15,
+    "maximum_p95_policy_tv": 0.05,
+    "maximum_p95_q_nrmse": 0.2,
+    "maximum_p95_reward_nrmse": 0.2,
+    "maximum_p95_transfer_policy_tv": 0.08,
+    "maximum_p95_transfer_regret": 0.08,
+    "maximum_p95_value_nrmse": 0.2,
+    "minimum_state_action_coverage": 0.95
+  },
+  "paper_boundary": "Fu et al. Section 7.1 begins from MaxEnt IRL. This generated adversarial study is a paper-supported controlled replica, not an exact replication of published AIRL numbers.",
+  "paper_replication": false,
+  "records": [
+    {
+      "converged": true,
+      "final_discriminator_loss": 1.386266640957973,
+      "iterations": 150,
+      "n_observations": 24000,
+      "panel_seed": 17110,
+      "policy_tv": 0.005898140343425413,
+      "q_nrmse": 0.15169778610845597,
+      "replication": 0,
+      "reward_nrmse": 0.1303701459652994,
+      "state_action_coverage": 1.0,
+      "summary": "Estimator\nAIRL (state-only tabular adversarial IRL)\n\nData\nObservations: 24000\nIndividuals: 300\nState coverage: 1.000\n\nModel\nStates: 16\nActions: 4\nDiscount: 0.95\nReward: state-only linear basis\n\nPre-estimation checks\nTransition orientation: (n_actions, n_states, n_states)\nReward feature rank: 4\n\nFit\nConverged: True\nRounds: 150\nFinal discriminator loss: 1.38627\n\nOutcome\nLog likelihood: -33156.710551\nRecovered object: centered state reward and induced policy\n\nUncertainty\nNot computed for this fit\n\nLimitations\nTransfer interpretation requires state-only rewards and AIRL's decomposability conditions.\nRaw adversarial weights are not structural coefficients.",
+      "training_seed": 17200,
+      "transfer_policy_tv": 0.005764221020820968,
+      "transfer_regret": 0.0031943148812962896,
+      "value_nrmse": 0.14039860367440266
+    },
+    {
+      "converged": true,
+      "final_discriminator_loss": 1.3862382271720344,
+      "iterations": 150,
+      "n_observations": 24000,
+      "panel_seed": 17111,
+      "policy_tv": 0.006380742380181671,
+      "q_nrmse": 0.1641728495736369,
+      "replication": 1,
+      "reward_nrmse": 0.14243909184780973,
+      "state_action_coverage": 1.0,
+      "summary": "Estimator\nAIRL (state-only tabular adversarial IRL)\n\nData\nObservations: 24000\nIndividuals: 300\nState coverage: 1.000\n\nModel\nStates: 16\nActions: 4\nDiscount: 0.95\nReward: state-only linear basis\n\nPre-estimation checks\nTransition orientation: (n_actions, n_states, n_states)\nReward feature rank: 4\n\nFit\nConverged: True\nRounds: 150\nFinal discriminator loss: 1.38624\n\nOutcome\nLog likelihood: -33156.272039\nRecovered object: centered state reward and induced policy\n\nUncertainty\nNot computed for this fit\n\nLimitations\nTransfer interpretation requires state-only rewards and AIRL's decomposability conditions.\nRaw adversarial weights are not structural coefficients.",
+      "training_seed": 17201,
+      "transfer_policy_tv": 0.006710489480410994,
+      "transfer_regret": 0.004012363523720142,
+      "value_nrmse": 0.15232520348891676
+    },
+    {
+      "converged": true,
+      "final_discriminator_loss": 1.3862580656091192,
+      "iterations": 150,
+      "n_observations": 24000,
+      "panel_seed": 17112,
+      "policy_tv": 0.008526452968498332,
+      "q_nrmse": 0.16460850017349837,
+      "replication": 2,
+      "reward_nrmse": 0.13966424916490502,
+      "state_action_coverage": 1.0,
+      "summary": "Estimator\nAIRL (state-only tabular adversarial IRL)\n\nData\nObservations: 24000\nIndividuals: 300\nState coverage: 1.000\n\nModel\nStates: 16\nActions: 4\nDiscount: 0.95\nReward: state-only linear basis\n\nPre-estimation checks\nTransition orientation: (n_actions, n_states, n_states)\nReward feature rank: 4\n\nFit\nConverged: True\nRounds: 150\nFinal discriminator loss: 1.38626\n\nOutcome\nLog likelihood: -33181.156459\nRecovered object: centered state reward and induced policy\n\nUncertainty\nNot computed for this fit\n\nLimitations\nTransfer interpretation requires state-only rewards and AIRL's decomposability conditions.\nRaw adversarial weights are not structural coefficients.",
+      "training_seed": 17202,
+      "transfer_policy_tv": 0.010526307574954447,
+      "transfer_regret": 0.007359833631510826,
+      "value_nrmse": 0.1520654245279206
+    }
+  ],
+  "status": "ready",
+  "summary": {
+    "final_discriminator_loss": {
+      "maximum": 1.386266640957973,
+      "median": 1.3862580656091192,
+      "minimum": 1.3862382271720344,
+      "p95": 1.3862657834230876
+    },
+    "n_converged": 3,
+    "n_requested": 3,
+    "n_successful": 3,
+    "policy_tv": {
+      "maximum": 0.008526452968498332,
+      "median": 0.006380742380181671,
+      "minimum": 0.005898140343425413,
+      "p95": 0.008311881909666665
+    },
+    "q_nrmse": {
+      "maximum": 0.16460850017349837,
+      "median": 0.1641728495736369,
+      "minimum": 0.15169778610845597,
+      "p95": 0.16456493511351222
+    },
+    "reward_nrmse": {
+      "maximum": 0.14243909184780973,
+      "median": 0.13966424916490502,
+      "minimum": 0.1303701459652994,
+      "p95": 0.14216160757951926
+    },
+    "state_action_coverage": {
+      "maximum": 1.0,
+      "median": 1.0,
+      "minimum": 1.0,
+      "p95": 1.0
+    },
+    "transfer_policy_tv": {
+      "maximum": 0.010526307574954447,
+      "median": 0.006710489480410994,
+      "minimum": 0.005764221020820968,
+      "p95": 0.010144725765500101
+    },
+    "transfer_regret": {
+      "maximum": 0.007359833631510826,
+      "median": 0.004012363523720142,
+      "minimum": 0.0031943148812962896,
+      "p95": 0.0070250866207317575
+    },
+    "value_nrmse": {
+      "maximum": 0.15232520348891676,
+      "median": 0.1520654245279206,
+      "minimum": 0.14039860367440266,
+      "p95": 0.15229922559281714
+    }
+  },
+  "target": "state-only reward recovery and changed-dynamics transfer"
+}
