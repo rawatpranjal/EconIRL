@@ -50,7 +50,6 @@ three edge-level reward weights are identifiable from choices.
 | RHIP-H3 | behavioral | yes | yes | no |
 | RHIP-Hinf | behavioral | yes | yes | no |
 | MCE-IRL | behavioral | yes | yes | no |
-| AIRL | behavioral | no | no | no |
 | NFXP | structural | yes | yes | yes |
 | CCP | structural | yes | yes | no |
 | MPEC | structural | yes | yes | yes |
@@ -66,7 +65,6 @@ Uses transitions is whether the estimator reads the transition kernel; model-fre
 | RHIP-H3 | behavioral | 2/2 | 0/2 | [0.947, 0.478, 1.149] | - | 0.0640 | 0.0201 | 0.0197 | 0.0136 | 0.0205 | 6.7 |
 | RHIP-Hinf | behavioral | 2/2 | 0/2 | [-0.055, 0.465, 0.746] | - | 0.0360 | 0.0537 | 0.0581 | 0.0855 | 0.0325 | 6.3 |
 | MCE-IRL | behavioral | 2/2 | 0/2 | [-0.055, 0.465, 0.746] | - | 0.0360 | 0.0537 | 0.0581 | 0.0855 | 0.0325 | 6.1 |
-| AIRL | behavioral | 2/2 | 2/2 | - | - | 0.2872 | 6.1177 | 5.8846 | 3.7734 | 49.8310 | 83.1 |
 | NFXP | structural | 2/2 | 2/2 | [1.072, 0.513, 0.963] | 0.0903 | 0.0065 | 0.0028 | 0.0027 | 0.0021 | 0.0018 | 2.5 |
 | CCP | structural | 2/2 | 2/2 | [0.796, 0.504, 0.901] | 0.1341 | 0.0366 | 0.0060 | 0.0062 | 0.0071 | 0.0047 | 2.4 |
 | MPEC | structural | 2/2 | 2/2 | [1.072, 0.513, 0.963] | 0.0903 | 0.0065 | 0.0028 | 0.0027 | 0.0021 | 0.0018 | 0.3 |
@@ -91,7 +89,7 @@ Param RMSE covers the structural family only, which shares the parameterization 
 
 Coverage is the share of replications whose 95% interval contains the truth, shown with its Monte Carlo standard error. It is computed only where every replication produced a finite standard error. SE avail is the share of replications with finite standard errors.
 
-The structural family (NFXP, CCP, MPEC) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. The RHIP horizon variants and MCE-IRL use the same linear features but their weights stay out of the recovery table, because an IRL reward is only partially identified in general. RHIP-Hinf and MCE-IRL match by construction. Policy TV and regret are the right scorecards for the behavioral family. AIRL learns a model-free policy with no reward weights to compare.
+The structural family (NFXP, CCP, MPEC) recovers all three parameters on the same scale as the truth, so Param RMSE applies to them alone. The RHIP horizon variants and MCE-IRL use the same linear features but their weights stay out of the recovery table, because an IRL reward is only partially identified in general. RHIP-Hinf and MCE-IRL match by construction. Policy TV and regret are the right scorecards for the behavioral family.
 
 ## Scaling
 
@@ -124,8 +122,6 @@ Entropy end.
 
 **MCE-IRL.** Max Causal Entropy IRL with linear features. Its convergence indicator reports whether the gradient norm crossed the tolerance. The objective often plateaus before that, so it can read False while the recovered policy is accurate. It is the H=inf endpoint of the RHIP spectrum.
 
-**AIRL.** Adversarial IRL. A model-free neural reward learner trained against a policy network. It reads the feature matrix and the panel, not the transition kernel. Capped at 200 epochs here for short compute.
-
 **NFXP.** Full-solution MLE with a nested Bellman fixed-point inner loop. Quadratic convergence near the optimum. All three parameters are identified from the edge-feature contrast.
 
 **CCP.** CCP uses a first-step nonparametric policy estimate to avoid the inner Bellman loop. One policy-iteration step corrects the first-stage bias.
@@ -144,5 +140,6 @@ Results file: `validation/results/study_highdim_route_choice.json`.
 
 Not shown on this page: IQ-Learn and f-IRL, because reward is only partially
 identified from behavior here; GLADIUS, because this page focuses on the RHIP
-horizon spectrum; NNES, SEES, TD-CCP, and UFXP, because NFXP and CCP already
-cover the structural family on this graph.
+horizon spectrum; AIRL, because its public state-only reward cannot represent
+the within-state edge contrasts in this problem; NNES, SEES, TD-CCP, and UFXP,
+because NFXP and CCP already cover the structural family on this graph.

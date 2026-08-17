@@ -1,4 +1,4 @@
-"""Base mixin for neural reward estimators (NeuralGLADIUS, NeuralAIRL).
+"""Base mixin for neural reward estimators such as NeuralGLADIUS.
 
 Neural reward estimators learn R(s,a,ctx) via neural networks, then project
 onto linear features to extract approximate structural parameters theta.
@@ -68,9 +68,7 @@ class NeuralEstimatorMixin:
         # constant offset (the network's bias plus the reward-level gauge) into
         # the slopes and can flip their sign. The intercept absorbs that
         # non-identified level; theta is the identified reward direction.
-        design = np.column_stack(
-            [features_np, np.ones(N, dtype=features_np.dtype)]
-        )
+        design = np.column_stack([features_np, np.ones(N, dtype=features_np.dtype)])
         coef, _, _, _ = np.linalg.lstsq(design, rewards_np, rcond=None)
         theta = coef[:K]
 
@@ -195,12 +193,8 @@ class NeuralEstimatorMixin:
             r2_str = f"{projection_r2:.4f}"
             lines.append(f"  Projection R2:   {r2_str}")
             if projection_r2 < 0.95:
-                lines.append(
-                    "  WARNING: R2 < 0.95 -- linear features may not fully"
-                )
-                lines.append(
-                    "  capture the neural reward surface. Interpret theta"
-                )
+                lines.append("  WARNING: R2 < 0.95 -- linear features may not fully")
+                lines.append("  capture the neural reward surface. Interpret theta")
                 lines.append("  with caution.")
             lines.append("-" * width)
 
@@ -222,9 +216,7 @@ class NeuralEstimatorMixin:
             lines.append("-" * width)
         else:
             lines.append("  No feature projection (params_ is None)")
-            lines.append(
-                "  Pass features= to fit() to extract structural parameters."
-            )
+            lines.append("  Pass features= to fit() to extract structural parameters.")
             lines.append("-" * width)
 
         # Extra info
@@ -233,12 +225,8 @@ class NeuralEstimatorMixin:
                 lines.append(f"  {line}")
             lines.append("-" * width)
 
-        lines.append(
-            "  Note: SEs are pseudo standard errors from the projection"
-        )
-        lines.append(
-            "  regression, NOT from the structural likelihood."
-        )
+        lines.append("  Note: SEs are pseudo standard errors from the projection")
+        lines.append("  regression, NOT from the structural likelihood.")
         lines.append("=" * width)
 
         return "\n".join(lines)

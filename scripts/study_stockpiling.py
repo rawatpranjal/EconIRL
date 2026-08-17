@@ -29,14 +29,14 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "study_stockpiling.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "stockpiling.md")
-FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                          "stockpiling_dgp.png")
-RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                           "stockpiling_results.png")
-CURVE_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                         "stockpiling_reward_curve.png")
-REWARD_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                          "stockpiling_reward.png")
+FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies", "stockpiling_dgp.png")
+RESULTS_FIG = os.path.join(
+    _ROOT, "docs", "_static", "simulation_studies", "stockpiling_results.png"
+)
+CURVE_FIG = os.path.join(
+    _ROOT, "docs", "_static", "simulation_studies", "stockpiling_reward_curve.png"
+)
+REWARD_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies", "stockpiling_reward.png")
 
 # ---- DGP configuration ----
 # 10 inventory levels x 2 price regimes = 20 states, 2 actions. Small enough for
@@ -59,8 +59,11 @@ def _run_nfxp(env, panel):
     from econirl.estimation import NFXPEstimator
 
     est = NFXPEstimator(
-        inner_solver="hybrid", inner_tol=1e-10,
-        inner_max_iter=100_000, compute_hessian=True, verbose=False,
+        inner_solver="hybrid",
+        inner_tol=1e-10,
+        inner_max_iter=100_000,
+        compute_hessian=True,
+        verbose=False,
     )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -79,7 +82,8 @@ def _run_mpec(env, panel):
     # the augmented-Lagrangian penalty solver and does not check optimality.
     est = MPECEstimator(
         config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
-        compute_hessian=True, verbose=False,
+        compute_hessian=True,
+        verbose=False,
     )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -87,17 +91,22 @@ def _run_mpec(env, panel):
 def _run_mce_irl(env, panel):
     from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
 
-    est = MCEIRLEstimator(config=MCEIRLConfig(
-        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,
-        compute_se=False, verbose=False,
-    ))
+    est = MCEIRLEstimator(
+        config=MCEIRLConfig(
+            learning_rate=0.05,
+            outer_max_iter=80,
+            inner_max_iter=1000,
+            compute_se=False,
+            verbose=False,
+        )
+    )
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 ROSTER = (
-    RosterEntry("NFXP",         "structural", _run_nfxp, uses_transitions=True),
-    RosterEntry("CCP",          "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
 )
 
 # ---------------------------------------------------------------------------
@@ -153,11 +162,11 @@ EXCLUDED = [
         ),
     },
     {
-        "name": "MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL",
+        "name": "MaxEnt-IRL, MaxMargin-IRL, AIRL, Deep-MCE-IRL",
         "reason": (
             "trajectory-entropy and max-margin objectives are not the "
-            "choice model that generated the data; neural AIRL adds "
-            "compute without new information here"
+            "choice model that generated the data; AIRL also requires a "
+            "state-only reward and cannot represent the action contrast"
         ),
     },
     {
@@ -287,23 +296,25 @@ _ACTIONS = ["no buy", "buy"]
 
 
 def _make_curve_fig(data):
-    from validation.benchmark.figures import (_structural_mean_params,
-                                              reward_curve)
+    from validation.benchmark.figures import _structural_mean_params, reward_curve
 
     _, theta = _structural_mean_params(data, "stockpiling")
-    reward_curve(_env(), CURVE_FIG, params=theta, action_labels=_ACTIONS,
-                 state_label="state index $s = 2i + p$")
+    reward_curve(
+        _env(),
+        CURVE_FIG,
+        params=theta,
+        action_labels=_ACTIONS,
+        state_label="state index $s = 2i + p$",
+    )
 
 
 def _make_reward_fig(data):
-    from validation.benchmark.figures import (_structural_mean_params,
-                                              reward_heatmap)
+    from validation.benchmark.figures import _structural_mean_params, reward_heatmap
 
     name, theta = _structural_mean_params(data, "stockpiling")
     if theta is None:
         return
-    reward_heatmap(_env(), theta, REWARD_FIG,
-                   title=f"Recovered reward from {name}")
+    reward_heatmap(_env(), theta, REWARD_FIG, title=f"Recovered reward from {name}")
 
 
 EXTRA_FIGURES = [(CURVE_FIG, _make_curve_fig), (REWARD_FIG, _make_reward_fig)]

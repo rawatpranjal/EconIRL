@@ -31,14 +31,18 @@ from validation.benchmark.runner import _action_reward, _linear_utility  # noqa:
 
 RESULTS_JSON = os.path.join(_ROOT, "validation", "results", "study_vehicle_scrappage.json")
 PAGE_PATH = os.path.join(_ROOT, "docs", "simulation_studies", "vehicle_scrappage.md")
-FIGURE_PNG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                          "vehicle_scrappage_dgp.png")
-RESULTS_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                           "vehicle_scrappage_results.png")
-CURVE_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                         "vehicle_scrappage_reward_curve.png")
-REWARD_FIG = os.path.join(_ROOT, "docs", "_static", "simulation_studies",
-                          "vehicle_scrappage_reward.png")
+FIGURE_PNG = os.path.join(
+    _ROOT, "docs", "_static", "simulation_studies", "vehicle_scrappage_dgp.png"
+)
+RESULTS_FIG = os.path.join(
+    _ROOT, "docs", "_static", "simulation_studies", "vehicle_scrappage_results.png"
+)
+CURVE_FIG = os.path.join(
+    _ROOT, "docs", "_static", "simulation_studies", "vehicle_scrappage_reward_curve.png"
+)
+REWARD_FIG = os.path.join(
+    _ROOT, "docs", "_static", "simulation_studies", "vehicle_scrappage_reward.png"
+)
 
 # ---- DGP configuration ----
 # 25 age bins x 3 defect levels = 75 states, 2 actions (keep/scrap).
@@ -64,8 +68,11 @@ def _run_nfxp(env, panel):
     from econirl.estimation import NFXPEstimator
 
     est = NFXPEstimator(
-        inner_solver="hybrid", inner_tol=1e-10,
-        inner_max_iter=100_000, compute_hessian=True, verbose=False,
+        inner_solver="hybrid",
+        inner_tol=1e-10,
+        inner_max_iter=100_000,
+        compute_hessian=True,
+        verbose=False,
     )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -84,7 +91,8 @@ def _run_mpec(env, panel):
     # the augmented-Lagrangian penalty solver and does not check optimality.
     est = MPECEstimator(
         config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
-        compute_hessian=True, verbose=False,
+        compute_hessian=True,
+        verbose=False,
     )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -102,31 +110,34 @@ def _run_ufxp(env, panel):
 def _run_nnes(env, panel):
     from econirl.estimation.nnes import NNESEstimator
 
-    est = NNESEstimator(hidden_dim=64, v_epochs=800, n_outer_iterations=5,
-                        compute_se=False, verbose=False)
+    est = NNESEstimator(
+        hidden_dim=64, v_epochs=800, n_outer_iterations=5, compute_se=False, verbose=False
+    )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_mce_irl(env, panel):
     from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
 
-    est = MCEIRLEstimator(config=MCEIRLConfig(
-        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,
-        compute_se=False, verbose=False,
-    ))
+    est = MCEIRLEstimator(
+        config=MCEIRLConfig(
+            learning_rate=0.05,
+            outer_max_iter=80,
+            inner_max_iter=1000,
+            compute_se=False,
+            verbose=False,
+        )
+    )
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 ROSTER = (
-    RosterEntry("NFXP",   "structural", _run_nfxp, uses_transitions=True),
-    RosterEntry("CCP",    "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MPEC",   "structural", _run_mpec,  timeout=180,
-                uses_transitions=True),
-    RosterEntry("UFXP",   "structural", _run_ufxp,  timeout=180,
-                uses_transitions=True),
-    RosterEntry("NNES",   "structural", _run_nnes,  timeout=300,
-                uses_transitions=True),
-    RosterEntry("MCE-IRL","behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MPEC", "structural", _run_mpec, timeout=180, uses_transitions=True),
+    RosterEntry("UFXP", "structural", _run_ufxp, timeout=180, uses_transitions=True),
+    RosterEntry("NNES", "structural", _run_nnes, timeout=300, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
 )
 
 # ---------------------------------------------------------------------------
@@ -194,11 +205,11 @@ EXCLUDED = [
         ),
     },
     {
-        "name": "MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL",
+        "name": "MaxEnt-IRL, MaxMargin-IRL, AIRL, Deep-MCE-IRL",
         "reason": (
             "trajectory-entropy and max-margin objectives are not the "
-            "choice model that generated the data; neural AIRL adds "
-            "compute without new information here"
+            "choice model that generated the data; AIRL also requires a "
+            "state-only reward and cannot represent the action contrast"
         ),
     },
 ]
@@ -338,24 +349,27 @@ def _ages(env):
 
 
 def _make_curve_fig(data):
-    from validation.benchmark.figures import (_structural_mean_params,
-                                              reward_curve)
+    from validation.benchmark.figures import _structural_mean_params, reward_curve
 
     _, theta = _structural_mean_params(data, "vehicle_scrappage")
     env = _env()
-    reward_curve(env, CURVE_FIG, params=theta, action_labels=_ACTIONS,
-                 state_label="vehicle age (years)", x=_ages(env))
+    reward_curve(
+        env,
+        CURVE_FIG,
+        params=theta,
+        action_labels=_ACTIONS,
+        state_label="vehicle age (years)",
+        x=_ages(env),
+    )
 
 
 def _make_reward_fig(data):
-    from validation.benchmark.figures import (_structural_mean_params,
-                                              reward_heatmap)
+    from validation.benchmark.figures import _structural_mean_params, reward_heatmap
 
     name, theta = _structural_mean_params(data, "vehicle_scrappage")
     if theta is None:
         return
-    reward_heatmap(_env(), theta, REWARD_FIG,
-                   title=f"Recovered reward from {name}")
+    reward_heatmap(_env(), theta, REWARD_FIG, title=f"Recovered reward from {name}")
 
 
 EXTRA_FIGURES = [(CURVE_FIG, _make_curve_fig), (REWARD_FIG, _make_reward_fig)]

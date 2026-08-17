@@ -46,8 +46,7 @@ SCALING_NODES = (15, 40)
 
 
 def _env(num_nodes=HEADLINE_NODES):
-    return road_network(num_nodes=num_nodes, num_actions=4, seed=0,
-                        discount_factor=0.95)
+    return road_network(num_nodes=num_nodes, num_actions=4, seed=0, discount_factor=0.95)
 
 
 # ---------------------------------------------------------------------------
@@ -60,8 +59,11 @@ def _run_nfxp(env, panel):
     from econirl.estimation import NFXPEstimator
 
     est = NFXPEstimator(
-        inner_solver="hybrid", inner_tol=1e-10,
-        inner_max_iter=100_000, compute_hessian=True, verbose=False,
+        inner_solver="hybrid",
+        inner_tol=1e-10,
+        inner_max_iter=100_000,
+        compute_hessian=True,
+        verbose=False,
     )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -80,7 +82,8 @@ def _run_mpec(env, panel):
     # the augmented-Lagrangian penalty solver and does not check optimality.
     est = MPECEstimator(
         config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
-        compute_hessian=True, verbose=False,
+        compute_hessian=True,
+        verbose=False,
     )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
@@ -88,17 +91,22 @@ def _run_mpec(env, panel):
 def _run_mce_irl(env, panel):
     from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
 
-    est = MCEIRLEstimator(config=MCEIRLConfig(
-        learning_rate=0.05, outer_max_iter=80, inner_max_iter=1000,
-        compute_se=False, verbose=False,
-    ))
+    est = MCEIRLEstimator(
+        config=MCEIRLConfig(
+            learning_rate=0.05,
+            outer_max_iter=80,
+            inner_max_iter=1000,
+            compute_se=False,
+            verbose=False,
+        )
+    )
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 ROSTER = (
-    RosterEntry("NFXP",         "structural", _run_nfxp, uses_transitions=True),
-    RosterEntry("CCP",          "structural", _run_ccp, uses_transitions=True),
-    RosterEntry("MCE-IRL",      "behavioral", _run_mce_irl, uses_transitions=True),
+    RosterEntry("NFXP", "structural", _run_nfxp, uses_transitions=True),
+    RosterEntry("CCP", "structural", _run_ccp, uses_transitions=True),
+    RosterEntry("MCE-IRL", "behavioral", _run_mce_irl, uses_transitions=True),
 )
 
 # ---------------------------------------------------------------------------
@@ -153,11 +161,11 @@ EXCLUDED = [
         ),
     },
     {
-        "name": "MaxEnt-IRL, MaxMargin-IRL, NeuralAIRL, Deep-MCE-IRL",
+        "name": "MaxEnt-IRL, MaxMargin-IRL, AIRL, Deep-MCE-IRL",
         "reason": (
             "trajectory-entropy and max-margin objectives are not the "
-            "choice model that generated the data; neural AIRL adds "
-            "compute without new information here"
+            "choice model that generated the data; AIRL also requires a "
+            "state-only reward and cannot represent the edge contrast"
         ),
     },
     {
@@ -172,6 +180,7 @@ EXCLUDED = [
         ),
     },
 ]
+
 
 def _cell(num_nodes, *, headline):
     """One route-choice cell at a given graph size.
@@ -300,14 +309,12 @@ def _make_network_fig(data):  # noqa: ARG001 - pure from the env it rebuilds
 
 
 def _make_reward_fig(data):
-    from validation.benchmark.figures import (_structural_mean_params,
-                                              reward_heatmap)
+    from validation.benchmark.figures import _structural_mean_params, reward_heatmap
 
     name, theta = _structural_mean_params(data, "route_choice")
     if theta is None:
         return
-    reward_heatmap(_env(HEADLINE_NODES), theta, REWARD_FIG,
-                   title=f"Recovered reward from {name}")
+    reward_heatmap(_env(HEADLINE_NODES), theta, REWARD_FIG, title=f"Recovered reward from {name}")
 
 
 EXTRA_FIGURES = [(NETWORK_FIG, _make_network_fig), (REWARD_FIG, _make_reward_fig)]

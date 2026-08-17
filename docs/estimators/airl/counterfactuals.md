@@ -1,50 +1,52 @@
 # Counterfactuals
 
-Read this page as policy-regret evidence, not structural re-solving. AIRL's
-state-only recovered reward is not used here like an NFXP-style parameter vector.
+## Important Links
 
-AIRL does not recover a reward in the same parameterization as the
-data-generating process. The recovered reward component
-$g_\theta$ is identified only up to potential-based shaping, so raw parameter
-values cannot be re-solved under an arbitrary intervention the way NFXP or
-MCE-IRL can. The package evaluates AIRL counterfactuals through the simulation
-harness, which fixes the intervention oracle-side and measures the welfare cost
-of deploying the recovered policy in the changed world.
+- [AIRL Overview](../airl.md)
+- [Identification Boundary](identification.md)
+- [Taxi Dynamics Transfer](taxi_transfer.md)
+- [Applied Notebook](https://github.com/rawatpranjal/EconIRL/blob/main/examples/airl/airl_applied_workflow.ipynb)
 
-## Counterfactual Families
+AIRL supports counterfactuals that preserve the state-only reward
+interpretation. The fitted policy is re-solved after one primitive changes.
 
-| Type | Intervention | How AIRL is evaluated |
-| --- | --- | --- |
-| Type A | Shift payoffs, hold transitions fixed. | Re-solve the oracle problem under the new payoffs; report regret from the old AIRL policy. |
-| Type B | Change transitions, hold the recovered reward fixed. | Re-solve the oracle under new transitions; report regret from the old AIRL policy. |
-| Type C | Disable one non-anchor action. | Re-solve the oracle with the penalized action; report regret from the old AIRL policy. |
+## Supported changes
 
-Because AIRL's recovered reward is state-only and on its own scale, it is not
-re-solved under each intervention. The harness instead treats
-the recovered policy as fixed and measures how much welfare it loses in the
-counterfactual world relative to the oracle policy that was re-solved under the
-intervention.
+| Change | Public call |
+| --- | --- |
+| Transition system | `counterfactual(transitions=...)` |
+| Reward parameters | `counterfactual(params=...)` |
 
-## Reported Results
+Supply exactly one change. The result contains baseline and changed policies,
+values, policy differences, and value differences.
 
-From the primary `airl_paper_identification` simulation:
+A transition change holds the recovered reward fixed and re-solves behavior.
+A parameter change is a user-specified reward scenario in the fitted basis. It
+is not an identified causal effect.
 
-| Counterfactual | Policy TV | Regret |
-| --- | ---: | ---: |
-| Type A | 0.0062 | 0.0029 |
-| Type B | 0.0076 | 0.0038 |
-| Type C | 0.0075 | 0.0050 |
+The transition tensor retains `(n_actions, n_states, n_states)` orientation.
+The method checks the tensor shape before solving. Supply a finite, nonnegative
+tensor whose rows sum to one.
 
-Regret values below 0.01 are in the range of good IRL methods on this synthetic
-cell. They reflect a nearly correct policy in the base world; the recovered
-policy adapts reasonably to the counterfactual world even without re-solving,
-because the oracle policy change is also small.
+## Interpretation
 
-## API Boundary
+A changed-dynamics result carries the AIRL transfer interpretation only when
+the reward is state-only and the problem satisfies the decomposability
+conditions. A small policy distance under the original dynamics is not enough.
 
-The stable public objects after fitting are `summary.policy`, `summary.parameters`,
-and the value function on the result object. For controlled
-payoff, transition, or action-set interventions, use the package's simulation
-and evaluation utilities with an explicit problem and transition environment.
-The `AIRLEstimator` does not expose a `.counterfactual()` method; the
-counterfactual evaluation in the results file comes from the simulation study runner.
+The controlled study reports changed-dynamics policy TV of 0.0101 and regret of
+0.0070 at the 95th percentile. The taxi study uses a larger intervention. Its
+oracle policy changes by 0.1095 TV. AIRL reaches 0.0525 transfer policy TV and
+0.0071 flow-equivalent regret at the 95th percentile.
+
+## Unsupported changes
+
+The public AIRL class does not accept action-dependent reward features,
+context, or latent segments. It also does not expose action removal as a public
+counterfactual input. Do not encode these changes by silently altering the
+state feature basis.
+
+Bootstrap intervals describe fitted reward and policy functionals. They are not
+automatically propagated through a counterfactual. Report counterfactual
+sampling uncertainty only after defining and validating that additional
+resampling procedure.

@@ -130,5 +130,6 @@ Results file: `validation/results/study_vehicle_scrappage.json`.
 Not shown on this page: IQ-Learn and f-IRL, because reward is only partially
 identified from behavior here. GLADIUS, SEES, and TD-CCP are omitted because
 the page already covers the structural and reward-recovery families. Neural
-MCE-IRL, neural AIRL, and max-margin variants are better suited to other study
-settings.
+MCE-IRL and max-margin variants are better suited to other study settings. AIRL
+requires a state-only reward and cannot represent the action contrast in this
+problem.

@@ -11,8 +11,10 @@ Routing summary (verified):
   MaxMarginIRL, MCEIRL) and IQLearn: ``path="estimate"``, need transitions, linear.
 * Neural model-based (MCEIRLNeural, NeuralUFXP): ``path="fit_features"``, need
   transitions, reward can be linear/nonlinear/neural.
-* Neural model-free (NeuralAIRL, NeuralGLADIUS, and the AIRL/GLADIUS aliases):
-  ``path="fit_features"``, do not use transitions.
+* Tabular AIRL (including the ``NeuralAIRL`` compatibility name):
+  ``path="fit_features"``, requires transitions and state-only linear rewards.
+* Neural model-free (NeuralGLADIUS and the GLADIUS alias): ``path="fit_features"``,
+  does not use transitions.
 """
 
 from __future__ import annotations
@@ -58,33 +60,73 @@ class EstimatorCapability:
 
 def _structural(name: str, group: str, shown: bool) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="structural", needs_transitions=True, reward_forms=_LINEAR,
-        model_free=False, generalizes_to_unvisited=True, path="estimate",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="structural",
+        needs_transitions=True,
+        reward_forms=_LINEAR,
+        model_free=False,
+        generalizes_to_unvisited=True,
+        path="estimate",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
-def _linear_irl(name: str, group: str, shown: bool, generalizes: bool = True) -> EstimatorCapability:
+def _linear_irl(
+    name: str, group: str, shown: bool, generalizes: bool = True
+) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="behavioral", needs_transitions=True, reward_forms=_LINEAR,
-        model_free=False, generalizes_to_unvisited=generalizes, path="estimate",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="behavioral",
+        needs_transitions=True,
+        reward_forms=_LINEAR,
+        model_free=False,
+        generalizes_to_unvisited=generalizes,
+        path="estimate",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
 def _neural_model_based(name: str, group: str, shown: bool) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="behavioral", needs_transitions=True, reward_forms=_NEURAL,
-        model_free=False, generalizes_to_unvisited=True, path="fit_features",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="behavioral",
+        needs_transitions=True,
+        reward_forms=_NEURAL,
+        model_free=False,
+        generalizes_to_unvisited=True,
+        path="fit_features",
+        group=group,
+        shown_in_studies=shown,
+    )
+
+
+def _linear_model_based_fit(name: str, group: str, shown: bool) -> EstimatorCapability:
+    return EstimatorCapability(
+        name=name,
+        family="behavioral",
+        needs_transitions=True,
+        reward_forms=_LINEAR,
+        model_free=False,
+        generalizes_to_unvisited=True,
+        path="fit_features",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
 def _neural_model_free(name: str, group: str, shown: bool) -> EstimatorCapability:
     return EstimatorCapability(
-        name=name, family="behavioral", needs_transitions=False, reward_forms=_NEURAL,
-        model_free=True, generalizes_to_unvisited=True, path="fit_features",
-        group=group, shown_in_studies=shown,
+        name=name,
+        family="behavioral",
+        needs_transitions=False,
+        reward_forms=_NEURAL,
+        model_free=True,
+        generalizes_to_unvisited=True,
+        path="fit_features",
+        group=group,
+        shown_in_studies=shown,
     )
 
 
@@ -114,14 +156,15 @@ CAPABILITIES: dict[str, EstimatorCapability] = {
         # Neural, model-based (fit(features=); transitions required).
         _neural_model_based("MCEIRLNeural", "causal-entropy", True),
         _neural_model_based("NeuralUFXP", "other", False),
+        # AIRL is tabular and model-based. NeuralAIRL is its compatibility name.
+        _linear_model_based_fit("NeuralAIRL", "causal-entropy", True),
         # Neural, model-free (fit(features=); transitions unused).
-        _neural_model_free("NeuralAIRL", "model-free", True),
         _neural_model_free("NeuralGLADIUS", "model-free", True),
     )
 }
 
-# AIRL and GLADIUS are aliases of the same classes (econirl.AIRL is NeuralAIRL,
-# econirl.GLADIUS is NeuralGLADIUS). Derive their entries from the canonical ones
+# AIRL and GLADIUS each retain one compatibility name. Derive their entries from
+# the canonical records
 # so the records can never drift apart.
 CAPABILITIES["AIRL"] = replace(CAPABILITIES["NeuralAIRL"], name="AIRL")
 CAPABILITIES["GLADIUS"] = replace(CAPABILITIES["NeuralGLADIUS"], name="GLADIUS")

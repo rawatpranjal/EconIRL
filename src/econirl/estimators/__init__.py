@@ -42,17 +42,18 @@ Example:
     >>> print(model.summary())
 """
 
+from econirl.estimators.airl import AIRL, NeuralAIRL
 from econirl.estimators.ccp import CCP
 from econirl.estimators.max_margin_irl import MaxMarginIRL
 from econirl.estimators.maxent_irl import MaxEntIRL
 from econirl.estimators.mce_irl import MCEIRL, estimate_empirical_transitions
 from econirl.estimators.nfxp import NFXP
 from econirl.estimators.nnes import NNES
+from econirl.estimators.protocol import EstimatorProtocol
 from econirl.estimators.rhip import RHIP
 from econirl.estimators.sees import SEES
 from econirl.estimators.tdccp import TDCCP
 from econirl.estimators.ufxp import UFXP
-from econirl.estimators.protocol import EstimatorProtocol
 
 try:
     from econirl.estimators.gcl import GCL
@@ -65,13 +66,6 @@ except ImportError:
     NeuralGLADIUS = None
 
 GLADIUS = NeuralGLADIUS
-
-try:
-    from econirl.estimators.neural_airl import NeuralAIRL
-except ImportError:
-    NeuralAIRL = None
-
-AIRL = NeuralAIRL
 
 try:
     from econirl.estimators.mceirl_neural import MCEIRLNeural
