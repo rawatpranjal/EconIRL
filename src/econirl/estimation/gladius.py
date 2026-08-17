@@ -33,16 +33,43 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-import numpy as np
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
+import numpy as np
 import optax
 
 from econirl.core.types import DDCProblem, Panel
 from econirl.estimation.base import BaseEstimator, EstimationResult
 from econirl.inference.results import EstimationSummary, GoodnessOfFit
 from econirl.preferences.base import UtilityFunction
+
+
+def _relu(values: jax.Array) -> jax.Array:
+    """Module-level ReLU keeps fitted Equinox networks pickle-safe."""
+    return jnp.maximum(values, 0)
+
+
+def _paper_reference_bellman_terms(
+    *,
+    q_sa: jax.Array,
+    value_next: jax.Array,
+    continuation: jax.Array,
+    anchor_reward: jax.Array,
+    discount: float,
+) -> jax.Array:
+    """Return the author-reference corrected anchor residual.
+
+    The checked-in first-author implementation minimizes the mean absolute
+    value of ``td**2 - beta**2 * continuation_error**2``.  Keeping this in one
+    helper prevents the lower-level and public GLADIUS paths from silently
+    drifting apart.  It is deliberately named ``paper_reference`` because the
+    L1 stabilization is an implementation detail beyond the signed expression
+    printed in the paper.
+    """
+    td_error = q_sa - anchor_reward - discount * value_next
+    continuation_error = value_next - continuation
+    return jnp.abs(td_error**2 - discount**2 * continuation_error**2)
 
 
 @dataclass
@@ -139,6 +166,7 @@ class GLADIUSConfig:
     gradient_clip], matching Enoch's ``clip_grad_value_``."""
     compute_se: bool = True
     n_bootstrap: int = 100
+    seed: int = 42
     verbose: bool = False
 
 
@@ -173,7 +201,7 @@ class _QNetwork(eqx.Module):
             out_size=1,
             width_size=hidden_dim,
             depth=num_layers,
-            activation=jax.nn.relu,
+            activation=_relu,
             key=key,
         )
 
@@ -188,9 +216,7 @@ class _QNetwork(eqx.Module):
         """
         return self.mlp(x).squeeze(-1) * self.value_scale
 
-    def forward(
-        self, state_features: jax.Array, action_onehot: jax.Array
-    ) -> jax.Array:
+    def forward(self, state_features: jax.Array, action_onehot: jax.Array) -> jax.Array:
         """Compute Q(s, a) for a batch.
 
         Args:
@@ -220,9 +246,7 @@ class _QNetwork(eqx.Module):
             return self.forward(state_features, onehot)
 
         # Stack Q values for each action along axis 1.
-        q_values = jnp.stack(
-            [_q_for_action(a) for a in range(self.n_actions)], axis=1
-        )
+        q_values = jnp.stack([_q_for_action(a) for a in range(self.n_actions)], axis=1)
         return q_values
 
 
@@ -250,7 +274,7 @@ class _EVNetwork(eqx.Module):
             out_size=1,
             width_size=hidden_dim,
             depth=num_layers,
-            activation=jax.nn.relu,
+            activation=_relu,
             key=key,
         )
 
@@ -265,9 +289,7 @@ class _EVNetwork(eqx.Module):
         """
         return self.mlp(x).squeeze(-1) * self.value_scale
 
-    def forward(
-        self, state_features: jax.Array, action_onehot: jax.Array
-    ) -> jax.Array:
+    def forward(self, state_features: jax.Array, action_onehot: jax.Array) -> jax.Array:
         """Compute EV(s, a) for a batch.
 
         Args:
@@ -323,8 +345,8 @@ class _SharedTrunkNetwork(eqx.Module):
             out_size=hidden_dim,
             width_size=hidden_dim,
             depth=max(num_layers - 1, 0),
-            activation=jax.nn.relu,
-            final_activation=jax.nn.relu,
+            activation=_relu,
+            final_activation=_relu,
             key=trunk_key,
         )
         self.q_head = eqx.nn.Linear(hidden_dim, n_actions, key=q_key)
@@ -350,9 +372,7 @@ class _SharedTrunkNetwork(eqx.Module):
         _, zeta = self._heads(state_features)
         return zeta
 
-    def forward(
-        self, state_features: jax.Array, action_onehot: jax.Array
-    ) -> jax.Array:
+    def forward(self, state_features: jax.Array, action_onehot: jax.Array) -> jax.Array:
         """Q(s, a) for the chosen action, shape (batch,)."""
         q, _ = self._heads(state_features)
         return jnp.sum(q * action_onehot, axis=-1)
@@ -401,9 +421,7 @@ class GLADIUSEstimator(BaseEstimator):
     def name(self) -> str:
         return "GLADIUS"
 
-    def _build_state_features(
-        self, states: jnp.ndarray, problem: DDCProblem
-    ) -> jnp.ndarray:
+    def _build_state_features(self, states: jnp.ndarray, problem: DDCProblem) -> jnp.ndarray:
         """Build state feature vectors from state indices.
 
         Uses the problem's state_encoder if available, otherwise
@@ -596,7 +614,7 @@ class GLADIUSEstimator(BaseEstimator):
         # --- Step 2: Build networks ---
         state_dim = problem.state_dim or 1
 
-        key = jax.random.PRNGKey(0)
+        key = jax.random.PRNGKey(self.config.seed)
         q_key, zeta_key = jax.random.split(key)
 
         # Compute value_scale so networks predict in per-period units.
@@ -612,14 +630,15 @@ class GLADIUSEstimator(BaseEstimator):
         if self.config.network_mode == "shared_trunk":
             # Enoch-faithful: the output-bias init carries the value level, so
             # default to no rescaling unless value_scale was set explicitly.
-            if (
-                self.config.value_scale is None
-                and self.config.output_bias_init is not None
-            ):
+            if self.config.value_scale is None and self.config.output_bias_init is not None:
                 vs = 1.0
             shared_net = _SharedTrunkNetwork(
-                state_dim, n_actions, self.config.q_hidden_dim,
-                self.config.q_num_layers, key=key, value_scale=vs,
+                state_dim,
+                n_actions,
+                self.config.q_hidden_dim,
+                self.config.q_num_layers,
+                key=key,
+                value_scale=vs,
                 output_bias_init=self.config.output_bias_init,
             )
             # q_net and zeta_net are the same shared object; the shared-trunk
@@ -628,8 +647,12 @@ class GLADIUSEstimator(BaseEstimator):
             zeta_net = shared_net
         else:
             q_net = _QNetwork(
-                state_dim, n_actions, self.config.q_hidden_dim,
-                self.config.q_num_layers, key=q_key, value_scale=vs,
+                state_dim,
+                n_actions,
+                self.config.q_hidden_dim,
+                self.config.q_num_layers,
+                key=q_key,
+                value_scale=vs,
             )
             # Zeta network approximates E[V(s')|s,a]. Same architecture as
             # the EV network but trained with the corrected alternating scheme
@@ -637,8 +660,12 @@ class GLADIUSEstimator(BaseEstimator):
             # (rather than a shared-body multi-headed MLP) for cleaner
             # gradient separation in the alternating update.
             zeta_net = _EVNetwork(
-                state_dim, n_actions, self.config.v_hidden_dim,
-                self.config.v_num_layers, key=zeta_key, value_scale=vs,
+                state_dim,
+                n_actions,
+                self.config.v_hidden_dim,
+                self.config.v_num_layers,
+                key=zeta_key,
+                value_scale=vs,
             )
 
         # Build optimizers with gradient clipping, weight decay, and
@@ -654,6 +681,7 @@ class GLADIUSEstimator(BaseEstimator):
 
         def _make_optimizer(base_lr: float):
             """Build an optax optimizer chain with LR decay."""
+
             def lr_schedule(step):
                 return base_lr / (1.0 + decay * step)
 
@@ -699,12 +727,8 @@ class GLADIUSEstimator(BaseEstimator):
                 zeta_sa = zeta_net_inner.forward(s_feat, a_onehot)
 
                 # V(s') from frozen Q network
-                q_sp_all = jax.lax.stop_gradient(
-                    q_net.forward_all_actions(sp_feat)
-                )
-                v_sp = sigma * jax.scipy.special.logsumexp(
-                    q_sp_all / sigma, axis=1
-                )
+                q_sp_all = jax.lax.stop_gradient(q_net.forward_all_actions(sp_feat))
+                v_sp = sigma * jax.scipy.special.logsumexp(q_sp_all / sigma, axis=1)
 
                 # MSE loss: make zeta approximate E[V(s')|s,a]
                 mse = jnp.mean((zeta_sa - v_sp) ** 2)
@@ -718,8 +742,9 @@ class GLADIUSEstimator(BaseEstimator):
             return zeta_net, new_zeta_opt, loss
 
         @eqx.filter_jit
-        def q_step(q_net, zeta_net, q_opt_state, s_feat, a_batch, sp_feat,
-                   anchor_r_batch, ce_weight):
+        def q_step(
+            q_net, zeta_net, q_opt_state, s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight
+        ):
             """Update Q to fit observed choices with Bellman consistency.
 
             Loss = ce_weight * NLL + bellman_weight * Bellman_penalty
@@ -746,29 +771,23 @@ class GLADIUSEstimator(BaseEstimator):
 
                 zeta_sa = jax.lax.stop_gradient(zeta_net.forward(s_feat, a_onehot))
                 q_sp_all = q_net_inner.forward_all_actions(sp_feat)
-                v_sp = sigma * jax.scipy.special.logsumexp(
-                    q_sp_all / sigma, axis=1
-                )
+                v_sp = sigma * jax.scipy.special.logsumexp(q_sp_all / sigma, axis=1)
 
                 if use_anchor_bellman:
                     q_sa = jnp.sum(q_all * a_onehot, axis=1)
                     mask = (a_batch == anchor_action).astype(jnp.float32)
                     if anchor_bellman_mode == "paper_minimax":
-                        anchor_td = anchor_r_batch + beta * v_sp - q_sa
-                        zeta_residual = v_sp - zeta_sa
-                        # Enoch's reference takes the ABSOLUTE value (MAE) of the
-                        # bi-conjugate residual (Zurcher_train.py:490,502): the signed
-                        # mean is unbounded below (Q inflates the variance term to make
-                        # it -inf), which diverges. abs bounds it at >= 0.
-                        bellman_terms = jnp.abs(
-                            anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
+                        bellman_terms = _paper_reference_bellman_terms(
+                            q_sa=q_sa,
+                            value_next=v_sp,
+                            continuation=zeta_sa,
+                            anchor_reward=anchor_r_batch,
+                            discount=beta,
                         )
                     else:
                         anchor_td = anchor_r_batch + beta * zeta_sa - q_sa
-                        bellman_terms = anchor_td ** 2
-                    bellman_loss = jnp.sum(mask * bellman_terms) / jnp.maximum(
-                        mask.sum(), 1.0
-                    )
+                        bellman_terms = anchor_td**2
+                    bellman_loss = jnp.sum(mask * bellman_terms) / jnp.maximum(mask.sum(), 1.0)
                     total_loss = ce_weight * nll + bellman_weight * bellman_loss
                 else:
                     # Without known anchor rewards, this quantity is only a
@@ -777,17 +796,15 @@ class GLADIUSEstimator(BaseEstimator):
                     v_sp = jax.lax.stop_gradient(v_sp)
                     if anchor_action is not None:
                         mask = (a_batch == anchor_action).astype(jnp.float32)
-                        bellman_loss = jnp.sum(
-                            mask * (v_sp - zeta_sa) ** 2
-                        ) / jnp.maximum(mask.sum(), 1.0)
+                        bellman_loss = jnp.sum(mask * (v_sp - zeta_sa) ** 2) / jnp.maximum(
+                            mask.sum(), 1.0
+                        )
                     else:
                         bellman_loss = jnp.mean((v_sp - zeta_sa) ** 2)
                     total_loss = ce_weight * nll
                 return total_loss, (nll, bellman_loss)
 
-            (loss, aux), grads = eqx.filter_value_and_grad(
-                q_loss_fn, has_aux=True
-            )(q_net)
+            (loss, aux), grads = eqx.filter_value_and_grad(q_loss_fn, has_aux=True)(q_net)
 
             updates, new_q_opt = q_optimizer.update(
                 grads, q_opt_state, eqx.filter(q_net, eqx.is_array)
@@ -798,8 +815,17 @@ class GLADIUSEstimator(BaseEstimator):
         # Legacy joint step for backward compatibility when
         # alternating_updates=False.
         @eqx.filter_jit
-        def joint_step(q_net, zeta_net, q_opt_state, zeta_opt_state,
-                       s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight):
+        def joint_step(
+            q_net,
+            zeta_net,
+            q_opt_state,
+            zeta_opt_state,
+            s_feat,
+            a_batch,
+            sp_feat,
+            anchor_r_batch,
+            ce_weight,
+        ):
             """Joint update of both networks in one step (legacy mode)."""
 
             def loss_fn(nets):
@@ -813,29 +839,24 @@ class GLADIUSEstimator(BaseEstimator):
 
                 zeta_sa = zeta_net_inner.forward(s_feat, a_onehot)
                 q_sp_all = q_net_inner.forward_all_actions(sp_feat)
-                v_sp = sigma * jax.scipy.special.logsumexp(
-                    q_sp_all / sigma, axis=1
-                )
-                zeta_loss = jnp.mean(
-                    (zeta_sa - jax.lax.stop_gradient(v_sp)) ** 2
-                )
+                v_sp = sigma * jax.scipy.special.logsumexp(q_sp_all / sigma, axis=1)
+                zeta_loss = jnp.mean((zeta_sa - jax.lax.stop_gradient(v_sp)) ** 2)
 
                 if use_anchor_bellman:
                     q_sa = jnp.sum(q_all * a_onehot, axis=1)
                     mask = (a_batch == anchor_action).astype(jnp.float32)
                     if anchor_bellman_mode == "paper_minimax":
-                        anchor_td = anchor_r_batch + beta * v_sp - q_sa
-                        zeta_residual = v_sp - zeta_sa
-                        # abs(MAE) per Enoch's reference (see q_step note).
-                        anchor_terms = jnp.abs(
-                            anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
+                        anchor_terms = _paper_reference_bellman_terms(
+                            q_sa=q_sa,
+                            value_next=v_sp,
+                            continuation=zeta_sa,
+                            anchor_reward=anchor_r_batch,
+                            discount=beta,
                         )
                     else:
                         anchor_td = anchor_r_batch + beta * zeta_sa - q_sa
-                        anchor_terms = anchor_td ** 2
-                    anchor_loss = jnp.sum(mask * anchor_terms) / jnp.maximum(
-                        mask.sum(), 1.0
-                    )
+                        anchor_terms = anchor_td**2
+                    anchor_loss = jnp.sum(mask * anchor_terms) / jnp.maximum(mask.sum(), 1.0)
                     bellman_loss = zeta_loss + anchor_loss
                 else:
                     bellman_loss = zeta_loss
@@ -843,17 +864,14 @@ class GLADIUSEstimator(BaseEstimator):
                 total_loss = ce_weight * nll + bellman_weight * bellman_loss
                 return total_loss, (nll, bellman_loss)
 
-            (loss, aux), grads = eqx.filter_value_and_grad(
-                loss_fn, has_aux=True
-            )((q_net, zeta_net))
+            (loss, aux), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)((q_net, zeta_net))
 
             q_grads, zeta_grads = grads
             q_updates, new_q_opt = q_optimizer.update(
                 q_grads, q_opt_state, eqx.filter(q_net, eqx.is_array)
             )
             zeta_updates, new_zeta_opt = zeta_optimizer.update(
-                zeta_grads, zeta_opt_state,
-                eqx.filter(zeta_net, eqx.is_array)
+                zeta_grads, zeta_opt_state, eqx.filter(zeta_net, eqx.is_array)
             )
             q_net = eqx.apply_updates(q_net, q_updates)
             zeta_net = eqx.apply_updates(zeta_net, zeta_updates)
@@ -867,27 +885,18 @@ class GLADIUSEstimator(BaseEstimator):
         def shared_zeta_step(net, opt_state, s_feat, a_batch, sp_feat):
             def loss_fn(net_inner):
                 a_onehot = jax.nn.one_hot(a_batch, n_actions)
-                zeta_sa = jnp.sum(
-                    net_inner.zeta_all_actions(s_feat) * a_onehot, axis=1
-                )
-                q_sp_all = jax.lax.stop_gradient(
-                    net_inner.forward_all_actions(sp_feat)
-                )
-                v_sp = sigma * jax.scipy.special.logsumexp(
-                    q_sp_all / sigma, axis=1
-                )
+                zeta_sa = jnp.sum(net_inner.zeta_all_actions(s_feat) * a_onehot, axis=1)
+                q_sp_all = jax.lax.stop_gradient(net_inner.forward_all_actions(sp_feat))
+                v_sp = sigma * jax.scipy.special.logsumexp(q_sp_all / sigma, axis=1)
                 return jnp.mean((zeta_sa - v_sp) ** 2)
 
             loss, grads = eqx.filter_value_and_grad(loss_fn)(net)
-            updates, new_opt = q_optimizer.update(
-                grads, opt_state, eqx.filter(net, eqx.is_array)
-            )
+            updates, new_opt = q_optimizer.update(grads, opt_state, eqx.filter(net, eqx.is_array))
             net = eqx.apply_updates(net, updates)
             return net, new_opt, loss
 
         @eqx.filter_jit
-        def shared_q_step(net, opt_state, s_feat, a_batch, sp_feat,
-                          anchor_r_batch, ce_weight):
+        def shared_q_step(net, opt_state, s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight):
             def loss_fn(net_inner):
                 a_onehot = jax.nn.one_hot(a_batch, n_actions)
                 q_all = net_inner.forward_all_actions(s_feat)
@@ -900,37 +909,31 @@ class GLADIUSEstimator(BaseEstimator):
                     jnp.sum(net_inner.zeta_all_actions(s_feat) * a_onehot, axis=1)
                 )
                 q_sp_all = net_inner.forward_all_actions(sp_feat)
-                v_sp = sigma * jax.scipy.special.logsumexp(
-                    q_sp_all / sigma, axis=1
-                )
+                v_sp = sigma * jax.scipy.special.logsumexp(q_sp_all / sigma, axis=1)
 
                 if use_anchor_bellman:
                     q_sa = jnp.sum(q_all * a_onehot, axis=1)
                     mask = (a_batch == anchor_action).astype(jnp.float32)
                     if anchor_bellman_mode == "paper_minimax":
-                        anchor_td = anchor_r_batch + beta * v_sp - q_sa
-                        zeta_residual = v_sp - zeta_sa
-                        bellman_terms = jnp.abs(
-                            anchor_td ** 2 - (beta ** 2) * zeta_residual ** 2
+                        bellman_terms = _paper_reference_bellman_terms(
+                            q_sa=q_sa,
+                            value_next=v_sp,
+                            continuation=zeta_sa,
+                            anchor_reward=anchor_r_batch,
+                            discount=beta,
                         )
                     else:
                         anchor_td = anchor_r_batch + beta * zeta_sa - q_sa
-                        bellman_terms = anchor_td ** 2
-                    bellman_loss = jnp.sum(mask * bellman_terms) / jnp.maximum(
-                        mask.sum(), 1.0
-                    )
+                        bellman_terms = anchor_td**2
+                    bellman_loss = jnp.sum(mask * bellman_terms) / jnp.maximum(mask.sum(), 1.0)
                     total_loss = ce_weight * nll + bellman_weight * bellman_loss
                 else:
                     total_loss = ce_weight * nll
                     bellman_loss = jnp.float32(0.0)
                 return total_loss, (nll, bellman_loss)
 
-            (loss, aux), grads = eqx.filter_value_and_grad(
-                loss_fn, has_aux=True
-            )(net)
-            updates, new_opt = q_optimizer.update(
-                grads, opt_state, eqx.filter(net, eqx.is_array)
-            )
+            (loss, aux), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(net)
+            updates, new_opt = q_optimizer.update(grads, opt_state, eqx.filter(net, eqx.is_array))
             net = eqx.apply_updates(net, updates)
             return net, new_opt, loss, aux
 
@@ -939,7 +942,7 @@ class GLADIUSEstimator(BaseEstimator):
         epochs_no_improve = 0
         converged = False
         loss_history: list[float] = []
-        rng_key = jax.random.PRNGKey(42)
+        rng_key = jax.random.PRNGKey(self.config.seed)
         alternating = self.config.alternating_updates
         q_only_mode = self.config.mode == "q_only"
 
@@ -958,9 +961,7 @@ class GLADIUSEstimator(BaseEstimator):
                     nll = -log_probs[jnp.arange(len(a_batch)), a_batch].mean()
                     return ce_weight * nll, nll
 
-                (loss, nll), grads = eqx.filter_value_and_grad(
-                    q_only_loss_fn, has_aux=True
-                )(q_net)
+                (loss, nll), grads = eqx.filter_value_and_grad(q_only_loss_fn, has_aux=True)(q_net)
                 updates, new_q_opt = q_optimizer.update(
                     grads, q_opt_state, eqx.filter(q_net, eqx.is_array)
                 )
@@ -968,6 +969,7 @@ class GLADIUSEstimator(BaseEstimator):
                 return q_net, new_q_opt, loss, nll
 
         from tqdm import tqdm
+
         pbar = tqdm(
             range(self.config.max_epochs),
             desc="GLADIUS",
@@ -985,9 +987,7 @@ class GLADIUSEstimator(BaseEstimator):
             # Tikhonov annealing: decay CE weight over epochs so training
             # transitions from behavioral cloning to Bellman-driven.
             if self.config.tikhonov_annealing:
-                ce_weight = jnp.float32(
-                    self.config.tikhonov_initial_weight / (1.0 + epoch)
-                )
+                ce_weight = jnp.float32(self.config.tikhonov_initial_weight / (1.0 + epoch))
             else:
                 ce_weight = jnp.float32(1.0)
 
@@ -1011,43 +1011,71 @@ class GLADIUSEstimator(BaseEstimator):
                     if batch_idx % 2 == 0:
                         # Even batch: zeta head (V) update on the shared net.
                         q_net, q_opt_state, loss = shared_zeta_step(
-                            q_net, q_opt_state, s_feat, a_batch, sp_feat,
+                            q_net,
+                            q_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
                         )
                         epoch_bell = float(loss)
                     else:
                         # Odd batch: Q head update on the shared net.
                         q_net, q_opt_state, loss, _aux = shared_q_step(
-                            q_net, q_opt_state, s_feat, a_batch, sp_feat,
-                            anchor_r_batch, ce_weight,
+                            q_net,
+                            q_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
+                            anchor_r_batch,
+                            ce_weight,
                         )
                         epoch_nll = float(_aux[0])
                     zeta_net = q_net  # same shared object
                 elif q_only_mode:
                     q_net, q_opt_state, loss, nll = q_only_step(
-                        q_net, q_opt_state, s_feat, a_batch, ce_weight,
+                        q_net,
+                        q_opt_state,
+                        s_feat,
+                        a_batch,
+                        ce_weight,
                     )
                     epoch_nll = float(nll)
                 elif alternating:
                     if batch_idx % 2 == 0:
                         # Even batch: update zeta only
                         zeta_net, zeta_opt_state, loss = zeta_step(
-                            zeta_net, q_net, zeta_opt_state,
-                            s_feat, a_batch, sp_feat,
+                            zeta_net,
+                            q_net,
+                            zeta_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
                         )
                         epoch_bell = float(loss)
                     else:
                         # Odd batch: update Q only
                         q_net, q_opt_state, loss, _aux = q_step(
-                            q_net, zeta_net, q_opt_state,
-                            s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight,
+                            q_net,
+                            zeta_net,
+                            q_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
+                            anchor_r_batch,
+                            ce_weight,
                         )
                         epoch_nll = float(_aux[0])
                 else:
-                    q_net, zeta_net, q_opt_state, zeta_opt_state, loss, _aux = (
-                        joint_step(
-                            q_net, zeta_net, q_opt_state, zeta_opt_state,
-                            s_feat, a_batch, sp_feat, anchor_r_batch, ce_weight,
-                        )
+                    q_net, zeta_net, q_opt_state, zeta_opt_state, loss, _aux = joint_step(
+                        q_net,
+                        zeta_net,
+                        q_opt_state,
+                        zeta_opt_state,
+                        s_feat,
+                        a_batch,
+                        sp_feat,
+                        anchor_r_batch,
+                        ce_weight,
                     )
                     epoch_nll = float(_aux[0])
                     epoch_bell = float(_aux[1])
@@ -1060,19 +1088,19 @@ class GLADIUSEstimator(BaseEstimator):
             loss_history.append(avg_loss)
 
             # Q-value range: sample a small batch of states for monitoring
-            sample_feat = self._build_state_features(
-                all_states[:min(256, n_obs)], problem
-            )
+            sample_feat = self._build_state_features(all_states[: min(256, n_obs)], problem)
             q_sample = q_net.forward_all_actions(sample_feat)
             q_min = float(q_sample.min())
             q_max = float(q_sample.max())
 
-            pbar.set_postfix({
-                "nll": f"{epoch_nll:.3f}" if not jnp.isnan(epoch_nll) else "n/a",
-                "bell": f"{epoch_bell:.3f}" if not jnp.isnan(epoch_bell) else "n/a",
-                "q": f"[{q_min:.1f},{q_max:.1f}]",
-                "pat": f"{epochs_no_improve}/{self.config.patience}",
-            })
+            pbar.set_postfix(
+                {
+                    "nll": f"{epoch_nll:.3f}" if not jnp.isnan(epoch_nll) else "n/a",
+                    "bell": f"{epoch_bell:.3f}" if not jnp.isnan(epoch_bell) else "n/a",
+                    "q": f"[{q_min:.1f},{q_max:.1f}]",
+                    "pat": f"{epochs_no_improve}/{self.config.patience}",
+                }
+            )
 
             # Early stopping
             if avg_loss < best_loss - 1e-6:
@@ -1090,9 +1118,6 @@ class GLADIUSEstimator(BaseEstimator):
                 break
 
         num_epochs = epoch + 1
-        if num_epochs == self.config.max_epochs:
-            converged = True
-
         # --- Step 4: Extract parameters ---
         all_state_feat = self._build_state_features_all(problem)
 
@@ -1117,17 +1142,13 @@ class GLADIUSEstimator(BaseEstimator):
         policy = jax.nn.softmax(q_table / sigma, axis=1)
 
         # Value function: V(s) = sigma * logsumexp(Q(s, :) / sigma)
-        value_function = sigma * jax.scipy.special.logsumexp(
-            q_table / sigma, axis=1
-        )
+        value_function = sigma * jax.scipy.special.logsumexp(q_table / sigma, axis=1)
 
         # Regress implied rewards onto feature matrix if available
         parameters = self._extract_parameters(utility, reward_table)
 
         # Compute log-likelihood
-        ll = self._compute_log_likelihood(
-            q_net, all_states, all_actions, problem, sigma
-        )
+        ll = self._compute_log_likelihood(q_net, all_states, all_actions, problem, sigma)
 
         optimization_time = time.time() - start_time
 
@@ -1135,7 +1156,11 @@ class GLADIUSEstimator(BaseEstimator):
         self.q_net_ = q_net
         self.ev_net_ = zeta_net
 
-        message = f"GLADIUS converged after {num_epochs} epochs"
+        message = (
+            f"GLADIUS converged after {num_epochs} epochs"
+            if converged
+            else f"GLADIUS reached max_epochs={self.config.max_epochs} without convergence"
+        )
         if self._verbose:
             self._log(message)
 
@@ -1164,12 +1189,9 @@ class GLADIUSEstimator(BaseEstimator):
                 "output_bias_init": self.config.output_bias_init,
                 "gradient_clip_mode": self.config.gradient_clip_mode,
                 "anchor_rewards": (
-                    np.asarray(anchor_rewards).tolist()
-                    if anchor_rewards is not None else None
+                    np.asarray(anchor_rewards).tolist() if anchor_rewards is not None else None
                 ),
-                "final_loss": (
-                    loss_history[-1] if loss_history else float("nan")
-                ),
+                "final_loss": (loss_history[-1] if loss_history else float("nan")),
             },
         )
 
