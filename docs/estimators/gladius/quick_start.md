@@ -61,9 +61,9 @@ Important fitted attributes:
 | `result_` | Estimator-specific lower-level result object. |
 | `capabilities_` | Read-only inference, prediction, simulation, counterfactual, and serialization support map. |
 
-Use `conf_int()` for percentile intervals from the trajectory bootstrap. It
-refuses to turn the descriptive projection standard errors into confidence
-intervals.
+Use `conf_int()` for point-centered intervals based on whole-trajectory
+bootstrap standard errors. It refuses to turn the descriptive projection
+standard errors into confidence intervals.
 
 ## Counterfactual
 

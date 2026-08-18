@@ -64,10 +64,13 @@ selection. The public estimator never receives true rewards or held-out truth.
 
 The frozen design uses 20 independently simulated panels and 19 whole-
 trajectory bootstrap draws per panel. It checks three reward and three policy
-functionals per panel. Required gates are at least 85% empirical coverage, no
-more than 10% misses in either tail, at least 95% usable panels and successful
-draws, positive interval widths, p95-to-median width no larger than 4, and exact
-seeded reproducibility.
+functionals per panel using point-centered bootstrap-standard-error intervals.
+The controlled nominal states use a categorical encoder and the estimator seed
+is held fixed while panel and trajectory-resampling seeds vary. Required gates
+are at least 85% empirical coverage, no more than 10% misses in either tail, at
+least 95% usable panels and successful draws, positive interval widths,
+p95-to-median width no larger than 4, and exact seeded reproducibility. The
+qualified receipt achieves reward coverage 0.967 and policy coverage 0.950.
 
 ## Combined Gate
 

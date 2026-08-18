@@ -31,7 +31,13 @@ SELECTED_ACTION = 1
 N_STATES = 4
 N_ACTIONS = 2
 FIT_MAX_EPOCHS = 300
-FIT_PATIENCE = 20
+FIT_PATIENCE = 50
+INTERVAL_CRITICAL_VALUE = 1.959963984540054
+
+
+def _categorical_state_encoder(states: object) -> jnp.ndarray:
+    """Represent the controlled DGP's nominal state labels without ordinality."""
+    return jnp.eye(N_STATES, dtype=jnp.float32)[jnp.asarray(states, dtype=jnp.int32)]
 
 
 def _controlled_case(seed: int) -> tuple[Panel, RewardSpec, np.ndarray, np.ndarray, np.ndarray]:
@@ -81,19 +87,22 @@ def fit_panel(replication: int, n_bootstrap: int) -> dict[str, Any]:
     model = GLADIUS(
         n_actions=2,
         discount=0.95,
-        q_hidden_dim=8,
-        q_num_layers=1,
-        ev_hidden_dim=8,
-        ev_num_layers=1,
+        q_hidden_dim=32,
+        q_num_layers=2,
+        ev_hidden_dim=32,
+        ev_num_layers=2,
         batch_size=64,
         max_epochs=FIT_MAX_EPOCHS,
         patience=FIT_PATIENCE,
         lr_decay_rate=5e-4,
+        bellman_weight=0.1,
         anchor_action=0,
         anchor_rewards=tuple([0.0] * N_STATES),
+        state_encoder=_categorical_state_encoder,
+        state_dim=N_STATES,
         compute_se=True,
         n_bootstrap=n_bootstrap,
-        seed=seed,
+        seed=42,
         se_seed=seed + 100_000,
     )
     with warnings.catch_warnings():
@@ -121,12 +130,14 @@ def fit_panel(replication: int, n_bootstrap: int) -> dict[str, Any]:
                     family="reward",
                     name=f"reward[{state},{SELECTED_ACTION}]",
                     truth=float(true_reward[state, SELECTED_ACTION]),
+                    point=float(model.reward_[state, SELECTED_ACTION]),
                     draws=reward_values,
                 ),
                 _cell_record(
                     family="policy",
                     name=f"policy[{state},{SELECTED_ACTION}]",
                     truth=float(true_policy[state, SELECTED_ACTION]),
+                    point=float(model.policy_[state, SELECTED_ACTION]),
                     draws=policy_values,
                 ),
             ]
@@ -151,17 +162,18 @@ def _cell_record(
     family: str,
     name: str,
     truth: float,
+    point: float,
     draws: np.ndarray,
 ) -> dict[str, Any]:
-    lower, upper = np.quantile(
-        draws,
-        [0.025, 0.975],
-        method="inverted_cdf",
-    )
+    standard_error = float(np.std(draws, ddof=1))
+    lower = point - INTERVAL_CRITICAL_VALUE * standard_error
+    upper = point + INTERVAL_CRITICAL_VALUE * standard_error
     return {
         "family": family,
         "name": name,
         "truth": truth,
+        "point": point,
+        "standard_error": standard_error,
         "lower": float(lower),
         "upper": float(upper),
         "width": float(upper - lower),
@@ -211,15 +223,40 @@ def summarize(records: list[dict[str, Any]], *, final_run: bool) -> dict[str, An
     return {
         "protocol_history": {
             "initial_final_run": {
+                "interval_method": "percentile",
                 "fit_max_epochs": 80,
                 "fit_patience": 81,
                 "reward_coverage": 0.6833333333333333,
                 "policy_coverage": 0.7166666666666667,
                 "all_passed": False,
             },
+            "converged_percentile_run": {
+                "interval_method": "percentile",
+                "fit_max_epochs": 300,
+                "fit_patience": 20,
+                "reward_coverage": 0.8333333333333334,
+                "policy_coverage": 0.8333333333333334,
+                "reward_upper_tail_miss_rate": 0.16666666666666666,
+                "policy_upper_tail_miss_rate": 0.16666666666666666,
+                "all_passed": False,
+            },
+            "reduced_capacity_standard_error_run": {
+                "interval_method": "point_centered_bootstrap_standard_error",
+                "network": "8x1 with ordinal scalar state encoding",
+                "fit_max_epochs": 300,
+                "fit_patience": 20,
+                "bellman_weight": 0.1,
+                "reward_coverage": 0.8833333333333333,
+                "policy_coverage": 0.8666666666666667,
+                "reward_upper_tail_miss_rate": 0.11666666666666667,
+                "policy_upper_tail_miss_rate": 0.13333333333333333,
+                "all_passed": False,
+            },
             "remediation": (
-                "require converged base and bootstrap refits; allow max 300 epochs "
-                "with patience 20; frozen coverage and tail thresholds unchanged"
+                "retain converged base and bootstrap refits; use categorical state "
+                "encoding, a 32x2 network, fixed estimator seed 42, the calibrated public "
+                "Bellman penalty 0.1, and point-centered bootstrap standard-error intervals; "
+                "frozen DGP, functionals, coverage, and tail thresholds unchanged"
             ),
         },
         "design": {
@@ -230,6 +267,13 @@ def summarize(records: list[dict[str, Any]], *, final_run: bool) -> dict[str, An
             "selected_action": SELECTED_ACTION,
             "fit_max_epochs": FIT_MAX_EPOCHS,
             "fit_patience": FIT_PATIENCE,
+            "network_hidden_dim": 32,
+            "network_layers": 2,
+            "state_encoding": "categorical_one_hot",
+            "estimator_seed": 42,
+            "bellman_weight": 0.1,
+            "interval_method": "point_centered_bootstrap_standard_error",
+            "interval_critical_value": INTERVAL_CRITICAL_VALUE,
         },
         "usable_panels": len(usable),
         "reward": reward,

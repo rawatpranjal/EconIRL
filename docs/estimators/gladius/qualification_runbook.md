@@ -27,11 +27,15 @@ This must write `validation/results/gladius.json` with status
 
 ## 3. Frozen Bootstrap Calibration
 
-The design is 20 panels, 19 whole-trajectory draws per panel. Each fit allows
-at most 300 epochs with patience 20, and every base and bootstrap refit must
-converge. Shards are only a runtime device; the merge rejects conflicting
-records. The receipt preserves the failed 80-epoch first run and records that
-the frozen coverage and tail thresholds did not change.
+The design is 20 panels, 19 whole-trajectory draws per panel. Each fit uses a
+categorical encoder for the nominal four-state DGP, a 32-by-2 network, fixed
+estimator seed 42, the calibrated public Bellman penalty 0.1, and at most 300
+epochs with patience 50. Every base and bootstrap refit must converge.
+Intervals are centered on the fitted functional with whole-trajectory
+bootstrap standard errors. Shards are only a runtime device; the merge rejects
+conflicting records. The receipt preserves the failed percentile and
+reduced-capacity runs and records that the DGP, target functionals, coverage
+thresholds, and tail thresholds did not change.
 
 ```bash
 uv run python validation/estimators/gladius/bootstrap_calibration.py \

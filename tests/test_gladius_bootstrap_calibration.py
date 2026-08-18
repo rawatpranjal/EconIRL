@@ -44,6 +44,12 @@ def test_bootstrap_summary_accepts_only_the_frozen_final_design() -> None:
     assert payload["all_passed"] is True
     assert payload["design"]["panels"] == 20
     assert payload["design"]["draws_per_panel"] == 19
+    assert payload["design"]["bellman_weight"] == 0.1
+    assert payload["design"]["fit_patience"] == 50
+    assert payload["design"]["network_hidden_dim"] == 32
+    assert payload["design"]["state_encoding"] == "categorical_one_hot"
+    assert payload["design"]["estimator_seed"] == 42
+    assert payload["design"]["interval_method"] == ("point_centered_bootstrap_standard_error")
 
 
 def test_bootstrap_summary_does_not_promote_a_smoke_run() -> None:

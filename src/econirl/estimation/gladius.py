@@ -987,6 +987,7 @@ class GLADIUSEstimator(BaseEstimator):
         converged = False
         convergence_reason: str | None = None
         loss_history: list[float] = []
+        inner_loss_history: list[float] = []
         oracle_mape_history: list[float] = []
         best_oracle_mape = float("inf")
         best_oracle_epoch: int | None = None
@@ -1071,6 +1072,8 @@ class GLADIUSEstimator(BaseEstimator):
             epoch_nll = float("nan")
             epoch_bell = float("nan")
             n_batches = 0
+            epoch_inner_loss = 0.0
+            n_inner_batches = 0
 
             # Tikhonov annealing: decay CE weight over epochs so training
             # transitions from behavioral cloning to Bellman-driven.
@@ -1080,6 +1083,7 @@ class GLADIUSEstimator(BaseEstimator):
                 ce_weight = jnp.float32(1.0)
 
             batch_idx = 0
+            batches_per_epoch = (n_obs + self.config.batch_size - 1) // self.config.batch_size
             for start_idx in range(0, n_obs, self.config.batch_size):
                 end_idx = min(start_idx + self.config.batch_size, n_obs)
                 idx = perm[start_idx:end_idx]
@@ -1094,9 +1098,32 @@ class GLADIUSEstimator(BaseEstimator):
 
                 s_feat = self._build_state_features(s_batch, problem)
                 sp_feat = self._build_state_features(sp_batch, problem)
+                counts_toward_stopping = False
 
                 if self.config.network_mode == "shared_trunk":
-                    if batch_idx % 2 == 0:
+                    if batches_per_epoch == 1:
+                        q_net, zeta_opt_state, inner_loss = shared_zeta_step(
+                            q_net,
+                            zeta_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
+                        )
+                        q_net, q_opt_state, loss, _aux = shared_q_step(
+                            q_net,
+                            q_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
+                            anchor_r_batch,
+                            ce_weight,
+                        )
+                        epoch_inner_loss += float(inner_loss)
+                        n_inner_batches += 1
+                        epoch_bell = float(inner_loss)
+                        epoch_nll = float(_aux[0])
+                        counts_toward_stopping = True
+                    elif batch_idx % 2 == 0:
                         # Even batch: zeta head (V) update on the shared net.
                         q_net, zeta_opt_state, loss = shared_zeta_step(
                             q_net,
@@ -1118,6 +1145,7 @@ class GLADIUSEstimator(BaseEstimator):
                             ce_weight,
                         )
                         epoch_nll = float(_aux[0])
+                        counts_toward_stopping = True
                     zeta_net = q_net  # same shared object
                 elif q_only_mode:
                     q_net, q_opt_state, loss, nll = q_only_step(
@@ -1128,8 +1156,33 @@ class GLADIUSEstimator(BaseEstimator):
                         ce_weight,
                     )
                     epoch_nll = float(nll)
+                    counts_toward_stopping = True
                 elif alternating:
-                    if batch_idx % 2 == 0:
+                    if batches_per_epoch == 1:
+                        zeta_net, zeta_opt_state, inner_loss = zeta_step(
+                            zeta_net,
+                            q_net,
+                            zeta_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
+                        )
+                        q_net, q_opt_state, loss, _aux = q_step(
+                            q_net,
+                            zeta_net,
+                            q_opt_state,
+                            s_feat,
+                            a_batch,
+                            sp_feat,
+                            anchor_r_batch,
+                            ce_weight,
+                        )
+                        epoch_inner_loss += float(inner_loss)
+                        n_inner_batches += 1
+                        epoch_bell = float(inner_loss)
+                        epoch_nll = float(_aux[0])
+                        counts_toward_stopping = True
+                    elif batch_idx % 2 == 0:
                         # Even batch: update zeta only
                         zeta_net, zeta_opt_state, loss = zeta_step(
                             zeta_net,
@@ -1153,6 +1206,7 @@ class GLADIUSEstimator(BaseEstimator):
                             ce_weight,
                         )
                         epoch_nll = float(_aux[0])
+                        counts_toward_stopping = True
                 else:
                     q_net, zeta_net, q_opt_state, zeta_opt_state, loss, _aux = joint_step(
                         q_net,
@@ -1167,13 +1221,22 @@ class GLADIUSEstimator(BaseEstimator):
                     )
                     epoch_nll = float(_aux[0])
                     epoch_bell = float(_aux[1])
+                    counts_toward_stopping = True
 
-                epoch_loss += float(loss)
-                n_batches += 1
+                if counts_toward_stopping:
+                    epoch_loss += float(loss)
+                    n_batches += 1
+                else:
+                    epoch_inner_loss += float(loss)
+                    n_inner_batches += 1
                 batch_idx += 1
 
-            avg_loss = epoch_loss / max(n_batches, 1)
-            loss_history.append(avg_loss)
+            outer_evaluated = n_batches > 0
+            avg_loss = epoch_loss / n_batches if outer_evaluated else float("nan")
+            if outer_evaluated:
+                loss_history.append(avg_loss)
+            if n_inner_batches > 0:
+                inner_loss_history.append(epoch_inner_loss / n_inner_batches)
 
             # Q-value range: sample a small batch of states for monitoring
             sample_feat = self._build_state_features(all_states[: min(256, n_obs)], problem)
@@ -1191,13 +1254,14 @@ class GLADIUSEstimator(BaseEstimator):
             )
 
             # Early stopping
-            if avg_loss < best_loss - 1e-6:
-                best_loss = avg_loss
-                epochs_no_improve = 0
-            else:
-                epochs_no_improve += 1
+            if outer_evaluated:
+                if avg_loss < best_loss - 1e-6:
+                    best_loss = avg_loss
+                    epochs_no_improve = 0
+                else:
+                    epochs_no_improve += 1
 
-            if epochs_no_improve >= self.config.patience:
+            if outer_evaluated and epochs_no_improve >= self.config.patience:
                 converged = True
                 convergence_reason = "patience"
                 pbar.set_postfix({"loss": f"{avg_loss:.4f}", "status": "early stop"})
@@ -1300,6 +1364,8 @@ class GLADIUSEstimator(BaseEstimator):
                 "q_table": np.asarray(q_table).tolist(),
                 "ev_table": np.asarray(ev_table).tolist(),
                 "loss_history": loss_history,
+                "inner_loss_history": inner_loss_history,
+                "stopping_objective": "outer_q",
                 "convergence_reason": convergence_reason,
                 "final_stability_relative_range": final_stability_relative_range,
                 "oracle_selected": oracle_enabled,

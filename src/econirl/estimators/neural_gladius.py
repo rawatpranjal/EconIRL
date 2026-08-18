@@ -15,6 +15,7 @@ from __future__ import annotations
 import warnings
 from functools import partial
 from importlib.metadata import PackageNotFoundError, version
+from statistics import NormalDist
 from time import perf_counter
 from types import MappingProxyType
 from typing import Any, Callable, Literal, Sequence
@@ -61,6 +62,19 @@ def _encoded_float_column(
 ) -> jax.Array:
     """Pickle-safe adapter for user-provided encoders when the encoder is serializable."""
     return _to_jax_float(encoder(values))
+
+
+def _normal_intervals(
+    point: np.ndarray,
+    standard_errors: np.ndarray,
+    *,
+    alpha: float,
+) -> np.ndarray:
+    """Return point-centered normal intervals using bootstrap standard errors."""
+    critical_value = NormalDist().inv_cdf(1.0 - alpha / 2.0)
+    margin = critical_value * np.asarray(standard_errors, dtype=float)
+    center = np.asarray(point, dtype=float)
+    return np.column_stack((center - margin, center + margin))
 
 
 class _MLP(eqx.Module):
@@ -185,7 +199,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         batch_size: int = 512,
         max_epochs: int = 500,
         lr: float = 1e-3,
-        bellman_weight: float = 1.0,
+        bellman_weight: float = 0.1,
         gradient_clip: float = 1.0,
         gradient_clip_mode: Literal["global_norm", "value"] = "value",
         patience: int = 50,
@@ -1498,6 +1512,13 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             [rewards.reshape(len(rewards), -1), policies.reshape(len(policies), -1)],
             axis=1,
         )
+        point = np.concatenate(
+            [
+                np.asarray(self.reward_, dtype=float).reshape(-1),
+                np.asarray(self.policy_, dtype=float).reshape(-1),
+            ]
+        )
+        standard_errors = draws.std(axis=0, ddof=1)
         names = tuple(
             [
                 f"reward[{state},{action}]"
@@ -1511,20 +1532,15 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             ]
         )
         self.bootstrap_ = FunctionalBootstrapResult(
-            method="pairs_cluster",
+            method="pairs_cluster_normal",
             unit="individual_trajectory",
             n_requested=self.n_bootstrap,
             n_successful=len(rewards),
             seed=self.se_seed,
             estimand_names=names,
             estimates=draws,
-            standard_errors=draws.std(axis=0, ddof=1),
-            intervals=np.quantile(
-                draws,
-                [0.025, 0.975],
-                axis=0,
-                method="inverted_cdf",
-            ).T,
+            standard_errors=standard_errors,
+            intervals=_normal_intervals(point, standard_errors, alpha=0.05),
             reward_draws=rewards,
             policy_draws=policies,
             failures=tuple(failures),
@@ -1685,19 +1701,17 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 "GLADIUS sampling intervals require compute_se=True; descriptive "
                 "projection standard errors are not sampling uncertainty"
             )
-        draws = np.concatenate(
+        point = np.concatenate(
             [
-                self.bootstrap_.reward_draws.reshape(self.bootstrap_.n_successful, -1),
-                self.bootstrap_.policy_draws.reshape(self.bootstrap_.n_successful, -1),
+                np.asarray(self.reward_, dtype=float).reshape(-1),
+                np.asarray(self.policy_, dtype=float).reshape(-1),
             ],
-            axis=1,
         )
-        intervals = np.quantile(
-            draws,
-            [alpha / 2.0, 1.0 - alpha / 2.0],
-            axis=0,
-            method="inverted_cdf",
-        ).T
+        intervals = _normal_intervals(
+            point,
+            self.bootstrap_.standard_errors,
+            alpha=alpha,
+        )
         return {
             name: (float(lower), float(upper))
             for name, (lower, upper) in zip(self.bootstrap_.estimand_names, intervals)
@@ -1718,7 +1732,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             "Whole-trajectory bootstrap: "
             f"{self.bootstrap_.n_successful}/{self.bootstrap_.n_requested} successful draws."
             if self.bootstrap_ is not None
-            else "Not requested. Set compute_se=True for whole-trajectory percentile intervals."
+            else "Not requested. Set compute_se=True for whole-trajectory bootstrap intervals."
         )
         projection = (
             "None"

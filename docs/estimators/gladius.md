@@ -206,7 +206,8 @@ conditional expectation $\zeta^*(s, a) = \mathbb{E}[V_{Q^*}(s') \mid s, a]$
 double-sampling bias when $\zeta$ is at its optimum.
 
 The public `GLADIUS` estimator defaults to the paper-reference
-`objective="paper_minimax"` and a shared Q/zeta trunk. The lower-level
+`objective="paper_minimax"`, a shared Q/zeta trunk, and a calibrated Bellman
+penalty weight of 0.1. The lower-level
 `GLADIUSConfig` also exposes `anchor_moment`, which replaces the minimax
 correction with the continuation-moment residual
 

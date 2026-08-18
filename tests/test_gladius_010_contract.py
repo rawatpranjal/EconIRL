@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from econirl.core.reward_spec import RewardSpec
+from econirl.inference import FunctionalBootstrapResult
 
 
 def _tiny_contract_case():
@@ -85,6 +86,7 @@ def test_public_gladius_defaults_to_paper_reference_objective():
     assert model.network_mode == "shared_trunk"
     assert model.output_bias_init == 0.0
     assert model.gradient_clip_mode == "value"
+    assert model.bellman_weight == 0.1
 
 
 @pytest.mark.parametrize(
@@ -159,6 +161,7 @@ def test_public_paper_fit_exposes_finite_identified_functionals(fitted_contract_
     np.testing.assert_allclose(model.reward_[:, 0].mean(), 0.0, atol=1e-6)
     assert model.diagnostics_["identification"]["anchor_available"] is True
     assert model.diagnostics_["optimization"]["termination_reason"]
+    assert model.result_.metadata["stopping_objective"] == "outer_q"
     assert model.is_fitted_ is True
     assert model.n_iter_ == model.n_epochs_
     assert model.fit_time_ > 0
@@ -308,6 +311,7 @@ def test_trajectory_bootstrap_records_functional_draws():
         batch_size=24,
         max_epochs=2,
         patience=1,
+        bellman_weight=1.0,
         anchor_action=0,
         anchor_rewards=(0.0, 0.0, 0.0, 0.0),
         compute_se=True,
@@ -333,3 +337,44 @@ def test_trajectory_bootstrap_records_functional_draws():
     assert len(intervals) == 16
     with pytest.raises(NotImplementedError, match="simulation requires a transition tensor"):
         model.simulate(1)
+
+
+def test_confidence_intervals_use_point_centered_bootstrap_standard_errors():
+    from econirl import GLADIUS
+
+    reward_draws = np.asarray(
+        [[[0.0, -1.4]], [[0.0, -1.0]], [[0.0, -0.6]]],
+        dtype=float,
+    )
+    policy_draws = np.asarray(
+        [[[0.8, 0.2]], [[0.7, 0.3]], [[0.6, 0.4]]],
+        dtype=float,
+    )
+    draws = np.concatenate(
+        [reward_draws.reshape(3, -1), policy_draws.reshape(3, -1)],
+        axis=1,
+    )
+    standard_errors = draws.std(axis=0, ddof=1)
+    model = GLADIUS(n_actions=2)
+    model.reward_ = np.asarray([[0.0, -1.0]])
+    model.policy_ = np.asarray([[0.7, 0.3]])
+    model.bootstrap_ = FunctionalBootstrapResult(
+        method="pairs_cluster_normal",
+        unit="individual_trajectory",
+        n_requested=3,
+        n_successful=3,
+        seed=9,
+        estimand_names=("reward[0,0]", "reward[0,1]", "policy[0,0]", "policy[0,1]"),
+        estimates=draws,
+        standard_errors=standard_errors,
+        intervals=np.zeros((4, 2)),
+        reward_draws=reward_draws,
+        policy_draws=policy_draws,
+    )
+
+    intervals = model.conf_int(alpha=0.05)
+
+    expected_margin = 1.959963984540054 * standard_errors[1]
+    assert intervals["reward[0,1]"] == pytest.approx(
+        (-1.0 - expected_margin, -1.0 + expected_margin)
+    )
