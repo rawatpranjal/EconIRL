@@ -106,12 +106,10 @@ The core estimators carry the main identification stories in EconIRL.
 | --- | --- | --- |
 | [NFXP](estimators/nfxp.md) | What is the exact tabular structural likelihood estimate? | Nothing. It is the reference under the maintained DDC assumptions. |
 | [CCP](estimators/ccp.md) | Can we avoid repeated Bellman solves? | Uses first-stage choice probabilities and Hotz-Miller inversion. NPL iterates the pseudo-likelihood route. |
-| [TD-CCP](estimators/tdccp.md) | Can we avoid transition-density estimation during parameter estimation? | Uses observed successor state-action pairs to estimate recursive terms. |
 | [MCE-IRL](estimators/mce_irl.md) | Can demonstrations identify a reward? | Replaces structural likelihood with maximum causal entropy feature matching. |
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | Can the reward be nonlinear? | Replaces fixed linear reward features with a neural reward map. |
 | [AIRL](estimators/airl.md) | Can a state-only reward transfer across dynamics? | Separates state reward from shaping under the original AIRL assumptions. |
 | [NeuralAIRL](estimators/neural_airl.md) | Can that state-only reward be nonlinear? | Uses neural approximators for the state reward, shaping potential, and generator policy. |
-| [AIRL2](estimators/airl2.md) | Can anchored rewards differ across latent segments? | Adds exit-action and absorbing-state anchors, then estimates segment-specific rewards. |
 | [GLADIUS](estimators/gladius.md) | Can high-dimensional offline DDC avoid repeated solves? | Learns Q and continuation objects, then reads projected action contrasts. |
 
 ## Core Estimators Side by Side
@@ -122,12 +120,10 @@ Use this table to narrow the choice before opening a method page.
 | --- | --- | --- | --- | --- | --- | --- |
 | [NFXP](estimators/nfxp.md) | You need the reference structural DDC likelihood and counterfactual policy analysis. | Discrete panel data; transitions known or estimated first. | Finite parametric structural reward. | Small or moderate tabular state-action spaces. | Repeated exact Bellman solves are too expensive or transition modeling is the main bottleneck. | Synthetic tabular simulation and the Rust (1987) Table IX replication. |
 | [CCP](estimators/ccp.md) | You want a faster Hotz-Miller or NPL tabular structural estimate. | Discrete panel data; transitions known or estimated first; strong empirical action support. | Finite parametric structural reward. | Small or moderate tabular state-action spaces. | Many states have weak or one-action support, or you need the direct nested fixed-point likelihood. | Synthetic tabular simulation with support conditions. |
-| [TD-CCP](estimators/tdccp.md) | Transition-density modeling is hard but the reward has known finite features. | Panel trajectories with current and next state-action information; an environment is still needed for post-fit counterfactuals. | Finite linear structural reward. | Encoded or higher-dimensional discrete states. | State space is small enough for tabular likelihood methods, support is sparse, or the target is a neural reward map. | Encoded-state finite-parameter hard case with locally robust standard errors. |
 | [MCE-IRL](estimators/mce_irl.md) | Demonstrations should be explained by maximum causal entropy feature matching. | Demonstrations from a discrete dynamic decision problem; transitions known or supplied. | Supplied finite reward features. | Tabular state-action spaces. | You need likelihood-based structural standard errors or reward features are unknown. | Synthetic supplied-feature simulations. |
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | Demonstrations should be explained by an unrestricted neural reward under the maximum causal entropy objective. | Demonstrations from a discrete dynamic decision problem; transitions known or supplied. | Neural reward map. | Tabular or encoded state-action spaces. | You need finite structural parameters with standard errors, or supplied reward features are enough. | Synthetic neural-reward recovery simulation. |
-| [AIRL](estimators/airl.md) | Adversarial recovery under the original state-only AIRL assumptions is the research object. | Demonstrations from a discrete dynamic decision problem; transitions available for validation or post-fit evaluation. | State-only reward with shaping term under a fixed normalization. | Discrete dynamic decision settings. | Reward is action-dependent, an absorbing-state normalization is central, or structural action-dependent recovery is required. | Synthetic state-only AIRL simulation. |
+| [AIRL](estimators/airl.md) | Adversarial recovery under the original state-only AIRL assumptions is the research object. | Complete demonstrations from a discrete dynamic decision problem and an explicit transition tensor required at fit time. | State-only reward with shaping term under a fixed normalization. | Discrete dynamic decision settings. | Reward is action-dependent, an absorbing-state normalization is central, or structural action-dependent recovery is required. | Synthetic state-only AIRL simulation. |
 | [NeuralAIRL](estimators/neural_airl.md) | The AIRL state reward is nonlinear in known state inputs. | Complete demonstration trajectories and an explicit transition tensor. | Nonlinear state-only reward with neural shaping and policy functions. | Tabular or finite encoded state inputs. | Heterogeneity or action-dependent structural reward is the target. | Generated nonlinear behavioral recovery. |
-| [AIRL2](estimators/airl2.md) | Latent segments have different dynamic preferences and segment-specific counterfactuals matter. | Repeated user trajectories; credible exit-action and absorbing-state anchors. | Segment-specific action-dependent reward. | Encoded discrete dynamic choice settings. | Segment membership is weakly identified, no credible reward anchor exists, or a homogeneous estimator is enough. | Synthetic serialized-content simulation. |
 | [GLADIUS](estimators/gladius.md) | You want neural Q and continuation modeling with anchor-moment reward recovery. | Dynamic discrete choices; known transitions; credible anchor action with known rewards. | Neural reward recovered from neural Q and continuation objects. | High-dimensional encoded state features. | No credible anchor action exists or you need tabular structural estimation. | Preview: projected reward diagnostics. |
 
 ## How the Papers Relate
@@ -226,11 +222,13 @@ the reward.
 
 ## Other Estimators
 
-The non-core estimator pages are useful when a specific computational or
+The other estimator pages are useful when a specific computational or
 behavioral complication is the main reason not to use the reference route.
 
 | Estimator | Use when | Current role |
 | --- | --- | --- |
+| [TD-CCP](estimators/tdccp.md) | Transition-density modeling is hard but the reward has known finite features. | Supported transition-density-free structural estimator. |
+| [AIRL2](estimators/airl2.md) | Latent segments need anchored, action-dependent reward recovery. | Supported heterogeneous adversarial IRL estimator. |
 | [NNES](estimators/nnes.md) | The value object is too large or encoded for repeated exact dynamic programming. | Neural value approximation with finite structural parameters. |
 | [MPEC](estimators/mpec.md) | You want a constrained-optimization check on the DDC likelihood. | Secondary structural check; overlaps with NFXP/CCP and has higher solver complexity. |
 | [UFXP](estimators/ufxp.md) | You want maximum-likelihood-grade structural estimates without nesting any fixed point in the search. | Secondary structural speed and first-order-condition variant. |
@@ -238,9 +236,9 @@ behavioral complication is the main reason not to use the reference route.
 | [f-IRL](estimators/f_irl.md) | The study question is state-marginal matching under an f-divergence. | Narrower state-marginal method. |
 | [IQ-Learn](estimators/iq_learn.md) | Inverse soft-Q learning or imitation diagnostics are the estimator of interest. | Preview diagnostic. |
 
-On a small, well-specified tabular problem, these alternatives do not answer a
-better question than NFXP. Their value appears when one of the complications on
-this page is real.
+On a small homogeneous tabular problem with an available transition model,
+NFXP remains the reference. The other estimators become relevant when one of
+the listed complications is substantive.
 
 ## Linear Reading Guide
 

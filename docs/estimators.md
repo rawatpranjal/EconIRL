@@ -14,10 +14,10 @@ pages linked below.
 
 The estimators are organized into two sections:
 
-- [Core Estimators](estimators/core.md) - NFXP, the exact reference replicated to
-  Rust (1987) Table IX.
-- [Other Estimators](estimators/other.md) - every other estimator, grouped by the
-  source of complexity it answers.
+- [Core Estimators](estimators/core.md) - the curated main-method roster,
+  anchored by NFXP and its exact Rust (1987) Table IX replication.
+- [Other Estimators](estimators/other.md) - every implemented estimator outside
+  the Core roster.
 
 For the reasoning behind the split, the canonical NFXP case, and side-by-side
 decision tables, see

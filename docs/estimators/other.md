@@ -1,29 +1,45 @@
 # Other Estimators
 
-These estimators are available for advanced users, checks, and method development.
-They sit outside the core focus, either because they overlap a core method, carry
-caveated public status, or are narrower in scope. The grouping follows the sources
-of complexity in [Choosing and Comparing Estimators](../comparing_estimators.md).
+## Important Links
 
-Read this page after the core menu. These methods are useful for specific
-computational, behavioral, or diagnostic needs, but each carries a narrower
-public evidence or interpretation boundary.
+- [Core Estimators](core.md)
+- [Choosing and Comparing Estimators](../comparing_estimators.md)
+- [API Reference](../api/index.rst)
 
-| Estimator | Source of complexity it answers | Use |
-| --- | --- | --- |
-| [NNES](nnes.md) | Large state space | Neural continuation value with finite reward parameters. |
-| [MPEC](mpec.md) | Large state space | Constrained-optimization form of the DDC likelihood. |
-| [UFXP](ufxp.md) | Large state space | Structural estimates without nesting a fixed point. |
-| [RHIP](rhip.md) | Bounded or finite-horizon planning | Horizon-parameterised entropy IRL for route choice. |
-| [f-IRL](f_irl.md) | Reward recovery via state-marginal matching | f-divergence state-marginal method. |
-| [IQ-Learn](iq_learn.md) | Imitation and inverse soft-Q | Inverse soft-Q learning diagnostics. |
+This is the complete list of implemented estimators outside the Core roster.
+A row means estimator code exists in this repository. It does not imply the same
+validation or public-support level as a Core estimator.
 
-Research baselines under `econirl.contrib`: Max Margin Planning, GCL, GAIL,
-Deep MaxEnt IRL, Bayesian IRL.
+Aliases are listed once. AIRL-Het resolves to AIRL2. NeuralGLADIUS resolves to
+GLADIUS, which remains in Core.
+
+| Estimator | Code home |
+| --- | --- |
+| [TD-CCP](tdccp.md) | `src/econirl/estimators/tdccp.py` |
+| [AIRL2](airl2.md) | `src/econirl/estimators/airl2.py` |
+| [NNES](nnes.md) | `src/econirl/estimators/nnes.py` |
+| [MPEC](mpec.md) | `src/econirl/estimation/mpec.py` |
+| Neural MPEC | `src/econirl/estimation/neural_mpec.py` |
+| [UFXP](ufxp.md) | `src/econirl/estimators/ufxp.py` |
+| Neural UFXP | `src/econirl/estimators/ufxp_neural.py` |
+| SEES | `src/econirl/estimators/sees.py` |
+| [RHIP](rhip.md) | `src/econirl/estimators/rhip.py` |
+| [f-IRL](f_irl.md) | `src/econirl/estimation/f_irl.py` |
+| [IQ-Learn](iq_learn.md) | `src/econirl/estimation/iq_learn.py` |
+| MaxEnt IRL | `src/econirl/estimators/maxent_irl.py` |
+| Deep MaxEnt IRL | `src/econirl/contrib/deep_maxent_irl.py` |
+| Max Margin IRL | `src/econirl/estimators/max_margin_irl.py` |
+| Max Margin Planning | `src/econirl/contrib/max_margin_planning.py` |
+| GAIL | `src/econirl/contrib/gail.py` |
+| GCL | `src/econirl/estimators/gcl.py` |
+| Bayesian IRL | `src/econirl/contrib/bayesian_irl.py` |
+| Behavioral Cloning | `src/econirl/estimation/behavioral_cloning.py` |
 
 ```{toctree}
 :maxdepth: 1
 
+tdccp
+airl2
 nnes
 mpec
 ufxp

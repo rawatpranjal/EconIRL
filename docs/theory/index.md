@@ -1,6 +1,6 @@
 # Theory
 
-This section collects the proof ideas behind the public core estimators. Read it
+This section collects the proof ideas behind the public estimators. Read it
 as the bridge between the estimator pages and the source papers: the estimator
 pages say what each method does, while these pages say which mathematical
 restriction makes the object interpretable.

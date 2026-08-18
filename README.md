@@ -47,12 +47,12 @@ reference within the core, the exact estimator we replicate to Rust (1987) Table
 See [Choosing an Estimator](https://econirl.readthedocs.io/en/latest/estimators/landscape.html)
 for how the methods relate.
 
-Core: NFXP, CCP, TD-CCP, MCE-IRL, Neural MCE-IRL, AIRL (AIRL-1), AIRL-Het (AIRL-2),
-and GLADIUS. GLADIUS is the package's neural estimator, the `GLADIUS` class is the
+Core: NFXP, CCP, MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, and GLADIUS. GLADIUS
+is the package's neural estimator, the `GLADIUS` class is the
 `NeuralGLADIUS` implementation.
 
-Other: NNES, MPEC, UFXP, RHIP, f-IRL, IQ-Learn, and the contrib baselines. These are
-available for advanced users and method development.
+Other: TD-CCP, AIRL2, and every other implemented estimator outside Core. See
+the exhaustive [Other Estimators](docs/estimators/other.md) list.
 
 ## Package Surface
 
