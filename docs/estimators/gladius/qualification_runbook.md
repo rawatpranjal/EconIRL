@@ -73,7 +73,9 @@ action differences and policy unchanged, while changing the subsequent
 optimization path. The qualification driver uses batches of two trajectories
 at N=50 and five trajectories in larger cells, so Q-update count grows with
 sample size. This batch rule is a disclosed package stabilization; the paper
-does not publish the Table 2 batch size.
+does not publish the Table 2 batch size. The qualification network seed is 2,
+chosen on the prespecified bad-seed diagnostics and recorded in every receipt;
+the driver does not select different restarts for different cells.
 
 ## 3. Oracle-Simulation Structural Checks
 

@@ -236,7 +236,8 @@ driver uses batches of two trajectories at N=50 and five trajectories in
 larger cells. This prevents the N=50 cell from receiving only one Q update per
 epoch and lets optimization effort grow with sample size under the alternating
 author loop. The paper does not publish the Table 2 batch size, so this batch
-rule is also disclosed as a package-level replication choice.
+rule is also disclosed as a package-level replication choice. The driver fixes
+network seed 2 for every cell; it does not choose restarts cell by cell.
 
 In the paper, $\zeta(s, a) = \mathbb{E}[V_Q(s') \mid s, a]$ is the
 closed-form conditional expectation that solves the inner maximisation in

@@ -83,7 +83,7 @@ PAPER_RECIPE_RECEIPT = {
     "q_lr": 1e-3,
     "v_lr": 1e-3,
     "lr_decay_rate": 5e-4,
-    "seed": 1,
+    "seed": 2,
 }
 
 N_MILEAGE = 20
@@ -203,6 +203,7 @@ def paper_training_config(
     max_epochs: int,
     batch_size: int,
     anchor: str = "paper_minimax",
+    network_seed: int = 1,
     oracle_reward_table: tuple[tuple[float, ...], ...] | None = None,
     oracle_states: tuple[int, ...] | None = None,
     oracle_actions: tuple[int, ...] | None = None,
@@ -235,7 +236,7 @@ def paper_training_config(
         shared_trunk_initializer="xavier_normal",
         output_bias_init=-55.0,
         compute_se=False,
-        seed=1,
+        seed=network_seed,
         _oracle_reward_table=oracle_reward_table,
         _oracle_eval_states=oracle_states,
         _oracle_eval_actions=oracle_actions,
@@ -283,6 +284,7 @@ def fit_gladius(
         anchor_rewards=tuple([-THETA1] * S),
         max_epochs=max_epochs,
         batch_size=batch_size,
+        network_seed=PAPER_RECIPE_RECEIPT["seed"],
         oracle_reward_table=tuple(
             tuple(float(value) for value in row) for row in true_reward_matrix()
         ),

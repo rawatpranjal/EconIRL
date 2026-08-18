@@ -34,6 +34,8 @@ def _passing_records() -> list[dict]:
 
 
 def test_table2_summary_accepts_only_the_frozen_6x20_design() -> None:
+    assert PAPER_RECIPE_RECEIPT["seed"] == 2
+
     summary = summarize_records(_passing_records())
 
     assert summary["all_passed"] is True
