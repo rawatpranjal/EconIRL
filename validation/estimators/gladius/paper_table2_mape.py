@@ -18,11 +18,14 @@ The exact DGP (paper sec 7.1, lines 1394-1429 of the full text):
     RAW recovered reward r_hat(s,a) = Q(s,a) - beta * zeta(s,a) (paper Table 3),
     NOT the projected theta.
 
-The estimator version is the paper-faithful one (Enoch Kang's reference =
-first-author code): GLADIUSEstimator with network_mode="shared_trunk" and
-anchor_bellman_mode="paper_minimax" (the literal bi-conjugate Bellman term),
-anchored at the replacement action with the known reward -theta1 (Assumption 3),
-MLP with 2 hidden layers x 10 units for Q.
+The estimator preserves the first-author objective and training mechanics:
+shared Q/zeta trunk, the literal ``paper_minimax`` bi-conjugate term,
+trajectory batches, Xavier-normal weights, and the -55 Zurcher output bias.
+It adds a projection onto the known replacement-reward level after each Q
+update. The projection is a package repair, not code found in the author repo;
+it leaves action differences and the softmax policy unchanged. Qualification
+also uses data-size-aware trajectory batches, capped at 32, so every sample-size
+cell receives at least ten Q updates per epoch.
 
 Usage:
   PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py --probe
@@ -59,6 +62,29 @@ PAPER_GLADIUS_SE = {50: 1.28, 250: 0.51, 500: 0.20, 1000: 0.22, 2500: 0.06, 5000
 PAPER_RUST = {50: 3.62, 250: 1.37, 500: 0.90, 1000: 0.71, 2500: 0.68, 5000: 0.40}
 TARGET_SIZES = (50, 250, 500, 1000, 2500, 5000)
 TARGET_REPETITIONS = 20
+REFERENCE_MAX_BATCH_SIZE = 32
+MIN_Q_UPDATES_PER_EPOCH = 10
+BATCH_POLICY = "min_10_q_updates_per_epoch_capped_at_32_trajectories"
+PAPER_RECIPE_RECEIPT = {
+    "network_mode": "shared_trunk",
+    "batch_unit": "trajectory",
+    "batch_policy": BATCH_POLICY,
+    "shuffle_batches": False,
+    "shared_trunk_initializer": "xavier_normal",
+    "output_bias_init": -55.0,
+    "zeta_loss_reduction": "sum",
+    "clip_zeta_gradients": False,
+    "anchor_level_projection": True,
+    "anchor_level_calibration": False,
+    "anchor_bellman_mode": "paper_minimax",
+    "lr_decay_unit": "epoch",
+    "q_hidden_dim": 10,
+    "q_num_layers": 2,
+    "q_lr": 1e-3,
+    "v_lr": 1e-3,
+    "lr_decay_rate": 5e-4,
+    "seed": 1,
+}
 
 N_MILEAGE = 20
 THETA0 = 1.0  # maintenance cost per mileage unit
@@ -146,6 +172,76 @@ def mape_on_samples(r_hat: np.ndarray, states: np.ndarray, actions: np.ndarray) 
     return float(100.0 * np.mean(np.abs(r_pred - r_true) / np.abs(r_true)))
 
 
+def qualification_batch_size(n_traj: int) -> int:
+    """Keep small paper cells from receiving only one Q update per epoch.
+
+    The author loop alternates zeta and Q updates across trajectory batches.
+    A fixed batch size of 32 therefore gives the N=50 cell only two batches,
+    hence one Q update, per epoch. Use smaller batches until every cell gets at
+    least ten Q updates per epoch, while retaining the reference maximum of 32.
+    """
+    if n_traj <= 0:
+        raise ValueError("n_traj must be positive")
+    train_trajectories = int(round(0.8 * n_traj))
+    target_batches = 2 * MIN_Q_UPDATES_PER_EPOCH
+    return min(
+        REFERENCE_MAX_BATCH_SIZE,
+        max(train_trajectories // target_batches, 1),
+    )
+
+
+def q_updates_per_epoch(train_trajectories: int, batch_size: int) -> int:
+    """Number of Q-side updates produced by the alternating author loop."""
+    batches = max(int(np.ceil(train_trajectories / batch_size)), 1)
+    return 1 if batches == 1 else batches // 2
+
+
+def paper_training_config(
+    *,
+    anchor_rewards: tuple[float, ...],
+    max_epochs: int,
+    batch_size: int,
+    anchor: str = "paper_minimax",
+    oracle_reward_table: tuple[tuple[float, ...], ...] | None = None,
+    oracle_states: tuple[int, ...] | None = None,
+    oracle_actions: tuple[int, ...] | None = None,
+) -> GLADIUSConfig:
+    """Return the paper-objective Zurcher recipe plus anchor-level repair."""
+    return GLADIUSConfig(
+        anchor_bellman_mode=anchor,
+        anchor_bellman_loss=True,
+        anchor_action=REPLACE,
+        anchor_rewards=anchor_rewards,
+        anchor_level_calibration=False,
+        anchor_level_projection=True,
+        network_mode="shared_trunk",
+        q_hidden_dim=10,
+        q_num_layers=2,
+        v_hidden_dim=10,
+        v_num_layers=2,
+        q_lr=1e-3,
+        v_lr=1e-3,
+        lr_decay_rate=5e-4,
+        lr_decay_unit="epoch",
+        batch_size=batch_size,
+        batch_unit="trajectory",
+        shuffle_batches=False,
+        max_epochs=max_epochs,
+        patience=max_epochs + 1,
+        gradient_clip_mode="value",
+        clip_zeta_gradients=False,
+        zeta_loss_reduction="sum",
+        shared_trunk_initializer="xavier_normal",
+        output_bias_init=-55.0,
+        compute_se=False,
+        seed=1,
+        _oracle_reward_table=oracle_reward_table,
+        _oracle_eval_states=oracle_states,
+        _oracle_eval_actions=oracle_actions,
+        verbose=False,
+    )
+
+
 def fit_gladius(
     env,
     train_panel,
@@ -181,36 +277,16 @@ def fit_gladius(
     # gap). anchor_moment is the fitted-Q diagnostic, a stop-gradient zeta target
     # (r + beta*zeta - Q) that pins the level via the beta-contraction but departs
     # from the paper's Bellman term. See the internal replication note.
-    cfg = GLADIUSConfig(
-        anchor_bellman_mode=anchor,
-        anchor_bellman_loss=True,
-        anchor_action=REPLACE,  # known r(s, replace) = -theta1
+    cfg = paper_training_config(
+        anchor=anchor,
         anchor_rewards=tuple([-THETA1] * S),
-        anchor_level_calibration=False,
-        q_hidden_dim=10,
-        q_num_layers=2,  # paper: MLP 2 x 10
-        v_hidden_dim=10,
-        v_num_layers=2,
-        q_lr=1e-3,
-        v_lr=1e-3,
-        lr_decay_rate=5e-4,
-        batch_size=batch_size,
         max_epochs=max_epochs,
-        # The first-author training loop runs the frozen epoch budget without
-        # early stopping. Keep the package's stopping rule out of the exact
-        # replication path so a noisy minimax epoch cannot truncate training.
-        patience=max_epochs + 1,
-        gradient_clip_mode="value",
-        # Predict Q directly (value_scale=1.0) from a zero bias; anchor_moment is
-        # init-robust and converges the absolute level via the fitted-Q contraction.
-        output_bias_init=0.0,
-        compute_se=False,
-        _oracle_reward_table=tuple(
+        batch_size=batch_size,
+        oracle_reward_table=tuple(
             tuple(float(value) for value in row) for row in true_reward_matrix()
         ),
-        _oracle_eval_states=tuple(int(value) for value in oracle_states),
-        _oracle_eval_actions=tuple(int(value) for value in oracle_actions),
-        verbose=False,
+        oracle_states=tuple(int(value) for value in oracle_states),
+        oracle_actions=tuple(int(value) for value in oracle_actions),
     )
     est = GLADIUSEstimator(config=cfg)
     result = est.estimate(
@@ -226,6 +302,28 @@ def fit_gladius(
         "termination": str(result.convergence_message),
         "final_loss": float(loss_history[-1]) if loss_history else None,
         "lr_decay_unit": result.metadata.get("lr_decay_unit"),
+        "network_mode": result.metadata.get("network_mode"),
+        "batch_unit": result.metadata.get("batch_unit"),
+        "batch_size": result.metadata.get("batch_size"),
+        "batch_policy": BATCH_POLICY,
+        "q_updates_per_epoch": q_updates_per_epoch(
+            train_panel.num_individuals,
+            batch_size,
+        ),
+        "shuffle_batches": result.metadata.get("shuffle_batches"),
+        "shared_trunk_initializer": result.metadata.get("shared_trunk_initializer"),
+        "output_bias_init": result.metadata.get("output_bias_init"),
+        "zeta_loss_reduction": result.metadata.get("zeta_loss_reduction"),
+        "clip_zeta_gradients": result.metadata.get("clip_zeta_gradients"),
+        "anchor_level_projection": result.metadata.get("anchor_level_projection"),
+        "anchor_level_calibration": result.metadata.get("anchor_level_calibration"),
+        "anchor_bellman_mode": result.metadata.get("anchor_bellman_mode"),
+        "q_hidden_dim": cfg.q_hidden_dim,
+        "q_num_layers": cfg.q_num_layers,
+        "q_lr": cfg.q_lr,
+        "v_lr": cfg.v_lr,
+        "lr_decay_rate": cfg.lr_decay_rate,
+        "seed": cfg.seed,
         "oracle_selected": bool(result.metadata.get("oracle_selected")),
         "oracle_best_epoch": result.metadata.get("oracle_best_epoch"),
         "oracle_best_mape": result.metadata.get("oracle_best_mape"),
@@ -340,6 +438,19 @@ def summarize_records(records: list[dict]) -> dict:
     )
     gates = {
         "full_6x20_design": complete,
+        "paper_recipe_disclosed": all(
+            (
+                all(
+                    record.get("optimization", {}).get(field) == expected
+                    for field, expected in PAPER_RECIPE_RECEIPT.items()
+                )
+                and record.get("optimization", {}).get("batch_size")
+                == qualification_batch_size(int(record["n_traj"]))
+                and record.get("optimization", {}).get("q_updates_per_epoch", 0)
+                >= MIN_Q_UPDATES_PER_EPOCH
+            )
+            for record in records
+        ),
         "all_cells_within_paper_mean_plus_2se": all(
             cell["within_paper_mean_plus_2se"] for cell in cells
         ),
@@ -371,7 +482,16 @@ def main():
             "to an epoch count using the frozen 80%% training split"
         ),
     )
-    ap.add_argument("--batch-size", type=int, default=64)
+    ap.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help=(
+            "override the qualification batch policy; by default batches are "
+            "data-size-aware, capped at 32 trajectories, and provide at least "
+            "10 Q updates per epoch"
+        ),
+    )
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--merge-shard", type=Path, action="append", default=None)
     ap.add_argument(
@@ -398,7 +518,10 @@ def main():
             json.dumps(
                 {
                     "dgp": "paper bus (20 mileage, +1..4, theta=[1,5], beta=0.95)",
-                    "estimator": "GLADIUSEstimator paper_minimax+shared_trunk, anchor=replace",
+                    "estimator": (
+                        "GLADIUSEstimator paper_minimax+shared_trunk"
+                        "+anchor_level_projection, anchor=replace"
+                    ),
                     "selection_boundary": (
                         "simulation-only best epoch selected by true held-out reward MAPE, "
                         "matching the checked-in author experiment; not used by public fit"
@@ -429,8 +552,11 @@ def main():
     records = []
     for n_traj in traj_list:
         mapes = []
-        train_observations = int(round(0.8 * n_traj)) * 100
-        steps_per_epoch = max(int(np.ceil(train_observations / args.batch_size)), 1)
+        train_trajectories = int(round(0.8 * n_traj))
+        cell_batch_size = (
+            qualification_batch_size(n_traj) if args.batch_size is None else args.batch_size
+        )
+        steps_per_epoch = max(int(np.ceil(train_trajectories / cell_batch_size)), 1)
         cell_epochs = (
             args.max_epochs
             if args.max_updates is None
@@ -444,7 +570,7 @@ def main():
                 n_traj,
                 seed,
                 max_epochs=cell_epochs,
-                batch_size=args.batch_size,
+                batch_size=cell_batch_size,
                 anchor=args.anchor,
             )
             records.append(rec)
@@ -484,7 +610,10 @@ def main():
             json.dumps(
                 {
                     "dgp": "paper bus (20 mileage, +1..4, theta=[1,5], beta=0.95)",
-                    "estimator": f"GLADIUSEstimator {args.anchor}+shared_trunk, anchor=replace",
+                    "estimator": (
+                        f"GLADIUSEstimator {args.anchor}+shared_trunk"
+                        "+anchor_level_projection, anchor=replace"
+                    ),
                     "anchor": args.anchor,
                     "paper_gladius_mape": PAPER_GLADIUS,
                     "paper_gladius_se": PAPER_GLADIUS_SE,

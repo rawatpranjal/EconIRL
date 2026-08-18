@@ -17,6 +17,7 @@ uv run ruff check \
   tests/test_gladius_010_contract.py \
   tests/test_gladius_bootstrap_calibration.py \
   tests/test_gladius_notebook.py \
+  tests/test_gladius_paper_simple_cases.py \
   tests/test_gladius_paper_table2.py \
   tests/test_gladius_qualification_report.py \
   tests/test_gladius_serialization_check.py \
@@ -33,6 +34,7 @@ uv run pytest -q \
   tests/test_gladius_010_contract.py \
   tests/test_gladius_bootstrap_calibration.py \
   tests/test_gladius_notebook.py \
+  tests/test_gladius_paper_simple_cases.py \
   tests/test_gladius_paper_table2.py \
   tests/test_gladius_qualification_report.py \
   tests/test_gladius_serialization_check.py \
@@ -46,7 +48,34 @@ Ruff and mypy runs expose existing debt outside GLADIUS. The full pytest suite
 also currently has unrelated TDCCP and SEES failures. Record those results
 separately rather than presenting them as GLADIUS qualification requirements.
 
-## 2. Oracle-Simulation Structural Checks
+## 2. Cheap Paper-Objective Gates
+
+Do not start Table 2 or bootstrap work until the literal `paper_minimax` path
+recovers cardinal rewards in the one-state and three-state synthetic cases:
+
+```bash
+uv run pytest -q tests/test_gladius_paper_simple_cases.py
+```
+
+These tests use no bootstrap and at most 200 epochs. They guard raw reward
+levels, policies, and known anchor rewards. Formula equality and finite output
+are not substitutes for these gates.
+
+The gate was added after the prior Table 2 driver was found to label receipts
+as `shared_trunk` without setting `network_mode`, so it had actually trained
+the lower-level `separate` default. The repaired recipe also matches the
+checked-in author code's whole-trajectory batches, no batch shuffle,
+Xavier-normal weights, zero hidden biases, -55 output bias, summed zeta loss,
+unclipped zeta updates, and epoch learning-rate decay. Its per-Q-update anchor
+level projection is a package repair beyond the author code; it uses only the
+known anchor reward. Each projection is a common shift that leaves the current
+action differences and policy unchanged, while changing the subsequent
+optimization path. The qualification driver also reduces the trajectory batch
+size in small cells so that the alternating loop receives at least ten Q
+updates per epoch. This data-size-aware batch rule is a disclosed package
+stabilization; the paper does not publish the Table 2 batch size.
+
+## 3. Oracle-Simulation Structural Checks
 
 ```bash
 PYTHONPATH=src:. uv run python validation/estimators/gladius/run.py \
@@ -56,7 +85,11 @@ PYTHONPATH=src:. uv run python validation/estimators/gladius/run.py \
 This must write `validation/results/gladius.json` with status
 `strict_structural_counterfactual_pass` and 12 passing gates.
 
-## 3. Prespecified Bootstrap Calibration
+## 4. Prespecified Bootstrap Calibration (Deferred During Paper Diagnosis)
+
+Do not rerun this expensive release gate until the staged paper checks in
+Section 5 pass. The existing receipt remains useful for the unchanged public
+bootstrap path; this section records the eventual release procedure.
 
 The design is 20 panels, 19 whole-trajectory draws per panel. Each fit uses a
 categorical encoder for the nominal four-state DGP, a 32-by-2 network, fixed
@@ -93,24 +126,44 @@ uv run python validation/estimators/gladius/bootstrap_calibration.py \
 The merge also repeats one seeded panel twice and requires byte-for-byte equal
 records.
 
-## 4. Paper Table 2 Replication
+## 5. Paper Table 2 Replication
 
-Run seeds 0 through 19 at all six paper sample sizes. The 128,000-update cap is
-converted to whole epochs per sample size, subject to the 800-epoch ceiling,
-and recorded in every shard.
+Stage the paper check and stop at the first failed stage:
 
 ```bash
 uv run python validation/estimators/gladius/paper_table2_mape.py \
-  --sweep --reps 5 --start-seed 0 --max-updates 128000 \
+  --sizes 50 --reps 7 --start-seed 0 --max-epochs 200 \
+  --out /tmp/gladius-n50-seeds0-6.json
+uv run python validation/estimators/gladius/paper_table2_mape.py \
+  --sizes 250 --reps 1 --start-seed 0 --max-epochs 200 \
+  --out /tmp/gladius-n250-seed0.json
+uv run python validation/estimators/gladius/paper_table2_mape.py \
+  --sizes 500 --reps 1 --start-seed 0 --max-epochs 400 \
+  --out /tmp/gladius-n500-seed0.json
+```
+
+Stop at the first failed stage. On 2026-08-18 the adaptive protocol produced
+4.323% mean MAPE for N=50 seeds 0-6, 0.484% for N=250 seed 0, and 0.892%
+for N=500 seed 0. All three pass their prespecified bounds. The detailed diagnosis is
+in `validation/estimators/gladius/paper_path_report.md`.
+
+Run seeds 0 through 19 at all six paper sample sizes. Use 800 epochs in every
+cell. Do not pass `--max-updates`: the old cap changed the number of data passes
+with N. Do not pass `--batch-size`: the default data-size-aware policy is part
+of the checked receipt and provides at least ten Q updates per epoch.
+
+```bash
+uv run python validation/estimators/gladius/paper_table2_mape.py \
+  --sweep --reps 5 --start-seed 0 --max-epochs 800 \
   --out /tmp/gladius-table2-0.json
 uv run python validation/estimators/gladius/paper_table2_mape.py \
-  --sweep --reps 5 --start-seed 5 --max-updates 128000 \
+  --sweep --reps 5 --start-seed 5 --max-epochs 800 \
   --out /tmp/gladius-table2-1.json
 uv run python validation/estimators/gladius/paper_table2_mape.py \
-  --sweep --reps 5 --start-seed 10 --max-updates 128000 \
+  --sweep --reps 5 --start-seed 10 --max-epochs 800 \
   --out /tmp/gladius-table2-2.json
 uv run python validation/estimators/gladius/paper_table2_mape.py \
-  --sweep --reps 5 --start-seed 15 --max-updates 128000 \
+  --sweep --reps 5 --start-seed 15 --max-epochs 800 \
   --out /tmp/gladius-table2-3.json
 
 uv run python validation/estimators/gladius/paper_table2_mape.py \
@@ -124,7 +177,7 @@ uv run python validation/estimators/gladius/paper_table2_mape.py \
 The simulation-only best-true-MAPE epoch rule matches the checked-in author
 experiment. It is deliberately isolated from the public fit path.
 
-## 5. Build the Wheel and Exercise Installed Code
+## 6. Build the Wheel and Exercise Installed Code
 
 Build only after the candidate changes and tracked scientific receipts are
 committed. The serialization receipt records the exact commit.
