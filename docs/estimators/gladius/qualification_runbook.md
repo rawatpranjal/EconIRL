@@ -27,8 +27,11 @@ This must write `validation/results/gladius.json` with status
 
 ## 3. Frozen Bootstrap Calibration
 
-The design is 20 panels, 19 whole-trajectory draws per panel. Shards are only a
-runtime device; the merge rejects conflicting records.
+The design is 20 panels, 19 whole-trajectory draws per panel. Each fit allows
+at most 300 epochs with patience 20, and every base and bootstrap refit must
+converge. Shards are only a runtime device; the merge rejects conflicting
+records. The receipt preserves the failed 80-epoch first run and records that
+the frozen coverage and tail thresholds did not change.
 
 ```bash
 uv run python validation/estimators/gladius/bootstrap_calibration.py \

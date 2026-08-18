@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+from types import MappingProxyType
 
 import jax.numpy as jnp
 import numpy as np
@@ -86,6 +87,32 @@ def test_public_gladius_defaults_to_paper_reference_objective():
     assert model.gradient_clip_mode == "value"
 
 
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [
+        ("state", -1, "state and next-state codes must be nonnegative"),
+        ("action", 2, "action codes must lie"),
+        ("state", 0.5, "state must contain integer codes"),
+    ],
+)
+def test_public_fit_rejects_invalid_discrete_codes(column, value, message):
+    from econirl import GLADIUS
+
+    data, features, _ = _tiny_contract_case()
+    if isinstance(value, float):
+        data[column] = data[column].astype(float)
+    data.loc[data.index[0], column] = value
+
+    with pytest.raises(ValueError, match=message):
+        GLADIUS(n_actions=2).fit(
+            data,
+            state="state",
+            action="action",
+            id="id",
+            features=features,
+        )
+
+
 def test_paper_reference_bellman_terms_match_author_code():
     """The corrected Bellman residual must match the checked-in author code."""
     from econirl.estimation.gladius import _paper_reference_bellman_terms
@@ -132,6 +159,20 @@ def test_public_paper_fit_exposes_finite_identified_functionals(fitted_contract_
     np.testing.assert_allclose(model.reward_[:, 0].mean(), 0.0, atol=1e-6)
     assert model.diagnostics_["identification"]["anchor_available"] is True
     assert model.diagnostics_["optimization"]["termination_reason"]
+    assert model.is_fitted_ is True
+    assert model.n_iter_ == model.n_epochs_
+    assert model.fit_time_ > 0
+    assert model.n_observations_ == 48
+    assert model.result_ is not None
+    np.testing.assert_allclose(model.value_function_, model.value_)
+    assert isinstance(model.capabilities_, MappingProxyType)
+    assert set(model.capabilities_) == {
+        "inference",
+        "prediction",
+        "simulation",
+        "counterfactual",
+        "serialization",
+    }
 
 
 def test_declared_state_universe_is_not_shrunk_by_partial_panel_coverage():
@@ -191,7 +232,7 @@ def test_structural_counterfactual_requires_anchor():
             features=features,
             transitions=transitions,
         )
-    with pytest.raises(RuntimeError, match="require anchor_action"):
+    with pytest.raises(NotImplementedError, match="unsupported without anchor_action"):
         model.counterfactual(reward_delta=np.zeros((4, 2)))
 
 
@@ -216,6 +257,40 @@ def test_pickle_round_trip_preserves_supported_results(fitted_contract_gladius):
     )
     np.testing.assert_allclose(restored.reward_, fitted_contract_gladius.reward_)
     assert restored.objective_ == "paper_minimax"
+
+
+def test_prediction_rejects_invalid_state_codes(fitted_contract_gladius):
+    with pytest.raises(ValueError, match="states must lie"):
+        fitted_contract_gladius.predict_proba(np.array([-1, 0]))
+    with pytest.raises(ValueError, match="states must lie"):
+        fitted_contract_gladius.predict_proba(np.array([4]))
+
+
+def test_simulation_uses_stored_planning_transitions(fitted_contract_gladius):
+    first = fitted_contract_gladius.simulate(3, n_periods=5, seed=123)
+    second = fitted_contract_gladius.simulate(3, n_periods=5, seed=123)
+
+    np.testing.assert_array_equal(first.get_all_states(), second.get_all_states())
+    np.testing.assert_array_equal(first.get_all_actions(), second.get_all_actions())
+    assert first.num_individuals == 3
+    assert first.num_observations == 15
+
+
+def test_summary_has_the_frozen_manager_sections(fitted_contract_gladius):
+    summary = fitted_contract_gladius.summary()
+    headings = (
+        "Estimator",
+        "Data",
+        "Model",
+        "Pre-estimation checks",
+        "Fit",
+        "Outcome",
+        "Uncertainty",
+        "Limitations",
+    )
+    positions = [summary.index(heading) for heading in headings]
+    assert positions == sorted(positions)
+    assert "stopping reason:" in summary
 
 
 def test_trajectory_bootstrap_records_functional_draws():
@@ -253,6 +328,8 @@ def test_trajectory_bootstrap_records_functional_draws():
     assert model.bootstrap_.n_successful == 2
     assert model.bootstrap_.reward_draws.shape == (2, 4, 2)
     assert model.bootstrap_.policy_draws.shape == (2, 4, 2)
-    assert model.bootstrap_.estimates.shape == (16,)
+    assert model.bootstrap_.estimates.shape == (2, 16)
     intervals = model.conf_int()
     assert len(intervals) == 16
+    with pytest.raises(NotImplementedError, match="simulation requires a transition tensor"):
+        model.simulate(1)

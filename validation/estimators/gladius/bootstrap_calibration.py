@@ -30,6 +30,8 @@ SELECTED_STATES = (0, 1, 3)
 SELECTED_ACTION = 1
 N_STATES = 4
 N_ACTIONS = 2
+FIT_MAX_EPOCHS = 300
+FIT_PATIENCE = 20
 
 
 def _controlled_case(seed: int) -> tuple[Panel, RewardSpec, np.ndarray, np.ndarray, np.ndarray]:
@@ -84,8 +86,8 @@ def fit_panel(replication: int, n_bootstrap: int) -> dict[str, Any]:
         ev_hidden_dim=8,
         ev_num_layers=1,
         batch_size=64,
-        max_epochs=80,
-        patience=81,
+        max_epochs=FIT_MAX_EPOCHS,
+        patience=FIT_PATIENCE,
         lr_decay_rate=5e-4,
         anchor_action=0,
         anchor_rewards=tuple([0.0] * N_STATES),
@@ -137,6 +139,9 @@ def fit_panel(replication: int, n_bootstrap: int) -> dict[str, Any]:
         "n_successful": int(bootstrap.n_successful),
         "success_rate": float(bootstrap.n_successful / n_bootstrap),
         "failures": list(bootstrap.failures),
+        "base_fit_converged": bool(model.converged_),
+        "base_fit_iterations": int(model.n_iter_),
+        "base_fit_termination": model.termination_reason_,
         "cells": cells,
     }
 
@@ -192,6 +197,7 @@ def summarize(records: list[dict[str, Any]], *, final_run: bool) -> dict[str, An
         "final_design": final_run,
         "usable_panel_rate": len(usable) / len(records) >= 0.95,
         "minimum_draw_success": min(record["success_rate"] for record in records) >= 0.95,
+        "base_fit_convergence": all(record["base_fit_converged"] for record in records),
         "reward_coverage": reward["coverage"] >= 0.85,
         "policy_coverage": policy["coverage"] >= 0.85,
         "reward_tail_misses": max(reward["lower_tail_miss_rate"], reward["upper_tail_miss_rate"])
@@ -203,12 +209,27 @@ def summarize(records: list[dict[str, Any]], *, final_run: bool) -> dict[str, An
         "policy_width_stability": policy["p95_to_median_width"] <= 4.0,
     }
     return {
+        "protocol_history": {
+            "initial_final_run": {
+                "fit_max_epochs": 80,
+                "fit_patience": 81,
+                "reward_coverage": 0.6833333333333333,
+                "policy_coverage": 0.7166666666666667,
+                "all_passed": False,
+            },
+            "remediation": (
+                "require converged base and bootstrap refits; allow max 300 epochs "
+                "with patience 20; frozen coverage and tail thresholds unchanged"
+            ),
+        },
         "design": {
             "panels": len(records),
             "draws_per_panel": records[0]["n_requested"],
             "resampling_unit": "individual trajectory",
             "selected_states": list(SELECTED_STATES),
             "selected_action": SELECTED_ACTION,
+            "fit_max_epochs": FIT_MAX_EPOCHS,
+            "fit_patience": FIT_PATIENCE,
         },
         "usable_panels": len(usable),
         "reward": reward,

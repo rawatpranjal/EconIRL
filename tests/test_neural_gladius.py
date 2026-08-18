@@ -646,6 +646,10 @@ class TestAnchorScaleRecovery:
         model = NeuralGLADIUS(
             n_actions=env.num_actions,
             discount=0.95,
+            objective="anchor_moment",
+            network_mode="separate",
+            output_bias_init=None,
+            gradient_clip_mode="global_norm",
             state_encoder=lambda s: phi_state[np.asarray(s)],
             state_dim=K,
             anchor_action=0,

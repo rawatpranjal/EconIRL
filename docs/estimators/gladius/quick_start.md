@@ -57,6 +57,9 @@ Important fitted attributes:
 | `bootstrap_` | Whole-trajectory reward and policy draws when `compute_se=True`. |
 | `diagnostics_` | Coverage, rank, anchor, and optimization diagnostics. |
 | `termination_reason_` | Why fitting stopped; exhausting `max_epochs` alone is not convergence. |
+| `n_iter_`, `fit_time_` | Shared iteration count and wall-clock fit time. |
+| `result_` | Estimator-specific lower-level result object. |
+| `capabilities_` | Read-only inference, prediction, simulation, counterfactual, and serialization support map. |
 
 Use `conf_int()` for percentile intervals from the trajectory bootstrap. It
 refuses to turn the descriptive projection standard errors into confidence
@@ -78,6 +81,10 @@ print(result.welfare_change)
 A structural counterfactual requires both the fitted anchor and stored
 planning transitions. An unanchored fit may still support policy prediction,
 but GLADIUS refuses to label its reward levels or re-solved welfare structural.
+
+`simulate(n_trajectories, n_periods=..., seed=...)` draws from the fitted policy
+and the same stored planning tensor. It raises an actionable
+`NotImplementedError` when no transition tensor was supplied.
 
 ## Lower-Level API
 

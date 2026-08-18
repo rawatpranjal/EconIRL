@@ -38,8 +38,8 @@ def fit_model() -> GLADIUS:
         ev_hidden_dim=8,
         ev_num_layers=1,
         batch_size=64,
-        max_epochs=8,
-        patience=9,
+        max_epochs=300,
+        patience=20,
         anchor_action=0,
         anchor_rewards=(0.0, 0.0, 0.0, 0.0),
         compute_se=True,
@@ -59,6 +59,7 @@ def snapshot(model: GLADIUS) -> dict[str, Any]:
     delta = np.zeros((4, 2), dtype=float)
     delta[:, 1] = 0.25
     counterfactual = model.counterfactual(reward_delta=delta)
+    simulated = model.simulate(2, n_periods=4, seed=91_004)
     assert model.bootstrap_ is not None
     return {
         "coef": np.asarray(model.coef_, dtype=float).tolist(),
@@ -76,6 +77,8 @@ def snapshot(model: GLADIUS) -> dict[str, Any]:
         "counterfactual_value": np.asarray(
             counterfactual.counterfactual_value, dtype=float
         ).tolist(),
+        "simulated_states": np.asarray(simulated.get_all_states(), dtype=int).tolist(),
+        "simulated_actions": np.asarray(simulated.get_all_actions(), dtype=int).tolist(),
     }
 
 
@@ -112,6 +115,8 @@ def verify(
         "bootstrap_estimates",
         "counterfactual_policy",
         "counterfactual_value",
+        "simulated_states",
+        "simulated_actions",
     )
     gaps = {field: maximum_gap(actual[field], expected[field]) for field in fields}
     summary_equal = actual["summary"] == expected["summary"]

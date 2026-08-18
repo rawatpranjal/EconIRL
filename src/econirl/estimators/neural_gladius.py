@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import warnings
 from functools import partial
+from importlib.metadata import PackageNotFoundError, version
+from time import perf_counter
+from types import MappingProxyType
 from typing import Any, Callable, Literal, Sequence
 
 import equinox as eqx
@@ -27,7 +30,7 @@ import pandas as pd
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.reward_spec import RewardSpec
 from econirl.core.solvers import value_iteration
-from econirl.core.types import DDCProblem, Panel, TrajectoryPanel
+from econirl.core.types import DDCProblem, Panel, Trajectory, TrajectoryPanel
 from econirl.estimation.gladius import GLADIUSConfig, GLADIUSEstimator
 from econirl.estimators.neural_base import NeuralEstimatorMixin
 from econirl.inference.results import FunctionalBootstrapResult
@@ -254,6 +257,25 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         # Keys: "class_weighting" (bool), "weight_decay" (float), "q_init_bias" (float).
         self._ablate = dict(_ablate or {})
 
+        try:
+            self.econirl_version_ = version("econirl")
+        except PackageNotFoundError:
+            self.econirl_version_ = "0+unknown"
+        self._capability_details = {
+            name: {
+                "status": "supported",
+                "reason": None,
+                "substitute": None,
+            }
+            for name in (
+                "inference",
+                "prediction",
+                "simulation",
+                "counterfactual",
+                "serialization",
+            )
+        }
+
         self.params_: dict[str, float] | None = None
         self.se_: dict[str, float] | None = None
         self.pvalues_: dict[str, float] | None = None
@@ -286,13 +308,25 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.termination_reason_: str | None = None
         self.failure_reason_: str | None = None
         self.n_observations_: int | None = None
+        self.n_iter_: int | None = None
+        self.fit_time_: float | None = None
+        self.result_: Any | None = None
         self.is_fitted_: bool = False
         self._panel: Panel | None = None
         self._features: RewardSpec | object | None = None
 
+    @property
+    def capabilities_(self) -> MappingProxyType:
+        """Read-only capability map shared by public estimator workflows."""
+        nested = {
+            name: MappingProxyType(details) for name, details in self._capability_details.items()
+        }
+        return MappingProxyType(nested)
+
     def fit(
         self,
         data: pd.DataFrame | Panel | TrajectoryPanel,
+        *,
         state: str | None = None,
         action: str | None = None,
         id: str | None = None,
@@ -300,6 +334,33 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         features: RewardSpec | object | None = None,
         transitions: object = None,
     ) -> NeuralGLADIUS:
+        fit_started = perf_counter()
+        self.is_fitted_ = False
+        self.converged_ = None
+        self.termination_reason_ = None
+        self.failure_reason_ = None
+        self.n_iter_ = None
+        self.fit_time_ = None
+        self.result_ = None
+        self.bootstrap_ = None
+        if isinstance(data, pd.DataFrame):
+            if state is None or action is None or id is None:
+                raise ValueError(
+                    "state, action, and id column names are required when data is a DataFrame"
+                )
+            missing_columns = [name for name in (state, action, id) if name not in data.columns]
+            if missing_columns:
+                raise ValueError(f"missing required data columns: {missing_columns}")
+            if data[[state, action, id]].isna().any().any():
+                raise ValueError("state, action, and id columns must not contain missing values")
+            for name in (state, action):
+                values = np.asarray(data[name])
+                try:
+                    integer_values = values.astype(np.int64)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"{name} must contain integer codes") from exc
+                if not np.array_equal(values, integer_values):
+                    raise ValueError(f"{name} must contain integer codes")
         if transitions is not None:
             warnings.warn(
                 "GLADIUS does not use a transition matrix during fitting; the "
@@ -325,6 +386,16 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             data, state, action, id, context
         )
 
+        state_array = np.asarray(all_states, dtype=np.int64)
+        action_array = np.asarray(all_actions, dtype=np.int64)
+        next_array = np.asarray(all_next, dtype=np.int64)
+        if not len(state_array):
+            raise ValueError("GLADIUS requires at least one state-action observation")
+        if np.any(state_array < 0) or np.any(next_array < 0):
+            raise ValueError("state and next-state codes must be nonnegative")
+        if np.any(action_array < 0) or np.any(action_array >= self.n_actions):
+            raise ValueError(f"action codes must lie in [0, {self.n_actions})")
+
         observed_n_states = int(np.asarray(all_states).max()) + 1
         declared_state_sizes: dict[str, int] = {}
         if features is not None:
@@ -336,20 +407,25 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             declared_state_sizes["features"] = int(feature_array.shape[0])
         if self.transitions_ is not None:
             declared_state_sizes["transitions"] = int(self.transitions_.shape[1])
-        if self.anchor_rewards is not None:
-            declared_state_sizes["anchor_rewards"] = len(self.anchor_rewards)
         unique_declared_sizes = set(declared_state_sizes.values())
         if len(unique_declared_sizes) > 1:
             detail = ", ".join(
                 f"{name}={size}" for name, size in sorted(declared_state_sizes.items())
             )
             raise ValueError(f"declared state dimensions disagree: {detail}")
-        n_states = next(iter(unique_declared_sizes)) if unique_declared_sizes else observed_n_states
+        if unique_declared_sizes:
+            n_states = next(iter(unique_declared_sizes))
+        elif self.anchor_rewards is not None:
+            n_states = max(observed_n_states, len(self.anchor_rewards))
+        else:
+            n_states = observed_n_states
         if observed_n_states > n_states:
             raise ValueError(
                 f"observed state codes require {observed_n_states} states, but "
                 f"declared inputs provide {n_states}"
             )
+        if int(next_array.max()) >= n_states:
+            raise ValueError(f"next-state codes must lie in [0, {n_states})")
         self._n_states = n_states
         # Number of (s, a) observations in the panel, for an honest summary count.
         self._n_obs = int(np.asarray(all_states).shape[0])
@@ -373,6 +449,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             self._fit_paper_reference(data, state, action, id, features)
             if self.compute_se:
                 self._fit_functional_bootstrap()
+            self._finalize_common_fit(fit_started)
             return self
 
         # Predict in per-period utility units and multiply by value_scale, so the
@@ -438,7 +515,22 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.is_fitted_ = True
         if self.compute_se:
             self._fit_functional_bootstrap()
+        self._finalize_common_fit(fit_started)
         return self
+
+    def _finalize_common_fit(self, fit_started: float) -> None:
+        """Populate the fitted-state fields shared by all public estimators."""
+        self.n_iter_ = int(self.n_epochs_ or 0)
+        self.fit_time_ = float(perf_counter() - fit_started)
+        if self.result_ is None:
+            self.result_ = {
+                "objective": self.objective_,
+                "q": self.q_,
+                "continuation_value": self.continuation_value_,
+                "reward": self.reward_matrix_,
+                "policy": self.policy_,
+                "value": self.value_,
+            }
 
     def _fit_paper_reference(
         self,
@@ -535,6 +627,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             raise RuntimeError("GLADIUS estimation failed during optimization") from exc
 
         metadata = result.metadata
+        self.result_ = result
         self._paper_estimator = estimator
         self.q_ = np.asarray(metadata["q_table"], dtype=float)
         self.continuation_value_ = np.asarray(metadata["ev_table"], dtype=float)
@@ -1135,6 +1228,11 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         ev_all = jax.vmap(ev_for_action)(action_oh).T
         return np.asarray(q_all - self.discount * ev_all)
 
+    @property
+    def value_function_(self) -> np.ndarray | None:
+        """Compatibility alias for the common ``value_`` fitted field."""
+        return self.value_
+
     def predict_proba(self, states: np.ndarray, context: object | None = None) -> np.ndarray:
         """Action probabilities for the given states.
 
@@ -1149,6 +1247,10 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         if self.policy_ is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         states = np.asarray(states, dtype=np.int64)
+        if states.ndim != 1:
+            raise ValueError("states must be a one-dimensional array of integer codes")
+        if self._n_states is None or np.any(states < 0) or np.any(states >= self._n_states):
+            raise ValueError(f"states must lie in [0, {int(self._n_states or 0)})")
         if context is None:
             return self.policy_[states]
         if self._paper_estimator is not None:
@@ -1375,6 +1477,8 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             )
             try:
                 clone.fit(sampled, features=self._features)
+                if not clone.converged_:
+                    raise RuntimeError(f"nonconverged bootstrap refit: {clone.termination_reason_}")
                 reward = np.asarray(clone.reward_matrix_, dtype=float)
                 policy = np.asarray(clone.policy_, dtype=float)
                 if not np.isfinite(reward).all() or not np.isfinite(policy).all():
@@ -1393,9 +1497,6 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         draws = np.concatenate(
             [rewards.reshape(len(rewards), -1), policies.reshape(len(policies), -1)],
             axis=1,
-        )
-        estimates = np.concatenate(
-            [np.asarray(self.reward_matrix_).ravel(), np.asarray(self.policy_).ravel()]
         )
         names = tuple(
             [
@@ -1416,7 +1517,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             n_successful=len(rewards),
             seed=self.se_seed,
             estimand_names=names,
-            estimates=estimates,
+            estimates=draws,
             standard_errors=draws.std(axis=0, ddof=1),
             intervals=np.quantile(
                 draws,
@@ -1428,6 +1529,58 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             policy_draws=policies,
             failures=tuple(failures),
         )
+
+    def simulate(
+        self,
+        n_trajectories: int,
+        *,
+        n_periods: int | None = None,
+        seed: int | None = None,
+    ) -> TrajectoryPanel:
+        """Simulate fitted-policy trajectories through stored planning dynamics."""
+        if not self.is_fitted_ or self.policy_ is None or self._panel is None:
+            raise RuntimeError("Model not fitted. Call fit() first.")
+        if self.transitions_ is None:
+            raise NotImplementedError(
+                "GLADIUS simulation requires a transition tensor supplied during fit; "
+                "GLADIUS estimates behavior without transitions, so supply validated "
+                "planning dynamics or use predict_proba() for behavioral predictions"
+            )
+        if n_trajectories < 1:
+            raise ValueError("n_trajectories must be positive")
+        if n_periods is None:
+            n_periods = max(len(trajectory.states) for trajectory in self._panel.trajectories)
+        if n_periods < 1:
+            raise ValueError("n_periods must be positive")
+
+        rng = np.random.default_rng(seed)
+        initial_states = np.asarray(
+            [int(trajectory.states[0]) for trajectory in self._panel.trajectories],
+            dtype=np.int64,
+        )
+        transitions = np.asarray(self.transitions_, dtype=float)
+        trajectories = []
+        for individual in range(n_trajectories):
+            state = int(rng.choice(initial_states))
+            states = []
+            actions = []
+            next_states = []
+            for _ in range(n_periods):
+                action = int(rng.choice(self.n_actions, p=self.policy_[state]))
+                next_state = int(rng.choice(int(self._n_states), p=transitions[action, state]))
+                states.append(state)
+                actions.append(action)
+                next_states.append(next_state)
+                state = next_state
+            trajectories.append(
+                Trajectory(
+                    states=jnp.asarray(states, dtype=jnp.int32),
+                    actions=jnp.asarray(actions, dtype=jnp.int32),
+                    next_states=jnp.asarray(next_states, dtype=jnp.int32),
+                    individual_id=individual,
+                )
+            )
+        return TrajectoryPanel(trajectories=trajectories)
 
     def _solve_reward_system(
         self,
@@ -1461,13 +1614,16 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         if not self.is_fitted_ or self.reward_matrix_ is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         if not self._use_anchor:
-            raise RuntimeError(
-                "GLADIUS structural counterfactuals require anchor_action and "
-                "anchor_rewards during fit"
+            raise NotImplementedError(
+                "GLADIUS structural counterfactuals are unsupported without "
+                "anchor_action and anchor_rewards because reward levels are not "
+                "identified; use predict_proba() for behavioral comparisons"
             )
         if self.transitions_ is None:
-            raise RuntimeError(
-                "counterfactual planning requires a baseline transition tensor supplied during fit"
+            raise NotImplementedError(
+                "GLADIUS counterfactual planning requires a baseline transition "
+                "tensor supplied during fit; the estimator does not infer dynamics, "
+                "so provide validated planning transitions or report policy predictions"
             )
         if (reward_delta is None) == (transitions is None):
             raise ValueError("supply exactly one of reward_delta or transitions")
@@ -1550,25 +1706,74 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
     def summary(self) -> str:
         if self.policy_ is None:
             return "NeuralGLADIUS: Not fitted yet. Call fit() first."
-        n_obs = self._n_obs if self._n_obs is not None else None
-        return self._format_neural_summary(
-            method_name="NeuralGLADIUS",
-            params=self.params_,
-            se=self.se_,
-            pvalues=self.pvalues_,
-            projection_r2=self.projection_r2_,
-            n_observations=n_obs,
-            n_epochs=self.n_epochs_,
-            converged=self.converged_,
-            discount=self.discount,
-            scale=self.scale,
-            context_dim=self._context_dim,
-            extra_lines=[
+        diagnostics = self.diagnostics_ or {}
+        data_checks = diagnostics.get("data", {})
+        identification = diagnostics.get("identification", {})
+        outcome = (
+            "No feature projection; reward and policy functionals are available."
+            if self.params_ is None
+            else ", ".join(f"{name}={value:.4f}" for name, value in self.params_.items())
+        )
+        uncertainty = (
+            "Whole-trajectory bootstrap: "
+            f"{self.bootstrap_.n_successful}/{self.bootstrap_.n_requested} successful draws."
+            if self.bootstrap_ is not None
+            else "Not requested. Set compute_se=True for whole-trajectory percentile intervals."
+        )
+        projection = (
+            "None"
+            if self.projection_r2_ is None
+            else f"R2={self.projection_r2_:.4f}; projection SEs are descriptive, not sampling SEs"
+        )
+        return "\n".join(
+            [
+                "Estimator",
+                "NeuralGLADIUS (public GLADIUS paper-reference path)",
+                "",
+                "Data",
+                f"Observations:    {int(self.n_observations_ or 0)}",
+                f"States declared: {int(self._n_states or 0)}",
+                "",
+                "Model",
                 f"Objective: {self.objective_ or self.objective}",
-                f"Network mode: {self.network_mode}",
-                f"Q-network: {self.q_num_layers} layers x {self.q_hidden_dim} hidden",
-                f"EV-network: {self.ev_num_layers} layers x {self.ev_hidden_dim} hidden",
-            ],
+                f"Network mode: {self.network_mode}; discount={self.discount}; scale={self.scale}",
+                "",
+                "Pre-estimation checks",
+                (
+                    f"State coverage={data_checks.get('state_coverage', float('nan')):.3f}; "
+                    f"state-action coverage="
+                    f"{data_checks.get('state_action_coverage', float('nan')):.3f}"
+                ),
+                (
+                    f"Anchor available={identification.get('anchor_available', False)}; "
+                    f"contrast rank={identification.get('contrast_rank', 'not supplied')}"
+                ),
+                "",
+                "Fit",
+                f"Converged: {self.converged_}; stopping reason: {self.termination_reason_}",
+                (
+                    f"Iterations: {int(self.n_iter_ or 0)}; "
+                    f"fit time: {float(self.fit_time_ or 0.0):.3f}s"
+                ),
+                "",
+                "Outcome",
+                f"Projected action contrasts: {outcome}",
+                f"Projection diagnostic: {projection}",
+                "",
+                "Uncertainty",
+                uncertainty,
+                "",
+                "Limitations",
+                (
+                    "Structural reward levels and counterfactual welfare require a credible "
+                    "known-reward anchor in every declared state."
+                ),
+                (
+                    "Simulation and counterfactual planning require a validated transition "
+                    "tensor supplied during fit; transitions are not used for estimation."
+                ),
+                "The public fit never uses the simulation-only oracle epoch selector.",
+            ]
         )
 
     def __repr__(self) -> str:

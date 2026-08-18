@@ -31,6 +31,7 @@ def _record(replication: int) -> dict:
         "n_requested": BOOTSTRAP_DRAWS,
         "n_successful": BOOTSTRAP_DRAWS,
         "success_rate": 1.0,
+        "base_fit_converged": True,
         "cells": cells,
     }
 
