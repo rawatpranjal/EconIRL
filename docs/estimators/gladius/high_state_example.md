@@ -55,7 +55,7 @@ difference feature matrix to recover the 4-parameter structural vector.
 
 ## Interpretation
 
-The primary known-truth cell passes all 12 frozen gates: parameter cosine is
+The primary oracle-simulation cell passes all 12 prespecified checks: parameter cosine is
 0.9773, projected reward NRMSE is 0.1311, raw Bellman reward NRMSE is 0.2989,
 policy TV is 0.0187, Q NRMSE is 0.1237, and value NRMSE is 0.2194. The three
 counterfactual regrets are all below 0.009. That cell uses the lower-level

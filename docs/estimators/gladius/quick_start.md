@@ -110,7 +110,7 @@ summary = GLADIUSEstimator(config=config).estimate(
 ```
 
 The lower-level `anchor_moment` mode is a separate fitted-Q diagnostic used by
-the known-truth structural stress test. It is not the public `GLADIUS` default.
+the oracle-simulation structural stress test. It is not the public `GLADIUS` default.
 
 See the
 [applied notebook](https://github.com/rawatpranjal/EconIRL/blob/main/examples/gladius/gladius_applied_workflow.ipynb)

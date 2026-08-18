@@ -219,7 +219,7 @@ L_{\text{anch}} =
 $$
 
 This fitted-Q diagnostic avoids the explicit minimax and is used by the
-known-truth structural stress test. Setting
+oracle-simulation structural stress test. Setting
 `anchor_bellman_mode="paper_minimax"` retains the literal Eq. 12 objective and
 is the canonical public path. The two modes differ in sign and structure: the
 paper_minimax mode subtracts the variance correction $\beta^2(V_Q(s')-\zeta)^2$
@@ -364,7 +364,7 @@ family expensive. Against
 simpler behavioral methods, GLADIUS adds explicit Bellman structure through
 the Q and zeta architecture and the anchor Bellman loss, which provides a
 path toward structural parameter recovery that policy-gradient or
-behavioral-cloning methods do not have. The current known-truth cell passes raw
+behavioral-cloning methods do not have. The current oracle-simulation cell passes raw
 reward, projected reward, Q, value, policy, and scoped counterfactual gates
 together. Those results do not remove the need for a credible anchor and
 support diagnostics in a new application.
@@ -421,7 +421,7 @@ GLADIUS is evaluated on two synthetic high-dimensional-state cells with
 known rewards, transitions, policies, and counterfactual oracle objects.
 The primary cell has 21 discrete states encoded into 64-dimensional feature
 vectors, a 4-parameter linear reward, and an anchor action with known rewards.
-All 12 frozen structural and counterfactual gates pass.
+All 12 prespecified structural and counterfactual checks pass.
 
 Behavioral recovery and counterfactual regret on the primary cell (21 states, 3
 actions, 1,000 individuals, 100 periods):
@@ -439,10 +439,10 @@ actions, 1,000 individuals, 100 periods):
 
 The imitation policy is close to the data-generating policy (TV 0.0187), and
 the projected parameters align with the truth (parameter cosine 0.9773). Raw
-reward and value also meet their frozen 0.30 NRMSE gates. These claims are
+reward and value also meet their prespecified 0.30 NRMSE checks. These claims are
 conditional on the valid anchor, full feature rank, full state-action coverage,
-and known-truth design. The separate paper Table 2 receipt evaluates the public
-minimax path; the known-truth cell uses the lower-level `anchor_moment`
+and oracle-simulation design. The separate paper Table 2 receipt evaluates the public
+minimax path; the oracle-simulation cell uses the lower-level `anchor_moment`
 structural diagnostic.
 
 For cross-estimator behavioral comparisons, including GLADIUS alongside the

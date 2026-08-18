@@ -7,7 +7,7 @@ counterfactuals for unanchored fits.
 
 ## Supported Changes
 
-| Family | Changed primitive | Known-truth primary-cell regret |
+| Family | Changed primitive | Oracle-simulation primary-cell regret |
 | --- | --- | ---: |
 | Type A | Reward shift | 0.00291 |
 | Type B | Transition kernel | 0.00814 |
@@ -15,7 +15,7 @@ counterfactuals for unanchored fits.
 
 The primary qualification cell passes upstream raw reward, projected reward,
 Q, value, and policy gates together with all three regret gates. These figures
-therefore support the scoped interventions in that known-truth design. They do
+therefore support the scoped interventions in that oracle-simulation design. They do
 not make an unanchored reward level identified or validate extrapolation beyond
 the observed state and action support.
 

@@ -45,5 +45,5 @@ Inspect the `projected_reward_normalized_rmse` and `raw_bellman_reward_normalize
 fields in the results file alongside policy TV before drawing
 any structural conclusions. A good imitation policy is a necessary but not
 sufficient condition for structural counterfactual validity. The current
-known-truth qualification passes those upstream gates together, but a new
+oracle-simulation study passes those upstream checks together, but a new
 dataset must establish its own coverage, anchor, rank, and optimization checks.

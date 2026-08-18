@@ -1,11 +1,11 @@
-# Validation and Qualification
+# Simulation Study
 
 GLADIUS has three separate scientific evidence surfaces. They answer different
 questions and should not be collapsed into one result.
 
 1. The paper Table 2 replication checks the shared-trunk minimax training
    recipe on the authors' bus experiment.
-2. The known-truth structural stress test checks reward, Q, value, policy, and
+2. The oracle-simulation structural stress test checks reward, Q, value, policy, and
    re-solved counterfactuals against oracle objects.
 3. The trajectory-bootstrap calibration checks reward and policy interval
    coverage, tail balance, draw success, width stability, and exact seeded
@@ -14,9 +14,9 @@ questions and should not be collapsed into one result.
 The complete gate also requires installed-wheel notebook execution and exact
 fresh-process serialization parity.
 
-## Known-Truth Structural Cell
+## Oracle-Simulation Structural Cell
 
-The primary 21-state, 3-action cell passes all 12 frozen gates:
+The primary 21-state, 3-action cell passes all 12 prespecified checks:
 
 | Metric | Result | Gate |
 | --- | ---: | ---: |
@@ -33,7 +33,7 @@ The primary 21-state, 3-action cell passes all 12 frozen gates:
 | Type C regret | 0.00102 | at most 0.12 |
 
 The cell uses the lower-level `anchor_moment` diagnostic with global anchor
-level calibration. It validates the structural objects and frozen thresholds;
+level calibration. It evaluates the structural objects against fixed thresholds;
 it is not presented as the paper's minimax replication. The separate Table 2
 receipt validates that implementation path.
 
@@ -64,13 +64,13 @@ The current 128,000-update qualification attempt is retained as a failed
 10-seed diagnostic, not promoted as a replication. Its large-sample cells
 receive only 103, 41, and 21 epochs at `N=1000`, `N=2500`, and `N=5000`, and
 already exceed the full-design error budget. Completing the remaining seeds
-cannot make the frozen mean-MAPE gates pass. GLADIUS therefore remains blocked
+cannot make the prespecified mean-MAPE checks pass. GLADIUS therefore remains blocked
 on this paper gate pending a reviewed paper-scale budget or an approved replica
 protocol.
 
 ## Bootstrap Calibration
 
-The frozen design uses 20 independently simulated panels and 19 whole-
+The prespecified design uses 20 independently simulated panels and 19 whole-
 trajectory bootstrap draws per panel. It checks three reward and three policy
 functionals per panel using point-centered bootstrap-standard-error intervals.
 The controlled nominal states use a categorical encoder and the estimator seed
@@ -88,7 +88,7 @@ After generating all receipts and executing the notebook from the built wheel:
 PYTHONPATH=src:. uv run python validation/estimators/gladius/qualification_report.py
 ```
 
-The report fails closed when a receipt is missing, a frozen design changes, a
+The report fails closed when a receipt is missing, a prespecified design changes, a
 scientific gate fails, serialization did not import the installed wheel, or a
 notebook code cell was not executed cleanly.
 
