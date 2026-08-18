@@ -57,6 +57,8 @@ from econirl.simulation.synthetic import simulate_panel  # noqa: E402
 PAPER_GLADIUS = {50: 3.44, 250: 0.84, 500: 0.55, 1000: 0.52, 2500: 0.13, 5000: 0.12}
 PAPER_GLADIUS_SE = {50: 1.28, 250: 0.51, 500: 0.20, 1000: 0.22, 2500: 0.06, 5000: 0.06}
 PAPER_RUST = {50: 3.62, 250: 1.37, 500: 0.90, 1000: 0.71, 2500: 0.68, 5000: 0.40}
+TARGET_SIZES = (50, 250, 500, 1000, 2500, 5000)
+TARGET_REPETITIONS = 20
 
 N_MILEAGE = 20
 THETA0 = 1.0  # maintenance cost per mileage unit
@@ -290,6 +292,65 @@ def run_one(
     }
 
 
+def summarize_records(records: list[dict]) -> dict:
+    """Apply the frozen Table 2 acceptance rule to merged replication records."""
+    cells = []
+    for n_traj in TARGET_SIZES:
+        cell_records = [record for record in records if record["n_traj"] == n_traj]
+        mapes = np.asarray([record["mape"] for record in cell_records], dtype=float)
+        nfxp = np.asarray(
+            [
+                record["nfxp_oracle_mape"]
+                for record in cell_records
+                if record.get("nfxp_oracle_mape") is not None
+            ],
+            dtype=float,
+        )
+        paper_mean = PAPER_GLADIUS[n_traj]
+        threshold = paper_mean + 2.0 * PAPER_GLADIUS_SE[n_traj]
+        cells.append(
+            {
+                "n_traj": n_traj,
+                "repetitions": len(cell_records),
+                "seeds": sorted(int(record["seed"]) for record in cell_records),
+                "mean_mape": float(np.mean(mapes)) if len(mapes) else None,
+                "standard_error": (
+                    float(np.std(mapes, ddof=1) / np.sqrt(len(mapes))) if len(mapes) > 1 else None
+                ),
+                "paper_mean_mape": paper_mean,
+                "paper_standard_error": PAPER_GLADIUS_SE[n_traj],
+                "acceptance_upper_bound": threshold,
+                "within_paper_mean_plus_2se": bool(len(mapes) and np.mean(mapes) <= threshold),
+                "nfxp_oracle_mean_mape": float(np.mean(nfxp)) if len(nfxp) else None,
+            }
+        )
+    by_size = {cell["n_traj"]: cell for cell in cells}
+    complete = all(
+        cell["repetitions"] == TARGET_REPETITIONS
+        and cell["seeds"] == list(range(TARGET_REPETITIONS))
+        for cell in cells
+    )
+    post_250 = bool(
+        complete
+        and all(
+            by_size[n_traj]["mean_mape"] <= by_size[250]["mean_mape"]
+            for n_traj in TARGET_SIZES
+            if n_traj > 250
+        )
+    )
+    gates = {
+        "full_6x20_design": complete,
+        "all_cells_within_paper_mean_plus_2se": all(
+            cell["within_paper_mean_plus_2se"] for cell in cells
+        ),
+        "post_250_non_deterioration": post_250,
+        "oracle_epoch_rule_disclosed": all(
+            record.get("optimization", {}).get("oracle_selected") is True for record in records
+        ),
+    }
+    return {"cells": cells, "gates": gates, "all_passed": all(gates.values())}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--probe", action="store_true", help="1 rep at 1000 trajs (cheap)")
@@ -312,6 +373,7 @@ def main():
     )
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--merge-shard", type=Path, action="append", default=None)
     ap.add_argument(
         "--anchor",
         choices=["paper_minimax", "anchor_moment"],
@@ -320,12 +382,47 @@ def main():
     )
     args = ap.parse_args()
 
+    if args.merge_shard:
+        merged: dict[tuple[int, int], dict] = {}
+        for shard in args.merge_shard:
+            payload = json.loads(shard.read_text(encoding="utf-8"))
+            for record in payload["records"]:
+                key = (int(record["n_traj"]), int(record["seed"]))
+                if key in merged and merged[key] != record:
+                    raise ValueError(f"conflicting Table 2 shard record {key}")
+                merged[key] = record
+        records = [merged[key] for key in sorted(merged)]
+        summary = summarize_records(records)
+        output = args.out or ROOT / "validation" / "results" / "gladius_paper_table2.json"
+        output.write_text(
+            json.dumps(
+                {
+                    "dgp": "paper bus (20 mileage, +1..4, theta=[1,5], beta=0.95)",
+                    "estimator": "GLADIUSEstimator paper_minimax+shared_trunk, anchor=replace",
+                    "selection_boundary": (
+                        "simulation-only best epoch selected by true held-out reward MAPE, "
+                        "matching the checked-in author experiment; not used by public fit"
+                    ),
+                    **summary,
+                    "records": records,
+                },
+                indent=2,
+                allow_nan=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        print(f"wrote {output}")
+        if not summary["all_passed"]:
+            raise SystemExit("GLADIUS Table 2 qualification gates failed")
+        return
+
     if args.probe:
         traj_list, reps = [1000], 1
     elif args.sizes:
         traj_list, reps = [int(x) for x in args.sizes.split(",")], args.reps
     elif args.sweep:
-        traj_list, reps = [50, 250, 500, 1000, 2500, 5000], args.reps
+        traj_list, reps = list(TARGET_SIZES), args.reps
     else:
         traj_list, reps = [args.traj], args.reps
 
@@ -337,7 +434,10 @@ def main():
         cell_epochs = (
             args.max_epochs
             if args.max_updates is None
-            else max(int(np.ceil(args.max_updates / steps_per_epoch)), 1)
+            else min(
+                args.max_epochs,
+                max(int(np.ceil(args.max_updates / steps_per_epoch)), 1),
+            )
         )
         for seed in range(args.start_seed, args.start_seed + reps):
             rec = run_one(
@@ -379,6 +479,7 @@ def main():
             print(f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f}{nfxp_str}")
 
     if args.out:
+        summary = summarize_records(records)
         args.out.write_text(
             json.dumps(
                 {
@@ -390,10 +491,19 @@ def main():
                     "start_seed": args.start_seed,
                     "repetitions": reps,
                     "max_updates": args.max_updates,
+                    "max_epochs": args.max_epochs,
+                    "selection_boundary": (
+                        "simulation-only best epoch selected by true held-out reward MAPE, "
+                        "matching the checked-in author experiment; not used by public fit"
+                    ),
+                    **summary,
                     "records": records,
                 },
                 indent=2,
+                allow_nan=False,
             )
+            + "\n",
+            encoding="utf-8",
         )
         print(f"\nwrote {args.out}")
 
