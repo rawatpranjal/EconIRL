@@ -30,7 +30,7 @@ that case fails.
    estimators: [MCE-IRL](estimators/mce_irl.md),
    [Neural MCE-IRL](estimators/deep_mce_irl.md),
    [AIRL](estimators/airl.md), [NeuralAIRL](estimators/neural_airl.md),
-   [AIRL-Het](estimators/airl_het.md), and
+   [AIRL2](estimators/airl2.md), and
    [GLADIUS](estimators/gladius.md).
 5. If the behavior is better described by bounded or finite-horizon planning,
    inspect [RHIP](estimators/rhip.md).
@@ -74,8 +74,8 @@ somewhere else.
 | --- | --- | --- |
 | Large or continuous state space | CCP, MPEC, UFXP, NNES | The exact nested solve is replaced by inversion, constraints, fixed-point first-order conditions, or value approximation. |
 | Hard-to-model transition density | TD-CCP | Estimation uses observed successor tuples instead of a transition-density model. |
-| Unknown reward form | MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL-Het, GLADIUS | The target shifts from structural likelihood estimation to reward recovery from demonstrations. |
-| Latent heterogeneity | AIRL-Het | The reward is segment-specific and needs credible segment, exit-action, and absorbing-state anchors. |
+| Unknown reward form | MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL2, GLADIUS | The target shifts from structural likelihood estimation to reward recovery from demonstrations. |
+| Latent heterogeneity | AIRL2 | The reward is segment-specific and needs credible segment, exit-action, and absorbing-state anchors. |
 | Bounded or finite-horizon planning | RHIP | The planning horizon becomes part of the behavioral model. |
 
 Large or continuous state spaces break the cheap exact solve. Encoded,
@@ -93,7 +93,7 @@ density.
 Unknown rewards motivate inverse reinforcement learning. MCE-IRL recovers
 reward coefficients in supplied features. Neural MCE-IRL uses a neural reward
 map. AIRL targets the original state-only transfer claim. NeuralAIRL keeps that
-state-only boundary with neural function approximation. AIRL-Het adds
+state-only boundary with neural function approximation. AIRL2 adds
 anchors for segment-specific action-dependent rewards. GLADIUS learns neural Q
 and continuation objects, then reads reward information through anchored action
 contrasts.
@@ -111,7 +111,7 @@ The core estimators carry the main identification stories in EconIRL.
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | Can the reward be nonlinear? | Replaces fixed linear reward features with a neural reward map. |
 | [AIRL](estimators/airl.md) | Can a state-only reward transfer across dynamics? | Separates state reward from shaping under the original AIRL assumptions. |
 | [NeuralAIRL](estimators/neural_airl.md) | Can that state-only reward be nonlinear? | Uses neural approximators for the state reward, shaping potential, and generator policy. |
-| [AIRL-Het](estimators/airl_het.md) | Can anchored rewards differ across latent segments? | Adds exit-action and absorbing-state anchors, then estimates segment-specific rewards. |
+| [AIRL2](estimators/airl2.md) | Can anchored rewards differ across latent segments? | Adds exit-action and absorbing-state anchors, then estimates segment-specific rewards. |
 | [GLADIUS](estimators/gladius.md) | Can high-dimensional offline DDC avoid repeated solves? | Learns Q and continuation objects, then reads projected action contrasts. |
 
 ## Core Estimators Side by Side
@@ -127,7 +127,7 @@ Use this table to narrow the choice before opening a method page.
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | Demonstrations should be explained by an unrestricted neural reward under the maximum causal entropy objective. | Demonstrations from a discrete dynamic decision problem; transitions known or supplied. | Neural reward map. | Tabular or encoded state-action spaces. | You need finite structural parameters with standard errors, or supplied reward features are enough. | Synthetic neural-reward recovery simulation. |
 | [AIRL](estimators/airl.md) | Adversarial recovery under the original state-only AIRL assumptions is the research object. | Demonstrations from a discrete dynamic decision problem; transitions available for validation or post-fit evaluation. | State-only reward with shaping term under a fixed normalization. | Discrete dynamic decision settings. | Reward is action-dependent, an absorbing-state normalization is central, or structural action-dependent recovery is required. | Synthetic state-only AIRL simulation. |
 | [NeuralAIRL](estimators/neural_airl.md) | The AIRL state reward is nonlinear in known state inputs. | Complete demonstration trajectories and an explicit transition tensor. | Nonlinear state-only reward with neural shaping and policy functions. | Tabular or finite encoded state inputs. | Heterogeneity or action-dependent structural reward is the target. | Generated nonlinear behavioral recovery. |
-| [AIRL-Het](estimators/airl_het.md) | Latent segments have different dynamic preferences and segment-specific counterfactuals matter. | Repeated user trajectories; credible exit-action and absorbing-state anchors. | Segment-specific action-dependent reward. | Encoded discrete dynamic choice settings. | Segment membership is weakly identified, no credible reward anchor exists, or a homogeneous estimator is enough. | Synthetic serialized-content simulation. |
+| [AIRL2](estimators/airl2.md) | Latent segments have different dynamic preferences and segment-specific counterfactuals matter. | Repeated user trajectories; credible exit-action and absorbing-state anchors. | Segment-specific action-dependent reward. | Encoded discrete dynamic choice settings. | Segment membership is weakly identified, no credible reward anchor exists, or a homogeneous estimator is enough. | Synthetic serialized-content simulation. |
 | [GLADIUS](estimators/gladius.md) | You want neural Q and continuation modeling with anchor-moment reward recovery. | Dynamic discrete choices; known transitions; credible anchor action with known rewards. | Neural reward recovered from neural Q and continuation objects. | High-dimensional encoded state features. | No credible anchor action exists or you need tabular structural estimation. | Preview: projected reward diagnostics. |
 
 ## How the Papers Relate
@@ -145,7 +145,7 @@ recovery from demonstrations.
 | Neural MCE-IRL / DeepIRL | Linear MaxEnt IRL. | Neural MCE-IRL is a nonlinear reward-map extension of MCE-IRL. Raw weights are not the estimand. |
 | AIRL / Fu-Luo-Levine | GAIL and shaped adversarial rewards. | Use AIRL for the original state-only reward-transfer claim. |
 | NeuralAIRL / Fu-Luo-Levine | Tabular AIRL with a fixed reward basis. | Neural functions expand the reward map, but their raw weights are not structural parameters. |
-| AIRL-Het / Lee-Sudhir-Wang | Homogeneous AIRL and pooled dynamic choice. | Exit and absorbing-state anchors do the identification work for action-dependent and segment-specific rewards. |
+| AIRL2 / Lee-Sudhir-Wang | Homogeneous AIRL and pooled dynamic choice. | Exit and absorbing-state anchors do the identification work for action-dependent and segment-specific rewards. |
 | GLADIUS / Kang-Yoganarasimhan-Jain | NFXP, CCP, TD-CCP, offline MaxEnt IRL, and Bellman-loss methods. | GLADIUS is the high-dimensional offline bridge. Its safest structural object is the projected action contrast. |
 
 ## Paper MDP Shapes
@@ -162,7 +162,7 @@ motivated it.
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | DeepIRL grid maps. | Nonlinear state or state-action reward maps with known transitions. |
 | [AIRL](estimators/airl.md) | State-only transfer MDP. | State-only reward transfer under the Fu-Luo-Levine assumptions. |
 | [NeuralAIRL](estimators/neural_airl.md) | Nonlinear finite-state transfer MDP. | State-only neural reward recovery with known transitions. |
-| [AIRL-Het](estimators/airl_het.md) | Serialized-content choice with latent types. | Anchored action-dependent rewards and persistent latent segments. |
+| [AIRL2](estimators/airl2.md) | Serialized-content choice with latent types. | Anchored action-dependent rewards and persistent latent segments. |
 | [GLADIUS](estimators/gladius.md) | High-dimensional offline dynamic choice. | Offline panels where tabular dynamic programming is too costly and action contrasts are enough. |
 
 ## Main Axes
@@ -175,7 +175,7 @@ motivated it.
 | Small or moderate tabular space with speed pressure | CCP, MPEC, UFXP | The structural target remains tabular, but the computation changes. |
 | Encoded or higher-dimensional state space with finite reward parameters | TD-CCP, NNES | The reward is still finite-dimensional, but transition or value objects become harder. |
 | Nonlinear reward over tabular or encoded states | Neural MCE-IRL, NeuralAIRL | The reward map is neural, but planning still uses supplied transitions. |
-| Repeated choices with latent segments | AIRL-Het | It estimates segment-specific rewards and policies. |
+| Repeated choices with latent segments | AIRL2 | It estimates segment-specific rewards and policies. |
 | High-dimensional offline state features | GLADIUS | It learns Q and continuation objects instead of repeated tabular solves. |
 
 ### Reward Form
@@ -186,14 +186,14 @@ motivated it.
 | Linear IRL reward basis | MCE-IRL | Identified only inside the supplied feature basis. |
 | Neural reward map | Neural MCE-IRL, NeuralAIRL | The reward matrix is the object. The raw weights are not. |
 | State-only transferable reward | AIRL, NeuralAIRL | Matches the original AIRL claim only under its state-only assumptions. |
-| Segment-specific action-dependent reward | AIRL-Het | Needs credible exit-action and absorbing-state anchors, persistent segments, and enough trajectory support per segment. |
+| Segment-specific action-dependent reward | AIRL2 | Needs credible exit-action and absorbing-state anchors, persistent segments, and enough trajectory support per segment. |
 | Projected action contrast | GLADIUS | Stronger than raw Bellman reward levels in the package route. |
 
 ### Transition Information
 
 | Transition input | Estimators | Meaning |
 | --- | --- | --- |
-| Explicit transition tensor | NFXP, CCP, MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL-Het | The estimator or policy update uses a transition model. |
+| Explicit transition tensor | NFXP, CCP, MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL2 | The estimator or policy update uses a transition model. |
 | Observed successor pairs for estimation | TD-CCP | Estimation uses successor tuples instead of a transition-density model. |
 | Offline next states | GLADIUS | Training uses sampled next states and learned continuation objects. |
 
@@ -220,7 +220,7 @@ the reward.
 | Neural MCE-IRL | Anchored reward matrix. | Conditional. | Known transitions, representable reward, sufficient occupancy, and exact optimization under a fixed anchor. |
 | AIRL | State-only reward up to a constant. | Yes under the original AIRL assumptions. | State-only reward, decomposable dynamics, sufficient expert and learner samples, and adversarial equilibrium. |
 | NeuralAIRL | Nonlinear state-only reward up to a constant. | Conditional. | State-only reward, deterministic decomposable dynamics, representable state inputs, complete observed-state coverage, sufficient samples, and recovery of the optimal discriminator score. |
-| AIRL-Het | Segment-specific anchored $R_k(s,a)$. | Conditional. | Exit-action reward anchor, absorbing-state value anchor, correct segment count, segment separation, support, fixed discount, and exact policy solution. |
+| AIRL2 | Segment-specific anchored $R_k(s,a)$. | Conditional. | Exit-action reward anchor, absorbing-state value anchor, correct segment count, segment separation, support, fixed discount, and exact policy solution. |
 | GLADIUS dual anchor-moment | Projected action contrasts. | Conditional. | Credible anchor, learned Q and continuation objects, action-contrast rank, and support. |
 | GLADIUS `q_only` | Full reward. | No. | Useful as a diagnostic mode, but not enough for reward recovery. |
 
@@ -259,7 +259,7 @@ If you are reading the docs in order, use this route.
 6. Read [AIRL](estimators/airl.md) when state-only reward transfer is the
    object.
 7. Read [NeuralAIRL](estimators/neural_airl.md) when that reward is nonlinear.
-8. Read [AIRL-Het](estimators/airl_het.md) when anchored latent heterogeneity
+8. Read [AIRL2](estimators/airl2.md) when anchored latent heterogeneity
    is the object.
 9. Read [GLADIUS](estimators/gladius.md) when high-dimensional offline state
    features make repeated dynamic-programming solves unattractive and projected

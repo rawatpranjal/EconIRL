@@ -104,7 +104,7 @@ The restrictions are the point:
   above does not apply.
 
 **Estimator consequence.** The AIRL page should be read with the state-only
-condition in mind. The AIRL-Het page uses extra economic anchors instead of
+condition in mind. The AIRL2 page uses extra economic anchors instead of
 relying only on AIRL's original state-only decomposition.
 
 The stochastic-transition problem has two parts. First, the target advantage
@@ -201,6 +201,6 @@ identified primitive utility.
 | MCE-IRL | Feature-count matching / soft likelihood. | Reward in the supplied feature span. |
 | Neural MCE-IRL | Soft likelihood with a neural reward map. | Reward map, not raw weights; needs support and normalization. |
 | AIRL | Advantage decomposition at an adversarial saddle. | State-only reward under original AIRL restrictions. |
-| AIRL-Het | Anchored action-dependent rewards with latent segments. | Segment-specific reward under anchor and segment support conditions. |
+| AIRL2 | Anchored action-dependent rewards with latent segments. | Segment-specific reward under anchor and segment support conditions. |
 | GAIL | Occupancy matching. | Imitation unless extra Bellman identification is added. |
 | IQ-Learn | Soft-Q fit plus regularized Bellman-implied reward. | Representative selected by regularization unless anchored. |

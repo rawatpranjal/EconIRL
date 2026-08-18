@@ -1,4 +1,4 @@
-"""Simulation study: content consumption with latent viewer types (AIRL-Het showcase).
+"""Simulation study: content consumption with latent viewer types (AIRL2 showcase).
 
 The HETEROGENEITY axis of the comparison suite. Every other study is a single-type,
 homogeneous-agent DGP. This one mixes two latent viewer types in one panel and asks
@@ -20,24 +20,24 @@ A mixed panel draws each viewer's type from a 50/50 mixture and simulates their 
 session from that type's optimal policy, recording the latent label as ground truth.
 
 Roster:
-  - AIRL-Het (headline): recovers a per-segment reward + policy via EM, plus a
+  - AIRL2 (headline): recovers a per-segment reward + policy via EM, plus a
     posterior segment membership for every viewer (Lee, Sudhir & Wang 2026). The
     anchors are literal here: leave is the zero-reward exit action, the session-ended
-    state is the zero-reward absorbing state whose value AIRL-Het normalizes to zero.
+    state is the zero-reward absorbing state whose value AIRL2 normalizes to zero.
   - AIRL, MCE-IRL (homogeneous baselines): fit ONE reward/policy on the same mixed
     panel, blind to the types. One reward cannot serve two types, so a homogeneous
     fit settles on one type and leaves the other behind.
 
 Metrics:
-  - assignment accuracy: does the AIRL-Het posterior put each viewer in the right
+  - assignment accuracy: does the AIRL2 posterior put each viewer in the right
     segment? Reported as the best of the two label permutations (segment indices are
     arbitrary), against the panel's latent labels.
   - per-segment policy TV: each method's recovered segment policy vs that true type's
-    optimal policy. AIRL-Het has one policy per segment; the homogeneous baselines
+    optimal policy. AIRL2 has one policy per segment; the homogeneous baselines
     have ONE policy, scored against BOTH true types.
 
 The headline: a homogeneous IRL must serve both types with one policy, so it fits one
-type well and abandons the other (its worst-served type has high TV); AIRL-Het serves
+type well and abandons the other (its worst-served type has high TV); AIRL2 serves
 both, so its worst-served type is closer to the truth, and it classifies viewers
 (assignment accuracy >> 50%).
 
@@ -95,10 +95,10 @@ N_INDIVIDUALS = 250
 N_PERIODS = 40
 PANEL_SEED = 42
 
-# AIRL-Het EM budget for the full run.
+# AIRL2 EM budget for the full run.
 MAX_EM = 20
 MAX_AIRL_ROUNDS = 20
-AIRL_HET_SEED = 7
+AIRL2_SEED = 7
 
 
 # ---------------------------------------------------------------------------
@@ -124,14 +124,14 @@ def _true_segment_policies(segment_envs):
 
 
 def _utility(env):
-    """Action-dependent linear utility over the env's own features (the AIRL-Het basis)."""
+    """Action-dependent linear utility over the env's own features (the AIRL2 basis)."""
     from econirl.preferences.action_reward import ActionDependentReward
 
     return ActionDependentReward(env.feature_matrix, list(env.parameter_names))
 
 
 def _assignment_accuracy(posteriors: np.ndarray, true_labels: np.ndarray, K: int) -> dict:
-    """Best-permutation assignment accuracy of the AIRL-Het posterior.
+    """Best-permutation assignment accuracy of the AIRL2 posterior.
 
     Segment indices are arbitrary (label switching), so the accuracy is the best
     match over all K! relabelings of the recovered segments onto the true labels.
@@ -152,31 +152,34 @@ def _assignment_accuracy(posteriors: np.ndarray, true_labels: np.ndarray, K: int
     return {"accuracy": best_acc, "permutation": list(best_perm)}
 
 
-def run_airl_het(panel, segment_envs, true_policies, *, max_em, max_airl_rounds):
-    """Headline: AIRL-Het. Recovers per-segment policy + per-viewer posterior.
+def run_airl2(panel, segment_envs, true_policies, *, max_em, max_airl_rounds):
+    """Headline: AIRL2. Recovers per-segment policy + per-viewer posterior.
 
     Returns per-segment policy TV (recovered segment matched to the true type via the
     same best permutation as the assignment), the assignment accuracy, and the priors.
     """
-    from econirl.estimation.adversarial.airl_het import AIRLHetConfig, AIRLHetEstimator
+    from econirl.estimation.adversarial.airl2 import AIRL2Config, AIRL2Estimator
 
     K = len(segment_envs)
     env = segment_envs[0]  # shared problem/transitions/features
     utility = _utility(env)
 
-    config = AIRLHetConfig(
+    config = AIRL2Config(
         num_segments=K,
         exit_action=env.leave_action,
         absorbing_state=env.session_ended_state,
         reward_type="linear",
         max_em_iterations=max_em,
         max_airl_rounds=max_airl_rounds,
-        seed=AIRL_HET_SEED,
+        seed=AIRL2_SEED,
         verbose=False,
     )
-    est = AIRLHetEstimator(config)
+    est = AIRL2Estimator(config)
     summary = est.estimate(
-        panel, utility, env.problem_spec, env.transition_matrices,
+        panel,
+        utility,
+        env.problem_spec,
+        env.transition_matrices,
     )
 
     posteriors = np.asarray(summary.metadata["segment_posteriors"], dtype=np.float64)
@@ -199,7 +202,7 @@ def run_airl_het(panel, segment_envs, true_policies, *, max_em, max_airl_rounds)
         per_segment_tv.append(tv)
 
     return {
-        "name": "AIRL-Het",
+        "name": "AIRL2",
         "family": "heterogeneity-aware",
         "assignment_accuracy": assign["accuracy"],
         "assignment_permutation": perm,
@@ -215,12 +218,20 @@ def run_mce_irl(panel, segment_envs, true_policies):
     from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
 
     env = segment_envs[0]
-    est = MCEIRLEstimator(config=MCEIRLConfig(
-        learning_rate=0.05, outer_max_iter=100, inner_max_iter=1000,
-        compute_se=False, verbose=False,
-    ))
+    est = MCEIRLEstimator(
+        config=MCEIRLConfig(
+            learning_rate=0.05,
+            outer_max_iter=100,
+            inner_max_iter=1000,
+            compute_se=False,
+            verbose=False,
+        )
+    )
     summary = est.estimate(
-        panel, _utility(env), env.problem_spec, env.transition_matrices,
+        panel,
+        _utility(env),
+        env.problem_spec,
+        env.transition_matrices,
     )
     pi = np.asarray(summary.policy, dtype=np.float64)
     per_segment_tv = [policy_tv(pi, true_policies[t]) for t in range(len(segment_envs))]
@@ -239,7 +250,7 @@ def run_airl(panel, segment_envs, true_policies):
 
     env = segment_envs[0]
     # State-action reward with the same leave/session-ended anchors so AIRL sees the
-    # same identification as AIRL-Het, only without the segment mixture.
+    # same identification as AIRL2, only without the segment mixture.
     config = AIRLConfig(
         reward_type="linear",
         reward_arg="state_action",
@@ -251,7 +262,10 @@ def run_airl(panel, segment_envs, true_policies):
     )
     est = AIRLEstimator(config)
     summary = est.estimate(
-        panel, _utility(env), env.problem_spec, env.transition_matrices,
+        panel,
+        _utility(env),
+        env.problem_spec,
+        env.transition_matrices,
     )
     pi = np.asarray(summary.policy, dtype=np.float64)
     per_segment_tv = [policy_tv(pi, true_policies[t]) for t in range(len(segment_envs))]
@@ -276,11 +290,16 @@ def run_study(*, n_individuals, n_periods, max_em, max_airl_rounds, include_airl
     true_policies = _true_segment_policies(segment_envs)
 
     panel = simulate_mixture_panel(
-        segment_envs, SEGMENT_PROBS,
-        n_individuals=n_individuals, n_periods=n_periods, seed=PANEL_SEED,
+        segment_envs,
+        SEGMENT_PROBS,
+        n_individuals=n_individuals,
+        n_periods=n_periods,
+        seed=PANEL_SEED,
     )
     labels = np.asarray(panel.metadata["segment_labels"], dtype=np.int64)
-    label_shares = (np.bincount(labels, minlength=len(segment_envs)) / len(labels)).round(3).tolist()
+    label_shares = (
+        (np.bincount(labels, minlength=len(segment_envs)) / len(labels)).round(3).tolist()
+    )
     print(
         f"mixed panel: {n_individuals} viewers x {n_periods} periods | "
         f"true label shares {label_shares} | "
@@ -290,13 +309,16 @@ def run_study(*, n_individuals, n_periods, max_em, max_airl_rounds, include_airl
     methods = {}
 
     t0 = time.time()
-    methods["AIRL-Het"] = run_airl_het(
-        panel, segment_envs, true_policies,
-        max_em=max_em, max_airl_rounds=max_airl_rounds,
+    methods["AIRL2"] = run_airl2(
+        panel,
+        segment_envs,
+        true_policies,
+        max_em=max_em,
+        max_airl_rounds=max_airl_rounds,
     )
     print(
-        f"  AIRL-Het    assignment {methods['AIRL-Het']['assignment_accuracy']:.3f} "
-        f"per-seg TV {[round(x, 3) for x in methods['AIRL-Het']['per_segment_tv']]} "
+        f"  AIRL2    assignment {methods['AIRL2']['assignment_accuracy']:.3f} "
+        f"per-seg TV {[round(x, 3) for x in methods['AIRL2']['per_segment_tv']]} "
         f"({time.time() - t0:.1f}s)"
     )
 
@@ -312,7 +334,8 @@ def run_study(*, n_individuals, n_periods, max_em, max_airl_rounds, include_airl
         try:
             methods["AIRL"] = run_airl(panel, segment_envs, true_policies)
             print(
-                f"  AIRL        per-seg TV {[round(x, 3) for x in methods['AIRL']['per_segment_tv']]} "
+                "  AIRL        per-seg TV "
+                f"{[round(x, 3) for x in methods['AIRL']['per_segment_tv']]} "
                 f"({time.time() - t0:.1f}s)"
             )
         except Exception as exc:  # noqa: BLE001
@@ -334,7 +357,7 @@ def run_study(*, n_individuals, n_periods, max_em, max_airl_rounds, include_airl
             "feature_names": list(env.parameter_names),
             "max_em_iterations": max_em,
             "max_airl_rounds": max_airl_rounds,
-            "airl_het_seed": AIRL_HET_SEED,
+            "airl2_seed": AIRL2_SEED,
             "discount_factor": float(env.problem_spec.discount_factor),
             "scale_parameter": float(env.problem_spec.scale_parameter),
         },
@@ -356,8 +379,10 @@ def results_figure(data: dict, out_path: str) -> None:
 
     seg_names = data["meta"]["segment_names"]
     methods = data["methods"]
-    # Stable order: AIRL-Het first (headline), then homogeneous baselines.
-    order = [m for m in ("AIRL-Het", "AIRL", "MCE-IRL") if m in methods and "per_segment_tv" in methods[m]]
+    # Stable order: AIRL2 first (headline), then homogeneous baselines.
+    order = [
+        m for m in ("AIRL2", "AIRL", "MCE-IRL") if m in methods and "per_segment_tv" in methods[m]
+    ]
 
     K = len(seg_names)
     x = np.arange(len(order), dtype=np.float64)
@@ -368,8 +393,11 @@ def results_figure(data: dict, out_path: str) -> None:
     for t in range(K):
         tvs = [methods[m]["per_segment_tv"][t] for m in order]
         ax.bar(
-            x + (t - (K - 1) / 2.0) * width, tvs, width,
-            label=f"vs {seg_names[t]} type", color=seg_colors[t % len(seg_colors)],
+            x + (t - (K - 1) / 2.0) * width,
+            tvs,
+            width,
+            label=f"vs {seg_names[t]} type",
+            color=seg_colors[t % len(seg_colors)],
         )
     ax.set_xticks(x)
     ax.set_xticklabels(order)
@@ -400,7 +428,7 @@ def render_page(data: dict) -> str:
     thetas = meta["segment_thetas"]
     fnames = meta["feature_names"]
 
-    het = methods.get("AIRL-Het", {})
+    het = methods.get("AIRL2", {})
     accuracy = het.get("assignment_accuracy")
 
     lines: list[str] = []
@@ -417,7 +445,7 @@ def render_page(data: dict) -> str:
     lines.append(
         "A homogeneous method fits one reward to the whole crowd. With one reward it "
         "cannot serve two types, so it settles on one and leaves the other behind. "
-        "This study asks whether AIRL-Het can pull the two types apart: recover a "
+        "This study asks whether AIRL2 can pull the two types apart: recover a "
         "reward and a policy for each type, and sort each viewer into the right type."
     )
     lines.append("")
@@ -436,11 +464,13 @@ def render_page(data: dict) -> str:
         "a satiation cost on the category just watched, a flat time cost, and a variety "
         "bonus for keeping fresh categories on the menu. Leaving carries zero reward. "
         "The session-ended state carries zero reward. These two zeros are the anchors "
-        "AIRL-Het uses to pin down the reward exactly."
+        "AIRL2 uses to pin down the reward exactly."
     )
     lines.append("")
-    lines.append("The two types differ only in their reward weights "
-                 f"on the four features ({', '.join(fnames)}):")
+    lines.append(
+        "The two types differ only in their reward weights "
+        f"on the four features ({', '.join(fnames)}):"
+    )
     lines.append("")
     lines.append("| Type | " + " | ".join(fnames) + " |")
     lines.append("|" + "---|" * (len(fnames) + 1))
@@ -463,14 +493,14 @@ def render_page(data: dict) -> str:
     lines.append("")
     lines.append(
         "Per-segment policy total variation measures how far a recovered policy is from "
-        "a true type's policy. Lower is better; zero means the policies agree. AIRL-Het "
+        "a true type's policy. Lower is better; zero means the policies agree. AIRL2 "
         "has one policy per type, each scored against its matched type. The homogeneous "
         "baselines have one policy, scored against both types."
     )
     lines.append("")
     lines.append("| Method | TV vs " + seg[0] + " | TV vs " + seg[1] + " | Assignment accuracy |")
     lines.append("|---|---|---|---|")
-    order = [m for m in ("AIRL-Het", "AIRL", "MCE-IRL") if m in methods]
+    order = [m for m in ("AIRL2", "AIRL", "MCE-IRL") if m in methods]
     for name in order:
         m = methods[name]
         if "error" in m:
@@ -478,14 +508,14 @@ def render_page(data: dict) -> str:
             continue
         tv = m.get("per_segment_tv", [None, None])
         acc = m.get("assignment_accuracy")
-        lines.append(
-            f"| {name} | {_fmt(tv[0])} | {_fmt(tv[1])} | {_fmt(acc)} |"
-        )
+        lines.append(f"| {name} | {_fmt(tv[0])} | {_fmt(tv[1])} | {_fmt(acc)} |")
     lines.append("")
     if accuracy is not None:
         het_tv = het.get("per_segment_tv", [None, None])
-        homo_names = [m for m in ("AIRL", "MCE-IRL") if m in methods and "per_segment_tv" in methods[m]]
-        # The headline holds only when the numbers support it: AIRL-Het classifies
+        homo_names = [
+            m for m in ("AIRL", "MCE-IRL") if m in methods and "per_segment_tv" in methods[m]
+        ]
+        # The headline holds only when the numbers support it: AIRL2 classifies
         # well above chance AND its worse-segment policy beats the best homogeneous
         # baseline's worse segment. The prose follows the evidence, not the hope.
         het_worst = max(het_tv) if all(v is not None for v in het_tv) else None
@@ -500,7 +530,7 @@ def render_page(data: dict) -> str:
         )
         if separates:
             lines.append(
-                f"AIRL-Het recovers both types. Its per-segment policy TV is "
+                f"AIRL2 recovers both types. Its per-segment policy TV is "
                 f"{het_tv[0]:.3f} for the {seg[0]} type and {het_tv[1]:.3f} for the "
                 f"{seg[1]} type. It sorts {accuracy * 100:.1f} percent of viewers into "
                 f"the right type, well above the 50 percent a coin flip would give."
@@ -510,12 +540,12 @@ def render_page(data: dict) -> str:
                 "A homogeneous fit cannot do this. One policy has to serve everyone, so "
                 "it settles on whichever type is easier to fit and leaves the other "
                 "behind. Its worst-served type ends up far further from the truth than "
-                "AIRL-Het's worst-served type. The single averaged reward is the reward "
+                "AIRL2's worst-served type. The single averaged reward is the reward "
                 "of no real viewer."
             )
         else:
             lines.append(
-                f"AIRL-Het sorts {accuracy * 100:.1f} percent of viewers into the right "
+                f"AIRL2 sorts {accuracy * 100:.1f} percent of viewers into the right "
                 f"type, well above the 50 percent a coin flip would give, so it detects "
                 f"the heterogeneity. It does not recover a better per-type policy than a "
                 f"pooled fit on this data: its per-segment policy TV does not beat the "
@@ -528,7 +558,7 @@ def render_page(data: dict) -> str:
         lines.append("")
     lines.append(
         "![Grouped bars of per-segment policy total variation, one pair per method. "
-        "AIRL-Het is scored per recovered type; the homogeneous baselines are scored "
+        "AIRL2 is scored per recovered type; the homogeneous baselines are scored "
         "against both true types.]"
         "(../_static/simulation_studies/content_consumption_results.png)"
     )
@@ -568,12 +598,21 @@ def _load() -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--page", action="store_true",
-                        help="re-render the page + figure from the saved JSON, no re-run")
-    parser.add_argument("--verify", action="store_true",
-                        help="re-derive the results table from the saved JSON and print it")
-    parser.add_argument("--smoke", action="store_true",
-                        help="tiny bounded smoke (60 viewers, MAX_EM=3, AIRL-Het + MCE-IRL only)")
+    parser.add_argument(
+        "--page",
+        action="store_true",
+        help="re-render the page + figure from the saved JSON, no re-run",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="re-derive the results table from the saved JSON and print it",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="tiny bounded smoke (60 viewers, MAX_EM=3, AIRL2 + MCE-IRL only)",
+    )
     args = parser.parse_args()
 
     if args.page:
@@ -587,13 +626,19 @@ def main() -> None:
 
     if args.smoke:
         data = run_study(
-            n_individuals=60, n_periods=25,
-            max_em=3, max_airl_rounds=5, include_airl=False,
+            n_individuals=60,
+            n_periods=25,
+            max_em=3,
+            max_airl_rounds=5,
+            include_airl=False,
         )
     else:
         data = run_study(
-            n_individuals=N_INDIVIDUALS, n_periods=N_PERIODS,
-            max_em=MAX_EM, max_airl_rounds=MAX_AIRL_ROUNDS, include_airl=True,
+            n_individuals=N_INDIVIDUALS,
+            n_periods=N_PERIODS,
+            max_em=MAX_EM,
+            max_airl_rounds=MAX_AIRL_ROUNDS,
+            include_airl=True,
         )
     write_outputs(data)
 

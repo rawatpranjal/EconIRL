@@ -1,14 +1,14 @@
 {
-  "estimator": "AIRL-Het",
-  "interpretation": "AIRL-Het passes the anchored serialized-content latent-segment known-truth cell.",
-  "primary_cell_id": "airl_het_paper_identification",
+  "estimator": "AIRL2",
+  "interpretation": "AIRL2 passes the anchored serialized-content latent-segment known-truth cell.",
+  "primary_cell_id": "airl2_paper_identification",
   "results": [
     {
-      "cell_id": "airl_het_paper_identification",
+      "cell_id": "airl2_paper_identification",
       "compatibility": {
         "compatible": true,
         "errors": [],
-        "estimator": "AIRL-Het",
+        "estimator": "AIRL2",
         "warnings": [
           "58 of 61 states are observed"
         ]
@@ -64,7 +64,7 @@
           "58 of 61 states are observed"
         ]
       },
-      "estimator": "AIRL-Het",
+      "estimator": "AIRL2",
       "gates": [
         {
           "name": "num_segments_match",
@@ -85,7 +85,7 @@
           "operator": "<=",
           "passed": true,
           "threshold": 0.35,
-          "value": 0.043477813304278856
+          "value": 0.0434778133042788
         },
         {
           "name": "segment_assignment_accuracy",
@@ -106,21 +106,21 @@
           "operator": "<=",
           "passed": true,
           "threshold": 0.12,
-          "value": 0.05913144436746753
+          "value": 0.059131444367467215
         },
         {
           "name": "max_segment_value_normalized_rmse",
           "operator": "<=",
           "passed": true,
           "threshold": 0.3,
-          "value": 0.14197337719868644
+          "value": 0.14197337719868555
         },
         {
           "name": "max_segment_q_normalized_rmse",
           "operator": "<=",
           "passed": true,
           "threshold": 0.3,
-          "value": 0.21138937605956745
+          "value": 0.21138937605956615
         },
         {
           "name": "type_a_max_regret",
@@ -150,10 +150,10 @@
           "type_b": 0.11893310781701327,
           "type_c": 0.00686809129514554
         },
-        "max_segment_policy_tv": 0.05913144436746753,
-        "max_segment_q_normalized_rmse": 0.21138937605956745,
+        "max_segment_policy_tv": 0.059131444367467215,
+        "max_segment_q_normalized_rmse": 0.21138937605956615,
         "max_segment_reward_normalized_rmse": 0.2650011487814588,
-        "max_segment_value_normalized_rmse": 0.14197337719868644,
+        "max_segment_value_normalized_rmse": 0.14197337719868555,
         "segment_assignment_accuracy": 0.895,
         "segment_permutation": {
           "estimated_to_true": {
@@ -165,19 +165,19 @@
             0
           ]
         },
-        "segment_prior_l1": 0.043477813304278856,
+        "segment_prior_l1": 0.0434778133042788,
         "segment_prior_max_abs_error": 0.021738921553300594,
         "segment_q_normalized_rmse": [
-          0.13125537952018404,
-          0.21138937605956745
+          0.1312553795201841,
+          0.21138937605956615
         ],
         "segment_reward_normalized_rmse": [
           0.24404583135758476,
           0.2650011487814588
         ],
         "segment_value_normalized_rmse": [
-          0.09269394540489886,
-          0.14197337719868644
+          0.09269394540489935,
+          0.14197337719868555
         ]
       },
       "simulation": {
@@ -189,12 +189,12 @@
       "summary": {
         "converged": true,
         "convergence_message": "EM converged",
-        "estimation_time": 30.698772192001343,
-        "log_likelihood": -11614.762960734517,
+        "estimation_time": 19.30384373664856,
+        "log_likelihood": -11614.762960734519,
         "metadata": {
           "em_log_likelihoods": [
-            -11609.662028932702,
-            -11614.762960734517
+            -11609.662028932706,
+            -11614.762960734519
           ],
           "generator_reward": "f",
           "initialization": "behavioral_anchor",
@@ -204,7 +204,7 @@
           "min_airl_rounds": 1,
           "num_segments": 2,
           "segment_priors": [
-            0.4982610891755354,
+            0.49826108917553547,
             0.5017389108244645
           ]
         },

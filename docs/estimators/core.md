@@ -23,7 +23,7 @@ For how to choose among them, including the side-by-side table, see
 | [Neural MCE-IRL](deep_mce_irl.md) | IRL | Unrestricted neural reward map under the MCE objective. |
 | [AIRL](airl.md) | IRL | Adversarial state-only reward recovery under the original AIRL transfer assumptions. |
 | [NeuralAIRL](neural_airl.md) | IRL | Nonlinear state reward recovery with neural reward, shaping, and policy functions. |
-| [AIRL-Het](airl_het.md) | IRL | Segment-specific action-dependent rewards under exit and absorbing-state anchors. |
+| [AIRL2](airl2.md) | IRL | Segment-specific action-dependent rewards under exit and absorbing-state anchors. |
 | [GLADIUS](gladius.md) | IRL | Neural Q and continuation reward recovery at scale. |
 
 GLADIUS is the core neural Q and continuation estimator.
@@ -38,6 +38,6 @@ mce_irl
 deep_mce_irl
 airl
 neural_airl
-airl_het
+airl2
 gladius
 ```

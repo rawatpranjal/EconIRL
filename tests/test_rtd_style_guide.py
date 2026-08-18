@@ -33,7 +33,15 @@ NEURAL_MCE_PAGES = [
     DOCS / "estimators" / "deep_mce_irl" / "counterfactuals.md",
     DOCS / "estimators" / "deep_mce_irl" / "wulfmeier_objectworld.md",
 ]
-COMPLETED_ESTIMATOR_PAGES = NFXP_PAGES + CCP_PAGES + NEURAL_MCE_PAGES
+AIRL2_PAGES = [
+    DOCS / "estimators" / "airl2.md",
+    DOCS / "estimators" / "airl2" / "quick_start.md",
+    DOCS / "estimators" / "airl2" / "pre_estimation.md",
+    DOCS / "estimators" / "airl2" / "validation.md",
+    DOCS / "estimators" / "airl2" / "counterfactuals.md",
+    DOCS / "estimators" / "airl2" / "serialized_content.md",
+]
+COMPLETED_ESTIMATOR_PAGES = NFXP_PAGES + CCP_PAGES + NEURAL_MCE_PAGES + AIRL2_PAGES
 
 
 def test_completed_estimator_pages_put_important_links_immediately_after_title() -> None:
@@ -256,7 +264,8 @@ def test_estimator_navigation_is_owned_by_section_pages() -> None:
         "mce_irl",
         "deep_mce_irl",
         "airl",
-        "airl_het",
+        "neural_airl",
+        "airl2",
         "gladius",
     ]
     expected_other = [
@@ -521,6 +530,10 @@ def _public_estimator_validation_pages() -> list[Path]:
 
 
 def _is_excluded_from_rtd(path: Path) -> bool:
+    if path.suffix == ".md":
+        opening = path.read_text(encoding="utf-8")[:80]
+        if opening.startswith("---\n") and "\norphan: true\n" in opening:
+            return True
     rel = path.relative_to(DOCS).as_posix()
     parts = path.relative_to(DOCS).parts
     for pattern in _exclude_patterns():

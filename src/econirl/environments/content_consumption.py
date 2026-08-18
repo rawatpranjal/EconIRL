@@ -48,7 +48,7 @@ positive weight on that channel::
 
 For the ``leave`` action and for the absorbing state, all features are zero, so
 the exit action and the session-ended state both carry zero flow reward -- the
-anchors AIRL-Het expects.
+anchors AIRL2 expects.
 
 **Identification** -- ``enjoyment`` is category-specific intrinsic quality, kept
 *decoupled* from satiation so it is not an affine function of the satiation
@@ -63,7 +63,7 @@ drops the contrast rank to 3.)
 P(s' | s, a)``, matching the estimator-facing convention.
 
 The constructed :class:`ArrayMDP` carries two extra attributes so a study and the
-AIRL-Het anchors line up with the environment:
+AIRL2 anchors line up with the environment:
 
 - ``leave_action`` -- the index of the ``leave`` action (``= C``).
 - ``session_ended_state`` -- the index of the absorbing state (``= L ** C``).
@@ -125,13 +125,10 @@ def content_consumption(
     """
     if reward_form != "linear":
         raise ValueError(
-            f"content_consumption: unknown reward_form {reward_form!r}. "
-            "Supported: 'linear'."
+            f"content_consumption: unknown reward_form {reward_form!r}. Supported: 'linear'."
         )
     if n_categories < 2:
-        raise ValueError(
-            f"content_consumption: n_categories must be >= 2, got {n_categories}."
-        )
+        raise ValueError(f"content_consumption: n_categories must be >= 2, got {n_categories}.")
     if satiation_levels < 2:
         raise ValueError(
             f"content_consumption: satiation_levels must be >= 2, got {satiation_levels}."
@@ -212,7 +209,7 @@ def content_consumption(
         seed=seed,
     )
 
-    # Expose the anchor indices so the study and AIRL-Het line up with the env.
+    # Expose the anchor indices so the study and AIRL2 line up with the env.
     env.leave_action = leave_action
     env.session_ended_state = session_ended_state
     env.n_categories = C

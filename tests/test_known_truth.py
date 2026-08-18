@@ -239,7 +239,7 @@ def test_estimator_contract_registry_has_required_estimators():
     assert "UFXP" in REQUIRED_ESTIMATORS
     assert "BC" not in REQUIRED_ESTIMATORS
     assert "MCE-IRL Deep" in REQUIRED_ESTIMATORS
-    assert "AIRL-Het" in REQUIRED_ESTIMATORS
+    assert "AIRL2" in REQUIRED_ESTIMATORS
     for name in REQUIRED_ESTIMATORS:
         contract = ESTIMATOR_CONTRACTS[name]
         assert contract.code_path
@@ -267,7 +267,7 @@ def test_estimator_factories_and_compatibility_reports_are_available():
     )
 
     for name in REQUIRED_ESTIMATORS:
-        dgp = hetero_dgp if name == "AIRL-Het" else structural_dgp
+        dgp = hetero_dgp if name == "AIRL2" else structural_dgp
         estimator = make_estimator(name, dgp, smoke=True)
         assert estimator is not None
 
@@ -275,7 +275,7 @@ def test_estimator_factories_and_compatibility_reports_are_available():
     assert not check_estimator_compatibility("NFXP", state_only_dgp).compatible
     assert check_estimator_compatibility("MCE-IRL Deep", state_only_dgp).compatible
     assert check_estimator_compatibility("MCE-IRL Deep", structural_dgp).compatible
-    assert check_estimator_compatibility("AIRL-Het", hetero_dgp).compatible
+    assert check_estimator_compatibility("AIRL2", hetero_dgp).compatible
 
 
 def test_nfxp_uses_universal_canonical_preset():
@@ -285,7 +285,7 @@ def test_nfxp_uses_universal_canonical_preset():
         "canonical_low_state_only",
         "airl_paper_identification",
         "f_irl_paper_state_marginal",
-        "airl_het_paper_identification",
+        "airl2_paper_identification",
         "canonical_high_action",
         "gladius_paper_high_state",
         "gladius_paper_high_state_scaled",
@@ -359,13 +359,13 @@ def test_f_irl_paper_state_marginal_cell_matches_paper_assumptions():
     assert jnp.allclose(transition_max, 1.0)
 
 
-def test_airl_het_paper_identification_cell_matches_anchor_assumptions():
-    cell = get_cell("airl_het_paper_identification")
+def test_airl2_paper_identification_cell_matches_anchor_assumptions():
+    cell = get_cell("airl2_paper_identification")
     dgp = build_known_truth_dgp(cell.dgp_config)
     panel = simulate_known_truth_panel(dgp, cell.simulation_config)
     diagnostics = run_pre_estimation_diagnostics(dgp)
 
-    assert cell.cell_id == "airl_het_paper_identification"
+    assert cell.cell_id == "airl2_paper_identification"
     assert isinstance(cell.dgp_config, ContentHeterogeneityKnownTruthConfig)
     assert dgp.config.heterogeneity == "latent_segments"
     assert dgp.config.reward_mode == "action_dependent"
@@ -385,9 +385,9 @@ def test_airl_het_paper_identification_cell_matches_anchor_assumptions():
     assert len(panel.metadata["segment_labels"]) == len(panel.trajectories)
     assert diagnostics.passed
     assert diagnostics.anchor_valid
-    assert check_estimator_compatibility("AIRL-Het", dgp).compatible
+    assert check_estimator_compatibility("AIRL2", dgp).compatible
 
-    estimator = make_estimator("AIRL-Het", dgp, smoke=True)
+    estimator = make_estimator("AIRL2", dgp, smoke=True)
     assert estimator.config.reward_type == "linear"
     assert estimator.config.generator_reward == "f"
     assert estimator.config.initialization == "behavioral_anchor"

@@ -77,7 +77,7 @@ AIRL_ANCHORED_CELL = KnownTruthCell(
     description=(
         "AIRL anchored known-truth cell: action-dependent reward with the "
         "exit action pinned to zero and the absorbing-state reward row pinned "
-        "to zero, matching the AIRL-Het gauge."
+        "to zero, matching the AIRL2 gauge."
     ),
 )
 
@@ -200,7 +200,7 @@ def render_results_tex(records: list[dict[str, Any]]) -> str:
         "The current AIRL path is evaluated on two surfaces: a no-anchor "
         "state-only deterministic-transition DGP that matches the original "
         "AIRL identification conditions, and an action-dependent DGP with the "
-        "same exit-action/absorbing-state anchor used by AIRL-Het. The "
+        "same exit-action/absorbing-state anchor used by AIRL2. The "
         "original-conditions DGP passes all hard gates after learning the AIRL "
         "shaping potential inside the discriminator. The anchored "
         "action-dependent DGP remains a diagnostic failure."

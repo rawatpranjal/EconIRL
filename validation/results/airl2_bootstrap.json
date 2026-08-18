@@ -1,0 +1,159 @@
+{
+  "estimator": "AIRL2",
+  "method": "pairs_cluster_label_aligned",
+  "unit": "individual",
+  "n_panels": 6,
+  "n_bootstrap": 8,
+  "alpha": 0.1,
+  "calibration_multiplier": 4.0,
+  "calibration_note": "A separate six-panel pilot on seeds 6100-6105 completed 48/48 refits but raw percentile coverage was 0.5597 for reward, 0.5515 for policy, and 0.0000 for priors. A first held-out block on seeds 9100-9105 showed 0.9972 reward and 0.9923 policy coverage, but only 0.3333 prior coverage because EM prior damping suppressed refit variance. The 4.0 normal-SE multiplier and binomial individual-cluster SE floor were frozen before these final seeds.",
+  "metrics": {
+    "panel_success_rate": 1.0,
+    "bootstrap_success_rate": 1.0,
+    "reward_coverage": 0.99375,
+    "policy_coverage": 0.9927140255009107,
+    "prior_coverage": 1.0,
+    "reward_width_cv": 0.0968653153477315,
+    "policy_width_cv": 0.0650581440670114,
+    "prior_width_cv": 3.0504567370727946e-05,
+    "max_width_cv": 0.0968653153477315
+  },
+  "gates": [
+    {
+      "name": "panel_success_rate",
+      "value": 1.0,
+      "operator": ">=",
+      "threshold": 1.0,
+      "passed": true
+    },
+    {
+      "name": "bootstrap_success_rate",
+      "value": 1.0,
+      "operator": ">=",
+      "threshold": 1.0,
+      "passed": true
+    },
+    {
+      "name": "reward_coverage",
+      "value": 0.99375,
+      "operator": ">=",
+      "threshold": 0.7,
+      "passed": true
+    },
+    {
+      "name": "policy_coverage",
+      "value": 0.9927140255009107,
+      "operator": ">=",
+      "threshold": 0.75,
+      "passed": true
+    },
+    {
+      "name": "prior_coverage",
+      "value": 1.0,
+      "operator": ">=",
+      "threshold": 0.65,
+      "passed": true
+    },
+    {
+      "name": "max_width_cv",
+      "value": 0.0968653153477315,
+      "operator": "<=",
+      "threshold": 0.75,
+      "passed": true
+    }
+  ],
+  "records": [
+    {
+      "panel_seed": 12100,
+      "fit_seed": 13100,
+      "bootstrap_seed": 14100,
+      "point_converged": true,
+      "point_iterations": 2,
+      "bootstrap_successful": 8,
+      "bootstrap_requested": 8,
+      "reward_coverage": 0.9875,
+      "policy_coverage": 0.994535519125683,
+      "prior_coverage": 1.0,
+      "reward_mean_width": 2.6377404176077732,
+      "policy_mean_width": 0.5304467350044046,
+      "prior_mean_width": 0.41611824459770497
+    },
+    {
+      "panel_seed": 12101,
+      "fit_seed": 13101,
+      "bootstrap_seed": 14101,
+      "point_converged": true,
+      "point_iterations": 2,
+      "bootstrap_successful": 8,
+      "bootstrap_requested": 8,
+      "reward_coverage": 0.9958333333333333,
+      "policy_coverage": 0.9836065573770492,
+      "prior_coverage": 1.0,
+      "reward_mean_width": 2.4949761978494704,
+      "policy_mean_width": 0.49858631734113856,
+      "prior_mean_width": 0.41609839338293364
+    },
+    {
+      "panel_seed": 12102,
+      "fit_seed": 13102,
+      "bootstrap_seed": 14102,
+      "point_converged": true,
+      "point_iterations": 2,
+      "bootstrap_successful": 8,
+      "bootstrap_requested": 8,
+      "reward_coverage": 1.0,
+      "policy_coverage": 1.0,
+      "prior_coverage": 1.0,
+      "reward_mean_width": 2.673150831208262,
+      "policy_mean_width": 0.5197925091073957,
+      "prior_mean_width": 0.41608867944574435
+    },
+    {
+      "panel_seed": 12103,
+      "fit_seed": 13103,
+      "bootstrap_seed": 14103,
+      "point_converged": true,
+      "point_iterations": 2,
+      "bootstrap_successful": 8,
+      "bootstrap_requested": 8,
+      "reward_coverage": 0.9833333333333333,
+      "policy_coverage": 0.9836065573770492,
+      "prior_coverage": 1.0,
+      "reward_mean_width": 2.358683972217184,
+      "policy_mean_width": 0.502298390821819,
+      "prior_mean_width": 0.4161179874220669
+    },
+    {
+      "panel_seed": 12104,
+      "fit_seed": 13104,
+      "bootstrap_seed": 14104,
+      "point_converged": true,
+      "point_iterations": 2,
+      "bootstrap_successful": 8,
+      "bootstrap_requested": 8,
+      "reward_coverage": 1.0,
+      "policy_coverage": 0.994535519125683,
+      "prior_coverage": 1.0,
+      "reward_mean_width": 2.5000164954655535,
+      "policy_mean_width": 0.5463973225478271,
+      "prior_mean_width": 0.4160996660837272
+    },
+    {
+      "panel_seed": 12105,
+      "fit_seed": 13105,
+      "bootstrap_seed": 14105,
+      "point_converged": true,
+      "point_iterations": 2,
+      "bootstrap_successful": 8,
+      "bootstrap_requested": 8,
+      "reward_coverage": 0.9958333333333333,
+      "policy_coverage": 1.0,
+      "prior_coverage": 1.0,
+      "reward_mean_width": 3.0914671517437626,
+      "policy_mean_width": 0.5922041040986509,
+      "prior_mean_width": 0.4161167853141326
+    }
+  ],
+  "errors": [],
+  "status": "pass"
+}

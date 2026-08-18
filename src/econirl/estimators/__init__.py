@@ -43,6 +43,7 @@ Example:
 """
 
 from econirl.estimators.airl import AIRL
+from econirl.estimators.airl2 import AIRL2
 from econirl.estimators.ccp import CCP
 from econirl.estimators.max_margin_irl import MaxMarginIRL
 from econirl.estimators.maxent_irl import MaxEntIRL
@@ -92,6 +93,7 @@ __all__ = [
     "RHIP",
     "GLADIUS",
     "AIRL",
+    "AIRL2",
     "NeuralGLADIUS",
     "NeuralAIRL",
     "MCEIRLNeural",

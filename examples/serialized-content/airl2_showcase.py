@@ -1,4 +1,4 @@
-"""AIRL-Het: Anchor identification and heterogeneous treatment effects.
+"""AIRL2: Anchor identification and heterogeneous treatment effects.
 
 Demonstrates the key contributions of Lee, Sudhir and Wang (2026):
 1. Anchor identification pins down structural rewards (not shaped)
@@ -10,7 +10,7 @@ Uses a synthetic two-segment serialized content DGP with known
 ground truth for validation.
 
 Usage:
-    python examples/serialized-content/airl_het_showcase.py
+    python examples/serialized-content/airl2_showcase.py
 """
 
 import json
@@ -23,7 +23,7 @@ import numpy as np
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.adversarial.airl_het import AIRLHetEstimator, AIRLHetConfig
+from econirl.estimation.adversarial.airl2 import AIRL2Config, AIRL2Estimator
 from econirl.estimation.nfxp import NFXPEstimator
 from econirl.preferences.action_reward import ActionDependentReward
 
@@ -135,7 +135,7 @@ def simulate_mixture_panel(env, n_individuals=300, n_periods=30,
 
 def main():
     print("=" * 70)
-    print("AIRL-Het: Anchor Identification and Heterogeneous Treatment Effects")
+    print("AIRL2: Anchor Identification and Heterogeneous Treatment Effects")
     print("Lee, Sudhir and Wang (2026)")
     print("=" * 70)
 
@@ -175,10 +175,10 @@ def main():
         print(f"  Failed: {e}")
         nfxp_params = None
 
-    # ---- AIRL-Het (K=2 segments) ----
-    print("\n--- AIRL-Het (K=2 segments, EM) ---")
+    # ---- AIRL2 (K=2 segments) ----
+    print("\n--- AIRL2 (K=2 segments, EM) ---")
     t0 = time.time()
-    config = AIRLHetConfig(
+    config = AIRL2Config(
         num_segments=2,
         exit_action=env["exit_action"],
         absorbing_state=env["absorbing"],
@@ -186,8 +186,8 @@ def main():
         max_airl_rounds=50,
         reward_lr=0.01,
     )
-    airl_het = AIRLHetEstimator(config)
-    het_result = airl_het.estimate(
+    airl2 = AIRL2Estimator(config)
+    het_result = airl2.estimate(
         panel, env["utility"], env["problem"], env["transitions"]
     )
     het_time = time.time() - t0
@@ -220,7 +220,7 @@ def main():
         print(f"\n  Pooled NFXP: {[f'{p:.4f}' for p in nfxp_params]}")
         print(f"  True A:      {[f'{float(p):.4f}' for p in env['params_a']]}")
         print(f"  True B:      {[f'{float(p):.4f}' for p in env['params_b']]}")
-        print(f"\n  The pooled estimate is a compromise between the two segments.")
+        print("\n  The pooled estimate is a compromise between the two segments.")
 
     # Classification accuracy
     if seg_posteriors is not None:
@@ -255,12 +255,12 @@ def main():
             "mix_a": mix_a,
         },
         "pooled_nfxp": [float(p) for p in nfxp_params] if nfxp_params is not None else None,
-        "airl_het": {
+        "airl2": {
             "priors": [float(p) for p in seg_priors] if seg_priors else None,
             "time": het_time,
         },
     }
-    path = Path(__file__).parent / "airl_het_results.json"
+    path = Path(__file__).parent / "airl2_results.json"
     with open(path, "w") as f:
         json.dump(out, f, indent=2)
     print(f"\nResults saved to {path}")

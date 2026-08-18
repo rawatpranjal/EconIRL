@@ -24,7 +24,7 @@ class AIRL(MCEIRL):
 
     The public class intentionally enforces the setting in which AIRL's
     disentangled reward has a dynamics-transfer interpretation. Use
-    :class:`econirl.estimators.AIRLHet` for observed or latent context and
+    :class:`econirl.AIRL2` for observed or latent context and
     action-dependent rewards.
     """
 
@@ -108,7 +108,7 @@ class AIRL(MCEIRL):
         """Fit AIRL after validating its state-only identification boundary."""
         if context is not None:
             raise NotImplementedError(
-                "AIRL does not accept context. Use AIRLHet for heterogeneous rewards."
+                "AIRL does not accept context. Use AIRL2 for heterogeneous rewards."
             )
         if tasks is not None or task is not None:
             raise NotImplementedError("AIRL does not support task-specific fits")
@@ -124,7 +124,7 @@ class AIRL(MCEIRL):
                     )
                 if not np.allclose(feature_array, feature_array[:, :1, :]):
                     raise ValueError(
-                        "AIRL requires state-only reward features. Use AIRLHet for "
+                        "AIRL requires state-only reward features. Use AIRL2 for "
                         "action-dependent or heterogeneous rewards."
                     )
                 feature_array = feature_array[:, 0, :]
@@ -138,7 +138,7 @@ class AIRL(MCEIRL):
         reward_spec = cast(RewardSpec | None, reward if reward is not None else features)
         if reward_spec is not None and not reward_spec.is_state_only:
             raise ValueError(
-                "AIRL requires state-only reward features. Use AIRLHet for "
+                "AIRL requires state-only reward features. Use AIRL2 for "
                 "action-dependent or heterogeneous rewards."
             )
         if data is None:
@@ -181,7 +181,7 @@ class AIRL(MCEIRL):
             created_reward = self._create_reward()
             if not isinstance(created_reward, LinearReward):
                 raise ValueError(
-                    "AIRL requires a 2D state-only feature_matrix. Use AIRLHet "
+                    "AIRL requires a 2D state-only feature_matrix. Use AIRL2 "
                     "for action-dependent rewards."
                 )
             reward_fn = created_reward
