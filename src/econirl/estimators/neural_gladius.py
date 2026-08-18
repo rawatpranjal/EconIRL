@@ -473,7 +473,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             self.value_scale if self.value_scale is not None else 1.0 / (1.0 - self.discount)
         )
 
-        key = jr.PRNGKey(np.random.randint(0, 2**31 - 1))
+        key = jr.PRNGKey(self.seed)
         q_key, ev_key = jr.split(key, 2)
         self._q_net = _ContextQNetwork(
             self._state_dim,
@@ -920,6 +920,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         ev_opt_state = ev_optimizer.init(eqx.filter(ev_net, eqx.is_inexact_array))
 
         N = len(states)
+        rng = np.random.default_rng(self.seed)
         best_loss = float("inf")
         patience_counter = 0
 
@@ -1077,7 +1078,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         best_ev = ev_net
 
         for epoch in range(self.max_epochs):
-            perm = np.random.permutation(N)
+            perm = rng.permutation(N)
             epoch_loss = 0.0
             n_batches = 0
             batch_idx = 0

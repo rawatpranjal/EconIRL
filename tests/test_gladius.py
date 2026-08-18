@@ -7,16 +7,16 @@ Tests cover:
 - Parameter recovery on Rust bus (slow, marked with @pytest.mark.slow)
 """
 
-import numpy as np
-import pytest
 import jax
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from econirl.core.types import DDCProblem, Panel, Trajectory
 from econirl.estimation.gladius import (
-    _EVNetwork,
     GLADIUSConfig,
     GLADIUSEstimator,
+    _EVNetwork,
     _QNetwork,
 )
 
@@ -86,7 +86,9 @@ class TestNetworkArchitectures:
         state_features = jax.random.normal(jax.random.PRNGKey(1), (batch, state_dim))
 
         q_all = q_net.forward_all_actions(state_features)
-        assert q_all.shape == (batch, n_actions), f"Expected ({batch}, {n_actions}), got {q_all.shape}"
+        assert q_all.shape == (batch, n_actions), (
+            f"Expected ({batch}, {n_actions}), got {q_all.shape}"
+        )
         assert jnp.all(jnp.isfinite(q_all)), "All Q values should be finite"
 
     def test_ev_network_forward_shape(self):
@@ -160,7 +162,7 @@ class TestGLADIUSEstimatorSmall:
         transitions = transitions.at[0, 0, 1].set(1.0)  # keep at 0 -> go to 1
         transitions = transitions.at[0, 1, 2].set(1.0)  # keep at 1 -> go to 2
         transitions = transitions.at[0, 2, 2].set(1.0)  # keep at 2 -> stay at 2
-        transitions = transitions.at[1, :, 0].set(1.0)   # replace -> reset to 0
+        transitions = transitions.at[1, :, 0].set(1.0)  # replace -> reset to 0
 
         # Trajectories consistent with simple replacement behavior
         trajectories = [
@@ -197,6 +199,7 @@ class TestGLADIUSEstimatorSmall:
             feature_matrix = feature_matrix.at[s, 1, 1].set(1.0)  # replacement indicator
 
         from econirl.preferences.linear import LinearUtility
+
         utility = LinearUtility(
             feature_matrix=feature_matrix,
             parameter_names=["operating_cost", "replacement_cost"],
@@ -427,17 +430,17 @@ class TestGLADIUSStateFeatures:
 
 @pytest.mark.slow
 class TestGLADIUSParameterRecovery:
-    """Parameter recovery test on the Rust bus environment.
+    """Reward-direction and policy recovery on the Rust bus environment.
 
     This test generates data from a known DGP and checks that GLADIUS
-    can recover the structural parameters within reasonable tolerance.
+    recovers the identified reward direction and induced policy.
     """
 
     def test_rust_bus_parameter_recovery(self):
-        """Recover Rust bus parameters with RMSE < 1.0."""
+        """Recover the unanchored Rust-bus reward direction and policy."""
         from econirl.environments import RustBusEnvironment
         from econirl.preferences.linear import LinearUtility
-        from econirl.simulation.synthetic import simulate_panel
+        from econirl.simulation.synthetic import _compute_optimal_policy, simulate_panel
 
         env = RustBusEnvironment(
             operating_cost=0.001,
@@ -446,6 +449,7 @@ class TestGLADIUSParameterRecovery:
         )
         utility = LinearUtility.from_environment(env)
         panel = simulate_panel(env, n_individuals=500, n_periods=100, seed=42)
+        true_params = jnp.array([0.001, 3.0])
 
         config = GLADIUSConfig(
             q_hidden_dim=128,
@@ -469,15 +473,13 @@ class TestGLADIUSParameterRecovery:
             transitions=env.transition_matrices,
         )
 
-        true_params = jnp.array([0.001, 3.0])
         estimated_params = result.parameters
-
-        # IRL recovers parameters up to a scale factor, so we compare
-        # the ratio of parameters (replacement_cost / operating_cost).
-        # The true ratio is 3.0 / 0.001 = 3000.
-        # We also check RMSE directly with a generous bound since the
-        # parameters have very different scales.
-        rmse = float(jnp.sqrt(jnp.mean((estimated_params - true_params) ** 2)))
+        cosine = float(
+            jnp.dot(estimated_params, true_params)
+            / (jnp.linalg.norm(estimated_params) * jnp.linalg.norm(true_params))
+        )
+        true_policy = _compute_optimal_policy(env)
+        policy_tv = float(0.5 * jnp.mean(jnp.sum(jnp.abs(result.policy - true_policy), axis=1)))
 
         # Also check that the sign/direction is correct
         assert float(estimated_params[1]) > 0, "Replacement cost should be positive"
@@ -487,11 +489,8 @@ class TestGLADIUSParameterRecovery:
         policy_sums = result.policy.sum(axis=1)
         assert jnp.allclose(policy_sums, jnp.ones(env.problem_spec.num_states), atol=1e-4)
 
-        # RMSE check -- generous bound for NN-based method
-        assert rmse < 1.0, (
-            f"RMSE={rmse:.4f} exceeds 1.0. "
-            f"True: {true_params.tolist()}, Estimated: {estimated_params.tolist()}"
-        )
+        assert cosine >= 0.99, f"reward direction cosine={cosine:.4f} is below 0.99"
+        assert policy_tv <= 0.10, f"policy TV={policy_tv:.4f} exceeds 0.10"
 
 
 if __name__ == "__main__":

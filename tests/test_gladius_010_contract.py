@@ -89,6 +89,43 @@ def test_public_gladius_defaults_to_paper_reference_objective():
     assert model.bellman_weight == 0.1
 
 
+def test_anchor_moment_fit_is_reproducible_from_declared_seed():
+    from econirl import GLADIUS
+
+    data, features, _ = _tiny_contract_case()
+    config = dict(
+        n_actions=2,
+        discount=0.9,
+        objective="anchor_moment",
+        network_mode="separate",
+        q_hidden_dim=8,
+        q_num_layers=1,
+        ev_hidden_dim=8,
+        ev_num_layers=1,
+        batch_size=16,
+        max_epochs=3,
+        patience=4,
+        anchor_action=0,
+        anchor_rewards=(0.0, 0.0, 0.0, 0.0),
+        seed=17,
+    )
+
+    fitted = []
+    for _ in range(2):
+        model = GLADIUS(**config)
+        model.fit(
+            data,
+            state="state",
+            action="action",
+            id="id",
+            features=features,
+        )
+        fitted.append(model)
+
+    np.testing.assert_array_equal(fitted[0].q_, fitted[1].q_)
+    np.testing.assert_array_equal(fitted[0].reward_matrix_, fitted[1].reward_matrix_)
+
+
 @pytest.mark.parametrize(
     ("column", "value", "message"),
     [
