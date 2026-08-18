@@ -82,6 +82,8 @@ def test_public_gladius_defaults_to_paper_reference_objective():
     assert GLADIUS is NeuralGLADIUS
     assert model.objective == "paper_minimax"
     assert model.network_mode == "shared_trunk"
+    assert model.output_bias_init == 0.0
+    assert model.gradient_clip_mode == "value"
 
 
 def test_paper_reference_bellman_terms_match_author_code():
@@ -130,6 +132,39 @@ def test_public_paper_fit_exposes_finite_identified_functionals(fitted_contract_
     np.testing.assert_allclose(model.reward_[:, 0].mean(), 0.0, atol=1e-6)
     assert model.diagnostics_["identification"]["anchor_available"] is True
     assert model.diagnostics_["optimization"]["termination_reason"]
+
+
+def test_declared_state_universe_is_not_shrunk_by_partial_panel_coverage():
+    from econirl import GLADIUS
+
+    data, features, transitions = _tiny_contract_case()
+    partial = data.loc[data["state"].isin([0, 1])].copy()
+    model = GLADIUS(
+        n_actions=2,
+        discount=0.9,
+        q_hidden_dim=4,
+        q_num_layers=1,
+        ev_hidden_dim=4,
+        ev_num_layers=1,
+        batch_size=16,
+        max_epochs=1,
+        patience=2,
+        anchor_action=0,
+        anchor_rewards=(0.0, 0.0, 0.0, 0.0),
+        seed=19,
+    )
+    with pytest.warns((UserWarning, RuntimeWarning)):
+        model.fit(
+            partial,
+            state="state",
+            action="action",
+            id="id",
+            features=features,
+            transitions=transitions,
+        )
+
+    assert model.q_.shape == (4, 2)
+    assert model.diagnostics_["data"]["state_coverage"] == 0.5
 
 
 def test_structural_counterfactual_requires_anchor():

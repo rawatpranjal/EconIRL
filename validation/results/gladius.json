@@ -5,7 +5,7 @@
     "estimator": "GLADIUS",
     "warnings": []
   },
-  "counterfactual_valid_certified": false,
+  "counterfactual_valid_certified": true,
   "diagnostics": {
     "action_shares": [
       0.34231,
@@ -28,10 +28,7 @@
     "warnings": []
   },
   "estimator": "GLADIUS",
-  "failed_gates": [
-    "raw_bellman_reward_normalized_rmse",
-    "value_normalized_rmse"
-  ],
+  "failed_gates": [],
   "gates": [
     {
       "name": "converged",
@@ -45,159 +42,159 @@
       "operator": "<=",
       "passed": true,
       "threshold": 2.0,
-      "value": 0.545973276725348
+      "value": 0.5463930934910729
     },
     {
       "name": "parameter_cosine",
       "operator": ">=",
       "passed": true,
       "threshold": 0.9,
-      "value": 0.9751894072932922
+      "value": 0.977338422892955
     },
     {
       "name": "parameter_relative_rmse",
       "operator": "<=",
       "passed": true,
       "threshold": 0.5,
-      "value": 0.48553486969012566
+      "value": 0.3118505656699056
     },
     {
       "name": "raw_bellman_reward_normalized_rmse",
       "operator": "<=",
-      "passed": false,
+      "passed": true,
       "threshold": 0.3,
-      "value": 0.5714927858965088
+      "value": 0.2988922475223385
     },
     {
       "name": "projected_reward_normalized_rmse",
       "operator": "<=",
       "passed": true,
       "threshold": 0.3,
-      "value": 0.19803809882968765
+      "value": 0.13110406052420087
     },
     {
       "name": "policy_tv",
       "operator": "<=",
       "passed": true,
       "threshold": 0.12,
-      "value": 0.03687434095014895
+      "value": 0.018738595155411954
     },
     {
       "name": "value_normalized_rmse",
       "operator": "<=",
-      "passed": false,
+      "passed": true,
       "threshold": 0.3,
-      "value": 0.41959305638864025
+      "value": 0.21940838289298709
     },
     {
       "name": "q_normalized_rmse",
       "operator": "<=",
       "passed": true,
       "threshold": 0.3,
-      "value": 0.23510273892875772
+      "value": 0.1236928450165849
     },
     {
       "name": "type_a_regret",
       "operator": "<=",
       "passed": true,
       "threshold": 0.12,
-      "value": 0.00854271447474041
+      "value": 0.0029100138614409675
     },
     {
       "name": "type_b_regret",
       "operator": "<=",
       "passed": true,
       "threshold": 0.12,
-      "value": 0.052909876848731247
+      "value": 0.008143895682867261
     },
     {
       "name": "type_c_regret",
       "operator": "<=",
       "passed": true,
       "threshold": 0.12,
-      "value": 0.008522312861510423
+      "value": 0.001022659465172085
     }
   ],
   "metric_groups": {
     "counterfactual_recovery": {
-      "type_a": 0.00854271447474041,
-      "type_b": 0.052909876848731247,
-      "type_c": 0.008522312861510423
+      "type_a": 0.0029100138614409675,
+      "type_b": 0.008143895682867261,
+      "type_c": 0.001022659465172085
     },
     "imitation_policy": {
-      "policy_kl": 0.005191904727467587,
-      "policy_tv": 0.03687434095014895
+      "policy_kl": 0.0011439948973495707,
+      "policy_tv": 0.018738595155411954
     },
     "projected_structural_parameters": {
-      "parameter_cosine": 0.9751894072932922,
-      "parameter_relative_rmse": 0.48553486969012566
+      "parameter_cosine": 0.977338422892955,
+      "parameter_relative_rmse": 0.3118505656699056
     },
     "reward_table_recovery": {
-      "projected_reward_normalized_rmse": 0.19803809882968765,
-      "raw_bellman_reward_normalized_rmse": 0.5714927858965088
+      "projected_reward_normalized_rmse": 0.13110406052420087,
+      "raw_bellman_reward_normalized_rmse": 0.2988922475223385
     },
     "value_q_recovery": {
-      "q_normalized_rmse": 0.23510273892875772,
-      "value_normalized_rmse": 0.41959305638864025
+      "q_normalized_rmse": 0.1236928450165849,
+      "value_normalized_rmse": 0.21940838289298709
     }
   },
   "metrics": {
-    "anchor_projected_reward_normalized_rmse": 0.19803809882968765,
-    "anchor_projected_reward_rmse": 0.054744574064371755,
+    "anchor_projected_reward_normalized_rmse": 0.13110406052420087,
+    "anchor_projected_reward_rmse": 0.04396570967922133,
     "counterfactuals": {
       "type_a": {
         "policy": {
-          "kl": 0.002211325504628238,
-          "l1": 0.05164168362814713,
-          "linf": 0.10230060386839701,
-          "tv": 0.025820841814073566
+          "kl": 0.0010044768432710108,
+          "l1": 0.039094127125405276,
+          "linf": 0.053151196875061646,
+          "tv": 0.019547063562702638
         },
-        "regret": 0.00854271447474041,
-        "value_rmse": 0.011166531526873294
+        "regret": 0.0029100138614409675,
+        "value_rmse": 0.0028780221627173887
       },
       "type_b": {
         "policy": {
-          "kl": 0.0056759350382270335,
-          "l1": 0.0666160206631891,
-          "linf": 0.10964088113760032,
-          "tv": 0.03330801033159455
+          "kl": 0.0017751079195448976,
+          "l1": 0.04722044671625517,
+          "linf": 0.06278695091118036,
+          "tv": 0.023610223358127586
         },
-        "regret": 0.052909876848731247,
-        "value_rmse": 0.060021381407964425
+        "regret": 0.008143895682867261,
+        "value_rmse": 0.00806867686511544
       },
       "type_c": {
         "policy": {
-          "kl": 0.002786586745516221,
-          "l1": 0.06003228630202502,
-          "linf": 0.1318020586717109,
-          "tv": 0.03001614315101251
+          "kl": 0.0006233778334306841,
+          "l1": 0.03101016054153259,
+          "linf": 0.052655528494573556,
+          "tv": 0.015505080270766296
         },
-        "regret": 0.008522312861510423,
-        "value_rmse": 0.012273184235454978
+        "regret": 0.001022659465172085,
+        "value_rmse": 0.00121275053493928
       }
     },
     "parameters": {
-      "cosine_similarity": 0.9751894072932922,
-      "max_abs_error": 0.22344380326647095,
-      "relative_rmse": 0.48553486969012566,
-      "rmse": 0.13296919080954236
+      "cosine_similarity": 0.977338422892955,
+      "max_abs_error": 0.12847413596438662,
+      "relative_rmse": 0.3118505656699056,
+      "rmse": 0.0854037886034629
     },
     "policy": {
-      "kl": 0.005191904727467587,
-      "l1": 0.0737486819002979,
-      "linf": 0.1521533206587184,
-      "tv": 0.03687434095014895
+      "kl": 0.0011439948973495707,
+      "l1": 0.03747719031082391,
+      "linf": 0.09174687170875906,
+      "tv": 0.018738595155411954
     },
-    "projected_reward_normalized_rmse": 0.19803809882968765,
-    "projected_reward_rmse": 0.04362152075170851,
-    "q_normalized_rmse": 0.23510273892875772,
-    "q_rmse": 0.12186588343802637,
-    "raw_bellman_reward_normalized_rmse": 0.5714927858965088,
-    "raw_bellman_reward_rmse": 0.1371042112390151,
-    "reward_normalized_rmse": 0.19803809882968765,
-    "reward_rmse": 0.04362152075170851,
-    "value_normalized_rmse": 0.41959305638864025,
-    "value_rmse": 0.14183043545409826
+    "projected_reward_normalized_rmse": 0.13110406052420087,
+    "projected_reward_rmse": 0.03503271602553027,
+    "q_normalized_rmse": 0.1236928450165849,
+    "q_rmse": 0.06157091848488019,
+    "raw_bellman_reward_normalized_rmse": 0.2988922475223385,
+    "raw_bellman_reward_rmse": 0.06675225323531093,
+    "reward_normalized_rmse": 0.13110406052420087,
+    "reward_rmse": 0.03503271602553027,
+    "value_normalized_rmse": 0.21940838289298709,
+    "value_rmse": 0.0773963801541951
   },
   "primary_cell_id": "gladius_paper_high_state",
   "simulation": {
@@ -206,18 +203,18 @@
     "seed": 145,
     "show_progress": false
   },
-  "status": "strict_structural_counterfactual_fail",
+  "status": "strict_structural_counterfactual_pass",
   "summary": {
     "converged": true,
-    "estimation_time": 296.7046949863434,
-    "log_likelihood": -109186.55764330717,
+    "estimation_time": 953.6084296703339,
+    "log_likelihood": -109205.21534779808,
     "metadata": {
       "anchor_action": 2,
       "anchor_bellman_loss": true,
       "anchor_bellman_mode": "anchor_moment",
-      "final_loss": 0.545973276725348
+      "final_loss": 0.5463930934910729
     },
-    "num_iterations": 235,
+    "num_iterations": 500,
     "num_observations": 100000
   }
 }

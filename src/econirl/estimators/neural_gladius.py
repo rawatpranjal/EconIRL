@@ -184,6 +184,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         lr: float = 1e-3,
         bellman_weight: float = 1.0,
         gradient_clip: float = 1.0,
+        gradient_clip_mode: Literal["global_norm", "value"] = "value",
         patience: int = 50,
         alternating_updates: bool = True,
         lr_decay_rate: float = 0.001,
@@ -192,6 +193,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         anchor_action: int | None = None,
         anchor_rewards: Sequence[float] | None = None,
         value_scale: float | None = None,
+        output_bias_init: float | None = 0.0,
         state_encoder: Callable[[object], object] | None = None,
         context_encoder: Callable[[object], object] | None = None,
         state_dim: int | None = None,
@@ -218,6 +220,9 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.lr = lr
         self.bellman_weight = bellman_weight
         self.gradient_clip = gradient_clip
+        if gradient_clip_mode not in {"global_norm", "value"}:
+            raise ValueError("gradient_clip_mode must be 'global_norm' or 'value'")
+        self.gradient_clip_mode = gradient_clip_mode
         self.patience = patience
         self.alternating_updates = alternating_updates
         self.lr_decay_rate = lr_decay_rate
@@ -226,6 +231,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.anchor_action = anchor_action
         self.anchor_rewards = anchor_rewards
         self.value_scale = value_scale
+        self.output_bias_init = output_bias_init
         self.state_encoder = state_encoder
         self.context_encoder = context_encoder
         self.state_dim = state_dim
@@ -305,6 +311,8 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 raise ValueError("transitions must have shape (n_actions, n_states, n_states)")
             if transition_array.shape[0] != self.n_actions:
                 raise ValueError("transitions action axis must match n_actions")
+            if transition_array.shape[1] != transition_array.shape[2]:
+                raise ValueError("transitions state axes must be square")
             if np.any(transition_array < 0) or not np.isfinite(transition_array).all():
                 raise ValueError("transitions must be finite and nonnegative")
             if np.max(np.abs(transition_array.sum(axis=2) - 1.0)) > 1e-6:
@@ -317,7 +325,31 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             data, state, action, id, context
         )
 
-        n_states = int(np.asarray(all_states).max()) + 1
+        observed_n_states = int(np.asarray(all_states).max()) + 1
+        declared_state_sizes: dict[str, int] = {}
+        if features is not None:
+            feature_array = np.asarray(
+                features.feature_matrix if isinstance(features, RewardSpec) else features
+            )
+            if feature_array.ndim != 3 or feature_array.shape[1] != self.n_actions:
+                raise ValueError("features must have shape (n_states, n_actions, n_features)")
+            declared_state_sizes["features"] = int(feature_array.shape[0])
+        if self.transitions_ is not None:
+            declared_state_sizes["transitions"] = int(self.transitions_.shape[1])
+        if self.anchor_rewards is not None:
+            declared_state_sizes["anchor_rewards"] = len(self.anchor_rewards)
+        unique_declared_sizes = set(declared_state_sizes.values())
+        if len(unique_declared_sizes) > 1:
+            detail = ", ".join(
+                f"{name}={size}" for name, size in sorted(declared_state_sizes.items())
+            )
+            raise ValueError(f"declared state dimensions disagree: {detail}")
+        n_states = next(iter(unique_declared_sizes)) if unique_declared_sizes else observed_n_states
+        if observed_n_states > n_states:
+            raise ValueError(
+                f"observed state codes require {observed_n_states} states, but "
+                f"declared inputs provide {n_states}"
+            )
         self._n_states = n_states
         # Number of (s, a) observations in the panel, for an honest summary count.
         self._n_obs = int(np.asarray(all_states).shape[0])
@@ -452,6 +484,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             max_epochs=self.max_epochs,
             bellman_penalty_weight=self.bellman_weight,
             gradient_clip=self.gradient_clip,
+            gradient_clip_mode=self.gradient_clip_mode,
             patience=self.patience,
             alternating_updates=self.alternating_updates,
             lr_decay_rate=self.lr_decay_rate,
@@ -465,6 +498,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             ),
             anchor_bellman_mode="paper_minimax",
             value_scale=self.value_scale,
+            output_bias_init=self.output_bias_init,
             network_mode=self.network_mode,
             compute_se=False,
             seed=self.seed,
@@ -1320,6 +1354,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 lr=self.lr,
                 bellman_weight=self.bellman_weight,
                 gradient_clip=self.gradient_clip,
+                gradient_clip_mode=self.gradient_clip_mode,
                 patience=self.patience,
                 alternating_updates=self.alternating_updates,
                 lr_decay_rate=self.lr_decay_rate,
@@ -1328,6 +1363,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                 anchor_action=self.anchor_action,
                 anchor_rewards=self.anchor_rewards,
                 value_scale=self.value_scale,
+                output_bias_init=self.output_bias_init,
                 state_encoder=self.state_encoder,
                 state_dim=self.state_dim,
                 feature_names=self.feature_names,
