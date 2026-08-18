@@ -20,7 +20,7 @@ The primary 21-state, 3-action cell passes all 12 frozen gates:
 
 | Metric | Result | Gate |
 | --- | ---: | ---: |
-| Final loss | 0.5464 | at most 2.0 |
+| Final outer-Q loss | 1.0927 | at most 2.0 |
 | Parameter cosine | 0.9773 | at least 0.90 |
 | Parameter relative RMSE | 0.3119 | at most 0.50 |
 | Raw Bellman reward NRMSE | 0.2989 | at most 0.30 |
@@ -59,6 +59,14 @@ relative to the `N=250` mean.
 The checked-in author experiment selects the best epoch using true held-out
 reward MAPE. The replication matches and labels that simulation-only oracle
 selection. The public estimator never receives true rewards or held-out truth.
+
+The current 128,000-update qualification attempt is retained as a failed
+10-seed diagnostic, not promoted as a replication. Its large-sample cells
+receive only 103, 41, and 21 epochs at `N=1000`, `N=2500`, and `N=5000`, and
+already exceed the full-design error budget. Completing the remaining seeds
+cannot make the frozen mean-MAPE gates pass. GLADIUS therefore remains blocked
+on this paper gate pending a reviewed paper-scale budget or an approved replica
+protocol.
 
 ## Bootstrap Calibration
 
