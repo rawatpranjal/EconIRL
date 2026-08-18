@@ -31,6 +31,8 @@ def test_gladius_notebook_covers_complete_public_workflow() -> None:
         "model.summary()",
         "model.diagnostics_",
         "paper_minimax",
+        "model.conf_int()",
+        "Held-out negative log likelihood",
         "model.counterfactual(",
         "pickle.dumps(model)",
         "restored.predict_proba",
