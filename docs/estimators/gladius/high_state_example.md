@@ -18,7 +18,8 @@ config = GLADIUSConfig(
     anchor_action=2,
     anchor_rewards=anchor_rewards,   # shape (n_states,): known reward for action 2
     anchor_bellman_loss=True,
-    anchor_bellman_mode="anchor_moment",
+    anchor_bellman_mode="paper_minimax",
+    network_mode="shared_trunk",
     q_hidden_dim=128,
     q_num_layers=3,
     v_hidden_dim=128,
@@ -54,18 +55,17 @@ difference feature matrix to recover the 4-parameter structural vector.
 
 ## Interpretation
 
-The primary cell result (parameter cosine 0.9752, projected reward NRMSE 0.198,
-policy TV 0.037) shows that GLADIUS recovers the directional structure of the
-reward well and imitates the policy closely. The raw Bellman reward NRMSE (0.571)
-and value NRMSE (0.420) reveal that the absolute scale of the implied reward
-does not match the data-generating truth, even with the anchor pinning Q at one
-action. This gap is the reason structural counterfactual analysis requires
-caution with current GLADIUS results.
+The primary known-truth cell passes all 12 frozen gates: parameter cosine is
+0.9773, projected reward NRMSE is 0.1311, raw Bellman reward NRMSE is 0.2989,
+policy TV is 0.0187, Q NRMSE is 0.1237, and value NRMSE is 0.2194. The three
+counterfactual regrets are all below 0.009. That cell uses the lower-level
+`anchor_moment` structural diagnostic; the paper-reference shared-trunk minimax
+path is qualified separately against Table 2.
 
 ## Replication Boundary
 
-This page illustrates the evaluation setup, not a full historical replication.
-The estimator's recovery properties on this cell are established in the
-[Simulation Study](validation.md) page. The results file
+This page illustrates the high-state evaluation setup. The estimator's
+recovery properties and the separate paper-replication boundary are established
+in the [Validation and Qualification](validation.md) page. The results file
 [`gladius.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json)
 contains all numeric results.

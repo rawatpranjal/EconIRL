@@ -15,7 +15,7 @@ Bellman strategy.
 | Action support per state | A state where one action is never taken makes the action-difference construction degenerate at that state. |
 | Anchor validity | The anchor action must appear in every state for the anchor Bellman loss to pin Q everywhere. |
 | Transition row sums | Transition tensors must be row-stochastic in the `(n_actions, n_states, n_states)` orientation; row errors above `1e-6` indicate a construction bug. |
-| Network scaling | With a high discount factor ($\beta$ near 1), Q-values are large; the default `value_scale = 1/(1-beta)` rescales the MLP output to a numerically stable range. |
+| Network initialization | The public paper path uses zero output bias and direct value units, matching the checked-in author recipe. Inspect loss stability rather than treating budget exhaustion as convergence. |
 
 ## Canonical Simulation Checks
 
@@ -44,4 +44,6 @@ Policy TV can be good even when raw Bellman reward or value recovery fails.
 Inspect the `projected_reward_normalized_rmse` and `raw_bellman_reward_normalized_rmse`
 fields in the results file alongside policy TV before drawing
 any structural conclusions. A good imitation policy is a necessary but not
-sufficient condition for structural counterfactual validity.
+sufficient condition for structural counterfactual validity. The current
+known-truth qualification passes those upstream gates together, but a new
+dataset must establish its own coverage, anchor, rank, and optimization checks.

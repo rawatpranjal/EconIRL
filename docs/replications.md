@@ -322,61 +322,33 @@ PYTHONPATH=src python validation/estimators/nnes/bus_renewal_efficiency.py --n-r
 
 ## GLADIUS (Kang, Yoganarasimhan, and Jain, 2025)
 
-GLADIUS learns a reward by inverse Q-learning from offline choices. It fits a
-neural Q-network and a continuation-value network, then reads the reward as
-r(s, a) = Q(s, a) minus beta times the expected next value. An anchor action with
-a known reward sets the absolute level (their Assumption 3).
+GLADIUS estimates Q and conditional continuation value directly, then recovers
+reward without using a transition tensor during fitting. The Table 2 driver
+uses the paper's 20 mileage states, equiprobable maintenance increments of 1
+through 4, replacement reset, costs `(1, 5)`, discount `0.95`, 100 periods, and
+the paper's sample-level reward MAPE.
 
-The paper's first simulation is the Rust bus-engine problem on 20 mileage states.
-Maintenance costs theta0 per mileage unit. Replacement costs theta1 and resets the
-mileage to one. The true values are theta0 = 1 and theta1 = 5, with discount 0.95.
-The reported quantity is the mean absolute percentage error of the recovered
-reward, measured on the state-action pairs the expert visits (their Table 2). Most
-of those samples sit at low mileage.
+Qualification runs all six reported sample sizes with 20 seeds each. A cell
+passes when its mean MAPE is no larger than the paper mean plus two reported
+standard errors. The combined gate also requires no deterioration after the
+`N=250` cell. Exact values are stored in
+[`gladius_paper_table2.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_paper_table2.json).
 
-The package runs two estimators on this design. The nested fixed point is the
-oracle, with the true linear form and known transitions. GLADIUS uses a two-layer
-network over mileage, no transitions, and the replacement action as the anchor.
-
-### Bus-engine reward MAPE (percent), 80/20 split, one draw per cell
-
-The estimator here is the paper-faithful variant, the literal bi-conjugate Bellman
-term anchored at the replacement action (their Assumption 3).
-
-| Trajectories (H=100) | NFXP oracle | Paper Rust | GLADIUS | Paper GLADIUS |
-| --- | ---: | ---: | ---: | ---: |
-| 50 | 2.35 | 3.62 | 291.9 | 3.44 |
-| 250 | 1.52 | 1.37 | 372.4 | 0.84 |
-| 500 | 1.61 | 0.90 | 0.88 | 0.55 |
-
-The nested fixed point tracks the paper's oracle column across the three sample
-sizes, with recovered costs near [1.0, 5.0]. This confirms the design and the
-metric.
-
-GLADIUS recovers the reward direction. At 500 trajectories the recovered
-maintenance cost rises about one unit per mileage step, as it should, and the
-reward MAPE lands near the paper, 0.88 against 0.55. The absolute level is the weak
-point under the paper's minimax anchor. At 50 and 250 trajectories the level is far
-off. The low-mileage reward takes the wrong sign and the MAPE runs into the
-hundreds. The reward is a difference of two large value terms, so a small level
-error in Q dominates the low-mileage reward, where the metric puts most of its
-weight. The level lands near the paper only at the largest sample here, 500
-trajectories. One draw per cell, so read the orders of magnitude.
-
-The package also offers a fitted-Q anchor target that pins the level through the
-beta-contraction. It departs from the paper's bi-conjugate Bellman term, so it is a
-diagnostic, not the paper's method.
-
-This reproduces the oracle recovery and the GLADIUS reward direction. It is not a
-match to the paper's GLADIUS error. That would need the level pinned as tightly as
-the oracle at every sample size.
+The checked-in author experiment selects the best epoch using true held-out
+reward MAPE. The replication matches that simulation-only rule and labels it in
+the receipt. This is leakage by ordinary deployment standards, so the public
+`GLADIUS.fit` path never accepts oracle rewards or held-out truth.
 
 Reproduce:
 
 ```bash
-PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py \
-    --sizes 50,250,500 --reps 1 --anchor paper_minimax
+PYTHONPATH=src:. uv run python validation/estimators/gladius/paper_table2_mape.py \
+    --sweep --reps 20 --max-updates 128000 \
+    --out validation/results/gladius_paper_table2.json
 ```
+
+The sharded release procedure is in the
+[GLADIUS qualification runbook](estimators/gladius/qualification_runbook.md).
 
 ## RHIP (Barnes et al., 2024)
 
