@@ -100,7 +100,6 @@ def test_airl_refuses_airl_het_inputs_before_training(monkeypatch):
 
 def test_airl_serialization_preserves_transfer_decision(airl_recovery_case):
     """A persisted public fit must make the same changed-dynamics decision."""
-    from econirl import AIRL, NeuralAIRL
 
     dgp, model = airl_recovery_case
     changed = np.asarray(dgp.transitions)[[1, 2, 3, 0]].copy()
@@ -108,5 +107,4 @@ def test_airl_serialization_preserves_transfer_decision(airl_recovery_case):
     restored = pickle.loads(pickle.dumps(model))
     after = restored.counterfactual(transitions=changed).counterfactual_policy
 
-    assert AIRL is NeuralAIRL
     np.testing.assert_allclose(after, before, atol=1e-8)

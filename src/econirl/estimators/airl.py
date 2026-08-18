@@ -504,7 +504,3 @@ class AIRL(MCEIRL):
                 "Raw adversarial weights are not structural coefficients.",
             ]
         )
-
-
-# Historical public name. It now resolves to the qualified tabular workflow.
-NeuralAIRL = AIRL

@@ -42,11 +42,12 @@ Example:
     >>> print(model.summary())
 """
 
-from econirl.estimators.airl import AIRL, NeuralAIRL
+from econirl.estimators.airl import AIRL
 from econirl.estimators.ccp import CCP
 from econirl.estimators.max_margin_irl import MaxMarginIRL
 from econirl.estimators.maxent_irl import MaxEntIRL
 from econirl.estimators.mce_irl import MCEIRL, estimate_empirical_transitions
+from econirl.estimators.neural_airl import NeuralAIRL
 from econirl.estimators.nfxp import NFXP
 from econirl.estimators.nnes import NNES
 from econirl.estimators.protocol import EstimatorProtocol

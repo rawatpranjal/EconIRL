@@ -11,8 +11,10 @@ Routing summary (verified):
   MaxMarginIRL, MCEIRL) and IQLearn: ``path="estimate"``, need transitions, linear.
 * Neural model-based (MCEIRLNeural, NeuralUFXP): ``path="fit_features"``, need
   transitions, reward can be linear/nonlinear/neural.
-* Tabular AIRL (including the ``NeuralAIRL`` compatibility name):
-  ``path="fit_features"``, requires transitions and state-only linear rewards.
+* Tabular AIRL: ``path="fit_features"``, requires transitions and state-only
+  linear rewards.
+* NeuralAIRL: ``path="fit_features"``, requires transitions and accepts
+  nonlinear neural state rewards.
 * Neural model-free (NeuralGLADIUS and the GLADIUS alias): ``path="fit_features"``,
   does not use transitions.
 """
@@ -156,15 +158,13 @@ CAPABILITIES: dict[str, EstimatorCapability] = {
         # Neural, model-based (fit(features=); transitions required).
         _neural_model_based("MCEIRLNeural", "causal-entropy", True),
         _neural_model_based("NeuralUFXP", "other", False),
-        # AIRL is tabular and model-based. NeuralAIRL is its compatibility name.
-        _linear_model_based_fit("NeuralAIRL", "causal-entropy", True),
+        _linear_model_based_fit("AIRL", "causal-entropy", True),
+        _neural_model_based("NeuralAIRL", "causal-entropy", True),
         # Neural, model-free (fit(features=); transitions unused).
         _neural_model_free("NeuralGLADIUS", "model-free", True),
     )
 }
 
-# AIRL and GLADIUS each retain one compatibility name. Derive their entries from
-# the canonical records
-# so the records can never drift apart.
-CAPABILITIES["AIRL"] = replace(CAPABILITIES["NeuralAIRL"], name="AIRL")
+# GLADIUS retains one compatibility name. Derive the entry from the canonical
+# record so the two records cannot drift apart.
 CAPABILITIES["GLADIUS"] = replace(CAPABILITIES["NeuralGLADIUS"], name="GLADIUS")

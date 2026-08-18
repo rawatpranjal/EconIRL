@@ -78,8 +78,9 @@ The public estimator rejects action-dependent reward features. It also rejects
 
 ## Public workflow
 
-The recommended import is `from econirl import AIRL`. `NeuralAIRL` remains a
-compatibility name for the same class.
+The recommended import is `from econirl import AIRL`. Use
+[`NeuralAIRL`](neural_airl.md) when the state reward needs nonlinear function
+approximation.
 
 `fit` accepts a `Panel`, `TrajectoryPanel`, or a DataFrame. DataFrame input
 requires state, action, individual, and next-state columns. The transition
