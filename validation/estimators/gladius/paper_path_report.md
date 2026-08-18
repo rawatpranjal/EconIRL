@@ -49,10 +49,9 @@ protocol was not comparable across sample sizes.
    training trajectories. With trajectory batch size 32 and alternating zeta/Q
    batches, each epoch contains only two batches and therefore one Q update.
    This produced a heavy-tailed optimizer failure: most seeds eventually fit,
-   but a few 23-50% MAPE runs dominated the mean. The protocol now chooses the
-   largest batch no greater than 32 that provides at least ten Q updates per
-   epoch. The resulting qualification batches are 2, 10, 20, 32, 32, and 32
-   for N=50, 250, 500, 1,000, 2,500, and 5,000.
+   but a few 23-50% MAPE runs dominated the mean. The protocol now uses batch
+   size 2 at N=50 and 5 in larger cells. This gives 10, 20, 40, 80, 200, and
+   400 Q updates per epoch as N grows.
 
 5. **The update cap changed the experiment with N.** A global optimizer-update
    cap shortened the number of epochs sharply as N grew. The related author

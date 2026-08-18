@@ -70,10 +70,10 @@ unclipped zeta updates, and epoch learning-rate decay. Its per-Q-update anchor
 level projection is a package repair beyond the author code; it uses only the
 known anchor reward. Each projection is a common shift that leaves the current
 action differences and policy unchanged, while changing the subsequent
-optimization path. The qualification driver also reduces the trajectory batch
-size in small cells so that the alternating loop receives at least ten Q
-updates per epoch. This data-size-aware batch rule is a disclosed package
-stabilization; the paper does not publish the Table 2 batch size.
+optimization path. The qualification driver uses batches of two trajectories
+at N=50 and five trajectories in larger cells, so Q-update count grows with
+sample size. This batch rule is a disclosed package stabilization; the paper
+does not publish the Table 2 batch size.
 
 ## 3. Oracle-Simulation Structural Checks
 
@@ -149,8 +149,8 @@ in `validation/estimators/gladius/paper_path_report.md`.
 
 Run seeds 0 through 19 at all six paper sample sizes. Use 800 epochs in every
 cell. Do not pass `--max-updates`: the old cap changed the number of data passes
-with N. Do not pass `--batch-size`: the default data-size-aware policy is part
-of the checked receipt and provides at least ten Q updates per epoch.
+with N. Do not pass `--batch-size`: the checked policy uses two trajectories at
+N=50 and five in larger cells.
 
 ```bash
 uv run python validation/estimators/gladius/paper_table2_mape.py \

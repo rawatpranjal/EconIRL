@@ -231,12 +231,12 @@ the known anchor reward after each Q update. Each projection is a common shift,
 so it leaves the current action differences and policy unchanged, although it
 can change the subsequent optimization path. This repairs the weak
 $(1-\beta)$ level gradient. It is a package repair beyond the checked-in author
-implementation and is reported explicitly in replication receipts.
-The same driver uses data-size-aware trajectory batches capped at 32, with a
-minimum of ten Q updates per epoch. This prevents the N=50 cell from receiving
-only one Q update per epoch under the alternating author loop. The paper does
-not publish the Table 2 batch size, so this batch rule is also disclosed as a
-package-level replication choice.
+implementation and is reported explicitly in replication receipts. The same
+driver uses batches of two trajectories at N=50 and five trajectories in
+larger cells. This prevents the N=50 cell from receiving only one Q update per
+epoch and lets optimization effort grow with sample size under the alternating
+author loop. The paper does not publish the Table 2 batch size, so this batch
+rule is also disclosed as a package-level replication choice.
 
 In the paper, $\zeta(s, a) = \mathbb{E}[V_Q(s') \mid s, a]$ is the
 closed-form conditional expectation that solves the inner maximisation in

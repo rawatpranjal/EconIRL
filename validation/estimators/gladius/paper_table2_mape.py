@@ -24,8 +24,8 @@ trajectory batches, Xavier-normal weights, and the -55 Zurcher output bias.
 It adds a projection onto the known replacement-reward level after each Q
 update. The projection is a package repair, not code found in the author repo;
 it leaves action differences and the softmax policy unchanged. Qualification
-also uses data-size-aware trajectory batches, capped at 32, so every sample-size
-cell receives at least ten Q updates per epoch.
+also uses fixed small trajectory batches: two trajectories at N=50 and five in
+the tighter larger cells. The resulting Q-update count grows with sample size.
 
 Usage:
   PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py --probe
@@ -62,9 +62,9 @@ PAPER_GLADIUS_SE = {50: 1.28, 250: 0.51, 500: 0.20, 1000: 0.22, 2500: 0.06, 5000
 PAPER_RUST = {50: 3.62, 250: 1.37, 500: 0.90, 1000: 0.71, 2500: 0.68, 5000: 0.40}
 TARGET_SIZES = (50, 250, 500, 1000, 2500, 5000)
 TARGET_REPETITIONS = 20
-REFERENCE_MAX_BATCH_SIZE = 32
-MIN_Q_UPDATES_PER_EPOCH = 10
-BATCH_POLICY = "min_10_q_updates_per_epoch_capped_at_32_trajectories"
+N50_BATCH_SIZE = 2
+LARGER_CELL_BATCH_SIZE = 5
+BATCH_POLICY = "2_trajectories_at_n50_5_trajectories_above"
 PAPER_RECIPE_RECEIPT = {
     "network_mode": "shared_trunk",
     "batch_unit": "trajectory",
@@ -176,18 +176,19 @@ def qualification_batch_size(n_traj: int) -> int:
     """Keep small paper cells from receiving only one Q update per epoch.
 
     The author loop alternates zeta and Q updates across trajectory batches.
-    A fixed batch size of 32 therefore gives the N=50 cell only two batches,
-    hence one Q update, per epoch. Use smaller batches until every cell gets at
-    least ten Q updates per epoch, while retaining the reference maximum of 32.
+    A fixed batch size of 32 gives the N=50 cell only two batches, hence one Q
+    update, per epoch. The qualified small batches give N=50 ten Q updates and
+    let update count grow with N as the MAPE target tightens.
     """
     if n_traj <= 0:
         raise ValueError("n_traj must be positive")
+    return N50_BATCH_SIZE if n_traj <= 50 else LARGER_CELL_BATCH_SIZE
+
+
+def qualification_min_q_updates(n_traj: int) -> int:
+    """Prespecified Q-update floor for a paper sample-size cell."""
     train_trajectories = int(round(0.8 * n_traj))
-    target_batches = 2 * MIN_Q_UPDATES_PER_EPOCH
-    return min(
-        REFERENCE_MAX_BATCH_SIZE,
-        max(train_trajectories // target_batches, 1),
-    )
+    return q_updates_per_epoch(train_trajectories, qualification_batch_size(n_traj))
 
 
 def q_updates_per_epoch(train_trajectories: int, batch_size: int) -> int:
@@ -447,7 +448,7 @@ def summarize_records(records: list[dict]) -> dict:
                 and record.get("optimization", {}).get("batch_size")
                 == qualification_batch_size(int(record["n_traj"]))
                 and record.get("optimization", {}).get("q_updates_per_epoch", 0)
-                >= MIN_Q_UPDATES_PER_EPOCH
+                >= qualification_min_q_updates(int(record["n_traj"]))
             )
             for record in records
         ),
@@ -487,9 +488,8 @@ def main():
         type=int,
         default=None,
         help=(
-            "override the qualification batch policy; by default batches are "
-            "data-size-aware, capped at 32 trajectories, and provide at least "
-            "10 Q updates per epoch"
+            "override the qualification batch policy; the default is two "
+            "trajectories at N=50 and five trajectories in larger cells"
         ),
     )
     ap.add_argument("--out", type=Path, default=None)

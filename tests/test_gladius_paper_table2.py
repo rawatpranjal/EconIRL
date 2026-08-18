@@ -8,6 +8,7 @@ from validation.estimators.gladius.paper_table2_mape import (
     TARGET_REPETITIONS,
     TARGET_SIZES,
     qualification_batch_size,
+    qualification_min_q_updates,
     run_one,
     summarize_records,
 )
@@ -23,7 +24,7 @@ def _passing_records() -> list[dict]:
             "optimization": {
                 "oracle_selected": True,
                 "batch_size": qualification_batch_size(n_traj),
-                "q_updates_per_epoch": 10,
+                "q_updates_per_epoch": qualification_min_q_updates(n_traj),
                 **PAPER_RECIPE_RECEIPT,
             },
         }
@@ -81,6 +82,10 @@ def test_table2_summary_rejects_a_mislabeled_training_recipe() -> None:
 def test_smallest_table2_cell_gets_enough_q_updates_to_recover_reward() -> None:
     """Protect the bad-seed failure that fixed batch size 32 concealed."""
     batch_size = qualification_batch_size(50)
+
+    assert qualification_batch_size(250) == 5
+    assert qualification_batch_size(500) == 5
+    assert qualification_batch_size(1000) == 5
 
     record = run_one(
         50,
