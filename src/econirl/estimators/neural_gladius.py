@@ -269,6 +269,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self._use_anchor: bool = False
         self._anchor_r: jax.Array | None = None
         self._paper_estimator: GLADIUSEstimator | None = None
+        self._level_shift: float = 0.0
         self.q_: np.ndarray | None = None
         self.continuation_value_: np.ndarray | None = None
         self.reward_: np.ndarray | None = None
@@ -507,6 +508,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
         self.policy_ = np.asarray(result.policy, dtype=float)
         self.value_ = np.asarray(result.value_function, dtype=float)
         self.objective_ = str(metadata["anchor_bellman_mode"])
+        self._level_shift = float(metadata.get("level_shift", 0.0))
         self.converged_ = bool(result.converged)
         self.n_epochs_ = int(result.num_iterations)
         self.termination_reason_ = (
@@ -1163,6 +1165,7 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
             assert self._paper_estimator.q_net_ is not None
             return np.asarray(
                 self._paper_estimator.q_net_.forward_all_actions(state_features_array)
+                + self._level_shift
             )
         if self._q_net is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
@@ -1235,7 +1238,9 @@ class NeuralGLADIUS(NeuralEstimatorMixin):
                     state_features_array,
                     action_onehot,
                 )
-            return np.asarray(q_values - self.discount * continuation)
+            return np.asarray(
+                q_values - self.discount * continuation + (1.0 - self.discount) * self._level_shift
+            )
         if self._q_net is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
         s_feat = _to_jax_float(state_features)

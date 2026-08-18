@@ -55,6 +55,7 @@ from econirl.simulation.synthetic import simulate_panel  # noqa: E402
 
 # Paper Table 2, GLADIUS column (# dummy = 0), MAPE % (SE).
 PAPER_GLADIUS = {50: 3.44, 250: 0.84, 500: 0.55, 1000: 0.52, 2500: 0.13, 5000: 0.12}
+PAPER_GLADIUS_SE = {50: 1.28, 250: 0.51, 500: 0.20, 1000: 0.22, 2500: 0.06, 5000: 0.06}
 PAPER_RUST = {50: 3.62, 250: 1.37, 500: 0.90, 1000: 0.71, 2500: 0.68, 5000: 0.40}
 
 N_MILEAGE = 20
@@ -144,14 +145,24 @@ def mape_on_samples(r_hat: np.ndarray, states: np.ndarray, actions: np.ndarray) 
 
 
 def fit_gladius(
-    env, train_panel, *, max_epochs: int, batch_size: int, anchor: str = "paper_minimax"
-) -> np.ndarray:
-    """Paper-faithful GLADIUS; returns raw recovered reward r_hat(s,a), shape (S,A)."""
+    env,
+    train_panel,
+    *,
+    max_epochs: int,
+    batch_size: int,
+    oracle_states: np.ndarray,
+    oracle_actions: np.ndarray,
+    anchor: str = "paper_minimax",
+) -> tuple[np.ndarray, dict]:
+    """Fit GLADIUS with the authors' simulation-only best-MAPE epoch rule."""
     S, A = env.num_states, env.num_actions
     phi = jnp.asarray(env.feature_matrix, dtype=jnp.float32)
     util = ActionDependentReward(phi, env.parameter_names)
     mileage = jnp.arange(1, S + 1, dtype=jnp.float32)  # raw mileage, the paper's MLP input
-    state_enc = lambda s: mileage[jnp.asarray(s, dtype=jnp.int32)][:, None]
+
+    def state_enc(states):
+        return mileage[jnp.asarray(states, dtype=jnp.int32)][:, None]
+
     base = env.problem_spec
     prob = DDCProblem(
         num_states=S,
@@ -173,6 +184,7 @@ def fit_gladius(
         anchor_bellman_loss=True,
         anchor_action=REPLACE,  # known r(s, replace) = -theta1
         anchor_rewards=tuple([-THETA1] * S),
+        anchor_level_calibration=False,
         q_hidden_dim=10,
         q_num_layers=2,  # paper: MLP 2 x 10
         v_hidden_dim=10,
@@ -182,22 +194,40 @@ def fit_gladius(
         lr_decay_rate=5e-4,
         batch_size=batch_size,
         max_epochs=max_epochs,
-        patience=400,
+        # The first-author training loop runs the frozen epoch budget without
+        # early stopping. Keep the package's stopping rule out of the exact
+        # replication path so a noisy minimax epoch cannot truncate training.
+        patience=max_epochs + 1,
         gradient_clip_mode="value",
         # Predict Q directly (value_scale=1.0) from a zero bias; anchor_moment is
         # init-robust and converges the absolute level via the fitted-Q contraction.
         output_bias_init=0.0,
         compute_se=False,
+        _oracle_reward_table=tuple(
+            tuple(float(value) for value in row) for row in true_reward_matrix()
+        ),
+        _oracle_eval_states=tuple(int(value) for value in oracle_states),
+        _oracle_eval_actions=tuple(int(value) for value in oracle_actions),
         verbose=False,
     )
     est = GLADIUSEstimator(config=cfg)
-    s = est.estimate(
+    result = est.estimate(
         panel=train_panel,
         utility=util,
         problem=prob,
         transitions=jnp.asarray(env.transition_matrices),
     )
-    return np.asarray(s.metadata["reward_table"], dtype=np.float64)
+    loss_history = list(result.metadata.get("loss_history", []))
+    return np.asarray(result.metadata["reward_table"], dtype=np.float64), {
+        "converged": bool(result.converged),
+        "num_epochs": int(result.num_iterations),
+        "termination": str(result.convergence_message),
+        "final_loss": float(loss_history[-1]) if loss_history else None,
+        "lr_decay_unit": result.metadata.get("lr_decay_unit"),
+        "oracle_selected": bool(result.metadata.get("oracle_selected")),
+        "oracle_best_epoch": result.metadata.get("oracle_best_epoch"),
+        "oracle_best_mape": result.metadata.get("oracle_best_mape"),
+    }
 
 
 def fit_nfxp_oracle(env, train_panel, test_states, test_actions) -> float:
@@ -237,7 +267,15 @@ def run_one(
     test_actions = np.concatenate([np.asarray(t.actions) for t in test])
 
     t0 = time.time()
-    r_hat = fit_gladius(env, train, max_epochs=max_epochs, batch_size=batch_size, anchor=anchor)
+    r_hat, optimization = fit_gladius(
+        env,
+        train,
+        max_epochs=max_epochs,
+        batch_size=batch_size,
+        oracle_states=test_states,
+        oracle_actions=test_actions,
+        anchor=anchor,
+    )
     mape = mape_on_samples(r_hat, test_states, test_actions)
     nfxp_mape = fit_nfxp_oracle(env, train, test_states, test_actions) if oracle else None
     return {
@@ -246,6 +284,7 @@ def run_one(
         "anchor": anchor,
         "mape": mape,
         "nfxp_oracle_mape": nfxp_mape,
+        "optimization": optimization,
         "r_hat_maintain": [round(float(r_hat[i, MAINTAIN]), 4) for i in range(10)],
         "seconds": round(time.time() - t0, 1),
     }
@@ -260,7 +299,17 @@ def main():
     )
     ap.add_argument("--traj", type=int, default=1000)
     ap.add_argument("--reps", type=int, default=1)
+    ap.add_argument("--start-seed", type=int, default=0)
     ap.add_argument("--max-epochs", type=int, default=800)
+    ap.add_argument(
+        "--max-updates",
+        type=int,
+        default=None,
+        help=(
+            "optional approximate optimizer-update budget per cell; converts "
+            "to an epoch count using the frozen 80%% training split"
+        ),
+    )
     ap.add_argument("--batch-size", type=int, default=64)
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument(
@@ -283,11 +332,18 @@ def main():
     records = []
     for n_traj in traj_list:
         mapes = []
-        for seed in range(reps):
+        train_observations = int(round(0.8 * n_traj)) * 100
+        steps_per_epoch = max(int(np.ceil(train_observations / args.batch_size)), 1)
+        cell_epochs = (
+            args.max_epochs
+            if args.max_updates is None
+            else max(int(np.ceil(args.max_updates / steps_per_epoch)), 1)
+        )
+        for seed in range(args.start_seed, args.start_seed + reps):
             rec = run_one(
                 n_traj,
                 seed,
-                max_epochs=args.max_epochs,
+                max_epochs=cell_epochs,
                 batch_size=args.batch_size,
                 anchor=args.anchor,
             )
@@ -312,9 +368,12 @@ def main():
         )
         paper = PAPER_GLADIUS.get(n_traj)
         if paper is not None:
+            upper = paper + 2.0 * PAPER_GLADIUS_SE[n_traj]
+            passed = mean_mape <= upper
             print(
                 f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f} "
-                f"(paper {paper}, {mean_mape / paper:.1f}x){nfxp_str}"
+                f"(paper {paper}, 2SE upper {upper:.3f}, "
+                f"{'PASS' if passed else 'FAIL'}){nfxp_str}"
             )
         else:
             print(f"  -> n_traj={n_traj}: GLADIUS MAPE {mean_mape:.3f}{nfxp_str}")
@@ -327,6 +386,10 @@ def main():
                     "estimator": f"GLADIUSEstimator {args.anchor}+shared_trunk, anchor=replace",
                     "anchor": args.anchor,
                     "paper_gladius_mape": PAPER_GLADIUS,
+                    "paper_gladius_se": PAPER_GLADIUS_SE,
+                    "start_seed": args.start_seed,
+                    "repetitions": reps,
+                    "max_updates": args.max_updates,
                     "records": records,
                 },
                 indent=2,

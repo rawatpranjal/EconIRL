@@ -132,6 +132,8 @@ class GLADIUSConfig:
     weight_decay: float = 1e-4
     gradient_clip: float = 1.0
     patience: int = 50
+    stability_window: int = 20
+    stability_relative_range: float = 0.002
     alternating_updates: bool = True
     mode: Literal["dual", "q_only"] = "dual"
     """Network configuration. ``dual`` (default) trains separate Q_eta and
@@ -139,12 +141,14 @@ class GLADIUSConfig:
     the V_zeta network and replaces V_zeta with the soft maximum of
     Q_eta, i.e. V(s) = sigma * logsumexp(Q(s, :) / sigma)."""
     lr_decay_rate: float = 0.001
+    lr_decay_unit: Literal["epoch", "step"] = "epoch"
     tikhonov_annealing: bool = False
     tikhonov_initial_weight: float = 100.0
     anchor_action: int | None = None
     anchor_rewards: tuple[float, ...] | None = None
     anchor_bellman_loss: bool = True
     anchor_bellman_mode: Literal["anchor_moment", "paper_minimax"] = "anchor_moment"
+    anchor_level_calibration: bool = True
     value_scale: float | None = None  # Output scale for Q/EV networks.
     # When None (default), auto-set to 1/(1-beta) so networks predict
     # in per-period utility units. With beta=0.9999, Q-values are order
@@ -167,6 +171,12 @@ class GLADIUSConfig:
     compute_se: bool = True
     n_bootstrap: int = 100
     seed: int = 42
+    # Research-only receipt fields for reproducing the authors' simulation
+    # protocol, which selects the epoch with the best true held-out reward
+    # MAPE. Public estimators never populate these leakage-bearing fields.
+    _oracle_reward_table: tuple[tuple[float, ...], ...] | None = None
+    _oracle_eval_states: tuple[int, ...] | None = None
+    _oracle_eval_actions: tuple[int, ...] | None = None
     verbose: bool = False
 
 
@@ -669,9 +679,13 @@ class GLADIUSEstimator(BaseEstimator):
             )
 
         # Build optimizers with gradient clipping, weight decay, and
-        # learning rate decay following Kang et al. (2025).
-        # LR decays as lr_0 / (1 + decay_rate * step).
+        # learning rate decay following Kang et al. (2025). The authors update
+        # it once per epoch. ``step`` remains available for reproducing older
+        # package receipts, but it must not make larger samples decay faster.
         decay = self.config.lr_decay_rate
+        if self.config.lr_decay_unit not in {"epoch", "step"}:
+            raise ValueError("lr_decay_unit must be 'epoch' or 'step'")
+        steps_per_epoch = max(int(np.ceil(n_obs / self.config.batch_size)), 1)
 
         clip_transform = (
             optax.clip(self.config.gradient_clip)
@@ -683,7 +697,10 @@ class GLADIUSEstimator(BaseEstimator):
             """Build an optax optimizer chain with LR decay."""
 
             def lr_schedule(step):
-                return base_lr / (1.0 + decay * step)
+                schedule_index = (
+                    step // steps_per_epoch if self.config.lr_decay_unit == "epoch" else step
+                )
+                return base_lr / (1.0 + decay * schedule_index)
 
             return optax.chain(
                 clip_transform,
@@ -715,6 +732,33 @@ class GLADIUSEstimator(BaseEstimator):
             and anchor_rewards is not None
         )
         anchor_bellman_mode = self.config.anchor_bellman_mode
+        oracle_parts = (
+            self.config._oracle_reward_table,
+            self.config._oracle_eval_states,
+            self.config._oracle_eval_actions,
+        )
+        if any(part is not None for part in oracle_parts) and not all(
+            part is not None for part in oracle_parts
+        ):
+            raise ValueError(
+                "oracle reward selection requires reward_table, states, and actions together"
+            )
+        oracle_enabled = all(part is not None for part in oracle_parts)
+        oracle_reward = (
+            None
+            if self.config._oracle_reward_table is None
+            else jnp.asarray(self.config._oracle_reward_table, dtype=jnp.float32)
+        )
+        oracle_states = (
+            None
+            if self.config._oracle_eval_states is None
+            else jnp.asarray(self.config._oracle_eval_states, dtype=jnp.int32)
+        )
+        oracle_actions = (
+            None
+            if self.config._oracle_eval_actions is None
+            else jnp.asarray(self.config._oracle_eval_actions, dtype=jnp.int32)
+        )
 
         # --- Define alternating training steps ---
 
@@ -941,7 +985,13 @@ class GLADIUSEstimator(BaseEstimator):
         best_loss = float("inf")
         epochs_no_improve = 0
         converged = False
+        convergence_reason: str | None = None
         loss_history: list[float] = []
+        oracle_mape_history: list[float] = []
+        best_oracle_mape = float("inf")
+        best_oracle_epoch: int | None = None
+        best_oracle_q_net = None
+        best_oracle_zeta_net = None
         rng_key = jax.random.PRNGKey(self.config.seed)
         alternating = self.config.alternating_updates
         q_only_mode = self.config.mode == "q_only"
@@ -977,6 +1027,44 @@ class GLADIUSEstimator(BaseEstimator):
             leave=True,
         )
         for epoch in pbar:
+            if oracle_enabled:
+                assert oracle_reward is not None
+                assert oracle_states is not None
+                assert oracle_actions is not None
+                oracle_features = self._build_state_features_all(problem)
+                oracle_q = q_net.forward_all_actions(oracle_features)
+                if self.config.network_mode == "shared_trunk":
+                    oracle_zeta = q_net.zeta_all_actions(oracle_features)
+                else:
+                    oracle_eye = jnp.eye(n_actions)
+                    oracle_zeta = jnp.stack(
+                        [
+                            zeta_net.forward(
+                                oracle_features,
+                                jnp.broadcast_to(
+                                    oracle_eye[action],
+                                    (n_states, n_actions),
+                                ),
+                            )
+                            for action in range(n_actions)
+                        ],
+                        axis=1,
+                    )
+                oracle_recovered_reward = oracle_q - beta * oracle_zeta
+                oracle_true = oracle_reward[oracle_states, oracle_actions]
+                oracle_predicted = oracle_recovered_reward[oracle_states, oracle_actions]
+                if bool(jnp.any(jnp.abs(oracle_true) <= 1e-12)):
+                    raise ValueError("oracle MAPE selection requires nonzero true rewards")
+                oracle_mape = float(
+                    100.0 * jnp.mean(jnp.abs(oracle_predicted - oracle_true) / jnp.abs(oracle_true))
+                )
+                oracle_mape_history.append(oracle_mape)
+                if oracle_mape < best_oracle_mape:
+                    best_oracle_mape = oracle_mape
+                    best_oracle_epoch = epoch
+                    best_oracle_q_net = q_net
+                    best_oracle_zeta_net = zeta_net
+
             rng_key, perm_key = jax.random.split(rng_key)
             perm = jax.random.permutation(perm_key, n_obs)
             epoch_loss = 0.0
@@ -1010,9 +1098,9 @@ class GLADIUSEstimator(BaseEstimator):
                 if self.config.network_mode == "shared_trunk":
                     if batch_idx % 2 == 0:
                         # Even batch: zeta head (V) update on the shared net.
-                        q_net, q_opt_state, loss = shared_zeta_step(
+                        q_net, zeta_opt_state, loss = shared_zeta_step(
                             q_net,
-                            q_opt_state,
+                            zeta_opt_state,
                             s_feat,
                             a_batch,
                             sp_feat,
@@ -1111,6 +1199,7 @@ class GLADIUSEstimator(BaseEstimator):
 
             if epochs_no_improve >= self.config.patience:
                 converged = True
+                convergence_reason = "patience"
                 pbar.set_postfix({"loss": f"{avg_loss:.4f}", "status": "early stop"})
                 pbar.close()
                 if self._verbose:
@@ -1118,6 +1207,17 @@ class GLADIUSEstimator(BaseEstimator):
                 break
 
         num_epochs = epoch + 1
+        final_stability_relative_range = None
+        if not converged and len(loss_history) >= self.config.stability_window:
+            recent = np.asarray(loss_history[-self.config.stability_window :], dtype=float)
+            denominator = max(abs(float(recent.mean())), 1e-12)
+            final_stability_relative_range = float(np.ptp(recent) / denominator)
+            if final_stability_relative_range <= self.config.stability_relative_range:
+                converged = True
+                convergence_reason = "stable_loss_window"
+        if best_oracle_q_net is not None and best_oracle_zeta_net is not None:
+            q_net = best_oracle_q_net
+            zeta_net = best_oracle_zeta_net
         # --- Step 4: Extract parameters ---
         all_state_feat = self._build_state_features_all(problem)
 
@@ -1134,6 +1234,24 @@ class GLADIUSEstimator(BaseEstimator):
                 a_oh = jnp.broadcast_to(eye[a], (n_states, n_actions))
                 ev_columns.append(zeta_net.forward(all_state_feat, a_oh))
             ev_table = jnp.stack(ev_columns, axis=1)
+
+        # The anchor identifies the uniform Q/zeta level, but its gradient is
+        # weakened by (1-beta). Enforce that identified normalization after
+        # fitting using only the known anchor reward. This is not available in
+        # an unanchored problem and is disabled in the exact author-code
+        # replication, which reports its own oracle-selected training curve.
+        level_shift = 0.0
+        state_level_shifts = jnp.zeros(n_states, dtype=q_table.dtype)
+        if use_anchor_bellman and self.config.anchor_level_calibration:
+            assert anchor_rewards is not None
+            assert anchor_action is not None
+            raw_anchor_reward = q_table[:, anchor_action] - beta * ev_table[:, anchor_action]
+            level_shift = float(
+                jnp.mean(anchor_rewards - raw_anchor_reward) / max(1.0 - beta, 1e-8)
+            )
+            state_level_shifts = jnp.full(n_states, level_shift, dtype=q_table.dtype)
+            q_table = q_table + level_shift
+            ev_table = ev_table + level_shift
 
         # Implied reward: r(s, a) = Q(s, a) - beta * zeta(s, a)
         reward_table = q_table - beta * ev_table
@@ -1157,7 +1275,7 @@ class GLADIUSEstimator(BaseEstimator):
         self.ev_net_ = zeta_net
 
         message = (
-            f"GLADIUS converged after {num_epochs} epochs"
+            f"GLADIUS converged after {num_epochs} epochs ({convergence_reason})"
             if converged
             else f"GLADIUS reached max_epochs={self.config.max_epochs} without convergence"
         )
@@ -1182,12 +1300,22 @@ class GLADIUSEstimator(BaseEstimator):
                 "q_table": np.asarray(q_table).tolist(),
                 "ev_table": np.asarray(ev_table).tolist(),
                 "loss_history": loss_history,
+                "convergence_reason": convergence_reason,
+                "final_stability_relative_range": final_stability_relative_range,
+                "oracle_selected": oracle_enabled,
+                "oracle_best_mape": (best_oracle_mape if best_oracle_epoch is not None else None),
+                "oracle_best_epoch": best_oracle_epoch,
+                "oracle_mape_history": oracle_mape_history,
                 "anchor_action": self.config.anchor_action,
                 "anchor_bellman_loss": bool(use_anchor_bellman),
                 "anchor_bellman_mode": anchor_bellman_mode,
+                "anchor_level_calibration": self.config.anchor_level_calibration,
+                "level_shift": level_shift,
+                "state_level_shifts": np.asarray(state_level_shifts).tolist(),
                 "network_mode": self.config.network_mode,
                 "output_bias_init": self.config.output_bias_init,
                 "gradient_clip_mode": self.config.gradient_clip_mode,
+                "lr_decay_unit": self.config.lr_decay_unit,
                 "anchor_rewards": (
                     np.asarray(anchor_rewards).tolist() if anchor_rewards is not None else None
                 ),

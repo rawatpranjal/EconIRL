@@ -108,6 +108,13 @@ def test_paper_reference_bellman_terms_match_author_code():
     np.testing.assert_allclose(actual, expected, rtol=1e-7, atol=1e-7)
 
 
+def test_lower_level_default_decays_learning_rate_by_epoch():
+    """Sample size must not silently accelerate the paper recipe's LR decay."""
+    from econirl.estimation.gladius import GLADIUSConfig
+
+    assert GLADIUSConfig().lr_decay_unit == "epoch"
+
+
 def test_public_paper_fit_exposes_finite_identified_functionals(fitted_contract_gladius):
     model = fitted_contract_gladius
 
@@ -120,6 +127,7 @@ def test_public_paper_fit_exposes_finite_identified_functionals(fitted_contract_
     assert np.isfinite(model.continuation_value_).all()
     assert np.isfinite(model.reward_).all()
     np.testing.assert_allclose(model.policy_.sum(axis=1), 1.0, atol=1e-6)
+    np.testing.assert_allclose(model.reward_[:, 0].mean(), 0.0, atol=1e-6)
     assert model.diagnostics_["identification"]["anchor_available"] is True
     assert model.diagnostics_["optimization"]["termination_reason"]
 

@@ -19,6 +19,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 JSON_OUT = ROOT / "validation" / "results" / "gladius.json"
+TEX_OUT = ROOT / "validation" / "results" / "gladius_results.tex"
 DEFAULT_OUTPUT_DIR = Path("/tmp/econirl_gladius_known_truth")
 DEFAULT_CELL_ID = "gladius_paper_high_state"
 ESTIMATOR = "GLADIUS"
@@ -31,6 +32,7 @@ from validation_display import (  # noqa: E402
     validation_context,
     validation_display_name,
 )
+
 from validation.known_truth import (  # noqa: E402
     RecoveryGateFailure,
     build_known_truth_dgp,
@@ -49,6 +51,7 @@ def main() -> None:
     parser.add_argument("--n-periods", type=int, default=None)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--json-out", type=Path, default=JSON_OUT)
+    parser.add_argument("--tex-out", type=Path, default=TEX_OUT)
     parser.add_argument("--show-progress", action="store_true", default=False)
     parser.add_argument("--quiet-progress", action="store_false", dest="show_progress")
     parser.add_argument("--verbose", action="store_true")
@@ -62,13 +65,13 @@ def main() -> None:
 
     record = run_validation_cell(args)
     write_json(args.json_out, compact_payload(record))
+    args.tex_out.write_text(render_results_tex(record) + "\n", encoding="utf-8")
 
     payload = record["payload"]
     failed = [gate for gate in payload["gates"] if not gate.passed]
     print(f"  result: {record['run_dir'] / 'result.json'}")
     print(
-        "  strict structural gates: "
-        f"{len(payload['gates']) - len(failed)} pass, {len(failed)} fail"
+        f"  strict structural gates: {len(payload['gates']) - len(failed)} pass, {len(failed)} fail"
     )
     print(f"  wrote: {args.json_out}")
     print(f"  wrote: {args.tex_out}")
@@ -76,8 +79,7 @@ def main() -> None:
     if args.enforce_gates and failed:
         raise RecoveryGateFailure(
             "; ".join(
-                f"{gate.name}={gate.value} {gate.operator} {gate.threshold}"
-                for gate in failed
+                f"{gate.name}={gate.value} {gate.operator} {gate.threshold}" for gate in failed
             )
         )
 
@@ -89,12 +91,10 @@ def run_validation_cell(args: argparse.Namespace) -> dict[str, Any]:
         cell.simulation_config,
         n_individuals=(
             cell.simulation_config.n_individuals
-            if args.n_individuals is None else args.n_individuals
+            if args.n_individuals is None
+            else args.n_individuals
         ),
-        n_periods=(
-            cell.simulation_config.n_periods
-            if args.n_periods is None else args.n_periods
-        ),
+        n_periods=(cell.simulation_config.n_periods if args.n_periods is None else args.n_periods),
         show_progress=args.show_progress,
     )
     panel = simulate_known_truth_panel(dgp, simulation_config)
@@ -267,17 +267,14 @@ def compact_payload(record: dict[str, Any]) -> dict[str, Any]:
                 "raw_bellman_reward_normalized_rmse": metrics.get(
                     "raw_bellman_reward_normalized_rmse"
                 ),
-                "projected_reward_normalized_rmse": metrics.get(
-                    "projected_reward_normalized_rmse"
-                ),
+                "projected_reward_normalized_rmse": metrics.get("projected_reward_normalized_rmse"),
             },
             "value_q_recovery": {
                 "value_normalized_rmse": metrics.get("value_normalized_rmse"),
                 "q_normalized_rmse": metrics.get("q_normalized_rmse"),
             },
             "counterfactual_recovery": {
-                kind: cf.regret
-                for kind, cf in metrics["counterfactuals"].items()
+                kind: cf.regret for kind, cf in metrics["counterfactuals"].items()
             },
         },
         "metrics": metrics,
