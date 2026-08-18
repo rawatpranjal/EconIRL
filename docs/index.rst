@@ -5,10 +5,6 @@ EconIRL is a Python package for structural dynamic discrete choice and inverse
 reinforcement learning. Use it to estimate forward-looking choice models,
 recover rewards, and predict behaviour under policy changes.
 
-If you are new to these models, read this page as a map: first install the
-package, then choose an estimator, then use the estimator-specific pages for the
-math, assumptions, evidence, and examples.
-
 Install
 -------
 
@@ -22,11 +18,8 @@ Estimators
 ----------
 
 Start with `Choosing an Estimator <estimators/landscape.html>`__ for the
-estimator chooser, the canonical NFXP case, reward targets, transitions, and
-identification strategies.
-
-The links below are method pages. Open one after you know the decision problem,
-the data you have, and the reward object you want to recover.
+canonical NFXP case, reward targets, transitions, and identification strategies.
+Then open a method page below for its assumptions, evidence, and examples.
 
 `NFXP <estimators/nfxp.html>`__ ·
 `CCP <estimators/ccp.html>`__ ·

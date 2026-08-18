@@ -17,10 +17,6 @@ reward equals the structural reward rather than a potential-based perturbation
 of it. The result is a segment-level reward object that supports structural
 counterfactual analysis on heterogeneous populations.
 
-Read this page when one pooled reward is not credible. The anchors and the
-latent-segment separation are the main reasons the recovered rewards can be
-interpreted segment by segment.
-
 ## Source Papers
 
 The estimator builds on {ref}`Fu, Luo, and Levine (2018) <fu-2018>`, which
@@ -344,9 +340,6 @@ for k, rw in enumerate(seg_rewards):
 segment 0 counterfactual policy: (21, 3)
 segment 1 counterfactual policy: (21, 3)
 ```
-
-The [Quick Start](airl2/quick_start.md) page documents the full set of
-fitted attributes, the initialization options, and the reward-type settings.
 
 ## Evidence
 

@@ -1,18 +1,11 @@
 # Choosing and Comparing Estimators
 
-This page is the first stop when you are deciding which EconIRL estimator to
-open from the menu. It assumes only the basic goal: you have observations of
-choices over time, and you want to estimate either a structural dynamic
-discrete-choice model or a reward function that explains observed behavior.
-
-The estimators differ in what they treat as known, what they estimate, and what
-kind of recovery claim they can support. A method that predicts choices well is
-not automatically recovering the reward. Reward recovery also needs the right
-normalization, support, transition information, and identification argument.
-
-Detailed math, system views, examples, and usage live on the estimator pages.
-Paper-number checks live in [Replications](replications.md). Problem-level
-simulation results live in [Simulation Studies](simulation_studies/index.md).
+Use this page to choose between structural dynamic discrete-choice estimation
+and reward recovery from demonstrations. Choice prediction alone does not
+establish reward recovery, which also requires normalization, support,
+transition information, and identification. See
+[Replications](replications.md) for paper-number checks and
+[Simulation Studies](simulation_studies/index.md) for problem-level results.
 
 ## How to Read the Menu
 
@@ -77,26 +70,6 @@ somewhere else.
 | Unknown reward form | MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL2, GLADIUS | The target shifts from structural likelihood estimation to reward recovery from demonstrations. |
 | Latent heterogeneity | AIRL2 | The reward is segment-specific and needs credible segment, exit-action, and absorbing-state anchors. |
 | Bounded or finite-horizon planning | RHIP | The planning horizon becomes part of the behavioral model. |
-
-Large or continuous state spaces break the cheap exact solve. Encoded,
-high-dimensional, or smooth states make repeated tabular dynamic programming
-unattractive. CCP avoids repeated solves by using first-stage choice
-probabilities. MPEC and UFXP keep a structural likelihood target but change the
-optimization route. NNES uses a neural continuation value with finite reward
-parameters.
-
-Hard transition-density problems motivate TD-CCP. The estimator still targets a
-finite structural reward parameter, but it estimates recursive terms from
-observed successor state-action pairs instead of first modeling the transition
-density.
-
-Unknown rewards motivate inverse reinforcement learning. MCE-IRL recovers
-reward coefficients in supplied features. Neural MCE-IRL uses a neural reward
-map. AIRL targets the original state-only transfer claim. NeuralAIRL keeps that
-state-only boundary with neural function approximation. AIRL2 adds
-anchors for segment-specific action-dependent rewards. GLADIUS learns neural Q
-and continuation objects, then reads reward information through anchored action
-contrasts.
 
 ## Core Lineage
 
@@ -222,8 +195,8 @@ the reward.
 
 ## Other Estimators
 
-The other estimator pages are useful when a specific computational or
-behavioral complication is the main reason not to use the reference route.
+Use the complete [Other Estimators](estimators/other.md) roster when a specific
+computational or behavioral complication rules out the reference route.
 
 | Estimator | Use when | Current role |
 | --- | --- | --- |
@@ -239,29 +212,3 @@ behavioral complication is the main reason not to use the reference route.
 On a small homogeneous tabular problem with an available transition model,
 NFXP remains the reference. The other estimators become relevant when one of
 the listed complications is substantive.
-
-## Linear Reading Guide
-
-If you are reading the docs in order, use this route.
-
-1. Read [NFXP](estimators/nfxp.md) first. It defines the structural benchmark
-   and the normalization issues that recur across the docs.
-2. Read [CCP](estimators/ccp.md) next if you want the same finite DDC target
-   without repeated nested solves.
-3. Read [TD-CCP](estimators/tdccp.md) if transition-density modeling is the
-   estimation bottleneck.
-4. Read [MCE-IRL](estimators/mce_irl.md) when demonstrations define the
-   problem and reward features are supplied.
-5. Read [Neural MCE-IRL](estimators/deep_mce_irl.md) when the reward is
-   nonlinear and transitions are known.
-6. Read [AIRL](estimators/airl.md) when state-only reward transfer is the
-   object.
-7. Read [NeuralAIRL](estimators/neural_airl.md) when that reward is nonlinear.
-8. Read [AIRL2](estimators/airl2.md) when anchored latent heterogeneity
-   is the object.
-9. Read [GLADIUS](estimators/gladius.md) when high-dimensional offline state
-   features make repeated dynamic-programming solves unattractive and projected
-   action contrasts are enough.
-10. Read [Other Estimators](estimators/other.md) when the complication is value
-   approximation, constrained structural optimization, finite-horizon planning,
-   f-divergence matching, or inverse soft-Q diagnostics.

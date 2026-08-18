@@ -7,19 +7,10 @@
 - [Simulation Studies](../simulation_studies/index.md)
 - [Paper Replications](../replications.md)
 
-EconIRL is a research build. These are the core estimators, the ones the project
-focuses on. NFXP is the reference: the exact maximum-likelihood estimator for
-tabular structural dynamic discrete choice, and the one with a verified paper-exact
-replication, matched to Rust (1987) Table IX. The rest of the core spans the
-structural and inverse-reinforcement-learning methods that carry the main
-identification stories and method lineages.
-
-Read this page as the short menu for the main methods. If a method name is
-unfamiliar, open the combined chooser first, then return here for the specific
-method page.
-
-For how to choose among them, including the side-by-side table, see
-[Choosing and Comparing Estimators](../comparing_estimators.md).
+Core contains the project's main methods. NFXP is the exact maximum-likelihood
+reference for tabular structural dynamic discrete choice, with a verified
+paper-exact match to Rust (1987) Table IX. The remaining methods carry the main
+structural and inverse-reinforcement-learning identification lines.
 
 | Estimator | Family | Best for |
 | --- | --- | --- |

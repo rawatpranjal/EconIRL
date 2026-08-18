@@ -8,10 +8,6 @@ probabilities. For linear utility with optimal weighting the estimator reduces t
 single closed-form solve that attains the same asymptotic efficiency as maximum
 likelihood.
 
-Read this page as an unnested route to the same finite structural reward target.
-The method replaces repeated Bellman solves with estimating equations built from
-empirical choice probabilities.
-
 ## Source Papers
 
 The estimator follows {ref}`Bray <bray-2019>`, which introduces the unnested
@@ -331,8 +327,7 @@ The fitted policy gives the replacement probability by state:
 print(model.predict_proba([0, 10, 50, 89]))
 ```
 
-The [Quick Start](ufxp/quick_start.md) page documents the full set of fitted
-attributes, weighting modes, and the full `UFXPEstimator` API.
+See [Quick Start](ufxp/quick_start.md) for the complete `UFXPEstimator` API.
 
 ## Evidence
 

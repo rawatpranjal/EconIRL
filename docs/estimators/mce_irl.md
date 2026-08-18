@@ -16,10 +16,6 @@ state distribution forward, and computes the model feature moments. It updates
 the parameters until the model moments equal the expert moments.
 Counterfactuals are meaningful only through the fitted MDP primitives.
 
-Read this page when demonstrations, not a structural likelihood, define the
-problem. The estimated object is a reward inside the supplied feature basis and
-normalization.
-
 ## Source Papers
 
 The estimator follows {ref}`Ziebart et al. (2008) <ziebart-2008>`, which
@@ -361,9 +357,8 @@ replaces the tabular feature basis with a neural reward map.
 
 ## Usage
 
-The [Quick Start](mce_irl/quick_start.md) gives a complete deterministic,
-multi-task example with exact output. Use a dense `(A, S, S)` tensor for a
-small stochastic MDP. Use `DeterministicTransitions` for a large sparse system.
+Use a dense `(A, S, S)` tensor for a small stochastic MDP. Use
+`DeterministicTransitions` for a large sparse system.
 
 The fitted model exposes shared reward parameters, standard errors,
 period-specific policies, task-specific policy views, simulation, and

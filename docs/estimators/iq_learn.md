@@ -10,10 +10,6 @@ yields a Bellman-implied reward as a diagnostic object. It does not enforce a
 structural Bellman fixed point and does not produce a point-identified reward parameter
 vector.
 
-Read this page as an imitation and diagnostic route. The fitted Q object can
-suggest a Bellman-implied reward, but that reward is not the same kind of
-structural parameter estimated by NFXP, CCP, or TD-CCP.
-
 ## Source Papers
 
 The estimator follows {ref}`Garg et al. (2021) <garg-2021>`, which introduces inverse
@@ -325,8 +321,7 @@ nfxp_summary = NFXPEstimator().estimate(
 )
 ```
 
-The [Quick Start](iq_learn/quick_start.md) page documents the full set of fitted
-attributes and the `IQLearnEstimator` interface.
+See [Quick Start](iq_learn/quick_start.md) for the `IQLearnEstimator` interface.
 
 ## Evidence
 
