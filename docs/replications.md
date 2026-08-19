@@ -339,12 +339,23 @@ reward MAPE. The replication matches that simulation-only rule and labels it in
 the receipt. This is leakage by ordinary deployment standards, so the public
 `GLADIUS.fit` path never accepts oracle rewards or held-out truth.
 
+Five of the six cells land inside the bound. `N=5000` does not, at 0.26 against
+a 0.24 bound. GLADIUS is therefore a partial match to Table 2, not a completed
+replication. The per-cell numbers and the reasons are on the
+[GLADIUS validation page](estimators/gladius/validation.md).
+
 Reproduce:
 
 ```bash
 PYTHONPATH=src:. uv run python validation/estimators/gladius/paper_table2_mape.py \
-    --sweep --reps 20 --max-updates 128000 \
+    --sweep --reps 20 --max-epochs 800 \
     --out validation/results/gladius_paper_table2.json
+```
+
+**Result**
+
+```text
+GLADIUS Table 2 qualification gates failed
 ```
 
 The sharded release procedure is in the

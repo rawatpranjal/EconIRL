@@ -24,6 +24,16 @@ NFXP, CCP, TD-CCP, MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL2, GLADIUS.
   from the documentation build.
 - `docs/comparing_estimators.md`, a single page for choosing between methods.
 
+### Known limitation
+
+GLADIUS is a partial match to Table 2 of its source paper, not a completed
+replication. Five of the six sample sizes land inside the paper's mean plus two
+standard errors. The largest, 5000 trajectories, does not: 0.26 percent reward
+MAPE against a 0.24 bound. The NFXP oracle control in the same harness beats the
+paper's own Rust column at every sample size, and the best seeds at 5000 already
+reach the paper value, so the miss is variance in the tail. See the GLADIUS
+validation page for the per-cell table.
+
 ### Changed
 
 - The estimator documentation is split into a core roster and an other roster.
