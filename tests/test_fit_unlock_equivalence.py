@@ -191,8 +191,8 @@ class TestFitEquivalence:
     # ── NFXP ──────────────────────────────────────────────────────────────────
 
     def test_nfxp_3d_equiv(self, small_panel, env_spec, transitions_3d):
-        from econirl.estimators import NFXP
         from econirl.estimation.nfxp import NFXPEstimator
+        from econirl.estimators import NFXP
 
         wrapper = NFXP(n_states=N_STATES, n_actions=N_ACTIONS, discount=DISCOUNT)
         wrapper.fit(data=small_panel, reward=env_spec, transitions=transitions_3d)
@@ -210,8 +210,8 @@ class TestFitEquivalence:
     # ── CCP ───────────────────────────────────────────────────────────────────
 
     def test_ccp_3d_equiv(self, small_panel, env_spec, transitions_3d):
-        from econirl.estimators import CCP
         from econirl.estimation.ccp import CCPEstimator
+        from econirl.estimators import CCP
 
         wrapper = CCP(n_states=N_STATES, n_actions=N_ACTIONS, discount=DISCOUNT)
         wrapper.fit(data=small_panel, reward=env_spec, transitions=transitions_3d)
@@ -229,8 +229,8 @@ class TestFitEquivalence:
     # ── UFXP ──────────────────────────────────────────────────────────────────
 
     def test_ufxp_3d_equiv(self, small_panel, env_spec, transitions_3d):
-        from econirl.estimators import UFXP
         from econirl.estimation.ufxp import UFXPEstimator
+        from econirl.estimators import UFXP
 
         wrapper = UFXP(n_states=N_STATES, n_actions=N_ACTIONS, discount=DISCOUNT)
         wrapper.fit(data=small_panel, reward=env_spec, transitions=transitions_3d)
@@ -252,8 +252,8 @@ class TestFitEquivalence:
     # ── SEES ──────────────────────────────────────────────────────────────────
 
     def test_sees_3d_equiv(self, small_panel, env_spec, transitions_3d):
+        from econirl.estimation.sees import SEESConfig, SEESEstimator
         from econirl.estimators import SEES
-        from econirl.estimation.sees import SEESEstimator, SEESConfig
 
         # basis_dim >= n_states is required for the basis to span the value fn
         wrapper = SEES(
@@ -288,8 +288,8 @@ class TestFitEquivalence:
     # ── TDCCP ─────────────────────────────────────────────────────────────────
 
     def test_tdccp_3d_equiv(self, small_panel, env_spec, transitions_3d):
+        from econirl.estimation.td_ccp import TDCCPConfig, TDCCPEstimator
         from econirl.estimators import TDCCP
-        from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
 
         wrapper = TDCCP(
             n_states=N_STATES,
@@ -320,7 +320,12 @@ class TestFitEquivalence:
             compute_se=True,
             verbose=False,
         )
-        est = TDCCPEstimator(config=config, se_method=wrapper.se_method)
+        # The wrapper translates se_method="robust" into the estimator's
+        # "asymptotic" path, because TD-CCP Algorithm 2 inference is driven by
+        # config.robust_se rather than the generic robust-SE routine. Mirror
+        # that translation so the low-level call matches what fit() ran.
+        effective_se_method = "asymptotic" if wrapper.se_method == "robust" else wrapper.se_method
+        est = TDCCPEstimator(config=config, se_method=effective_se_method)
         result = est.estimate(
             panel=wrapper._panel,
             utility=wrapper._utility_fn,
@@ -333,8 +338,8 @@ class TestFitEquivalence:
 
     @pytest.mark.slow
     def test_nnes_3d_equiv(self, small_panel, env_spec, transitions_3d):
+        from econirl.estimation.nnes import NNESConfig, NNESEstimator, NNESNFXPEstimator
         from econirl.estimators import NNES
-        from econirl.estimation.nnes import NNESEstimator, NNESNFXPEstimator, NNESConfig
 
         wrapper = NNES(
             n_states=N_STATES,

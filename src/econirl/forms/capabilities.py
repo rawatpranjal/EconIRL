@@ -15,6 +15,8 @@ Routing summary (verified):
   linear rewards.
 * NeuralAIRL: ``path="fit_features"``, requires transitions and accepts
   nonlinear neural state rewards.
+* AIRL2: ``path="fit_features"``, requires transitions and linear
+  segment-specific action-dependent rewards.
 * Neural model-free (NeuralGLADIUS and the GLADIUS alias): ``path="fit_features"``,
   does not use transitions.
 """
@@ -160,6 +162,9 @@ CAPABILITIES: dict[str, EstimatorCapability] = {
         _neural_model_based("NeuralUFXP", "other", False),
         _linear_model_based_fit("AIRL", "causal-entropy", True),
         _neural_model_based("NeuralAIRL", "causal-entropy", True),
+        # Anchored heterogeneous AIRL: linear segment rewards, transitions
+        # required at fit, outside the headline studies roster.
+        _linear_model_based_fit("AIRL2", "other", False),
         # Neural, model-free (fit(features=); transitions unused).
         _neural_model_free("NeuralGLADIUS", "model-free", True),
     )
