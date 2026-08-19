@@ -4,11 +4,11 @@ Read this page as the canonical small structural benchmark. It is useful because
 the true costs, policy, value, and counterfactual oracles are known before the
 estimators see the simulated panel.
 
-The canonical structural benchmark (Rust 1987). A single agent decides each period whether to keep paying a mileage-dependent operating cost or pay a fixed replacement cost to reset the bus engine. The data-generating process is fully known, so the table reports the exact recovered cost parameters, the distance between each estimator's policy and the true one, and the welfare lost when the recovered model is carried into three counterfactual worlds.
+The canonical structural benchmark. A single agent decides each period whether to keep paying a mileage-dependent operating cost or pay a fixed replacement cost to reset the bus engine. The data-generating process is fully known, so the table reports the exact recovered cost parameters, the distance between each estimator's policy and the true one, and the welfare lost when the recovered model is carried into three counterfactual worlds.
 
 ![A mechanic rebuilding a bus engine on a workbench in a 1943 garage, with parts bins lining the wall behind him.](../_static/simulation_studies/rust_bus_garage_1943.jpg)
 
-*Rebuilding a bus engine at the Tennessee Coach Company garage in Knoxville, September 1943. Photograph by Esther Bubley, [Library of Congress FSA/OWI collection](https://commons.wikimedia.org/wiki/File:Tennessee-coach-company-mechanic-knox-1943-tn1.jpg), digital ID fsa.8d33516, public domain. Rust (1987) studied the same decision at the Madison, Wisconsin bus fleet.*
+*Rebuilding a bus engine at the Tennessee Coach Company garage in Knoxville, September 1943. Photograph by Esther Bubley, [Library of Congress FSA/OWI collection](https://commons.wikimedia.org/wiki/File:Tennessee-coach-company-mechanic-knox-1943-tn1.jpg), digital ID fsa.8d33516, public domain.*
 
 ## The data-generating process
 

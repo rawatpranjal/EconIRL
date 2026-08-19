@@ -8,6 +8,10 @@ A viewer opens a feed and chooses what to watch each period, until they leave. T
 
 A homogeneous method fits one reward to the whole crowd. With one reward it cannot serve two types, so it settles on one and leaves the other behind. This study asks whether AIRL2 can pull the two types apart: recover a reward and a policy for each type, and sort each viewer into the right type.
 
+![A mother, father and child sitting around a wooden radio cabinet in a farmhouse parlour.](../_static/simulation_studies/content_consumption_photo.jpg)
+
+*A farm family listening to their radio, 1926. National Archives 5729282, public domain, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:A_Farm_Family_Listening_to_Their_Radio_-_NARA_-_5729282_(page_1).jpg). One household, several tastes.*
+
 ## The data-generating process
 
 Each viewer sits in a session. The state is a per-category satiation profile: how tired the viewer is of each content category right now. Watching a category raises its satiation. The other categories recover. The actions are watch category A, B, or C, or leave. Leaving ends the session and moves to an absorbing session-ended state.

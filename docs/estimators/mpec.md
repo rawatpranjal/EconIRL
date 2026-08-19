@@ -55,7 +55,7 @@ $$
 
 The log-sum-exp form follows because integrating over Type-I extreme value shocks
 yields $E[\max_a (Q_a + \varepsilon_a)] = \sigma \log \sum_a \exp(Q_a/\sigma)$
-(standard result; see Rust 1987, Section 3).
+(a standard result for Type-I extreme value shocks).
 
 Given a value vector $V$, the choice-specific value is:
 

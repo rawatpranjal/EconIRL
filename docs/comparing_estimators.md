@@ -55,8 +55,7 @@ When this holds, the soft-Bellman operator is a contraction on a small grid.
 The inner fixed point solves exactly and quickly. The outer loop is
 full-information maximum likelihood with an exact inner solve at every
 candidate parameter. The result is the efficient reference estimator, with
-standard errors from the information matrix. The Rust (1987) bus-engine model
-is the canonical example.
+standard errors from the information matrix.
 
 ## What Breaks the Canonical Case
 

@@ -305,8 +305,8 @@ Output  theta_hat, standard errors, policy pi^K, value V
 The inner optimizer in step 8 is L-BFGS-B. It fits the augmented-feature logit.
 Its gradient is the closed-form score $\psi_i$ from the Estimator section. The
 public `CCP` wrapper defaults to `num_policy_iterations=1`. The loop runs once
-and returns the one-step Hotz-Miller estimator. Under the assumptions in
-Aguirregabiria and Mira (2002), every fixed $K\geq1$ estimator is consistent,
+and returns the one-step Hotz-Miller estimator. Under the same assumptions,
+every fixed $K\geq1$ estimator is consistent,
 asymptotically normal, and first-order equivalent to partial maximum
 likelihood. Their simulations find the largest finite-sample gain between the
 first and second stages.

@@ -209,7 +209,7 @@ log-likelihood (Garg et al. 2021, Section 5.3). The second term penalizes large
 implied rewards on expert support and ensures the objective is bounded from below.
 Setting $\alpha \to \infty$ removes the penalty: $\mathcal{L}(Q) \to
 -\mathbb{E}_\rho[Q(s,a) - V(s)] = -\sigma\,\mathbb{E}_\rho[\log \pi(a \mid s)]$,
-which is the behavioral-cloning log-likelihood (Garg et al. 2021, Section 5.3).
+which is the behavioral-cloning log-likelihood.
 Standard errors are not computed; the returned standard-error array is NaN.
 
 **Estimator note (numerical stability).** The chi-squared divergence with quadratic

@@ -298,6 +298,10 @@ CELLS = (
 NARRATIVE = {
     "title": "High-dimensional route choice on a synthetic road network",
     "intro": (
+        '![An aerial photograph of the West End of New Orleans in 1941, with a highway running along the lakeshore into the distance.](../_static/simulation_studies/route_choice_photo.jpg)\n'
+        '\n'
+        '*West End, New Orleans, with the Old Hammond Highway along Lake Pontchartrain, 1941. Public domain, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:West_End_New_Orleans_and_Old_Hammond_Highway,_1941.jpg).*\n'
+        '\n'
         "A traveller moves through a road network one step at a time. "
         "Each period, the agent chooses among the nearest neighbours of the "
         "current node. The utility depends on the edge: how long it is, how "

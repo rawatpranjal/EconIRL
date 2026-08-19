@@ -64,7 +64,7 @@ $$
 
 This follows from additive separability (AS) and Type-I extreme-value logit
 shocks with scale $\tau$: integrating out the shock yields the log-sum-exp
-inclusive value (Rust 1987; Ziebart 2008).
+inclusive value.
 
 The choice-specific value and logit policy follow:
 

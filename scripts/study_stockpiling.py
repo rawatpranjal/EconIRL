@@ -216,6 +216,10 @@ CELLS = (
 NARRATIVE = {
     "title": "Consumer stockpiling of a storable good",
     "intro": (
+        '![A long queue of women and children waiting outside a building to register for sugar rationing.](../_static/simulation_studies/stockpiling_photo.jpg)\n'
+        '\n'
+        '*Registering for sugar rationing in the United States. National Archives 535570, public domain, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Sugar_rationing_-_NARA_-_535570.jpg). Rationing exists because households buy ahead once a storable good turns scarce.*\n'
+        '\n'
         "A household buys a storable good over time. It consumes one unit each "
         "period. The shelf price swings between a low sale price and a high "
         "regular price. The household can buy a pack now to avoid paying the "

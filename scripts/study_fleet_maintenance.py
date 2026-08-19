@@ -232,6 +232,10 @@ CELLS = (
 NARRATIVE = {
     "title": "Fleet maintenance (multi-component bus engine replacement)",
     "intro": (
+        '![A row of intercity buses parked inside a large garage in 1943.](../_static/simulation_studies/fleet_maintenance_photo.jpg)\n'
+        '\n'
+        '*The Greyhound bus garage in Pittsburgh, September 1943. Photograph by Esther Bubley, Library of Congress, public domain, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:The_Greyhound_bus_garage_8d32864v.jpg).*\n'
+        '\n'
         "A fleet operator maintains a bus with $K$ independent engine components. "
         "Each period, the operator chooses to keep all components running or replace "
         "them all at once. Replacing is costly upfront but avoids the growing "

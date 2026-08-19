@@ -10,6 +10,10 @@ length, the amenity of the destination, and the destination's distance to a fixe
 goal. The true reward is linear in these three features with parameters
 $\theta = [1.0, 0.5, 1.0]$.
 
+![Two men in suits playing chess at a small table, one resting his chin on his hand while the other moves a piece.](../_static/simulation_studies/rhip_lookahead_photo.jpg)
+
+*Two chess players, about 1920. Bain News Service, Library of Congress, no known restrictions, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:(Men_playing_chess)_(LOC).jpg). A player who searches three moves ahead behaves differently from one who searches ten.*
+
 ## Why this study
 
 RHIP makes the planning horizon $H$ a single knob. Within $H$ steps the agent
