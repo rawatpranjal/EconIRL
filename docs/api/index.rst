@@ -42,8 +42,9 @@ Inverse reinforcement learning estimators
 ----------------------------------------------------------
 
 Reward-learning estimators. ``AIRL`` is the tabular state-only adversarial
-estimator. ``NeuralAIRL`` remains a compatibility name for the same class.
-``GLADIUS`` is also importable as ``NeuralGLADIUS``.
+estimator. ``NeuralAIRL`` uses neural reward, shaping, and policy functions.
+``AIRL2`` adds anchored latent heterogeneity. ``GLADIUS`` is also importable as
+``NeuralGLADIUS``.
 
 .. autosummary::
    :toctree: generated/
@@ -55,6 +56,8 @@ estimator. ``NeuralAIRL`` remains a compatibility name for the same class.
    IQLearn
    GLADIUS
    AIRL
+   NeuralAIRL
+   AIRL2
    NeuralUFXP
 
 Environments and simulation

@@ -411,8 +411,7 @@ for state, row in zip(
 89: keep=0.884699, replace=0.115301
 ```
 
-The [Quick Start](ccp/quick_start.md) page documents the full set of fitted
-attributes and the full `CCPEstimator` API.
+See [Quick Start](ccp/quick_start.md) for the complete `CCPEstimator` API.
 
 ## Evidence
 

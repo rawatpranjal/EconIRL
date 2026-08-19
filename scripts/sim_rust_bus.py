@@ -260,7 +260,7 @@ EXCLUDED = [
      "gridworld study, whose deterministic state-only reward suits them"},
     {"name": "MaxEnt-IRL, IQ-Learn", "reason": "trajectory MaxEnt and inverse "
      "soft-Q; not part of the core roster"},
-    {"name": "AIRL-Het / AAIRL", "reason": "designed for latent-type "
+    {"name": "AIRL2 / AIRL2", "reason": "designed for latent-type "
      "heterogeneity; this panel has one agent type"},
     {"name": "MMP, GAIL", "reason": "too slow for this page's per-fit budget"},
     {"name": "GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "research code, "

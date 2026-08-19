@@ -383,7 +383,7 @@ class AIRLEstimator(AdversarialEstimatorBase):
     def _enforce_anchor_reward(self, reward_matrix: jnp.ndarray) -> jnp.ndarray:
         """Apply AIRL anchor normalization for state-action rewards.
 
-        This mirrors the AIRL-Het gauge: one action is pinned to zero reward,
+        This mirrors the AIRL2 normalization: one action is pinned to zero reward,
         and the absorbing state's reward row is pinned to zero when available.
         The anchor is deliberately not applied to state-only AIRL because doing
         so would turn a state reward into an action-dependent object.

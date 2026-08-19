@@ -10,7 +10,7 @@ VALIDATION_DISPLAY_NAMES: dict[str, str] = {
     "mce_low_high_reward": "low-state high-reward-feature DGP",
     "airl_paper_identification": "original AIRL identification DGP",
     "airl_anchor_action_dependent": "anchored action-dependent AIRL diagnostic DGP",
-    "airl_het_paper_identification": "latent-segment AIRL-Het DGP",
+    "airl2_paper_identification": "latent-segment AIRL2 DGP",
     "f_irl_paper_state_marginal": "state-marginal f-IRL DGP",
     "gladius_paper_high_state": "high-dimensional state GLADIUS DGP",
     "gladius_paper_high_state_scaled": "scaled high-dimensional state GLADIUS DGP",
@@ -31,7 +31,7 @@ VALIDATION_ROLES: dict[str, str] = {
     "mce_low_high_reward": "primary validation",
     "airl_paper_identification": "paper-side validation",
     "airl_anchor_action_dependent": "anchored diagnostic",
-    "airl_het_paper_identification": "paper-side validation",
+    "airl2_paper_identification": "paper-side validation",
     "f_irl_paper_state_marginal": "paper-side validation",
     "gladius_paper_high_state": "paper-side validation",
     "gladius_paper_high_state_scaled": "scaled diagnostic",
@@ -77,7 +77,7 @@ VALIDATION_CONTEXT_DEFINITIONS: dict[str, str] = {
         "absorbing-state and exit-action gauge but is not the certified AIRL "
         "reward-recovery setting."
     ),
-    "airl_het_paper_identification": (
+    "airl2_paper_identification": (
         "A serialized-content heterogeneous AIRL cell with repeated users, two "
         "latent segments, pay/wait/exit actions, an exit-action reward anchor, "
         "and known segment-level truth."

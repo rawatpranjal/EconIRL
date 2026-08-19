@@ -58,7 +58,7 @@ field to the one that fits your problem.
   reward cannot represent the action contrast, and the policy collapses toward uniform.
   Action-dependent rewards need a structural estimator ([NFXP](../estimators/nfxp.md),
   [CCP](../estimators/ccp.md)) or an anchored method
-  ([AIRL-Het](../estimators/airl_het.md)). The
+  ([AIRL2](../estimators/airl2.md)). The
   [AIRL identification boundary](../estimators/airl/identification.md) works this through.
 - **Are transitions deterministic or stochastic?** Structural estimators handle stochastic
   transitions directly. AIRL's reward-recovery guarantee holds under deterministic
@@ -73,7 +73,7 @@ field to the one that fits your problem.
 - **Can you anchor a reward value?** A reward is recovered relative to a baseline. If you
   can pin one value, such as a known zero-payoff exit action R(s, exit) = 0, you fix the
   level. An anchor also lets you identify an action-dependent reward where a plain method
-  cannot. AIRL-Het uses two anchors, one on the exit action and one on the absorbing
+  cannot. AIRL2 uses two anchors, one on the exit action and one on the absorbing
   state.
 
 ## Run the diagnostics

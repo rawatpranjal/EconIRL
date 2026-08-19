@@ -72,18 +72,17 @@ def test_support_matrix_matches_verified_rows():
         assert c.path == "estimate"
         assert c.needs_transitions
         assert c.reward_forms == ("linear",)
-    for n in ("MCEIRLNeural", "NeuralUFXP"):
+    for n in ("MCEIRLNeural", "NeuralUFXP", "NeuralAIRL"):
         c = CAPABILITIES[n]
         assert c.path == "fit_features"
         assert c.needs_transitions
         assert "neural" in c.reward_forms
         assert not c.model_free
-    for n in ("NeuralAIRL", "AIRL"):
-        c = CAPABILITIES[n]
-        assert c.path == "fit_features"
-        assert c.needs_transitions
-        assert c.reward_forms == ("linear",)
-        assert not c.model_free
+    c = CAPABILITIES["AIRL"]
+    assert c.path == "fit_features"
+    assert c.needs_transitions
+    assert c.reward_forms == ("linear",)
+    assert not c.model_free
     for n in ("NeuralGLADIUS", "GLADIUS"):
         c = CAPABILITIES[n]
         assert c.path == "fit_features"
@@ -101,9 +100,6 @@ def test_aliases_match_canonical():
 
     assert _fields_minus_name(CAPABILITIES["GLADIUS"]) == _fields_minus_name(
         CAPABILITIES["NeuralGLADIUS"]
-    )
-    assert _fields_minus_name(CAPABILITIES["AIRL"]) == _fields_minus_name(
-        CAPABILITIES["NeuralAIRL"]
     )
 
 

@@ -8,9 +8,8 @@ explicit optimization variable and enforces the Bellman fixed point as an
 equality constraint. The reward parameters and the value vector are estimated
 jointly in a single constrained program.
 
-Read this page as a numerical alternative to NFXP, not a different economic
-model. The target is the same likelihood; the risk is whether the constrained
-program is well conditioned enough to reach it.
+The main numerical risk is whether the constrained program is well conditioned
+enough to reach that likelihood.
 
 ## Source Papers
 
@@ -307,9 +306,6 @@ print(f"Bellman residual (inf-norm): {violation:.2e}")
 # Read the policy at specific states.
 print(summary.policy[[0, 5, 10, 19], :])
 ```
-
-The [Quick Start](mpec/quick_start.md) page documents the full set of fitted
-attributes and advanced API options.
 
 ## Evidence
 

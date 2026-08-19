@@ -1,97 +1,117 @@
 # Quick Start
 
-This page shows the public GLADIUS wrapper. Use the projected parameters and
-projection diagnostics for structural reading; the neural Q objects alone are
-not enough to claim reward recovery.
+`GLADIUS` is the public paper-reference estimator. It defaults to the shared-
+trunk minimax objective from Kang, Yoganarasimhan, and Jain (2025). Supply a
+known reward for one anchor action in every declared state when reward levels,
+bootstrap intervals, or structural counterfactuals are the target.
 
-## Sklearn-Style API
-
-`GLADIUS` accepts a pandas DataFrame directly.
+## Public API
 
 ```python
 from econirl import GLADIUS
-from econirl.core.reward_spec import RewardSpec
 
 model = GLADIUS(
     n_actions=3,
     discount=0.95,
     anchor_action=2,
+    anchor_rewards=known_anchor_rewards,  # length n_states
     q_hidden_dim=128,
     q_num_layers=3,
     ev_hidden_dim=128,
     ev_num_layers=3,
-    max_epochs=300,
+    max_epochs=500,
     patience=50,
-    bellman_weight=1.0,
-    verbose=False,
+    compute_se=True,
+    n_bootstrap=99,
+    seed=42,
+    se_seed=43,
 )
 model.fit(
     df,
     state="state_bin",
     action="action",
     id="individual_id",
-    features=reward_spec,      # RewardSpec or feature matrix; omit for policy only
+    features=reward_spec,
+    transitions=transition_tensor,
 )
 
-print(model.params_)           # projected structural parameters (dict)
-print(model.se_)               # projection standard errors
-print(model.policy_)           # imitation policy, shape (n_states, n_actions)
-print(model.value_)            # soft value function, shape (n_states,)
-print(model.projection_r2_)   # R-squared of the action-difference projection
+print(model.summary())
+print(model.diagnostics_)
+print(model.params_)
+print(model.conf_int())
 ```
 
-Fitted attributes:
+GLADIUS does not use `transition_tensor` to fit Q, continuation value, reward,
+or policy. It validates and stores the tensor for post-estimation planning.
+
+Important fitted attributes:
 
 | Attribute | Meaning |
 | --- | --- |
-| `params_` | Projected structural parameters by name. |
-| `se_` | Standard errors from the projection OLS. |
-| `coef_` | Parameter vector as a numpy array. |
-| `policy_` | Imitation policy P(a given s), shape (n_states, n_actions). |
-| `value_` | Soft value function V(s), shape (n_states,). |
-| `projection_r2_` | R-squared of the action-difference regression. |
-| `converged_` | Whether early stopping triggered before `max_epochs`. |
-| `n_epochs_` | Number of training epochs completed. |
+| `q_` | Learned action-value table, shape `(n_states, n_actions)`. |
+| `continuation_value_` | Learned conditional continuation table. |
+| `reward_` | Implied anchored reward `q_ - discount * continuation_value_`. |
+| `policy_` | Softmax policy implied by Q. |
+| `params_`, `coef_` | Descriptive action-contrast projection onto supplied reward features. |
+| `se_`, `pvalues_` | Descriptive projection diagnostics, not sampling uncertainty. |
+| `bootstrap_` | Whole-trajectory reward and policy draws when `compute_se=True`. |
+| `diagnostics_` | Coverage, rank, anchor, and optimization diagnostics. |
+| `termination_reason_` | Why fitting stopped; exhausting `max_epochs` alone is not convergence. |
+| `n_iter_`, `fit_time_` | Shared iteration count and wall-clock fit time. |
+| `result_` | Estimator-specific lower-level result object. |
+| `capabilities_` | Read-only inference, prediction, simulation, counterfactual, and serialization support map. |
 
-## Full Estimator API
+Use `conf_int()` for point-centered intervals based on whole-trajectory
+bootstrap standard errors. It refuses to turn the descriptive projection
+standard errors into confidence intervals.
 
-`GLADIUSEstimator` accepts a `Panel` and an explicit utility, problem, and
-transition tensor, mirroring the other full estimator APIs.
+## Counterfactual
+
+```python
+import numpy as np
+
+reward_delta = np.zeros_like(model.reward_)
+reward_delta[:, 1] = 0.25
+result = model.counterfactual(reward_delta=reward_delta)
+
+print(result.counterfactual_policy)
+print(result.welfare_change)
+```
+
+A structural counterfactual requires both the fitted anchor and stored
+planning transitions. An unanchored fit may still support policy prediction,
+but GLADIUS refuses to label its reward levels or re-solved welfare structural.
+
+`simulate(n_trajectories, n_periods=..., seed=...)` draws from the fitted policy
+and the same stored planning tensor. It raises an actionable
+`NotImplementedError` when no transition tensor was supplied.
+
+## Lower-Level API
+
+`GLADIUSEstimator` remains available for research protocols. Its configuration
+surface exposes both objectives. Set both fields explicitly when reproducing
+the public paper path:
 
 ```python
 from econirl.estimation import GLADIUSConfig, GLADIUSEstimator
 
 config = GLADIUSConfig(
     anchor_action=2,
-    anchor_rewards=anchor_rewards,     # known reward for anchor action, shape (n_states,)
-    anchor_bellman_loss=True,
-    anchor_bellman_mode="anchor_moment",
-    q_hidden_dim=128,
-    q_num_layers=3,
-    v_hidden_dim=128,
-    v_num_layers=3,
-    max_epochs=300,
-    patience=50,
-    bellman_penalty_weight=1.0,
+    anchor_rewards=known_anchor_rewards,
+    anchor_bellman_mode="paper_minimax",
+    network_mode="shared_trunk",
+    gradient_clip_mode="value",
+    output_bias_init=0.0,
+    seed=42,
 )
-estimator = GLADIUSEstimator(config=config)
-summary = estimator.estimate(panel, utility, problem, transitions)
-
-print(summary.parameters)      # projected structural vector
-print(summary.policy)          # imitation policy
-print(summary.value_function)  # soft value function
+summary = GLADIUSEstimator(config=config).estimate(
+    panel, utility, problem, transitions
+)
 ```
 
-## Anchor Bellman Modes
+The lower-level `anchor_moment` mode is a separate fitted-Q diagnostic used by
+the oracle-simulation structural stress test. It is not the public `GLADIUS` default.
 
-```python
-# Default: anchor moment pins Q to the continuation-value estimate
-config = GLADIUSConfig(anchor_bellman_mode="anchor_moment")
-
-# Paper's bi-conjugate minimax objective
-config = GLADIUSConfig(anchor_bellman_mode="paper_minimax")
-```
-
-Use `anchor_moment` for normal estimation. The `paper_minimax` mode is kept for
-comparing against the original paper objective and is not recommended for
-production.
+See the
+[applied notebook](https://github.com/rawatpranjal/EconIRL/blob/main/examples/gladius/gladius_applied_workflow.ipynb)
+for the complete fitted workflow.

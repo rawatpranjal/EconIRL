@@ -48,7 +48,7 @@ Legacy API (deprecated, for backward compatibility):
     >>> print(result.summary())
 """
 
-__version__ = "0.0.10"
+__version__ = "0.1.0"
 
 # Core types
 # Datasets
@@ -67,6 +67,7 @@ from econirl.estimation import IQLearnEstimator as IQLearn
 # Sklearn-style Estimators (JAX backend)
 from econirl.estimators import (
     AIRL,
+    AIRL2,
     CCP,
     GLADIUS,
     MCEIRL,
@@ -128,6 +129,7 @@ __all__ = [
     "MPEC",
     "GLADIUS",
     "AIRL",
+    "AIRL2",
     "IQLearn",
     "NeuralGLADIUS",
     "NeuralAIRL",

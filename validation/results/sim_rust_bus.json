@@ -248,7 +248,7 @@
     "determinism": "structural estimators are deterministic given the seeds; neural/IRL estimators may have nondeterministic training internals, so their behavioral numbers can vary slightly across runs",
     "excluded": [
       {
-        "name": "AIRL-Het / AAIRL",
+        "name": "AIRL2 / AIRL2",
         "reason": "designed for latent-type heterogeneity; this panel has a single agent type"
       },
       {

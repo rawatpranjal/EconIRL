@@ -216,7 +216,7 @@ The package reproduces the identification structure:
 | --- | --- | --- | --- |
 | AIRL-1 | R(s) | deterministic | yes |
 | AIRL-2 (default) | R(s,a) | any | no, a shaped advantage |
-| AIRL-2 anchored | R(s,a) with an action anchor | any | yes (see AIRL-Het) |
+| AIRL-2 anchored | R(s,a) with an action anchor | any | yes (see AIRL2) |
 
 State-only AIRL recovers the reward on the deterministic 16-state task: normalized
 reward error 0.10, policy distance 0.006, counterfactual regret near 0.004. The
@@ -322,50 +322,44 @@ PYTHONPATH=src python validation/estimators/nnes/bus_renewal_efficiency.py --n-r
 
 ## GLADIUS (Kang, Yoganarasimhan, and Jain, 2025)
 
-GLADIUS learns a reward by inverse Q-learning from offline choices. It fits a
-neural Q-network and a continuation-value network, then reads the reward as
-r(s, a) = Q(s, a) minus beta times the expected next value. An anchor action with
-a known reward sets the absolute level (their Assumption 3).
+GLADIUS estimates Q and conditional continuation value directly, then recovers
+reward without using a transition tensor during fitting. The Table 2 driver
+uses the paper's 20 mileage states, equiprobable maintenance increments of 1
+through 4, replacement reset, costs `(1, 5)`, discount `0.95`, 100 periods, and
+the paper's sample-level reward MAPE.
 
-The paper's first simulation is the Rust bus-engine problem on 20 mileage states.
-Maintenance costs theta0 per mileage unit. Replacement costs theta1 and resets the
-mileage to one. The true values are theta0 = 1 and theta1 = 5, with discount 0.95.
-The reported quantity is the mean absolute percentage error of the recovered
-reward, measured on the state-action pairs the expert visits (their Table 2). Most
-of those samples sit at low mileage.
+Qualification runs all six reported sample sizes with 20 seeds each. A cell
+passes when its mean MAPE is no larger than the paper mean plus two reported
+standard errors. The combined gate also requires no deterioration after the
+`N=250` cell. Exact values are stored in
+[`gladius_paper_table2.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_paper_table2.json).
 
-The package runs two estimators on this design. The nested fixed point is the
-oracle, with the true linear form and known transitions. GLADIUS uses a two-layer
-network over mileage, no transitions, and the replacement action as the anchor.
+The checked-in author experiment selects the best epoch using true held-out
+reward MAPE. The replication matches that simulation-only rule and labels it in
+the receipt. This is leakage by ordinary deployment standards, so the public
+`GLADIUS.fit` path never accepts oracle rewards or held-out truth.
 
-### Bus-engine reward MAPE (percent), 80/20 split, two draws per cell
-
-| Trajectories (H=100) | NFXP oracle | Paper Rust | GLADIUS | Paper GLADIUS |
-| --- | ---: | ---: | ---: | ---: |
-| 50 | 3.91 | 3.62 | 7.0 | 3.44 |
-| 250 | 0.97 | 1.37 | 4.2 | 0.84 |
-
-The nested fixed point reproduces the paper's oracle column to the precision the
-paper reports, with recovered costs near [1.0, 5.0]. This confirms the design and
-the metric.
-
-GLADIUS recovers the reward direction on the same data. The recovered maintenance
-cost rises about one unit per mileage step, as it should. The level is the weak
-point. The reward is a difference of two large value terms, so a small level error
-in Q shows up in the low-mileage reward, where the metric puts most of its weight.
-The package reward MAPE sits above the paper's GLADIUS column, and the gap grows
-with the sample size. The fitted-Q anchor target (the package default) pins the
-level far better than the literal bi-conjugate variant, which does not pin it.
-
-This reproduces the paper's oracle recovery and the GLADIUS reward direction. It is
-not yet a match to the paper's GLADIUS error. That would need the absolute level
-pinned as tightly as the oracle.
+Five of the six cells land inside the bound. `N=5000` does not, at 0.26 against
+a 0.24 bound. GLADIUS is therefore a partial match to Table 2, not a completed
+replication. The per-cell numbers and the reasons are on the
+[GLADIUS validation page](estimators/gladius/validation.md).
 
 Reproduce:
 
 ```bash
-PYTHONPATH=src python validation/estimators/gladius/paper_table2_mape.py --traj 250 --reps 2
+PYTHONPATH=src:. uv run python validation/estimators/gladius/paper_table2_mape.py \
+    --sweep --reps 20 --max-epochs 800 \
+    --out validation/results/gladius_paper_table2.json
 ```
+
+**Result**
+
+```text
+GLADIUS Table 2 qualification gates failed
+```
+
+The sharded release procedure is in the
+[GLADIUS qualification runbook](estimators/gladius/qualification_runbook.md).
 
 ## RHIP (Barnes et al., 2024)
 
@@ -405,7 +399,7 @@ Reproduce:
 python scripts/study_rhip_lookahead.py
 ```
 
-## AIRL-Het (Lee, Sudhir, and Wang, 2026)
+## AIRL2 (Lee, Sudhir, and Wang, 2026)
 
 Lee, Sudhir, and Wang extend AIRL to consumers who differ in unobserved ways and
 to action-dependent utilities. Their setting is sequential content: a reader of
@@ -440,7 +434,7 @@ published consumption estimates use proprietary data and are not reproduced here
 Reproduce:
 
 ```bash
-python validation/estimators/aairl/run.py
+python validation/estimators/airl2/run.py
 ```
 
 ## Pending

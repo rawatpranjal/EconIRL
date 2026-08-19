@@ -38,8 +38,9 @@ GRID_FIG = os.path.join(_STATIC, "taxi_gridworld_grid.png")
 # the inner solves cheap on a page meant to be light; the economics is the same.
 # The scaling sweep reruns a trimmed roster at 6x6 (36 states) and 10x10 (100
 # states) to trace compute and accuracy against problem size.
-ENV = dict(grid_size=8, step_penalty=-0.1, terminal_reward=10.0,
-           distance_weight=0.1, discount_factor=0.95)
+ENV = dict(
+    grid_size=8, step_penalty=-0.1, terminal_reward=10.0, distance_weight=0.1, discount_factor=0.95
+)
 HEADLINE_SIZE = 8
 SCALING_SIZES = (6, 10)
 
@@ -58,8 +59,13 @@ def _env(grid_size=HEADLINE_SIZE):
 def _run_nfxp(env, panel):
     from econirl.estimation import NFXPEstimator
 
-    est = NFXPEstimator(inner_solver="hybrid", inner_tol=1e-10,
-                        inner_max_iter=100000, compute_hessian=True, verbose=False)
+    est = NFXPEstimator(
+        inner_solver="hybrid",
+        inner_tol=1e-10,
+        inner_max_iter=100000,
+        compute_hessian=True,
+        verbose=False,
+    )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -73,8 +79,11 @@ def _run_ccp(env, panel):
 def _run_mpec(env, panel):
     from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
-    est = MPECEstimator(config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
-                        compute_hessian=True, verbose=False)
+    est = MPECEstimator(
+        config=MPECConfig(solver="sqp", outer_max_iter=200, tol=1e-8, constraint_tol=1e-6),
+        compute_hessian=True,
+        verbose=False,
+    )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -84,16 +93,29 @@ def _run_maxent_irl(env, panel):
     # Action-dependent features: the reward here depends on where the action
     # leads (terminal indicator), not on the state alone. Adaptive per-
     # parameter steps (Adam) handle the mixed feature scales.
-    est = MaxEntIRLEstimator(inner_tol=1e-8, inner_max_iter=5000, outer_max_iter=500,
-                             learning_rate=0.05, compute_hessian=False, verbose=False)
+    est = MaxEntIRLEstimator(
+        inner_tol=1e-8,
+        inner_max_iter=5000,
+        outer_max_iter=500,
+        learning_rate=0.05,
+        compute_hessian=False,
+        verbose=False,
+    )
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_mce_irl(env, panel):
     from econirl.estimation import MCEIRLConfig, MCEIRLEstimator
 
-    est = MCEIRLEstimator(config=MCEIRLConfig(learning_rate=0.05, outer_max_iter=100,
-                                              inner_max_iter=2000, compute_se=False, verbose=False))
+    est = MCEIRLEstimator(
+        config=MCEIRLConfig(
+            learning_rate=0.05,
+            outer_max_iter=100,
+            inner_max_iter=2000,
+            compute_se=False,
+            verbose=False,
+        )
+    )
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
@@ -105,29 +127,52 @@ def _run_deep_mce_irl(env, panel):
     # sklearn-style .fit interface; adapted to the uniform result shape. coef_
     # is the neural reward projected onto the linear features, so the regret
     # transfer uses that projection, not the raw network.
-    m = MCEIRLNeural(n_states=int(env.num_states), n_actions=int(env.num_actions),
-                     discount=float(env.problem_spec.discount_factor),
-                     max_epochs=300, verbose=False)
-    m.fit(panel, features=np.asarray(env.feature_matrix),
-          transitions=np.asarray(env.transition_matrices))
-    return SimpleNamespace(parameters=m.coef_, standard_errors=None, policy=m.policy_,
-                           value_function=m.value_, converged=bool(m.converged_))
+    m = MCEIRLNeural(
+        n_states=int(env.num_states),
+        n_actions=int(env.num_actions),
+        discount=float(env.problem_spec.discount_factor),
+        max_epochs=300,
+        verbose=False,
+    )
+    m.fit(
+        panel,
+        features=np.asarray(env.feature_matrix),
+        transitions=np.asarray(env.transition_matrices),
+    )
+    return SimpleNamespace(
+        parameters=m.coef_,
+        standard_errors=None,
+        policy=m.policy_,
+        value_function=m.value_,
+        converged=bool(m.converged_),
+    )
 
 
 def _run_airl(env, panel):
     from econirl.estimation import AIRLConfig, AIRLEstimator
 
-    est = AIRLEstimator(config=AIRLConfig(reward_type="linear", reward_arg="state_action",
-                                          reward_lr=0.01, discriminator_steps=10,
-                                          max_rounds=300, compute_se=False, verbose=False))
+    est = AIRLEstimator(
+        config=AIRLConfig(
+            reward_type="linear",
+            reward_arg="state_action",
+            reward_lr=0.01,
+            discriminator_steps=10,
+            max_rounds=300,
+            compute_se=False,
+            verbose=False,
+        )
+    )
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_iq_learn(env, panel):
     from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
 
-    est = IQLearnEstimator(config=IQLearnConfig(q_type="linear", divergence="chi2",
-                                                alpha=3.0, max_iter=2000, verbose=False))
+    est = IQLearnEstimator(
+        config=IQLearnConfig(
+            q_type="linear", divergence="chi2", alpha=3.0, max_iter=2000, verbose=False
+        )
+    )
     return est.estimate(panel, _action_reward(env), env.problem_spec, env.transition_matrices)
 
 
@@ -136,17 +181,25 @@ def _run_firl(env, panel):
 
     # fkl (bounded gradient) with the estimator's default reward clip; the
     # chi2 ratio gradient is unbounded on near-deterministic experts.
-    est = FIRLEstimator(f_divergence="fkl", lr=0.2, max_iter=400, reward_clip=10.0,
-                        verbose=False)
+    est = FIRLEstimator(f_divergence="fkl", lr=0.2, max_iter=400, reward_clip=10.0, verbose=False)
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
 def _run_gladius(env, panel):
     from econirl.estimation import GLADIUSConfig, GLADIUSEstimator
 
-    est = GLADIUSEstimator(config=GLADIUSConfig(max_epochs=300, q_hidden_dim=128,
-                                                v_hidden_dim=128, q_lr=1e-4, v_lr=1e-4,
-                                                patience=60, compute_se=False, verbose=False))
+    est = GLADIUSEstimator(
+        config=GLADIUSConfig(
+            max_epochs=300,
+            q_hidden_dim=128,
+            v_hidden_dim=128,
+            q_lr=1e-4,
+            v_lr=1e-4,
+            patience=60,
+            compute_se=False,
+            verbose=False,
+        )
+    )
     return est.estimate(panel, _linear_utility(env), env.problem_spec, env.transition_matrices)
 
 
@@ -190,30 +243,45 @@ SCALING_ROSTER = (
 
 DIAGNOSES = {
     "MCE-IRL": "Two of its three reward directions, the state-only step and "
-               "distance features, are unidentified here. Its gradient "
-               "ascent can drift along them, and in one replication of "
-               "three the policy collapsed. Read the per-rep records, not "
-               "just the mean.",
+    "distance features, are unidentified here. Its gradient "
+    "ascent can drift along them, and in one replication of "
+    "three the policy collapsed. Read the per-rep records, not "
+    "just the mean.",
     "f-IRL": "The strongest behavioral score on this page. It recovers a "
-             "tabular reward, one value per state-action pair, which does "
-             "not depend on the deficient feature basis at all.",
+    "tabular reward, one value per state-action pair, which does "
+    "not depend on the deficient feature basis at all.",
 }
 
 EXCLUDED = [
-    {"name": "SEES", "reason": "its spline value basis is built for an ordered "
-     "1-D state index. A 2-D grid breaks that geometry, so running it here "
-     "would be misspecification by construction"},
-    {"name": "MPEC, UFXP, NNES", "reason": "Other-tier structural estimators; "
-     "NFXP and CCP carry the structural contrast here, and the full structural "
-     "roster runs on the bus engine and fleet pages"},
-    {"name": "TD-CCP", "reason": "core, but shown on the bus engine study; the "
-     "deterministic grid does not exercise its transition-free estimation"},
-    {"name": "MaxEnt-IRL, IQ-Learn, f-IRL, BC", "reason": "trajectory MaxEnt, "
-     "inverse soft-Q, state-marginal, and behavioral-cloning baselines; not "
-     "part of the core roster"},
-    {"name": "MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL", "reason": "research "
-     "code or too slow; not benchmarked in this study"},
+    {
+        "name": "SEES",
+        "reason": "its spline value basis is built for an ordered "
+        "1-D state index. A 2-D grid breaks that geometry, so running it here "
+        "would be misspecification by construction",
+    },
+    {
+        "name": "MPEC, UFXP, NNES",
+        "reason": "Other-tier structural estimators; "
+        "NFXP and CCP carry the structural contrast here, and the full structural "
+        "roster runs on the bus engine and fleet pages",
+    },
+    {
+        "name": "TD-CCP",
+        "reason": "an Other estimator shown on the bus engine study; the "
+        "deterministic grid does not exercise its transition-free estimation",
+    },
+    {
+        "name": "MaxEnt-IRL, IQ-Learn, f-IRL, BC",
+        "reason": "trajectory MaxEnt, "
+        "inverse soft-Q, state-marginal, and behavioral-cloning baselines; not "
+        "part of the core roster",
+    },
+    {
+        "name": "MMP, GAIL, GCL, DeepMaxEnt-IRL, Bayesian-IRL",
+        "reason": "research code or too slow; not benchmarked in this study",
+    },
 ]
+
 
 def _scaling_cell(grid_size):
     """One scaling-only gridworld cell at a given size.
@@ -377,7 +445,14 @@ EXTRA_FIGURES = [(GRID_FIG, _make_grid_fig)]
 
 
 if __name__ == "__main__":
-    main_cli(cells=CELLS, title="Simulation study: gridworld navigation",
-             narrative=NARRATIVE, diagnoses=DIAGNOSES, excluded=EXCLUDED,
-             results_json=RESULTS_JSON, page_path=PAGE_PATH,
-             scaling_figure=SCALING_FIG, extra_figures=EXTRA_FIGURES)
+    main_cli(
+        cells=CELLS,
+        title="Simulation study: gridworld navigation",
+        narrative=NARRATIVE,
+        diagnoses=DIAGNOSES,
+        excluded=EXCLUDED,
+        results_json=RESULTS_JSON,
+        page_path=PAGE_PATH,
+        scaling_figure=SCALING_FIG,
+        extra_figures=EXTRA_FIGURES,
+    )

@@ -188,10 +188,10 @@ class ShapeshifterKnownTruthConfig:
 
 @dataclass(frozen=True)
 class ContentHeterogeneityKnownTruthConfig:
-    """Paper-style serialized-content DGP for AIRL-Het validation.
+    """Paper-style serialized-content DGP for AIRL2 validation.
 
     The generic high-dimensional grid is useful as a stress test, but it does
-    not encode the core structure of the AIRL-Het paper setting: repeated
+    not encode the core structure of the AIRL2 paper setting: repeated
     series for each user, latent segment membership that is constant across
     those series, a pay/wait/exit choice set, high-dimensional observed
     content controls, and an exit-action reward anchor.
@@ -256,13 +256,13 @@ class ContentHeterogeneityKnownTruthConfig:
         if self.price_levels < 2 or self.quality_levels < 2:
             raise ValueError("price_levels and quality_levels must be at least 2")
         if self.num_segments != 2:
-            raise ValueError("content AIRL-Het DGP is calibrated for two segments")
+            raise ValueError("content AIRL2 DGP is calibrated for two segments")
         if not 0 <= self.discount_factor < 1:
             raise ValueError("discount_factor must be in [0, 1)")
         if self.scale_parameter <= 0:
             raise ValueError("scale_parameter must be positive")
         if self.exit_action != 2:
-            raise ValueError("content AIRL-Het DGP expects action 2 to be exit")
+            raise ValueError("content AIRL2 DGP expects action 2 to be exit")
         if not 0 <= self.transition_noise < 1:
             raise ValueError("transition_noise must be in [0, 1)")
         if self.books_per_user < 1:
@@ -464,7 +464,7 @@ def build_shapeshifter_known_truth_dgp(
 def build_content_heterogeneity_known_truth_dgp(
     config: ContentHeterogeneityKnownTruthConfig,
 ) -> KnownTruthDGP:
-    """Build the serialized-content latent-segment AIRL-Het DGP."""
+    """Build the serialized-content latent-segment AIRL2 DGP."""
 
     config.validate()
     transitions = _build_content_transitions(config)
@@ -2409,12 +2409,12 @@ ESTIMATOR_CONTRACTS: dict[str, EstimatorContract] = {
             "an anchor action to be interpretable."
         ),
     ),
-    "AIRL-Het": EstimatorContract(
-        name="AIRL-Het",
-        code_path="src/econirl/estimation/adversarial/airl_het.py",
+    "AIRL2": EstimatorContract(
+        name="AIRL2",
+        code_path="src/econirl/estimation/adversarial/airl2.py",
         documentation_paths=(
             "docs/estimators/airl.md",
-            "docs/estimators/airl_het.md",
+            "docs/estimators/airl2.md",
         ),
         required_reward_modes=("state_only", "action_dependent"),
         required_state_modes=("low_dim", "high_dim"),
@@ -2521,9 +2521,9 @@ def check_estimator_compatibility(
             f"{estimator_name} requires empirical action support; minimum action share is "
             f"{diagnostics.min_action_share:.3g}"
         )
-    if estimator_name == "AIRL-Het" and dgp.config.heterogeneity != "latent_segments":
-        errors.append("AIRL-Het main validation requires a latent-segment DGP")
-    if estimator_name != "AIRL-Het" and dgp.config.heterogeneity == "latent_segments":
+    if estimator_name == "AIRL2" and dgp.config.heterogeneity != "latent_segments":
+        errors.append("AIRL2 main validation requires a latent-segment DGP")
+    if estimator_name != "AIRL2" and dgp.config.heterogeneity == "latent_segments":
         warnings.append(
             f"{estimator_name} will be evaluated on mixture-average behavior unless segmented"
         )
@@ -2884,6 +2884,7 @@ def make_estimator(
                 v_num_layers=1 if smoke else 3,
                 max_epochs=10 if smoke else 500,
                 batch_size=128 if smoke else 512,
+                patience=11 if smoke else 501,
                 anchor_action=anchor_action,
                 anchor_rewards=anchor_rewards,
                 anchor_bellman_mode="anchor_moment",
@@ -2941,12 +2942,12 @@ def make_estimator(
                 verbose=verbose,
             )
         )
-    if estimator_name == "AIRL-Het":
-        from econirl.estimation.adversarial.airl_het import AIRLHetConfig, AIRLHetEstimator
+    if estimator_name == "AIRL2":
+        from econirl.estimation.adversarial.airl2 import AIRL2Config, AIRL2Estimator
 
         content_cell = isinstance(dgp.config, ContentHeterogeneityKnownTruthConfig)
-        return AIRLHetEstimator(
-            config=AIRLHetConfig(
+        return AIRL2Estimator(
+            config=AIRL2Config(
                 num_segments=dgp.config.num_segments,
                 exit_action=dgp.config.exit_action,
                 absorbing_state=dgp.config.absorbing_state,
@@ -3371,7 +3372,7 @@ def recovery_gates(
             checks.append(_numeric_gate(f"{kind}_regret", cf_metrics.regret, "<=", 0.08))
         return checks
 
-    if estimator_name == "AIRL-Het":
+    if estimator_name == "AIRL2":
         assignment_accuracy = metrics["segment_assignment_accuracy"]
         if assignment_accuracy is None:
             assignment_accuracy = float("-inf")
@@ -3842,7 +3843,7 @@ DEFAULT_CELLS: tuple[KnownTruthCell, ...] = (
         description="Universal DGP preset: latent-segment benchmark for heterogeneous estimators.",
     ),
     KnownTruthCell(
-        cell_id="airl_het_paper_identification",
+        cell_id="airl2_paper_identification",
         dgp_config=ContentHeterogeneityKnownTruthConfig(
             num_chapters=5,
             wait_bins=3,
@@ -3855,7 +3856,7 @@ DEFAULT_CELLS: tuple[KnownTruthCell, ...] = (
         ),
         simulation_config=SimulationConfig(n_individuals=800, n_periods=16, seed=4507),
         description=(
-            "AIRL-Het serialized-content identification cell: two latent "
+            "AIRL2 serialized-content identification cell: two latent "
             "segments, repeated books per user, pay/wait/exit actions, an "
             "exit reward anchor, deterministic chapter transitions, and "
             "known finite reward features."
