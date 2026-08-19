@@ -81,13 +81,20 @@ def test_table2_summary_rejects_a_mislabeled_training_recipe() -> None:
     assert summary["gates"]["paper_recipe_disclosed"] is False
 
 
-def test_smallest_table2_cell_gets_enough_q_updates_to_recover_reward() -> None:
-    """Protect the bad-seed failure that fixed batch size 32 concealed."""
+def test_every_table2_cell_gets_enough_q_updates_to_recover_reward() -> None:
+    """Protect the bad-seed failure that fixed batch size 32 concealed.
+
+    The floor is stated in Q updates per epoch, not in trajectories. A fixed
+    small batch also fails, the other way: it leaves the largest cell
+    gradient-noise limited. So the batch never drops below what the floor needs
+    and never rises above the author's own 32.
+    """
     batch_size = qualification_batch_size(50)
 
-    assert qualification_batch_size(250) == 5
-    assert qualification_batch_size(500) == 5
-    assert qualification_batch_size(1000) == 5
+    for n_traj in TARGET_SIZES:
+        assert qualification_min_q_updates(n_traj) >= 10, n_traj
+        assert 2 <= qualification_batch_size(n_traj) <= 32, n_traj
+    assert qualification_batch_size(5000) == 32
 
     record = run_one(
         50,

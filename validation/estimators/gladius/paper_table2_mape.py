@@ -63,8 +63,9 @@ PAPER_RUST = {50: 3.62, 250: 1.37, 500: 0.90, 1000: 0.71, 2500: 0.68, 5000: 0.40
 TARGET_SIZES = (50, 250, 500, 1000, 2500, 5000)
 TARGET_REPETITIONS = 20
 N50_BATCH_SIZE = 2
-LARGER_CELL_BATCH_SIZE = 5
-BATCH_POLICY = "2_trajectories_at_n50_5_trajectories_above"
+AUTHOR_BATCH_SIZE = 32
+MIN_Q_UPDATES_PER_EPOCH = 10
+BATCH_POLICY = "author_batch_32_relaxed_to_a_10_q_update_per_epoch_floor_min_2"
 PAPER_RECIPE_RECEIPT = {
     "network_mode": "shared_trunk",
     "batch_unit": "trajectory",
@@ -173,16 +174,23 @@ def mape_on_samples(r_hat: np.ndarray, states: np.ndarray, actions: np.ndarray) 
 
 
 def qualification_batch_size(n_traj: int) -> int:
-    """Keep small paper cells from receiving only one Q update per epoch.
+    """Give every cell at least ``MIN_Q_UPDATES_PER_EPOCH`` Q updates per epoch.
 
-    The author loop alternates zeta and Q updates across trajectory batches.
-    A fixed batch size of 32 gives the N=50 cell only two batches, hence one Q
-    update, per epoch. The qualified small batches give N=50 ten Q updates and
-    let update count grow with N as the MAPE target tightens.
+    The author loop alternates zeta and Q updates across trajectory batches, so
+    the number of Q updates per epoch is set by the batch size. The author's
+    batch size of 32 gives the N=50 cell only two batches, hence one Q update
+    per epoch, which produced 23-50% MAPE outliers. The batch is therefore
+    shrunk only as far as the update floor requires, and never past the author's
+    32 in the other direction. Holding the batch at a small fixed size in every
+    cell is the wrong correction: at N=5000 it forces 400 noisy updates per
+    epoch and leaves the largest cell gradient-noise limited.
     """
     if n_traj <= 0:
         raise ValueError("n_traj must be positive")
-    return N50_BATCH_SIZE if n_traj <= 50 else LARGER_CELL_BATCH_SIZE
+    train_trajectories = int(round(0.8 * n_traj))
+    # Two Q-side updates need 2 * MIN batches, since the loop alternates.
+    batch = train_trajectories // (2 * MIN_Q_UPDATES_PER_EPOCH)
+    return max(N50_BATCH_SIZE, min(AUTHOR_BATCH_SIZE, batch))
 
 
 def qualification_min_q_updates(n_traj: int) -> int:
