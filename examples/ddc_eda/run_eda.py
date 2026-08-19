@@ -5,7 +5,7 @@ Reads every dataset, computes key statistics, runs quick assumption tests,
 and writes docs/summary_of_data_for_ddc_irl.md.
 
 Usage:
-    cd /Users/pranjal/Code/econirl
+    cd <repo root>
     python3 examples/ddc_eda/run_eda.py
 
 Runtime: ~10-15 minutes (large files are sampled).

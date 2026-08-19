@@ -1,5 +1,5 @@
 {
-  "econirl_module": "/private/tmp/econirl-tdccp-final-wheel.9dBzz8/venv/lib/python3.13/site-packages/econirl/__init__.py",
+  "econirl_module": ".../venv/lib/python3.13/site-packages/econirl/__init__.py",
   "econirl_version": "0.0.10",
   "estimator": "TD-CCP",
   "fresh_process": true,

@@ -1,6 +1,6 @@
 {
   "confidence_intervals_equal": true,
-  "econirl_module": "/private/tmp/econirl-airl-wheel-final-90652/venv/lib/python3.13/site-packages/econirl/__init__.py",
+  "econirl_module": ".../venv/lib/python3.13/site-packages/econirl/__init__.py",
   "econirl_version": "0.0.10",
   "estimator": "AIRL",
   "fresh_process": true,

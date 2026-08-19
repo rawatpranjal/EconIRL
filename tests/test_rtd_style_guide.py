@@ -192,9 +192,8 @@ def test_public_rtd_source_avoids_release_claim_wording() -> None:
         "release claim": re.compile(r"\brelease claim\b", flags=re.IGNORECASE),
         "validation target": re.compile(r"\bvalidation target\b", flags=re.IGNORECASE),
         "algorithm sketch": re.compile(r"\balgorithm sketch\b", flags=re.IGNORECASE),
-        # Register banned 2026-06-12 (docs/research/internal_docs/style.md, public prose
-        # register): internal honesty-contract vocabulary that leaked onto
-        # the live RTD pages.
+        # Register banned 2026-06-12: internal release vocabulary that leaked
+        # onto the live RTD pages.
         "gauge": re.compile(r"\bgauges?\b", flags=re.IGNORECASE),
         "verbatim": re.compile(r"\bverbatim\b", flags=re.IGNORECASE),
         "honest": re.compile(r"\bhonest(?:ly|y)?\b", flags=re.IGNORECASE),
