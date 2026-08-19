@@ -132,3 +132,32 @@ def test_form_wraps_env_and_delegates():
     # compare its content, not identity.
     assert form.problem_spec.num_states == env.num_states
     assert form.problem_spec.num_actions == env.num_actions
+
+
+def test_every_capability_either_builds_or_fails_with_an_actionable_message() -> None:
+    """A capability record must not promise a route the loader cannot take.
+
+    AIRL2 reached the public surface with a capability entry but no loader
+    recipe, so ``run_form`` swallowed the generic "no build recipe" error into
+    its skip log and silently dropped the estimator from every roster run.
+    Every registered name must now either build or explain itself.
+    """
+    from types import SimpleNamespace
+
+    from econirl.forms.loader import _build_estimator
+
+    form = SimpleNamespace(spec=SimpleNamespace(num_states=5, num_actions=2))
+    unexplained = []
+    for name in CAPABILITIES:
+        try:
+            _build_estimator(name, CAPABILITIES[name], form)
+        except ValueError as exc:
+            if "no build recipe" in str(exc):
+                unexplained.append(name)
+        except Exception:
+            # A recipe exists and failed on the stub form, which is fine here.
+            pass
+
+    assert unexplained == [], (
+        f"these estimators are silently skipped by run_form: {unexplained}"
+    )
