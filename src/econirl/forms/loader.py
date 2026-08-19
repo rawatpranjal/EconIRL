@@ -293,6 +293,16 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
             verbose=False,
         )
 
+    if name == "AIRL2":
+        raise ValueError(
+            "run_form cannot build AIRL2 automatically. AIRL2 identifies "
+            "segment rewards from an exit-action reward anchor and an "
+            "absorbing-state value anchor, and a generic form does not carry "
+            "either. Construct it directly with econirl.AIRL2("
+            "exit_action=..., absorbing_state=...) against a problem where "
+            "those anchors are credible."
+        )
+
     raise ValueError(f"run_form: no build recipe for estimator {name!r}")
 
 

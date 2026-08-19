@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.1
+
+Correctness and disclosure fixes found by an adversarial review of the 0.1.0
+diff. No estimator numerics changed.
+
+### Fixed
+
+- `AIRL2` was registered in the estimator capability matrix with no matching
+  build recipe in `econirl.forms.loader`, so `run_form` swallowed the generic
+  "no build recipe" error into its skip log and silently dropped AIRL2 from
+  every roster run. It now fails with a message naming the exit-action and
+  absorbing-state anchors it needs, and a test walks the whole capability
+  registry so no future entry can be silently skipped. AIRL2 used directly
+  was never affected.
+- The 0.1.0 migration notes understated the `AIRL` and `NeuralAIRL` change.
+  See below.
+
+### Documentation
+
+- The 0.1.0 note "Nothing was removed from the public import surface" was
+  true but misleading. `AIRL` and `NeuralAIRL` were rebound to different
+  classes, which raises `TypeError` on an old call rather than warning. The
+  migration section now says so.
+
+### Known behavior, now pinned by a test
+
+Neural MCE-IRL sets `converged_ = False` on a truncated fit without emitting
+a warning. The cross-estimator contract test records this so it stays visible.
+
 ## 0.1.0 (unreleased)
 
 This release completes the applied workflow across nine estimators. Each one
@@ -42,8 +71,26 @@ validation page for the per-cell table.
 
 ### Migration from 0.0.10
 
-Nothing was removed from the public import surface. The renames below keep
-working through 0.1.x and emit a `DeprecationWarning` on use.
+**`AIRL` and `NeuralAIRL` changed meaning. Neither emits a warning; both raise
+`TypeError` on an old call.** In 0.0.10 the package root bound `AIRL` to the
+neural, context-aware class (`AIRL = NeuralAIRL` in `econirl/estimators/__init__.py`),
+whose constructor took `state_dim` and `context_dim` and whose `fit` needed no
+transition tensor. In 0.1.0 `AIRL` is the tabular state-only estimator: it takes
+`n_states` and raises `ValueError` if `transitions` is omitted. `NeuralAIRL` is a
+new class with its own signature, also requiring `n_states` and transitions.
+
+Because this is a rebinding of an existing name rather than a rename behind a
+compatibility shim, upgrading code that calls the 0.0.10 `AIRL` or `NeuralAIRL`
+fails immediately with `TypeError` on the unexpected keyword. That is loud, not
+silent, but it is not a deprecation path.
+
+There is no replacement for the observed-context conditioning the 0.0.10 class
+offered. `NeuralAIRL` rejects `context` and directs callers to `AIRL2`, and
+`AIRL2` conditions on latent segments rather than observed context, so a 0.0.10
+workflow that passed a context encoder has no 0.1.0 equivalent.
+
+The `AIRLHet` names below are a genuine deprecation: they keep working through
+0.1.x and emit a `DeprecationWarning` on use.
 
 | 0.0.10 | 0.1.0 | Action |
 | --- | --- | --- |

@@ -210,11 +210,48 @@ def test_release_estimator_satisfies_the_public_protocol(name: str) -> None:
 @pytest.mark.parametrize("name", RELEASE_ESTIMATORS)
 def test_release_estimator_runs_the_documented_workflow(name: str) -> None:
     """Fit, report, predict out of sample, and reload without changing results."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
         model = _fit(name)
 
     assert isinstance(model, EstimatorProtocol)
+
+    # The budgets here are deliberately tiny so the contract stays fast, and
+    # five estimators legitimately stop before their convergence rule fires.
+    # Pinning the set means this test cannot quietly go green on a real
+    # optimizer regression in the four that should converge.
+    expected_unconverged = {
+        "MCEIRL",
+        "MCEIRLNeural",
+        "AIRL2",
+        "GLADIUS",
+        "NeuralAIRL",
+    }
+    # Of those five, four tell the user. Neural MCE-IRL stops early and sets
+    # converged_ = False while emitting nothing, so a user who does not read
+    # the attribute never learns the fit was truncated. Pinned here so the
+    # silence stays visible and a future fix trips this test.
+    silently_unconverged = {"MCEIRLNeural"}
+
+    converged = getattr(model, "converged_", None)
+    if converged is not None:
+        if name in expected_unconverged:
+            assert not converged, (
+                f"{name} now converges on the tiny contract budget; drop it from "
+                "expected_unconverged so this check keeps its teeth"
+            )
+            warned = any(
+                issubclass(w.category, (RuntimeWarning, UserWarning)) for w in caught
+            )
+            if name in silently_unconverged:
+                assert not warned, (
+                    f"{name} now warns on non-convergence; drop it from "
+                    "silently_unconverged"
+                )
+            else:
+                assert warned, f"{name} did not converge but issued no warning"
+        else:
+            assert converged, f"{name} failed to converge: {caught}"
 
     summary = model.summary()
     assert isinstance(summary, str) and summary.strip()

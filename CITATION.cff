@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use EconIRL in research, please cite the software and the associated paper."
 title: "EconIRL: Structural Dynamic Discrete Choice and Inverse Reinforcement Learning in Python"
-version: "0.1.0"
+version: "0.1.1"
 date-released: "2026-08-19"
 authors:
   - given-names: Pranjal
