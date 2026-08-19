@@ -75,10 +75,8 @@ data-generating process.
 
 ## Identification
 
-This is the section that says why the primary validated claim is behavioral
-state-marginal recovery, not structural counterfactual recovery.
-
-f-IRL identifies a behavioral reward under the following assumptions.
+f-IRL identifies a behavioral reward, not one that supports structural
+counterfactuals, under the following assumptions.
 
 - **Stationarity.** The data-generating process is a stationary Markov decision
   process and the expert follows a stationary policy.

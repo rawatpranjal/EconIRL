@@ -480,7 +480,6 @@ Pages:
 - [Simulation Study](gladius/validation.md)
 - [Counterfactuals](gladius/counterfactuals.md)
 - [High-State Example](gladius/high_state_example.md)
-- [Qualification Runbook](gladius/qualification_runbook.md)
 
 ```{toctree}
 :hidden:
@@ -490,5 +489,4 @@ gladius/pre_estimation
 gladius/validation
 gladius/counterfactuals
 gladius/high_state_example
-gladius/qualification_runbook
 ```

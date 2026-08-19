@@ -96,9 +96,6 @@ observed choices carry information about the structural costs.
 
 ## Identification
 
-This is the section that says when those empirical choice-probability equations
-identify the structural reward parameters.
-
 UFXP point-identifies the reward parameters $\theta$ under the following
 assumptions.
 
@@ -339,8 +336,6 @@ parameter is plotted as its recovered mean and 95% interval against the true val
 
 ![ufxp parameter recovery, Monte Carlo](../_static/estimators/ufxp_recovery.png)
 
-Recovery statistics are over a Monte-Carlo run of 100 replications.
-
 | Parameter | True | Recovered (mean) | 95% interval |
 | --- | ---: | ---: | --- |
 | `action_0_intercept` | 0.10 | 0.103 | [0.053, 0.151] |
@@ -348,7 +343,8 @@ Recovery statistics are over a Monte-Carlo run of 100 replications.
 | `action_1_intercept` | 0.00 | 0.003 | [-0.076, 0.071] |
 | `action_1_progress` | -0.20 | -0.198 | [-0.310, -0.086] |
 
-Across the 100 replications the true value sits inside the 95% interval for every parameter, and the mean estimate is close to the truth.
+Across the 100 replications the true value sits inside the 95% interval for
+every parameter.
 
 Behavioral fit and counterfactual regret on the same cell, against the known
 oracle objects:

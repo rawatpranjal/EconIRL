@@ -1,7 +1,7 @@
 # Pre-Estimation Checks
 
-Read this page before fitting IQ-Learn. Coverage gates matter because the method
-learns Q values from expert support and extrapolates outside it.
+Read this page before fitting IQ-Learn. State coverage matters because the
+method learns Q values from expert support and extrapolates outside it.
 
 IQ-Learn has the same general data-quality checks as other estimators plus
 coverage checks that are specific to its Q-based reward recovery.
@@ -16,7 +16,7 @@ coverage checks that are specific to its Q-based reward recovery.
 | Transition row sums | Transitions must be row-stochastic in the (n_actions, n_states, n_states) orientation for the inverse Bellman reward to be valid. |
 | Discount and scale | Misspecified beta or sigma shift the implied reward by a constant factor. |
 
-## Coverage Gates
+## Coverage Requirements
 
 IQ-Learn output is suitable for reward and counterfactual diagnostics only
 when:
@@ -52,5 +52,5 @@ from `summary.metadata` before interpreting the reward output.
 The sparse-support guard in
 [`sparse_support_guard.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/iq_learn/sparse_support_guard.py)
 demonstrates that small policy TV and low counterfactual regret numbers are
-not sufficient evidence when coverage is below the gates; support must pass
-first.
+not sufficient evidence when coverage falls below these levels. Support must
+pass first.

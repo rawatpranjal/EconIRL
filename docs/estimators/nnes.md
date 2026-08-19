@@ -131,11 +131,8 @@ reward when the state representation is richer than a small tabular reference.
 
 ## Identification
 
-This is the section that says when the finite reward parameters remain
-interpretable even though a neural network enters the continuation value.
-
 NNES point-identifies the reward parameters $\theta$ under the following
-assumptions.
+assumptions, even with a neural network in the continuation value.
 
 - **Conditional independence (CI).** The observed state transition is Markov in
   the current state and action and does not depend on the current logit shock.
@@ -374,7 +371,9 @@ value.
 
 ![NNES parameter recovery, Monte Carlo](../_static/estimators/nnes_recovery.png)
 
-The recovery study resimulates and refits across 25 replications. The estimator recovers all 32 value-function weights: the aggregate recovery RMSE is 0.0038, and the true value falls inside the 95% interval for all 32 of 32 weights. The figure shows the per-weight recovery-error distribution.
+Across 25 replications the estimator recovers all 32 value-function weights.
+Aggregate recovery RMSE is 0.0038, and the true value falls inside the 95%
+interval for all 32.
 
 Behavioral fit and counterfactual regret on the `canonical_high_action` primary
 cell, against the known oracle objects from `validation/results/nnes.json`:

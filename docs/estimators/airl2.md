@@ -90,13 +90,11 @@ absorbs each individual into a terminal state.
 
 ## Identification
 
-This is the section that says when the segment rewards are structurally pinned,
-not just clustered policies with different labels.
-
-AIRL2 recovers segment-level structural rewards under the following
-assumptions. Absent the anchor normalizations, the discriminator score
-$f_k$ is identified only up to potential-based transformations; the two anchors
-together uniquely resolve that ambiguity (Lee, Sudhir, and Wang 2026).
+AIRL2 recovers segment-level structural rewards, not clustered policies
+wearing different labels, under the following assumptions. Absent the anchor
+normalizations, the discriminator score $f_k$ is identified only up to
+potential-based transformations. The two anchors together uniquely resolve that
+ambiguity (Lee, Sudhir, and Wang 2026).
 
 - **Conditional independence (CI).** The observed state transition is Markov in
   the current state and action and does not depend on the current logit shock.

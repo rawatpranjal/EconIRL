@@ -81,9 +81,6 @@ planned stochastically.
 
 ## Identification
 
-This is the section that says what must hold before the horizon-specific moment
-match can be read as reward recovery.
-
 RHIP recovers a reward representation under the maximum causal entropy dynamic
 discrete choice assumptions. These are inherited unchanged from MCE-IRL; the
 horizon $H$ is a planner hyperparameter, not an identifying assumption.

@@ -60,5 +60,5 @@ nfxp_summary = NFXPEstimator().estimate(
 )
 ```
 
-Check coverage gates before relying on `theta_init`; off-support reward values
+Check state coverage before relying on `theta_init`. Off-support reward values
 can mislead the structural search.

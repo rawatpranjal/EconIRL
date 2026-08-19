@@ -14,7 +14,7 @@ counterfactuals for unanchored fits.
 | Type C | Action removal through a large payoff penalty | 0.00102 |
 
 The primary qualification cell passes upstream raw reward, projected reward,
-Q, value, and policy gates together with all three regret gates. These figures
+Q, value, and policy checks together with all three regret checks. These figures
 therefore support the scoped interventions in that oracle-simulation design. They do
 not make an unanchored reward level identified or validate extrapolation beyond
 the observed state and action support.

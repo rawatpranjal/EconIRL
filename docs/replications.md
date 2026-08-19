@@ -330,7 +330,7 @@ the paper's sample-level reward MAPE.
 
 Qualification runs all six reported sample sizes with 20 seeds each. A cell
 passes when its mean MAPE is no larger than the paper mean plus two reported
-standard errors. The combined gate also requires no deterioration after the
+standard errors. The combined report also requires no deterioration after the
 `N=250` cell. Exact values are stored in
 [`gladius_paper_table2.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_paper_table2.json).
 
@@ -357,9 +357,6 @@ PYTHONPATH=src:. uv run python validation/estimators/gladius/paper_table2_mape.p
 ```text
 GLADIUS Table 2 qualification gates failed
 ```
-
-The sharded release procedure is in the
-[GLADIUS qualification runbook](estimators/gladius/qualification_runbook.md).
 
 ## RHIP (Barnes et al., 2024)
 

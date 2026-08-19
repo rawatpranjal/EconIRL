@@ -52,7 +52,7 @@ replication would conflate two algorithms.
 
 ## Reproduce
 
-Run the combined gate after the four result files and applied notebook have
+Run the combined report after the four result files and applied notebook have
 been generated.
 
 ```bash
