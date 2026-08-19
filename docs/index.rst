@@ -8,7 +8,7 @@ recover rewards, and predict behaviour under policy changes.
 Install
 -------
 
-You can install EconIRL via:
+EconIRL installs with pip.
 
 .. code-block:: bash
 
@@ -17,8 +17,9 @@ You can install EconIRL via:
 Estimators
 ----------
 
-Start with `Choosing an Estimator <estimators/landscape.html>`__ for the
-canonical NFXP case, reward targets, transitions, and identification strategies.
+Start with `Choosing and Comparing Estimators <comparing_estimators.html>`__
+for the canonical NFXP case, reward targets, transitions, and identification
+strategies.
 Then open a method page below for its assumptions, evidence, and examples.
 
 `NFXP <estimators/nfxp.html>`__ ·
@@ -38,14 +39,14 @@ Then open a method page below for its assumptions, evidence, and examples.
 Replications
 ------------
 
-See `Replications <replications.html>`__ for the terse paper-number ledger.
-That page is about direct paper-number comparisons; broader synthetic evidence
-lives in the simulation studies.
+See `Replications <replications.html>`__ for the terse ledger of direct
+paper-number comparisons. Broader synthetic evidence lives in the simulation
+studies.
 
 Example
 -------
 
-Here is an example that estimates Rust (1987):
+This example estimates Rust (1987).
 
 .. code-block:: python
 

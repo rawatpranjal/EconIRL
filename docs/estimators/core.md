@@ -22,8 +22,6 @@ structural and inverse-reinforcement-learning identification lines.
 | [NeuralAIRL](neural_airl.md) | IRL | Nonlinear state reward recovery with neural reward, shaping, and policy functions. |
 | [GLADIUS](gladius.md) | IRL | Neural Q and continuation reward recovery at scale. |
 
-GLADIUS is the core neural Q and continuation estimator.
-
 ```{toctree}
 :maxdepth: 1
 

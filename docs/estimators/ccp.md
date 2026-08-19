@@ -272,7 +272,7 @@ Fit a logit pseudo-likelihood for theta
 Recovered reward parameters and implied policy
 ```
 
-The key tradeoff is support. CCP is fast when every relevant state-action cell
+The tradeoff is support. CCP is fast when every relevant state-action cell
 is observed often enough. Thin cells make the first-stage policy noisy, and the
 inversion turns that noise into reward noise.
 

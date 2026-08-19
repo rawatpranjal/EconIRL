@@ -495,6 +495,8 @@ def _public_doc_sources() -> list[Path]:
     roots = [
         DOCS / "index.rst",
         DOCS / "estimators.md",
+        DOCS / "comparing_estimators.md",
+        DOCS / "replications.md",
         DOCS / "references.md",
         DOCS / "api" / "index.rst",
         DOCS / "estimators",

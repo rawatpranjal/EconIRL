@@ -182,21 +182,21 @@ $$
 $$
 
 where $\mathcal{T}Q(s,a,s') = r_{\text{anch}}(s) + \beta V_Q(s')$ is the
-sampled Bellman operator on the anchor action. The correction term
-$-\beta^2(V_Q(s') - \zeta(s,a))^2$ is the key structural contribution of
-the paper: the naive squared TD error
+sampled Bellman operator on the anchor action. The naive squared TD error
 $\mathbb{E}[(\mathcal{T}Q - Q)^2 \mid s, a]$ has a double-sampling
-bias equal to $\beta^2 \operatorname{Var}[V(s') \mid s, a]$ because the same
+bias equal to $\beta^2 \operatorname{Var}[V(s') \mid s, a]$, because the same
 next-state draw $s'$ appears in both $\mathcal{T}Q$ and $V_Q(s')$.
-Lemma 4 of Kang et al. (2025) shows that the bi-conjugate decomposition
+Lemma 4 of Kang et al. (2025) gives the bi-conjugate decomposition
 $\mathbb{E}[(\mathcal{T}Q - Q)^2 \mid s, a]
 = \mathbb{E}[\ell_{\text{TD}}^2 \mid s, a, s'] - \beta^2 D(Q)(s,a)$,
 where $\ell_{\text{TD}}(s,a,s') = \mathcal{T}Q(s,a,s') - Q(s,a)$
 is the per-sample TD residual (the signed difference between the sampled
 Bellman target and the current Q value) and
-$D(Q)(s,a) = \min_\zeta \mathbb{E}[(V_Q(s') - \zeta)^2 \mid s, a]$,
-corrects for this bias. The inner $\max$ over $\zeta$ in Eq. 12 exploits
-this decomposition: the optimal $\zeta^*$ that solves the inner max is the
+$D(Q)(s,a) = \min_\zeta \mathbb{E}[(V_Q(s') - \zeta)^2 \mid s, a]$.
+Subtracting that second term is what corrects the bias, and the
+$-\beta^2(V_Q(s') - \zeta(s,a))^2$ term in Eq. 12 is how the objective does it.
+The inner $\max$ over $\zeta$ exploits the same
+decomposition: the optimal $\zeta^*$ that solves the inner max is the
 conditional expectation $\zeta^*(s, a) = \mathbb{E}[V_{Q^*}(s') \mid s, a]$
 (Theorem 5), and the $-\beta^2(V_Q(s') - \zeta)^2$ term cancels the
 double-sampling bias when $\zeta$ is at its optimum.
