@@ -10,17 +10,15 @@
 Use the public class for tabular state-only AIRL.
 
 ```python
-from econirl import AIRL, NeuralAIRL
+from econirl import AIRL
 
 model = AIRL(n_states=16, n_actions=4, compute_se=False)
-print(AIRL is NeuralAIRL)
 print(model.n_states, model.n_actions, model.compute_se)
 ```
 
 **Result**
 
 ```text
-True
 16 4 False
 ```
 

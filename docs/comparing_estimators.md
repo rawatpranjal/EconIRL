@@ -1,18 +1,11 @@
 # Choosing and Comparing Estimators
 
-This page is the first stop when you are deciding which EconIRL estimator to
-open from the menu. It assumes only the basic goal: you have observations of
-choices over time, and you want to estimate either a structural dynamic
-discrete-choice model or a reward function that explains observed behavior.
-
-The estimators differ in what they treat as known, what they estimate, and what
-kind of recovery claim they can support. A method that predicts choices well is
-not automatically recovering the reward. Reward recovery also needs the right
-normalization, support, transition information, and identification argument.
-
-Detailed math, system views, examples, and usage live on the estimator pages.
-Paper-number checks live in [Replications](replications.md). Problem-level
-simulation results live in [Simulation Studies](simulation_studies/index.md).
+Use this page to choose between structural dynamic discrete-choice estimation
+and reward recovery from demonstrations. Choice prediction alone does not
+establish reward recovery, which also requires normalization, support,
+transition information, and identification. See
+[Replications](replications.md) for paper-number checks and
+[Simulation Studies](simulation_studies/index.md) for problem-level results.
 
 ## How to Read the Menu
 
@@ -29,7 +22,8 @@ that case fails.
 4. If the reward itself must be learned from demonstrations, inspect the IRL
    estimators: [MCE-IRL](estimators/mce_irl.md),
    [Neural MCE-IRL](estimators/deep_mce_irl.md),
-   [AIRL](estimators/airl.md), [AIRL-Het](estimators/airl_het.md), and
+   [AIRL](estimators/airl.md), [NeuralAIRL](estimators/neural_airl.md),
+   [AIRL2](estimators/airl2.md), and
    [GLADIUS](estimators/gladius.md).
 5. If the behavior is better described by bounded or finite-horizon planning,
    inspect [RHIP](estimators/rhip.md).
@@ -73,28 +67,9 @@ somewhere else.
 | --- | --- | --- |
 | Large or continuous state space | CCP, MPEC, UFXP, NNES | The exact nested solve is replaced by inversion, constraints, fixed-point first-order conditions, or value approximation. |
 | Hard-to-model transition density | TD-CCP | Estimation uses observed successor tuples instead of a transition-density model. |
-| Unknown reward form | MCE-IRL, Neural MCE-IRL, AIRL, AIRL-Het, GLADIUS | The target shifts from structural likelihood estimation to reward recovery from demonstrations. |
-| Latent heterogeneity | AIRL-Het | The reward is segment-specific and needs credible segment, exit-action, and absorbing-state anchors. |
+| Unknown reward form | MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL2, GLADIUS | The target shifts from structural likelihood estimation to reward recovery from demonstrations. |
+| Latent heterogeneity | AIRL2 | The reward is segment-specific and needs credible segment, exit-action, and absorbing-state anchors. |
 | Bounded or finite-horizon planning | RHIP | The planning horizon becomes part of the behavioral model. |
-
-Large or continuous state spaces break the cheap exact solve. Encoded,
-high-dimensional, or smooth states make repeated tabular dynamic programming
-unattractive. CCP avoids repeated solves by using first-stage choice
-probabilities. MPEC and UFXP keep a structural likelihood target but change the
-optimization route. NNES uses a neural continuation value with finite reward
-parameters.
-
-Hard transition-density problems motivate TD-CCP. The estimator still targets a
-finite structural reward parameter, but it estimates recursive terms from
-observed successor state-action pairs instead of first modeling the transition
-density.
-
-Unknown rewards motivate inverse reinforcement learning. MCE-IRL recovers
-reward coefficients in supplied features. Neural MCE-IRL uses a neural reward
-map. AIRL targets the original state-only transfer claim. AIRL-Het adds
-anchors for segment-specific action-dependent rewards. GLADIUS learns neural Q
-and continuation objects, then reads reward information through anchored action
-contrasts.
 
 ## Core Lineage
 
@@ -104,11 +79,10 @@ The core estimators carry the main identification stories in EconIRL.
 | --- | --- | --- |
 | [NFXP](estimators/nfxp.md) | What is the exact tabular structural likelihood estimate? | Nothing. It is the reference under the maintained DDC assumptions. |
 | [CCP](estimators/ccp.md) | Can we avoid repeated Bellman solves? | Uses first-stage choice probabilities and Hotz-Miller inversion. NPL iterates the pseudo-likelihood route. |
-| [TD-CCP](estimators/tdccp.md) | Can we avoid transition-density estimation during parameter estimation? | Uses observed successor state-action pairs to estimate recursive terms. |
 | [MCE-IRL](estimators/mce_irl.md) | Can demonstrations identify a reward? | Replaces structural likelihood with maximum causal entropy feature matching. |
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | Can the reward be nonlinear? | Replaces fixed linear reward features with a neural reward map. |
 | [AIRL](estimators/airl.md) | Can a state-only reward transfer across dynamics? | Separates state reward from shaping under the original AIRL assumptions. |
-| [AIRL-Het](estimators/airl_het.md) | Can anchored rewards differ across latent segments? | Adds exit-action and absorbing-state anchors, then estimates segment-specific rewards. |
+| [NeuralAIRL](estimators/neural_airl.md) | Can that state-only reward be nonlinear? | Uses neural approximators for the state reward, shaping potential, and generator policy. |
 | [GLADIUS](estimators/gladius.md) | Can high-dimensional offline DDC avoid repeated solves? | Learns Q and continuation objects, then reads projected action contrasts. |
 
 ## Core Estimators Side by Side
@@ -119,11 +93,10 @@ Use this table to narrow the choice before opening a method page.
 | --- | --- | --- | --- | --- | --- | --- |
 | [NFXP](estimators/nfxp.md) | You need the reference structural DDC likelihood and counterfactual policy analysis. | Discrete panel data; transitions known or estimated first. | Finite parametric structural reward. | Small or moderate tabular state-action spaces. | Repeated exact Bellman solves are too expensive or transition modeling is the main bottleneck. | Synthetic tabular simulation and the Rust (1987) Table IX replication. |
 | [CCP](estimators/ccp.md) | You want a faster Hotz-Miller or NPL tabular structural estimate. | Discrete panel data; transitions known or estimated first; strong empirical action support. | Finite parametric structural reward. | Small or moderate tabular state-action spaces. | Many states have weak or one-action support, or you need the direct nested fixed-point likelihood. | Synthetic tabular simulation with support conditions. |
-| [TD-CCP](estimators/tdccp.md) | Transition-density modeling is hard but the reward has known finite features. | Panel trajectories with current and next state-action information; an environment is still needed for post-fit counterfactuals. | Finite linear structural reward. | Encoded or higher-dimensional discrete states. | State space is small enough for tabular likelihood methods, support is sparse, or the target is a neural reward map. | Encoded-state finite-parameter hard case with locally robust standard errors. |
 | [MCE-IRL](estimators/mce_irl.md) | Demonstrations should be explained by maximum causal entropy feature matching. | Demonstrations from a discrete dynamic decision problem; transitions known or supplied. | Supplied finite reward features. | Tabular state-action spaces. | You need likelihood-based structural standard errors or reward features are unknown. | Synthetic supplied-feature simulations. |
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | Demonstrations should be explained by an unrestricted neural reward under the maximum causal entropy objective. | Demonstrations from a discrete dynamic decision problem; transitions known or supplied. | Neural reward map. | Tabular or encoded state-action spaces. | You need finite structural parameters with standard errors, or supplied reward features are enough. | Synthetic neural-reward recovery simulation. |
-| [AIRL](estimators/airl.md) | Adversarial recovery under the original state-only AIRL assumptions is the research object. | Demonstrations from a discrete dynamic decision problem; transitions available for validation or post-fit evaluation. | State-only reward with shaping term under a fixed normalization. | Discrete dynamic decision settings. | Reward is action-dependent, an absorbing-state normalization is central, or structural action-dependent recovery is required. | Synthetic state-only AIRL simulation. |
-| [AIRL-Het](estimators/airl_het.md) | Latent segments have different dynamic preferences and segment-specific counterfactuals matter. | Repeated user trajectories; credible exit-action and absorbing-state anchors. | Segment-specific action-dependent reward. | Encoded discrete dynamic choice settings. | Segment membership is weakly identified, no credible reward anchor exists, or a homogeneous estimator is enough. | Synthetic serialized-content simulation. |
+| [AIRL](estimators/airl.md) | Adversarial recovery under the original state-only AIRL assumptions is the research object. | Complete demonstrations from a discrete dynamic decision problem and an explicit transition tensor required at fit time. | State-only reward with shaping term under a fixed normalization. | Discrete dynamic decision settings. | Reward is action-dependent, an absorbing-state normalization is central, or structural action-dependent recovery is required. | Synthetic state-only AIRL simulation. |
+| [NeuralAIRL](estimators/neural_airl.md) | The AIRL state reward is nonlinear in known state inputs. | Complete demonstration trajectories and an explicit transition tensor. | Nonlinear state-only reward with neural shaping and policy functions. | Tabular or finite encoded state inputs. | Heterogeneity or action-dependent structural reward is the target. | Generated nonlinear behavioral recovery. |
 | [GLADIUS](estimators/gladius.md) | You want neural Q and continuation modeling with anchor-moment reward recovery. | Dynamic discrete choices; known transitions; credible anchor action with known rewards. | Neural reward recovered from neural Q and continuation objects. | High-dimensional encoded state features. | No credible anchor action exists or you need tabular structural estimation. | Preview: projected reward diagnostics. |
 
 ## How the Papers Relate
@@ -140,7 +113,8 @@ recovery from demonstrations.
 | MCE-IRL / Ziebart | Apprenticeship learning and non-causal MaxEnt IRL. | MCE-IRL changes the estimand. It recovers reward only in the supplied feature span and normalization. |
 | Neural MCE-IRL / DeepIRL | Linear MaxEnt IRL. | Neural MCE-IRL is a nonlinear reward-map extension of MCE-IRL. Raw weights are not the estimand. |
 | AIRL / Fu-Luo-Levine | GAIL and shaped adversarial rewards. | Use AIRL for the original state-only reward-transfer claim. |
-| AIRL-Het / Lee-Sudhir-Wang | Homogeneous AIRL and pooled dynamic choice. | Exit and absorbing-state anchors do the identification work for action-dependent and segment-specific rewards. |
+| NeuralAIRL / Fu-Luo-Levine | Tabular AIRL with a fixed reward basis. | Neural functions expand the reward map, but their raw weights are not structural parameters. |
+| AIRL2 / Lee-Sudhir-Wang | Homogeneous AIRL and pooled dynamic choice. | Exit and absorbing-state anchors do the identification work for action-dependent and segment-specific rewards. |
 | GLADIUS / Kang-Yoganarasimhan-Jain | NFXP, CCP, TD-CCP, offline MaxEnt IRL, and Bellman-loss methods. | GLADIUS is the high-dimensional offline bridge. Its safest structural object is the projected action contrast. |
 
 ## Paper MDP Shapes
@@ -156,7 +130,8 @@ motivated it.
 | [MCE-IRL](estimators/mce_irl.md) | Taxi route preference with road features. | Demonstrations in a known controlled process with credible reward features. |
 | [Neural MCE-IRL](estimators/deep_mce_irl.md) | DeepIRL grid maps. | Nonlinear state or state-action reward maps with known transitions. |
 | [AIRL](estimators/airl.md) | State-only transfer MDP. | State-only reward transfer under the Fu-Luo-Levine assumptions. |
-| [AIRL-Het](estimators/airl_het.md) | Serialized-content choice with latent types. | Anchored action-dependent rewards and persistent latent segments. |
+| [NeuralAIRL](estimators/neural_airl.md) | Nonlinear finite-state transfer MDP. | State-only neural reward recovery with known transitions. |
+| [AIRL2](estimators/airl2.md) | Serialized-content choice with latent types. | Anchored action-dependent rewards and persistent latent segments. |
 | [GLADIUS](estimators/gladius.md) | High-dimensional offline dynamic choice. | Offline panels where tabular dynamic programming is too costly and action contrasts are enough. |
 
 ## Main Axes
@@ -168,8 +143,8 @@ motivated it.
 | Small tabular state space | NFXP, CCP, MCE-IRL, AIRL | The full grid can be enumerated. |
 | Small or moderate tabular space with speed pressure | CCP, MPEC, UFXP | The structural target remains tabular, but the computation changes. |
 | Encoded or higher-dimensional state space with finite reward parameters | TD-CCP, NNES | The reward is still finite-dimensional, but transition or value objects become harder. |
-| Nonlinear reward over tabular or encoded states | Neural MCE-IRL | The reward map is neural, but planning still uses supplied transitions. |
-| Repeated choices with latent segments | AIRL-Het | It estimates segment-specific rewards and policies. |
+| Nonlinear reward over tabular or encoded states | Neural MCE-IRL, NeuralAIRL | The reward map is neural, but planning still uses supplied transitions. |
+| Repeated choices with latent segments | AIRL2 | It estimates segment-specific rewards and policies. |
 | High-dimensional offline state features | GLADIUS | It learns Q and continuation objects instead of repeated tabular solves. |
 
 ### Reward Form
@@ -178,16 +153,16 @@ motivated it.
 | --- | --- | --- |
 | Finite linear structural reward | NFXP, CCP, TD-CCP | Needs dynamic feature rank and a fixed normalization. Direct action-contrast rank is a conservative sufficient check. |
 | Linear IRL reward basis | MCE-IRL | Identified only inside the supplied feature basis. |
-| Neural reward map | Neural MCE-IRL | The reward matrix is the object. The raw weights are not. |
-| State-only transferable reward | AIRL | Matches the original AIRL claim only under its state-only assumptions. |
-| Segment-specific action-dependent reward | AIRL-Het | Needs credible exit-action and absorbing-state anchors, persistent segments, and enough trajectory support per segment. |
+| Neural reward map | Neural MCE-IRL, NeuralAIRL | The reward matrix is the object. The raw weights are not. |
+| State-only transferable reward | AIRL, NeuralAIRL | Matches the original AIRL claim only under its state-only assumptions. |
+| Segment-specific action-dependent reward | AIRL2 | Needs credible exit-action and absorbing-state anchors, persistent segments, and enough trajectory support per segment. |
 | Projected action contrast | GLADIUS | Stronger than raw Bellman reward levels in the package route. |
 
 ### Transition Information
 
 | Transition input | Estimators | Meaning |
 | --- | --- | --- |
-| Explicit transition tensor | NFXP, CCP, MCE-IRL, Neural MCE-IRL, AIRL, AIRL-Het | The estimator or policy update uses a transition model. |
+| Explicit transition tensor | NFXP, CCP, MCE-IRL, Neural MCE-IRL, AIRL, NeuralAIRL, AIRL2 | The estimator or policy update uses a transition model. |
 | Observed successor pairs for estimation | TD-CCP | Estimation uses successor tuples instead of a transition-density model. |
 | Offline next states | GLADIUS | Training uses sampled next states and learned continuation objects. |
 
@@ -213,17 +188,20 @@ the reward.
 | MCE-IRL | Reward coefficients in supplied features. | Yes, in population. | Known transitions, true reward in the feature span, full-rank moments, support, and fixed normalization. |
 | Neural MCE-IRL | Anchored reward matrix. | Conditional. | Known transitions, representable reward, sufficient occupancy, and exact optimization under a fixed anchor. |
 | AIRL | State-only reward up to a constant. | Yes under the original AIRL assumptions. | State-only reward, decomposable dynamics, sufficient expert and learner samples, and adversarial equilibrium. |
-| AIRL-Het | Segment-specific anchored $R_k(s,a)$. | Conditional. | Exit-action reward anchor, absorbing-state value anchor, correct segment count, segment separation, support, fixed discount, and exact policy solution. |
+| NeuralAIRL | Nonlinear state-only reward up to a constant. | Conditional. | State-only reward, deterministic decomposable dynamics, representable state inputs, complete observed-state coverage, sufficient samples, and recovery of the optimal discriminator score. |
+| AIRL2 | Segment-specific anchored $R_k(s,a)$. | Conditional. | Exit-action reward anchor, absorbing-state value anchor, correct segment count, segment separation, support, fixed discount, and exact policy solution. |
 | GLADIUS dual anchor-moment | Projected action contrasts. | Conditional. | Credible anchor, learned Q and continuation objects, action-contrast rank, and support. |
 | GLADIUS `q_only` | Full reward. | No. | Useful as a diagnostic mode, but not enough for reward recovery. |
 
 ## Other Estimators
 
-The non-core estimator pages are useful when a specific computational or
-behavioral complication is the main reason not to use the reference route.
+Use the complete [Other Estimators](estimators/other.md) roster when a specific
+computational or behavioral complication rules out the reference route.
 
 | Estimator | Use when | Current role |
 | --- | --- | --- |
+| [TD-CCP](estimators/tdccp.md) | Transition-density modeling is hard but the reward has known finite features. | Supported transition-density-free structural estimator. |
+| [AIRL2](estimators/airl2.md) | Latent segments need anchored, action-dependent reward recovery. | Supported heterogeneous adversarial IRL estimator. |
 | [NNES](estimators/nnes.md) | The value object is too large or encoded for repeated exact dynamic programming. | Neural value approximation with finite structural parameters. |
 | [MPEC](estimators/mpec.md) | You want a constrained-optimization check on the DDC likelihood. | Secondary structural check; overlaps with NFXP/CCP and has higher solver complexity. |
 | [UFXP](estimators/ufxp.md) | You want maximum-likelihood-grade structural estimates without nesting any fixed point in the search. | Secondary structural speed and first-order-condition variant. |
@@ -231,31 +209,6 @@ behavioral complication is the main reason not to use the reference route.
 | [f-IRL](estimators/f_irl.md) | The study question is state-marginal matching under an f-divergence. | Narrower state-marginal method. |
 | [IQ-Learn](estimators/iq_learn.md) | Inverse soft-Q learning or imitation diagnostics are the estimator of interest. | Preview diagnostic. |
 
-On a small, well-specified tabular problem, these alternatives do not answer a
-better question than NFXP. Their value appears when one of the complications on
-this page is real.
-
-## Linear Reading Guide
-
-If you are reading the docs in order, use this route.
-
-1. Read [NFXP](estimators/nfxp.md) first. It defines the structural benchmark
-   and the normalization issues that recur across the docs.
-2. Read [CCP](estimators/ccp.md) next if you want the same finite DDC target
-   without repeated nested solves.
-3. Read [TD-CCP](estimators/tdccp.md) if transition-density modeling is the
-   estimation bottleneck.
-4. Read [MCE-IRL](estimators/mce_irl.md) when demonstrations define the
-   problem and reward features are supplied.
-5. Read [Neural MCE-IRL](estimators/deep_mce_irl.md) when the reward is
-   nonlinear and transitions are known.
-6. Read [AIRL](estimators/airl.md) when state-only reward transfer is the
-   object.
-7. Read [AIRL-Het](estimators/airl_het.md) when anchored latent heterogeneity
-   is the object.
-8. Read [GLADIUS](estimators/gladius.md) when high-dimensional offline state
-   features make repeated dynamic-programming solves unattractive and projected
-   action contrasts are enough.
-9. Read [Other Estimators](estimators/other.md) when the complication is value
-   approximation, constrained structural optimization, finite-horizon planning,
-   f-divergence matching, or inverse soft-Q diagnostics.
+On a small homogeneous tabular problem with an available transition model,
+NFXP remains the reference. The other estimators become relevant when one of
+the listed complications is substantive.

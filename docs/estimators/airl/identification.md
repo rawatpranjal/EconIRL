@@ -5,7 +5,7 @@
 - [AIRL Overview](../airl.md)
 - [Pre-Estimation Checks](pre_estimation.md)
 - [Counterfactuals](counterfactuals.md)
-- [AIRL-Het](../airl_het.md)
+- [AIRL2](../airl2.md)
 
 AIRL separates a reward candidate from potential-based shaping. That
 separation has a narrow positive result.
@@ -48,9 +48,9 @@ does not expose a switch that disables this scientific boundary.
 ## Context and heterogeneity
 
 Observed context and latent segments change the reward target. The public AIRL
-class rejects `context=` before optimization. AIRL-Het provides the separate
+class rejects `context=` before optimization. AIRL2 provides the separate
 anchored heterogeneous design. Its assumptions and evidence are documented on
-the [AIRL-Het page](../airl_het.md).
+the [AIRL2 page](../airl2.md).
 
 ## What is reported
 

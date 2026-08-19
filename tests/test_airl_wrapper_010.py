@@ -74,7 +74,7 @@ def test_airl_recovers_state_reward_and_transfers_it(airl_recovery_case):
     assert transfer_tv <= 0.08
 
 
-def test_airl_refuses_airl_het_inputs_before_training(monkeypatch):
+def test_airl_refuses_airl2_inputs_before_training(monkeypatch):
     """AIRL must fail closed when asked to estimate heterogeneous rewards."""
     from econirl import AIRL
     from econirl.estimation.adversarial.airl import AIRLEstimator
@@ -92,15 +92,14 @@ def test_airl_refuses_airl_het_inputs_before_training(monkeypatch):
         names=["action"],
     )
 
-    with pytest.raises(ValueError, match="AIRLHet"):
+    with pytest.raises(ValueError, match="AIRL2"):
         model.fit(None, transitions=np.zeros((2, 3, 3)), reward=unsupported)
-    with pytest.raises(NotImplementedError, match="AIRLHet"):
+    with pytest.raises(NotImplementedError, match="AIRL2"):
         model.fit(None, transitions=np.zeros((2, 3, 3)), context=np.zeros(1))
 
 
 def test_airl_serialization_preserves_transfer_decision(airl_recovery_case):
     """A persisted public fit must make the same changed-dynamics decision."""
-    from econirl import AIRL, NeuralAIRL
 
     dgp, model = airl_recovery_case
     changed = np.asarray(dgp.transitions)[[1, 2, 3, 0]].copy()
@@ -108,5 +107,4 @@ def test_airl_serialization_preserves_transfer_decision(airl_recovery_case):
     restored = pickle.loads(pickle.dumps(model))
     after = restored.counterfactual(transitions=changed).counterfactual_policy
 
-    assert AIRL is NeuralAIRL
     np.testing.assert_allclose(after, before, atol=1e-8)

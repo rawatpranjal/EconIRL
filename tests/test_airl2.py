@@ -1,4 +1,4 @@
-"""Tests for AIRL with unobserved heterogeneity (Lee, Sudhir & Wang 2026).
+"""Tests for AIRL2 anchored heterogeneity (Lee, Sudhir & Wang 2026).
 
 Tests the EM-AIRL estimator on a small serialized content environment
 with 2 segments. Verifies:
@@ -16,7 +16,7 @@ import pytest
 from econirl.core.bellman import SoftBellmanOperator
 from econirl.core.solvers import value_iteration
 from econirl.core.types import DDCProblem, Panel, Trajectory
-from econirl.estimation.adversarial.airl_het import AIRLHetConfig, AIRLHetEstimator
+from econirl.estimation.adversarial.airl2 import AIRL2Config, AIRL2Estimator
 from econirl.preferences.action_reward import ActionDependentReward
 
 # --- Test environment (small, 6 states) ---
@@ -123,25 +123,25 @@ def _simulate_panel(env_dict, n_individuals=50, n_periods=20, seed=42):
 # --- Tests ---
 
 
-class TestAIRLHetConfig:
+class TestAIRL2Config:
     """Test config validation."""
 
     def test_missing_exit_action_raises(self):
         with pytest.raises(ValueError, match="exit_action"):
-            AIRLHetConfig(absorbing_state=5)
+            AIRL2Config(absorbing_state=5)
 
     def test_missing_absorbing_state_raises(self):
         with pytest.raises(ValueError, match="absorbing_state"):
-            AIRLHetConfig(exit_action=2)
+            AIRL2Config(exit_action=2)
 
     def test_valid_config(self):
-        config = AIRLHetConfig(exit_action=2, absorbing_state=5)
+        config = AIRL2Config(exit_action=2, absorbing_state=5)
         assert config.num_segments == 2
         assert config.exit_action == 2
         assert config.absorbing_state == 5
 
 
-class TestAIRLHetEstimator:
+class TestAIRL2Estimator:
     """Test the full EM-AIRL estimator."""
 
     @pytest.fixture
@@ -155,7 +155,7 @@ class TestAIRLHetEstimator:
     @pytest.mark.slow
     def test_runs_without_error(self, env, panel):
         """Estimator runs end-to-end and returns EstimationSummary."""
-        config = AIRLHetConfig(
+        config = AIRL2Config(
             num_segments=2,
             exit_action=env["exit_action"],
             absorbing_state=env["absorbing"],
@@ -163,7 +163,7 @@ class TestAIRLHetEstimator:
             max_airl_rounds=10,
             reward_lr=0.01,
         )
-        estimator = AIRLHetEstimator(config)
+        estimator = AIRL2Estimator(config)
         summary = estimator.estimate(
             panel,
             env["utility"],
@@ -176,14 +176,14 @@ class TestAIRLHetEstimator:
     @pytest.mark.slow
     def test_anchor_enforcement(self, env, panel):
         """Segment reward matrices have zero exit action and absorbing state."""
-        config = AIRLHetConfig(
+        config = AIRL2Config(
             num_segments=2,
             exit_action=env["exit_action"],
             absorbing_state=env["absorbing"],
             max_em_iterations=3,
             max_airl_rounds=10,
         )
-        estimator = AIRLHetEstimator(config)
+        estimator = AIRL2Estimator(config)
         summary = estimator.estimate(
             panel,
             env["utility"],
@@ -210,14 +210,14 @@ class TestAIRLHetEstimator:
     @pytest.mark.slow
     def test_priors_update_from_uniform(self, env, panel):
         """Segment priors should move away from uniform after EM."""
-        config = AIRLHetConfig(
+        config = AIRL2Config(
             num_segments=2,
             exit_action=env["exit_action"],
             absorbing_state=env["absorbing"],
             max_em_iterations=5,
             max_airl_rounds=15,
         )
-        estimator = AIRLHetEstimator(config)
+        estimator = AIRL2Estimator(config)
         summary = estimator.estimate(
             panel,
             env["utility"],
@@ -233,14 +233,14 @@ class TestAIRLHetEstimator:
     @pytest.mark.slow
     def test_posteriors_valid_probabilities(self, env, panel):
         """Segment posteriors should be valid probability distributions."""
-        config = AIRLHetConfig(
+        config = AIRL2Config(
             num_segments=2,
             exit_action=env["exit_action"],
             absorbing_state=env["absorbing"],
             max_em_iterations=3,
             max_airl_rounds=10,
         )
-        estimator = AIRLHetEstimator(config)
+        estimator = AIRL2Estimator(config)
         summary = estimator.estimate(
             panel,
             env["utility"],
@@ -257,14 +257,14 @@ class TestAIRLHetEstimator:
     @pytest.mark.slow
     def test_em_log_likelihood_recorded(self, env, panel):
         """EM log-likelihood history should be recorded in metadata."""
-        config = AIRLHetConfig(
+        config = AIRL2Config(
             num_segments=2,
             exit_action=env["exit_action"],
             absorbing_state=env["absorbing"],
             max_em_iterations=5,
             max_airl_rounds=10,
         )
-        estimator = AIRLHetEstimator(config)
+        estimator = AIRL2Estimator(config)
         summary = estimator.estimate(
             panel,
             env["utility"],
@@ -277,21 +277,21 @@ class TestAIRLHetEstimator:
         assert all(np.isfinite(ll) for ll in em_lls)
 
     def test_name_property(self):
-        config = AIRLHetConfig(exit_action=0, absorbing_state=5)
-        estimator = AIRLHetEstimator(config)
+        config = AIRL2Config(exit_action=0, absorbing_state=5)
+        estimator = AIRL2Estimator(config)
         assert "Lee, Sudhir & Wang" in estimator.name
 
     @pytest.mark.slow
     def test_three_segments(self, env, panel):
         """Estimator works with K=3 segments."""
-        config = AIRLHetConfig(
+        config = AIRL2Config(
             num_segments=3,
             exit_action=env["exit_action"],
             absorbing_state=env["absorbing"],
             max_em_iterations=2,
             max_airl_rounds=5,
         )
-        estimator = AIRLHetEstimator(config)
+        estimator = AIRL2Estimator(config)
         summary = estimator.estimate(
             panel,
             env["utility"],

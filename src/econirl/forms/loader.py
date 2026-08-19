@@ -12,9 +12,8 @@
 
 Alias handling
 --------------
-``NeuralAIRL`` is a compatibility name for ``AIRL``. ``GLADIUS`` is a
-compatibility name for ``NeuralGLADIUS``. The loader skips compatibility names
-when their canonical name is already in the roster.
+``GLADIUS`` is a compatibility name for ``NeuralGLADIUS``. The loader skips the
+compatibility name when its canonical name is already in the roster.
 
 Import hygiene
 --------------
@@ -64,7 +63,6 @@ class RunResult:
 #: Aliases in the capability registry.  Skipped when their canonical
 #: counterpart is present in the roster.
 _ALIASES: dict[str, str] = {
-    "NeuralAIRL": "AIRL",
     "GLADIUS": "NeuralGLADIUS",
 }
 
@@ -256,7 +254,21 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
             verbose=False,
         )
 
-    if name in ("NeuralAIRL", "AIRL"):
+    if name == "AIRL":
+        from econirl.estimators import AIRL
+
+        ps = form.env.problem_spec
+        return AIRL(
+            n_states=num_states,
+            n_actions=form.spec.num_actions,
+            discount=float(ps.discount_factor),
+            max_rounds=200,
+            min_rounds=150,
+            compute_se=False,
+            verbose=False,
+        )
+
+    if name == "NeuralAIRL":
         from econirl.estimators import NeuralAIRL
 
         ps = form.env.problem_spec
@@ -265,7 +277,7 @@ def _build_estimator(name: str, cap: EstimatorCapability, form: Form) -> Any:
             n_actions=form.spec.num_actions,
             discount=float(ps.discount_factor),
             max_rounds=200,
-            min_rounds=150,
+            min_rounds=50,
             compute_se=False,
             verbose=False,
         )

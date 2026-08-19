@@ -10,10 +10,6 @@ the pseudo-likelihood Hessian is the correct variance estimator despite the
 neural nuisance object. The structural estimate supports counterfactual policy
 analysis; the neural network approximates the continuation value, not the reward.
 
-Read this page carefully because the word "neural" does not mean the reward is
-neural. NNES keeps a finite structural reward target and uses the network as a
-continuation-value nuisance approximation.
-
 ## Source Papers
 
 The estimator follows {ref}`Nguyen (2025) <nguyen-2025>`, which introduces

@@ -15,7 +15,7 @@ known, both recovery and failure are measurable.
 | [Route choice](route_choice.md) | Synthetic road network (25 nodes, random geometric graph). | 25 states x 4 actions | NFXP, CCP, MCE-IRL, GLADIUS. | Structural parameter recovery and behavioral fidelity on a graph topology. |
 | [Stockpiling](stockpiling.md) | Consumer stockpiling of a storable good (Hendel-Nevo). | 20 states x 2 actions | NFXP, CCP, MCE-IRL, GLADIUS. | Structural recovery on a price-driven inventory model where the optimal policy stockpiles on sale. |
 | [Fleet maintenance](fleet_maintenance.md) | Multi-component bus engine replacement (Rust 1987, K=3 components). | 216 states x 2 actions | NFXP, CCP, MCE-IRL, GLADIUS. | High-dimensional factored environment. Structural recovery at scale; GLADIUS scalability on a factored state space. |
-| [Content consumption](content_consumption.md) | Latent viewer types choosing what to watch (heterogeneous-agent model). | 65 states x 4 actions | AIRL-Het vs homogeneous AIRL and MCE-IRL. | Heterogeneity recovery. AIRL-Het sorts viewers into types and serves both, where a homogeneous fit settles on one and abandons the other. |
+| [Content consumption](content_consumption.md) | Latent viewer types choosing what to watch (heterogeneous-agent model). | 65 states x 4 actions | AIRL2 vs homogeneous AIRL and MCE-IRL. | Heterogeneity recovery. AIRL2 sorts viewers into types and serves both, where a homogeneous fit settles on one and abandons the other. |
 | [RHIP lookahead](rhip_lookahead.md) | Route choice with finite-lookahead demonstrators. | 25 nodes x local actions | RHIP horizon sweep. | The best-fitting planning horizon recovers the demonstrator's true lookahead. |
 
 The findings in one line. On easy problems most estimators match the choice

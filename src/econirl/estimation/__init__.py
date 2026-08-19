@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Estimation algorithms for dynamic discrete choice models.
 
 Production estimators (12):
@@ -9,35 +10,38 @@ Contrib estimators (moved to econirl.contrib):
 
 import warnings
 
-from econirl.estimation.base import Estimator, EstimationResult
+from econirl.estimation.base import EstimationResult, Estimator
 from econirl.estimation.categories import (
+    ESTIMATOR_REGISTRY,
     EstimatorCategory,
     ProblemCapabilities,
-    ESTIMATOR_REGISTRY,
+    get_capabilities,
+    get_category,
     get_estimators_by_category,
     get_estimators_with_capability,
-    get_category,
-    get_capabilities,
 )
+from econirl.estimation.ccp import CCPEstimator
+from econirl.estimation.mpec import MPECConfig, MPECEstimator
 
 # Structural
 from econirl.estimation.nfxp import NFXPEstimator
-from econirl.estimation.mpec import MPECEstimator, MPECConfig
-from econirl.estimation.ccp import CCPEstimator
+
 NFXP = NFXPEstimator
 MPEC = MPECEstimator
 CCP = CCPEstimator
 
 # Entropy IRL
-from econirl.estimation.mce_irl import MCEIRLEstimator, MCEIRLConfig
+from econirl.estimation.mce_irl import MCEIRLConfig, MCEIRLEstimator
+
 MCEIRL = MCEIRLEstimator
 
 # Structural approximation
-from econirl.estimation.td_ccp import TDCCPEstimator, TDCCPConfig
+from econirl.estimation.neural_mpec import NeuralMPECConfig, NeuralMPECEstimator
 from econirl.estimation.nnes import NNESEstimator, NNESNFXPEstimator
 from econirl.estimation.sees import SEESEstimator
+from econirl.estimation.td_ccp import TDCCPConfig, TDCCPEstimator
 from econirl.estimation.ufxp import UFXPEstimator
-from econirl.estimation.neural_mpec import NeuralMPECEstimator, NeuralMPECConfig
+
 TDCCP = TDCCPEstimator
 NNES = NNESEstimator
 SEES = SEESEstimator
@@ -45,29 +49,33 @@ UFXP = UFXPEstimator
 NeuralMPEC = NeuralMPECEstimator
 
 # Q-learning IRL
-from econirl.estimation.gladius import GLADIUSEstimator, GLADIUSConfig
-from econirl.estimation.iq_learn import IQLearnEstimator, IQLearnConfig
+from econirl.estimation.gladius import GLADIUSConfig, GLADIUSEstimator
+from econirl.estimation.iq_learn import IQLearnConfig, IQLearnEstimator
+
 IQLearn = IQLearnEstimator
 GLADIUS = GLADIUSEstimator
 
 # Adversarial IRL
 from econirl.estimation.adversarial import (
-    AIRLEstimator,
+    AIRL2Config,
+    AIRL2Estimator,
     AIRLConfig,
-    AIRLHetEstimator,
-    AIRLHetConfig,
-    TabularDiscriminator,
+    AIRLEstimator,
     LinearDiscriminator,
+    TabularDiscriminator,
 )
+
 AIRL = AIRLEstimator
-AIRLHet = AIRLHetEstimator
+AIRL2 = AIRL2Estimator
 
 # Distribution-matching IRL
 from econirl.estimation.f_irl import FIRLEstimator
+
 FIRL = FIRLEstimator
 
 # Imitation baseline
 from econirl.estimation.behavioral_cloning import BehavioralCloningEstimator
+
 BC = BehavioralCloningEstimator
 
 # Utilities
@@ -117,6 +125,9 @@ __all__ = [
     "AIRL",
     "AIRLEstimator",
     "AIRLConfig",
+    "AIRL2",
+    "AIRL2Estimator",
+    "AIRL2Config",
     "AIRLHet",
     "AIRLHetEstimator",
     "AIRLHetConfig",
@@ -155,8 +166,24 @@ _MOVED_TO_CONTRIB = {
     "GAILConfig": "gail",
 }
 
+_DEPRECATED_AIRL_HET = {
+    "AIRLHet": AIRL2Estimator,
+    "AIRLHetEstimator": AIRL2Estimator,
+    "AIRLHetConfig": AIRL2Config,
+}
+
 
 def __getattr__(name: str):
+    if name in _DEPRECATED_AIRL_HET:
+        replacement = _DEPRECATED_AIRL_HET[name]
+        canonical_name = "AIRL2" if name == "AIRLHet" else replacement.__name__
+        warnings.warn(
+            f"{name} is deprecated; use {canonical_name}. The AIRLHet alias "
+            "will be removed after the 0.1.x series.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return replacement
     if name in _MOVED_TO_CONTRIB:
         mod_name = _MOVED_TO_CONTRIB[name]
         warnings.warn(
@@ -166,6 +193,7 @@ def __getattr__(name: str):
             stacklevel=2,
         )
         import importlib
+
         mod = importlib.import_module(f"econirl.contrib.{mod_name}")
         return getattr(mod, name)
     raise AttributeError(f"module 'econirl.estimation' has no attribute {name!r}")

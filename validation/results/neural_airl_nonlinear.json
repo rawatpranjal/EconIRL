@@ -1,0 +1,288 @@
+{
+  "checks": [
+    {
+      "name": "all_fits_converged",
+      "operator": "==",
+      "passed": true,
+      "threshold": 10,
+      "value": 10
+    },
+    {
+      "name": "mean_tv_ratio_to_linear_airl",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.75,
+      "value": 0.05169602925309471
+    },
+    {
+      "name": "replications_improved",
+      "operator": ">=",
+      "passed": true,
+      "threshold": 8,
+      "value": 10
+    },
+    {
+      "name": "p95_policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.1,
+      "value": 0.03067207516298785
+    },
+    {
+      "name": "p95_transfer_policy_tv",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.12,
+      "value": 0.034612476625207556
+    },
+    {
+      "name": "median_affine_reward_nrmse",
+      "operator": "<=",
+      "passed": true,
+      "threshold": 0.35,
+      "value": 0.05663325375339909
+    }
+  ],
+  "configuration": {
+    "actions": 2,
+    "individuals": 120,
+    "n_replications": 10,
+    "periods": 25,
+    "state_inputs": 1,
+    "states": 9
+  },
+  "environment": {
+    "git_sha": "533af8a8f997aaf23b7e3c91265ed2ebb47e9161",
+    "packages": {
+      "econirl": "0.0.10",
+      "jax": "0.9.2",
+      "jaxlib": "0.9.2",
+      "numpy": "2.4.1",
+      "optax": "0.2.8"
+    },
+    "platform": "macOS-14.5-arm64-arm-64bit-Mach-O",
+    "python": "3.13.12"
+  },
+  "estimator": "NeuralAIRL",
+  "frozen_thresholds": {
+    "maximum_mean_tv_ratio_to_linear_airl": 0.75,
+    "maximum_median_affine_reward_nrmse": 0.35,
+    "maximum_p95_policy_tv": 0.1,
+    "maximum_p95_transfer_policy_tv": 0.12,
+    "minimum_replications_improved": 8
+  },
+  "paper_boundary": "Generated finite-state nonlinear recovery and transfer evidence. It is not a replication of Fu et al. continuous-control results.",
+  "paper_replication": false,
+  "records": [
+    {
+      "affine_reward_nrmse": 0.07593933348481689,
+      "converged": true,
+      "final_discriminator_loss": 1.3919055733692596,
+      "improved": true,
+      "linear_policy_tv": 0.38422501940048015,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.020136403524566717,
+      "panel_seed": 24000,
+      "policy_distillation_tv": 0.018253436156575546,
+      "replication": 0,
+      "rounds": 73,
+      "training_seed": 25000,
+      "transfer_policy_tv": 0.020684492330047582,
+      "tv_ratio": 0.052407840478442186
+    },
+    {
+      "affine_reward_nrmse": 0.05414555533180254,
+      "converged": true,
+      "final_discriminator_loss": 1.389678287519677,
+      "improved": true,
+      "linear_policy_tv": 0.39641423061914216,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.02306721219310222,
+      "panel_seed": 24001,
+      "policy_distillation_tv": 0.019931263944003488,
+      "replication": 1,
+      "rounds": 80,
+      "training_seed": 25001,
+      "transfer_policy_tv": 0.026825446579331943,
+      "tv_ratio": 0.05818966730098095
+    },
+    {
+      "affine_reward_nrmse": 0.09445054965937956,
+      "converged": true,
+      "final_discriminator_loss": 1.4065065401702954,
+      "improved": true,
+      "linear_policy_tv": 0.3950723071078006,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.030970016923954846,
+      "panel_seed": 24002,
+      "policy_distillation_tv": 0.030010965116465164,
+      "replication": 2,
+      "rounds": 82,
+      "training_seed": 25002,
+      "transfer_policy_tv": 0.036217581569472586,
+      "tv_ratio": 0.0783907562407412
+    },
+    {
+      "affine_reward_nrmse": 0.043826951778259245,
+      "converged": true,
+      "final_discriminator_loss": 1.4034742014342405,
+      "improved": true,
+      "linear_policy_tv": 0.38181889760794324,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.010627011685505814,
+      "panel_seed": 24003,
+      "policy_distillation_tv": 0.0140302794846957,
+      "replication": 3,
+      "rounds": 90,
+      "training_seed": 25003,
+      "transfer_policy_tv": 0.013170626993514989,
+      "tv_ratio": 0.027832597475093472
+    },
+    {
+      "affine_reward_nrmse": 0.10994776677079622,
+      "converged": true,
+      "final_discriminator_loss": 1.4105920156080385,
+      "improved": true,
+      "linear_policy_tv": 0.3975766075168095,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.022042683216245567,
+      "panel_seed": 24004,
+      "policy_distillation_tv": 0.027216171845344823,
+      "replication": 4,
+      "rounds": 100,
+      "training_seed": 25004,
+      "transfer_policy_tv": 0.02694011491274905,
+      "tv_ratio": 0.055442606027351855
+    },
+    {
+      "affine_reward_nrmse": 0.057810651147545626,
+      "converged": true,
+      "final_discriminator_loss": 1.3996060217690849,
+      "improved": true,
+      "linear_policy_tv": 0.3827616304764265,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.017227694959219643,
+      "panel_seed": 24005,
+      "policy_distillation_tv": 0.030213021470987207,
+      "replication": 5,
+      "rounds": 94,
+      "training_seed": 25005,
+      "transfer_policy_tv": 0.02046681350345401,
+      "tv_ratio": 0.0450089392130977
+    },
+    {
+      "affine_reward_nrmse": 0.03917422186529013,
+      "converged": true,
+      "final_discriminator_loss": 1.3936233835664844,
+      "improved": true,
+      "linear_policy_tv": 0.38440640617511,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.01569429958236465,
+      "panel_seed": 24006,
+      "policy_distillation_tv": 0.023593949042066163,
+      "replication": 6,
+      "rounds": 71,
+      "training_seed": 25006,
+      "transfer_policy_tv": 0.01650089402700041,
+      "tv_ratio": 0.040827362214185814
+    },
+    {
+      "affine_reward_nrmse": 0.02084418322027966,
+      "converged": true,
+      "final_discriminator_loss": 1.3810642488494178,
+      "improved": true,
+      "linear_policy_tv": 0.39501274658081936,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.005254211433716576,
+      "panel_seed": 24007,
+      "policy_distillation_tv": 0.02755450926519852,
+      "replication": 7,
+      "rounds": 79,
+      "training_seed": 25007,
+      "transfer_policy_tv": 0.00605460678812315,
+      "tv_ratio": 0.013301371865076175
+    },
+    {
+      "affine_reward_nrmse": 0.08556965503705642,
+      "converged": true,
+      "final_discriminator_loss": 1.4018338254194795,
+      "improved": true,
+      "linear_policy_tv": 0.3947853598784409,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.02610163867043698,
+      "panel_seed": 24008,
+      "policy_distillation_tv": 0.032492867476510714,
+      "replication": 8,
+      "rounds": 102,
+      "training_seed": 25008,
+      "transfer_policy_tv": 0.030861732866132346,
+      "tv_ratio": 0.06611602486595244
+    },
+    {
+      "affine_reward_nrmse": 0.055455856359252556,
+      "converged": true,
+      "final_discriminator_loss": 1.402509032940043,
+      "improved": true,
+      "linear_policy_tv": 0.3843401018323899,
+      "n_observations": 3000,
+      "neural_policy_tv": 0.030307924121805965,
+      "panel_seed": 24009,
+      "policy_distillation_tv": 0.03225353397523859,
+      "replication": 9,
+      "rounds": 78,
+      "training_seed": 25009,
+      "transfer_policy_tv": 0.03265068169332809,
+      "tv_ratio": 0.078857043481305
+    }
+  ],
+  "status": "ready",
+  "summary": {
+    "affine_reward_nrmse": {
+      "maximum": 0.10994776677079622,
+      "mean": 0.06371647246544788,
+      "median": 0.05663325375339909,
+      "minimum": 0.02084418322027966,
+      "p95": 0.1029740190706587
+    },
+    "linear_policy_tv": {
+      "maximum": 0.3975766075168095,
+      "mean": 0.3896413307195362,
+      "median": 0.38959588302677545,
+      "minimum": 0.38181889760794324,
+      "p95": 0.3970535379128592
+    },
+    "mean_tv_ratio_to_linear_airl": 0.05169602925309471,
+    "n_converged": 10,
+    "n_improved": 10,
+    "n_requested": 10,
+    "neural_policy_tv": {
+      "maximum": 0.030970016923954846,
+      "mean": 0.020142909631091895,
+      "median": 0.021089543370406142,
+      "minimum": 0.005254211433716576,
+      "p95": 0.03067207516298785
+    },
+    "policy_distillation_tv": {
+      "maximum": 0.032492867476510714,
+      "mean": 0.025554999777708594,
+      "median": 0.02738534055527167,
+      "minimum": 0.0140302794846957,
+      "p95": 0.03238516740093826
+    },
+    "transfer_policy_tv": {
+      "maximum": 0.036217581569472586,
+      "mean": 0.023037299126315414,
+      "median": 0.023754969454689762,
+      "minimum": 0.00605460678812315,
+      "p95": 0.034612476625207556
+    },
+    "tv_ratio": {
+      "maximum": 0.078857043481305,
+      "mean": 0.05163742091622268,
+      "median": 0.05392522325289702,
+      "minimum": 0.013301371865076175,
+      "p95": 0.07864721422305129
+    }
+  },
+  "target": "nonlinear state reward and changed-dynamics behavior"
+}

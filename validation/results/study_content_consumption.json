@@ -40,13 +40,13 @@
     ],
     "max_em_iterations": 20,
     "max_airl_rounds": 20,
-    "airl_het_seed": 7,
+    "airl2_seed": 7,
     "discount_factor": 0.95,
     "scale_parameter": 1.0
   },
   "methods": {
-    "AIRL-Het": {
-      "name": "AIRL-Het",
+    "AIRL2": {
+      "name": "AIRL2",
       "family": "heterogeneity-aware",
       "assignment_accuracy": 0.996,
       "assignment_permutation": [

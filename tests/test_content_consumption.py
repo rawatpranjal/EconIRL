@@ -3,7 +3,7 @@
 These verify the construction contract (shapes, valid transitions, the leave /
 absorbing anchors), that distinct reward thetas induce distinct optimal policies,
 and that the public ``simulate_mixture_panel`` carries per-agent segment labels.
-They are cheap and run no estimator fits (the AIRL-Het smoke is run separately).
+They are cheap and run no estimator fits (the AIRL2 smoke is run separately).
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ import pytest
 from econirl.environments import content_consumption
 from econirl.preprocessing.diagnostics import feature_diagnostics
 from econirl.simulation.synthetic import _compute_optimal_policy, simulate_mixture_panel
-
 
 # ---------------------------------------------------------------------------
 # (a) Construction and validation
@@ -29,7 +28,7 @@ def test_shapes_and_anchor_indices() -> None:
     assert env.num_features == 4
     assert env.transition_matrices.shape == (4, 65, 65)
     assert env.feature_matrix.shape == (65, 4, 4)
-    # Anchor indices exposed for the study + AIRL-Het.
+    # Anchor indices exposed for the study + AIRL2.
     assert env.leave_action == 3
     assert env.session_ended_state == 64
 

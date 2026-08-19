@@ -152,12 +152,10 @@ class BootstrapResult:
 
 @dataclass(frozen=True)
 class FunctionalBootstrapResult:
-    """Trajectory-bootstrap draws for neural reward and policy functionals.
+    """Trajectory-bootstrap draws for reward and policy functionals.
 
-    Neural reward networks do not expose a finite structural parameter vector.
-    This record therefore stores draws of the identified, user-facing
-    functionals instead of treating network weights or descriptive projection
-    coordinates as economic parameters.
+    This record stores draws of identified, user-facing functionals. Segmented
+    estimators may also retain label-aligned prior draws.
     """
 
     method: str
@@ -172,6 +170,8 @@ class FunctionalBootstrapResult:
     reward_draws: np.ndarray
     policy_draws: np.ndarray
     failures: tuple[str, ...] = ()
+    segment_prior_draws: np.ndarray | None = None
+    calibration_multiplier: float = 1.0
 
 
 def _quantiles(values: Any) -> dict[str, float]:

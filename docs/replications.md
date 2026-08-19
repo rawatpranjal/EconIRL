@@ -216,7 +216,7 @@ The package reproduces the identification structure:
 | --- | --- | --- | --- |
 | AIRL-1 | R(s) | deterministic | yes |
 | AIRL-2 (default) | R(s,a) | any | no, a shaped advantage |
-| AIRL-2 anchored | R(s,a) with an action anchor | any | yes (see AIRL-Het) |
+| AIRL-2 anchored | R(s,a) with an action anchor | any | yes (see AIRL2) |
 
 State-only AIRL recovers the reward on the deterministic 16-state task: normalized
 reward error 0.10, policy distance 0.006, counterfactual regret near 0.004. The
@@ -405,7 +405,7 @@ Reproduce:
 python scripts/study_rhip_lookahead.py
 ```
 
-## AIRL-Het (Lee, Sudhir, and Wang, 2026)
+## AIRL2 (Lee, Sudhir, and Wang, 2026)
 
 Lee, Sudhir, and Wang extend AIRL to consumers who differ in unobserved ways and
 to action-dependent utilities. Their setting is sequential content: a reader of
@@ -440,7 +440,7 @@ published consumption estimates use proprietary data and are not reproduced here
 Reproduce:
 
 ```bash
-python validation/estimators/aairl/run.py
+python validation/estimators/airl2/run.py
 ```
 
 ## Pending

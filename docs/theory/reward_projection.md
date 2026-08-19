@@ -72,7 +72,7 @@ them.
 
 **Estimator consequence.** This theorem applies when an estimator has already
 reduced the problem to observed reward contrasts $y=X\theta$. MCE-IRL,
-AIRL-Het, and GLADIUS use versions of that route. In a structural dynamic
+AIRL2, and GLADIUS use versions of that route. In a structural dynamic
 choice likelihood such as NFXP or CCP, action-dependent transitions can add
 parameter variation through future states. Direct action-contrast rank remains
 a conservative sufficient diagnostic, not a general necessary condition.

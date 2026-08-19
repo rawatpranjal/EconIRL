@@ -16,9 +16,6 @@ reward is a feedforward network rather than a dot product with fixed features.
 The validated object is the anchored reward matrix and the behavior it induces.
 Raw network weights are not a structural estimand.
 
-For a runnable fit with exact output, start with the
-[Quick Start](deep_mce_irl/quick_start.md).
-
 ## Source Papers
 
 The estimator draws on {ref}`Ziebart (2010) <ziebart-2010>`, which establishes
@@ -298,10 +295,8 @@ reward matrix and the behavior it induces.
 
 ## Usage
 
-The [Quick Start](deep_mce_irl/quick_start.md) page gives a complete runnable
-fit with exact output. The fitted estimator provides `reward_matrix_`,
-`policy_`, `value_`, `simulate()`, `counterfactual()`, and pickle
-serialization.
+The fitted estimator provides `reward_matrix_`, `policy_`, `value_`,
+`simulate()`, `counterfactual()`, and pickle serialization.
 
 Set `se_method="bootstrap"` to request whole-trajectory sampling uncertainty.
 `conf_int()` then returns percentile intervals for anchored reward cells and

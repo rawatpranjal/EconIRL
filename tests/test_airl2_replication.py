@@ -1,4 +1,4 @@
-"""Lock the AIRL-Het identification replication (Lee-Sudhir-Wang 2026).
+"""Lock the AIRL2 identification replication (Lee-Sudhir-Wang 2026).
 
 The paper proves (Theorems 1-3) that an exit-action reward anchor plus an
 absorbing-state anchor make the action-dependent AIRL discriminator uniquely
@@ -6,7 +6,7 @@ recover the true reward and value, with an EM layer recovering latent segments.
 The package reproduces this on a controlled two-segment problem.
 
 This locks the recovery from the saved result, so it is fast. Regenerate with
-``python validation/estimators/aairl/run.py``.
+``python validation/estimators/airl2/run.py``.
 """
 from __future__ import annotations
 
@@ -14,12 +14,12 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RESULT = ROOT / "validation" / "results" / "aairl.json"
+RESULT = ROOT / "validation" / "results" / "airl2.json"
 
 
 def _cell():
     data = json.loads(RESULT.read_text())
-    assert data["estimator"] == "AIRL-Het", data.get("estimator")
+    assert data["estimator"] == "AIRL2", data.get("estimator")
     return data["results"][0]
 
 

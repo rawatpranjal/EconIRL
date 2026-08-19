@@ -185,7 +185,7 @@ from the behavior that the true reward would imply.
 | TD-CCP | Same finite reward target, recursive terms learned from successor tuples. | Successor support, basis span, and standard-error path. |
 | MCE-IRL | Feature-matching / likelihood in a known controlled process. | Reward in supplied feature span and fixed normalization. |
 | AIRL | State-only decomposition under the original AIRL conditions. | State-only reward, deterministic or decomposable dynamics, exact-saddle caveat. |
-| AIRL-Het | Action-dependent reward with economic anchors. | Exit action, absorbing state, segment support. |
+| AIRL2 | Action-dependent reward with economic anchors. | Exit action, absorbing state, segment support. |
 | GLADIUS | Softmax likelihood plus anchor Bellman risk over $Q$. | Anchor action, support, continuation-value regression, realizability. |
 
 Use this table as a sanity check. If the right-hand column is not credible in

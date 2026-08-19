@@ -8,10 +8,6 @@ than structural utility parameters. The primary validated scope is
 state-marginal matching with a state-only reward; action-dependent structural
 DDC recovery remains a diagnostic exercise under current evidence.
 
-Read this page as a behavioral state-marginal method. It is useful for matching
-where the expert goes, but that is weaker than identifying structural utility
-parameters.
-
 ## Source Papers
 
 The estimator follows {ref}`Ni et al. (2020) <ni-2020>`, which introduces
@@ -315,9 +311,6 @@ summary_cf = FIRLEstimator(
 )
 print(summary_cf.policy)    # policy induced by the modified transitions
 ```
-
-The [Quick Start](f_irl/quick_start.md) page documents the full set of fitted
-attributes and divergence options.
 
 ## Evidence
 

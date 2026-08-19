@@ -33,7 +33,15 @@ NEURAL_MCE_PAGES = [
     DOCS / "estimators" / "deep_mce_irl" / "counterfactuals.md",
     DOCS / "estimators" / "deep_mce_irl" / "wulfmeier_objectworld.md",
 ]
-COMPLETED_ESTIMATOR_PAGES = NFXP_PAGES + CCP_PAGES + NEURAL_MCE_PAGES
+AIRL2_PAGES = [
+    DOCS / "estimators" / "airl2.md",
+    DOCS / "estimators" / "airl2" / "quick_start.md",
+    DOCS / "estimators" / "airl2" / "pre_estimation.md",
+    DOCS / "estimators" / "airl2" / "validation.md",
+    DOCS / "estimators" / "airl2" / "counterfactuals.md",
+    DOCS / "estimators" / "airl2" / "serialized_content.md",
+]
+COMPLETED_ESTIMATOR_PAGES = NFXP_PAGES + CCP_PAGES + NEURAL_MCE_PAGES + AIRL2_PAGES
 
 
 def test_completed_estimator_pages_put_important_links_immediately_after_title() -> None:
@@ -241,25 +249,26 @@ def test_estimator_docs_use_simulation_study_links_and_terms() -> None:
 
 
 def test_estimator_navigation_is_owned_by_section_pages() -> None:
-    """Estimator links live in the Core/Other section pages, not hardcoded at root."""
+    """Estimator links live in exactly one roster section, not at the root."""
 
     index = (DOCS / "index.rst").read_text(encoding="utf-8")
     core = (DOCS / "estimators" / "core.md").read_text(encoding="utf-8")
     other = (DOCS / "estimators" / "other.md").read_text(encoding="utf-8")
     config = runpy.run_path(str(DOCS / "conf.py"))
 
-    # The core roster lives in core.md; every other estimator lives under Other.
+    # The core roster lives in core.md; other estimators live in other.md.
     expected_core = [
         "nfxp",
         "ccp",
-        "tdccp",
         "mce_irl",
         "deep_mce_irl",
         "airl",
-        "airl_het",
+        "neural_airl",
         "gladius",
     ]
     expected_other = [
+        "tdccp",
+        "airl2",
         "nnes",
         "mpec",
         "ufxp",
@@ -269,8 +278,10 @@ def test_estimator_navigation_is_owned_by_section_pages() -> None:
     ]
     missing_core = [entry for entry in expected_core if f"\n{entry}\n" not in core]
     missing_other = [entry for entry in expected_other if f"\n{entry}\n" not in other]
+    other_in_core = [entry for entry in expected_other if f"\n{entry}\n" in core]
     assert missing_core == []
     assert missing_other == []
+    assert other_in_core == []
 
     # Estimator pages are not hardcoded directly in the root toctree.
     root_entries = [
@@ -521,6 +532,10 @@ def _public_estimator_validation_pages() -> list[Path]:
 
 
 def _is_excluded_from_rtd(path: Path) -> bool:
+    if path.suffix == ".md":
+        opening = path.read_text(encoding="utf-8")[:80]
+        if opening.startswith("---\n") and "\norphan: true\n" in opening:
+            return True
     rel = path.relative_to(DOCS).as_posix()
     parts = path.relative_to(DOCS).parts
     for pattern in _exclude_patterns():

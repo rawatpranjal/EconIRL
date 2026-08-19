@@ -271,10 +271,6 @@ limit. They can differ under misspecification.
 | A structural reference estimate is required. | Only a fast imitation baseline is required. |
 | Counterfactual policy analysis is central. | Only fitted choice probabilities are required. |
 
-NFXP is the reference estimator for tabular structural estimation. CCP, MPEC,
-NNES, TD-CCP, and UFXP use different computational strategies. Their estimator
-pages describe the corresponding assumptions and finite-sample objectives.
-
 ## Usage
 
 ```python
@@ -328,8 +324,7 @@ Transition counterfactuals use a complete action-specific transition model.
 The [Counterfactuals](nfxp/counterfactuals.md) page gives a runnable example
 and its result.
 
-The [Quick Start](nfxp/quick_start.md) page documents the fitted attributes and
-the advanced `NFXPEstimator` interface.
+See [Quick Start](nfxp/quick_start.md) for the advanced `NFXPEstimator` API.
 
 ## Evidence
 

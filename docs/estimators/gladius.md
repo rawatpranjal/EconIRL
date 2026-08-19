@@ -10,10 +10,6 @@ known rewards pins the absolute level of the learned Q-function; without
 the anchor, the network identifies the policy but not the reward in the
 full Bellman sense.
 
-Read this page as the high-dimensional offline route. The safest structural
-object is the anchored action contrast; raw neural Q levels need the anchor
-before they carry reward meaning.
-
 ## Source Papers
 
 The estimator follows {ref}`Kang, Yoganarasimhan, and Jain (2025) <kang-2025>`,
@@ -358,18 +354,15 @@ met well in the data.
 | Policy imitation and projected reward recovery are the target. | Full structural counterfactual validity is required. |
 | A fast neural approximation suffices for model exploration. | Structural standard errors or formal inference are required. |
 
-GLADIUS sits in the behavioral family alongside MCE-IRL, AIRL, and IQ-Learn.
-It learns its Q and continuation-value networks offline, from the fixed panel,
-without policy rollouts or a dynamic-program solve at each candidate parameter.
-That is what lets it scale to state representations that make the structural
-family expensive. Against
-simpler behavioral methods, GLADIUS adds explicit Bellman structure through
-the Q and zeta architecture and the anchor Bellman loss, which provides a
-path toward structural parameter recovery that policy-gradient or
-behavioral-cloning methods do not have. The current evaluation cells show
-strong policy imitation and projected-reward recovery. Raw Bellman reward and
-value recovery are weaker, so GLADIUS is best read as a policy-imitation and
-action-contrast method on those cells, not a source of counterfactual rewards.
+GLADIUS is an offline behavioral method alongside MCE-IRL, AIRL, and IQ-Learn.
+Its Q and zeta networks train without policy rollouts or a dynamic-program solve
+at each candidate parameter. The anchor Bellman loss adds a path toward
+structural parameter recovery that policy-gradient and behavioral-cloning
+methods do not have. This helps with state representations that make structural
+methods expensive. The current evaluation cells show strong policy imitation
+and projected-reward recovery. Raw Bellman reward and value recovery are weaker,
+so GLADIUS is best read as a policy-imitation and action-contrast method on
+those cells, not a source of counterfactual rewards.
 
 ## Usage
 

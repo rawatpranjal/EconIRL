@@ -45,5 +45,5 @@ and changed-dynamics behavior together.
 ## Fail-closed inputs
 
 Action-dependent `RewardSpec` objects raise before training. `context=` also
-raises before training. Both errors point to AIRL-Het because they require a
+raises before training. Both errors point to AIRL2 because they require a
 different identification design.
