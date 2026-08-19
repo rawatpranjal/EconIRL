@@ -201,8 +201,11 @@ conditional expectation $\zeta^*(s, a) = \mathbb{E}[V_{Q^*}(s') \mid s, a]$
 (Theorem 5), and the $-\beta^2(V_Q(s') - \zeta)^2$ term cancels the
 double-sampling bias when $\zeta$ is at its optimum.
 
-The package defaults to `anchor_bellman_mode="anchor_moment"`, which replaces
-the minimax correction with the continuation-moment residual
+The public `GLADIUS` estimator defaults to the paper-reference
+`objective="paper_minimax"`, a shared Q/zeta trunk, and a calibrated Bellman
+penalty weight of 0.1. The lower-level
+`GLADIUSConfig` also exposes `anchor_moment`, which replaces the minimax
+correction with the continuation-moment residual
 
 $$
 L_{\text{anch}} =
@@ -211,13 +214,26 @@ L_{\text{anch}} =
 \right].
 $$
 
-This variant avoids the explicit minimax and is more stable in the latent-reward
-IRL setting (where the paper's observed-reward anchor is not available in
-the same form). Setting `anchor_bellman_mode="paper_minimax"` retains the
-literal Eq. 12 objective. The two modes differ in sign and structure: the
+This fitted-Q diagnostic avoids the explicit minimax and is used by the
+oracle-simulation structural stress test. Setting
+`anchor_bellman_mode="paper_minimax"` retains the literal Eq. 12 objective and
+is the canonical public path. The two modes differ in sign and structure: the
 paper_minimax mode subtracts the variance correction $\beta^2(V_Q(s')-\zeta)^2$
 from the squared TD error, whereas the anchor_moment mode treats
 $Q - r_{\text{anch}} - \beta\zeta$ as a direct residual.
+
+The Table 2 research driver additionally projects the shared Q/zeta level onto
+the known anchor reward after each Q update. Each projection is a common shift,
+so it leaves the current action differences and policy unchanged, although it
+can change the subsequent optimization path. This repairs the weak
+$(1-\beta)$ level gradient. It is a package repair beyond the checked-in author
+implementation and is reported explicitly in replication receipts. The same
+driver uses batches of two trajectories at N=50 and five trajectories in
+larger cells. This prevents the N=50 cell from receiving only one Q update per
+epoch and lets optimization effort grow with sample size under the alternating
+author loop. The paper does not publish the Table 2 batch size, so this batch
+rule is also disclosed as a package-level replication choice. The driver fixes
+network seed 2 for every cell; it does not choose restarts cell by cell.
 
 In the paper, $\zeta(s, a) = \mathbb{E}[V_Q(s') \mid s, a]$ is the
 closed-form conditional expectation that solves the inner maximisation in
@@ -264,7 +280,7 @@ be the same action.
 ## Algorithm
 
 ```text
-Algorithm  GLADIUS (dual-network, alternating updates, anchor-moment mode)
+Algorithm  GLADIUS (paper-reference shared-trunk minimax mode)
 Input   panel {(s_it, a_it, s_{i,t+1})}, features phi, discount beta,
         logit scale sigma, anchor action a_anch, anchor rewards r_anch,
         Bellman penalty weight lambda, patience P
@@ -281,18 +297,20 @@ Output  theta_hat, imitation policy pi, soft value V
 4       shuffle panel into mini-batches
 5       for each mini-batch (s, a, s') with index b:
 6           s_feat := state_encoder(s);  sp_feat := state_encoder(s')
-7           if b is even:                          # zeta step, Q held fixed
+7           if b is even:                          # zeta optimizer step
 8               V_sp := sigma * logsumexp(Q_eta(sp_feat, all a) / sigma)
 9               update zeta_xi to minimize (zeta_xi(s_feat, a) - V_sp)^2
-10          else:                                  # Q step, zeta held fixed
+10          else:                                  # Q optimizer step
 11              log_pi := Q_eta(s_feat, all a) / sigma
 12                        - logsumexp(Q_eta(s_feat, all a) / sigma)
 13              L_NLL  := -mean(log_pi[a])
 14              mask   := (a == a_anch)
-15              L_anch := mean over mask of
-16                        (Q_eta(s_feat, a) - r_anch[s] - beta * zeta_xi(s_feat, a))^2
+15              TD := Q_eta(s_feat,a) - r_anch[s] - beta * V_sp
+16              L_anch := mean over mask of
+                          abs(TD^2 - beta^2 * (V_sp - zeta_xi(s_feat,a))^2)
 17              update Q_eta to minimize L_NLL + lambda * L_anch
-18      if no improvement for P epochs: break      # early stopping
+18      stop on the configured optimization rule; budget exhaustion alone is
+        not reported as convergence
 19  r_hat(s, a) := Q_eta(s, a) - beta * zeta_xi(s, a)    # implied reward
 20  Delta_r      := r_hat(s, a) - r_hat(s, 0)             # action differences
 21  Delta_phi    := phi(s, a)   - phi(s, 0)
@@ -302,18 +320,11 @@ Output  theta_hat, imitation policy pi, soft value V
 25  return theta_hat, pi, V
 ```
 
-The default configuration is `mode="dual"` with `alternating_updates=True`
-and `anchor_bellman_mode="anchor_moment"`: separate Q and zeta networks are
-trained in alternating mini-batch steps, and the anchor pins $Q_\eta$ via the
-continuation-moment residual above. Two alternative modes are available.
-`mode="q_only"` drops the zeta network and replaces $\mathbb{E}[V(s') \mid s, a]$
-with $\sigma \log \sum_b \exp(Q_\eta(s', b) / \sigma)$; the anchor Bellman
-loss is not available in this mode and $Q_\eta$ is trained on $L_{\text{NLL}}$
-alone. `anchor_bellman_mode="paper_minimax"` uses the paper's bi-conjugate
-minimax objective rather than the continuation-moment anchor. It is
-available for comparison and is not the default.
-Setting `alternating_updates=False` updates both networks jointly in each
-step, which is the legacy behavior.
+The public configuration uses `network_mode="shared_trunk"`,
+`alternating_updates=True`, epoch-based learning-rate decay, value clipping,
+and separate optimizer states for alternating Q and zeta steps. The
+lower-level `network_mode="separate"` and `anchor_bellman_mode="anchor_moment"`
+remain available for research diagnostics; they are not the public defaults.
 
 ## System View
 
@@ -351,18 +362,20 @@ met well in the data.
 | --- | --- |
 | State features are high-dimensional and tabular Bellman solves are costly. | The state space is small and tabular (use NFXP, CCP, or UFXP). |
 | An anchor action with known rewards is available. | There is no credible anchor action. |
-| Policy imitation and projected reward recovery are the target. | Full structural counterfactual validity is required. |
-| A fast neural approximation suffices for model exploration. | Structural standard errors or formal inference are required. |
+| Anchored reward, policy, and scoped counterfactuals are the target. | The anchor reward is unknown or not credible. |
+| Whole-trajectory bootstrap inference is computationally acceptable. | An analytic standard error is required. |
 
-GLADIUS is an offline behavioral method alongside MCE-IRL, AIRL, and IQ-Learn.
-Its Q and zeta networks train without policy rollouts or a dynamic-program solve
-at each candidate parameter. The anchor Bellman loss adds a path toward
-structural parameter recovery that policy-gradient and behavioral-cloning
-methods do not have. This helps with state representations that make structural
-methods expensive. The current evaluation cells show strong policy imitation
-and projected-reward recovery. Raw Bellman reward and value recovery are weaker,
-so GLADIUS is best read as a policy-imitation and action-contrast method on
-those cells, not a source of counterfactual rewards.
+GLADIUS sits in the behavioral family alongside MCE-IRL, AIRL, and IQ-Learn.
+It learns its Q and continuation-value networks offline, from the fixed panel,
+without policy rollouts or a dynamic-program solve at each candidate parameter.
+That is what lets it scale to state representations that make the structural
+family expensive. Against simpler behavioral methods, GLADIUS adds explicit
+Bellman structure through the Q and zeta architecture and the anchor Bellman
+loss, which provides a path toward structural parameter recovery that
+policy-gradient or behavioral-cloning methods do not have. The current
+oracle-simulation cell passes raw reward, projected reward, Q, value, policy,
+and scoped counterfactual checks together. Those results do not remove the need
+for a credible anchor and support diagnostics in a new application.
 
 ## Usage
 
@@ -395,7 +408,8 @@ diagnostics, and the implied policy and value function:
 
 ```python
 print(model.coef_)              # parameter vector as numpy array
-print(model.se_)                # projection standard errors
+print(model.se_)                # descriptive projection diagnostics
+print(model.conf_int())         # trajectory-bootstrap intervals, when requested
 print(model.projection_r2_)    # R-squared of the action-difference projection
 print(model.value_)             # soft value function, shape (n_states,)
 print(model.predict_proba([0, 5, 15, 20]))   # policy at selected states
@@ -415,32 +429,29 @@ GLADIUS is evaluated on two synthetic high-dimensional-state cells with
 known rewards, transitions, policies, and counterfactual oracle objects.
 The primary cell has 21 discrete states encoded into 64-dimensional feature
 vectors, a 4-parameter linear reward, and an anchor action with known rewards.
-Policy imitation and projected reward recovery are within acceptable bounds. Raw
-Bellman reward and value recovery are less accurate.
+All 12 prespecified structural and counterfactual checks pass.
 
 Behavioral recovery and counterfactual regret on the primary cell (21 states, 3
 actions, 1,000 individuals, 100 periods):
 
 | Metric | Value |
 | --- | ---: |
-| Policy total variation | 0.0369 |
-| Q NRMSE | 0.235 |
-| Projected reward NRMSE | 0.198 |
-| Raw Bellman reward NRMSE | 0.571 |
-| Value NRMSE | 0.420 |
-| Type A regret (reward shift) | 0.00854 |
-| Type B regret (transition change) | 0.0529 |
-| Type C regret (action removed) | 0.00852 |
+| Policy total variation | 0.0187 |
+| Q NRMSE | 0.1237 |
+| Projected reward NRMSE | 0.1311 |
+| Raw Bellman reward NRMSE | 0.2989 |
+| Value NRMSE | 0.2194 |
+| Type A regret (reward shift) | 0.00291 |
+| Type B regret (transition change) | 0.00814 |
+| Type C regret (action removed) | 0.00102 |
 
-The imitation policy is close to the data-generating policy (TV 0.0369). The
-projected parameters show high directional alignment with the truth (parameter
-cosine 0.975). That alignment should be read with care. Reward is only partially
-identified in general, and the projection matches the ground truth only when the
-anchor availability condition holds in the study cell. The raw Bellman reward and
-value are recovered less accurately, with NRMSE 0.571 and 0.420. On these cells
-GLADIUS recovers the imitation policy and the action-contrast reward well, but not
-the absolute reward and value that counterfactual re-solving needs. The small
-regret figures alone do not establish structural counterfactual validity.
+The imitation policy is close to the data-generating policy (TV 0.0187), and
+the projected parameters align with the truth (parameter cosine 0.9773). Raw
+reward and value also meet their prespecified 0.30 NRMSE checks. These claims are
+conditional on the valid anchor, full feature rank, full state-action coverage,
+and oracle-simulation design. The separate paper Table 2 receipt evaluates the public
+minimax path; the oracle-simulation cell uses the lower-level `anchor_moment`
+structural diagnostic.
 
 For cross-estimator behavioral comparisons, including GLADIUS alongside the
 structural and IRL rosters, see the
@@ -460,7 +471,7 @@ Implementation and reproduction:
 - Estimator source: [`econirl.estimation.gladius`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimation/gladius.py).
 - sklearn wrapper: [`econirl.GLADIUS`](https://github.com/rawatpranjal/EconIRL/blob/main/src/econirl/estimators/neural_gladius.py).
 - Validation runner: [`validation/estimators/gladius/run.py`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/estimators/gladius/run.py).
-- Results files: [`gladius.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json), [`gladius_scaled.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_scaled.json).
+- Qualification receipts: [`gladius.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius.json), [`gladius_bootstrap_calibration.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_bootstrap_calibration.json), [`gladius_paper_table2.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_paper_table2.json), and [`gladius_serialization.json`](https://github.com/rawatpranjal/EconIRL/blob/main/validation/results/gladius_serialization.json).
 
 Pages:
 
@@ -469,6 +480,7 @@ Pages:
 - [Simulation Study](gladius/validation.md)
 - [Counterfactuals](gladius/counterfactuals.md)
 - [High-State Example](gladius/high_state_example.md)
+- [Qualification Runbook](gladius/qualification_runbook.md)
 
 ```{toctree}
 :hidden:
@@ -478,4 +490,5 @@ gladius/pre_estimation
 gladius/validation
 gladius/counterfactuals
 gladius/high_state_example
+gladius/qualification_runbook
 ```

@@ -1,0 +1,1954 @@
+{
+  "dgp": "paper bus (20 mileage, +1..4, theta=[1,5], beta=0.95)",
+  "estimator": "GLADIUSEstimator paper_minimax+shared_trunk, anchor=replace",
+  "selection_boundary": "simulation-only best epoch selected by true held-out reward MAPE, matching the checked-in author experiment; not used by public fit",
+  "cells": [
+    {
+      "n_traj": 50,
+      "repetitions": 10,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mean_mape": 8.971645664915357,
+      "standard_error": 5.0626764380964815,
+      "paper_mean_mape": 3.44,
+      "paper_standard_error": 1.28,
+      "acceptance_upper_bound": 6.0,
+      "within_paper_mean_plus_2se": false,
+      "nfxp_oracle_mean_mape": 3.5217787054469176
+    },
+    {
+      "n_traj": 250,
+      "repetitions": 10,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mean_mape": 2.3406774719037897,
+      "standard_error": 0.4979604263199714,
+      "paper_mean_mape": 0.84,
+      "paper_standard_error": 0.51,
+      "acceptance_upper_bound": 1.8599999999999999,
+      "within_paper_mean_plus_2se": false,
+      "nfxp_oracle_mean_mape": 1.2055420913953523
+    },
+    {
+      "n_traj": 500,
+      "repetitions": 10,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mean_mape": 1.7003956424597035,
+      "standard_error": 0.1902787133381913,
+      "paper_mean_mape": 0.55,
+      "paper_standard_error": 0.2,
+      "acceptance_upper_bound": 0.9500000000000001,
+      "within_paper_mean_plus_2se": false,
+      "nfxp_oracle_mean_mape": 1.1869574777420886
+    },
+    {
+      "n_traj": 1000,
+      "repetitions": 10,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mean_mape": 7.561728725524453,
+      "standard_error": 4.375211290720848,
+      "paper_mean_mape": 0.52,
+      "paper_standard_error": 0.22,
+      "acceptance_upper_bound": 0.96,
+      "within_paper_mean_plus_2se": false,
+      "nfxp_oracle_mean_mape": 0.703605778795606
+    },
+    {
+      "n_traj": 2500,
+      "repetitions": 10,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mean_mape": 11.50363879965366,
+      "standard_error": 4.652752354907285,
+      "paper_mean_mape": 0.13,
+      "paper_standard_error": 0.06,
+      "acceptance_upper_bound": 0.25,
+      "within_paper_mean_plus_2se": false,
+      "nfxp_oracle_mean_mape": 0.3625036835552093
+    },
+    {
+      "n_traj": 5000,
+      "repetitions": 10,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "mean_mape": 14.190829696284359,
+      "standard_error": 4.070075289817093,
+      "paper_mean_mape": 0.12,
+      "paper_standard_error": 0.06,
+      "acceptance_upper_bound": 0.24,
+      "within_paper_mean_plus_2se": false,
+      "nfxp_oracle_mean_mape": 0.23687518169173286
+    }
+  ],
+  "gates": {
+    "full_6x20_design": false,
+    "all_cells_within_paper_mean_plus_2se": false,
+    "post_250_non_deterioration": false,
+    "oracle_epoch_rule_disclosed": true
+  },
+  "all_passed": false,
+  "records": [
+    {
+      "n_traj": 50,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 1.8436639369468835,
+      "nfxp_oracle_mape": 2.345949608213218,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.4446596879645779,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 763,
+        "oracle_best_mape": 1.843663936946884
+      },
+      "r_hat_maintain": [
+        -0.9896,
+        -2.1659,
+        -3.1137,
+        -4.2509,
+        -5.3913,
+        -6.5317,
+        -7.6721,
+        -8.8125,
+        -9.7232,
+        -10.5552
+      ],
+      "seconds": 69.4
+    },
+    {
+      "n_traj": 50,
+      "seed": 1,
+      "anchor": "paper_minimax",
+      "mape": 0.9816104486715638,
+      "nfxp_oracle_mape": 5.482082923521637,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.6097431139843904,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 321,
+        "oracle_best_mape": 0.9816104486715636
+      },
+      "r_hat_maintain": [
+        -0.9937,
+        -1.9933,
+        -2.9928,
+        -4.0442,
+        -5.0971,
+        -6.5593,
+        -8.1608,
+        -8.476,
+        -8.5909,
+        -9.171
+      ],
+      "seconds": 66.5
+    },
+    {
+      "n_traj": 50,
+      "seed": 2,
+      "anchor": "paper_minimax",
+      "mape": 1.852256268198512,
+      "nfxp_oracle_mape": 3.796132041471858,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.5389491456269115,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 791,
+        "oracle_best_mape": 1.8522562681985129
+      },
+      "r_hat_maintain": [
+        -0.9918,
+        -2.0516,
+        -2.847,
+        -3.5328,
+        -4.2186,
+        -5.7691,
+        -7.6641,
+        -9.5591,
+        -11.4542,
+        -13.3492
+      ],
+      "seconds": 66.3
+    },
+    {
+      "n_traj": 50,
+      "seed": 3,
+      "anchor": "paper_minimax",
+      "mape": 50.37338240164036,
+      "nfxp_oracle_mape": 0.6073593701758196,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.4499776650864952,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 606,
+        "oracle_best_mape": 50.37338240164036
+      },
+      "r_hat_maintain": [
+        0.1464,
+        -1.4182,
+        -2.2312,
+        -2.9952,
+        -3.7642,
+        -4.5333,
+        -5.334,
+        -6.4264,
+        -7.7119,
+        -9.0595
+      ],
+      "seconds": 66.3
+    },
+    {
+      "n_traj": 50,
+      "seed": 4,
+      "anchor": "paper_minimax",
+      "mape": 3.0747493605380667,
+      "nfxp_oracle_mape": 4.274345086701901,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.4257564539768378,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 156,
+        "oracle_best_mape": 3.074749360538066
+      },
+      "r_hat_maintain": [
+        -1.033,
+        -2.0202,
+        -2.7316,
+        -3.3912,
+        -4.5983,
+        -6.1031,
+        -7.6079,
+        -9.1127,
+        -10.8844,
+        -13.1904
+      ],
+      "seconds": 66.1
+    },
+    {
+      "n_traj": 50,
+      "seed": 5,
+      "anchor": "paper_minimax",
+      "mape": 1.3985020829221888,
+      "nfxp_oracle_mape": 2.812217631672552,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.5309489590881308,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 436,
+        "oracle_best_mape": 1.3985020829221888
+      },
+      "r_hat_maintain": [
+        -0.9837,
+        -2.0701,
+        -3.0834,
+        -3.8461,
+        -4.6437,
+        -5.2736,
+        -5.7365,
+        -6.1919,
+        -6.6473,
+        -7.0864
+      ],
+      "seconds": 69.2
+    },
+    {
+      "n_traj": 50,
+      "seed": 6,
+      "anchor": "paper_minimax",
+      "mape": 23.196700918342362,
+      "nfxp_oracle_mape": 5.657030376955514,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.6461479685588399,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 63,
+        "oracle_best_mape": 23.196700918342366
+      },
+      "r_hat_maintain": [
+        -0.4694,
+        -1.6949,
+        -2.8864,
+        -4.0973,
+        -5.2599,
+        -6.3593,
+        -7.6759,
+        -9.1254,
+        -10.5385,
+        -11.9078
+      ],
+      "seconds": 65.8
+    },
+    {
+      "n_traj": 50,
+      "seed": 7,
+      "anchor": "paper_minimax",
+      "mape": 2.8395034312621017,
+      "nfxp_oracle_mape": 0.37086727046860546,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.4926077621418124,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 396,
+        "oracle_best_mape": 2.839503431262102
+      },
+      "r_hat_maintain": [
+        -0.9721,
+        -1.7054,
+        -2.8936,
+        -3.9708,
+        -4.9637,
+        -5.9569,
+        -7.2146,
+        -8.9995,
+        -10.5037,
+        -11.8822
+      ],
+      "seconds": 65.9
+    },
+    {
+      "n_traj": 50,
+      "seed": 8,
+      "anchor": "paper_minimax",
+      "mape": 1.7623681218113234,
+      "nfxp_oracle_mape": 4.465515464036278,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.464064288054607,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 405,
+        "oracle_best_mape": 1.7623681218113239
+      },
+      "r_hat_maintain": [
+        -0.9882,
+        -1.8634,
+        -3.0437,
+        -4.1403,
+        -5.2369,
+        -6.1535,
+        -6.4577,
+        -6.8487,
+        -7.2449,
+        -7.6792
+      ],
+      "seconds": 65.8
+    },
+    {
+      "n_traj": 50,
+      "seed": 9,
+      "anchor": "paper_minimax",
+      "mape": 2.3937196788202093,
+      "nfxp_oracle_mape": 5.406287281251795,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 800,
+        "termination": "GLADIUS reached max_epochs=800 without convergence",
+        "final_loss": 0.4473682045102463,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 778,
+        "oracle_best_mape": 2.3937196788202093
+      },
+      "r_hat_maintain": [
+        -1.0225,
+        -1.9339,
+        -3.1404,
+        -4.2322,
+        -5.0634,
+        -5.7425,
+        -5.9126,
+        -6.0568,
+        -6.1865,
+        -6.4573
+      ],
+      "seconds": 65.7
+    },
+    {
+      "n_traj": 250,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 0.8274002809910005,
+      "nfxp_oracle_mape": 1.51728073964149,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.4213742778643911,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 305,
+        "oracle_best_mape": 0.8274002809910005
+      },
+      "r_hat_maintain": [
+        -1.0129,
+        -1.9798,
+        -3.0474,
+        -3.9779,
+        -4.7774,
+        -5.6791,
+        -6.5808,
+        -9.0982,
+        -13.9322,
+        -18.7748
+      ],
+      "seconds": 143.3
+    },
+    {
+      "n_traj": 250,
+      "seed": 1,
+      "anchor": "paper_minimax",
+      "mape": 5.018441199216387,
+      "nfxp_oracle_mape": 0.4140333722597424,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.5493112235743306,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 385,
+        "oracle_best_mape": 5.018441199216387
+      },
+      "r_hat_maintain": [
+        -0.9733,
+        -1.8513,
+        -3.1637,
+        -3.8994,
+        -4.5695,
+        -5.2395,
+        -5.9095,
+        -6.5795,
+        -7.2625,
+        -8.4282
+      ],
+      "seconds": 143.0
+    },
+    {
+      "n_traj": 250,
+      "seed": 2,
+      "anchor": "paper_minimax",
+      "mape": 1.4323262132984018,
+      "nfxp_oracle_mape": 2.007098752778331,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.5051937892715751,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 397,
+        "oracle_best_mape": 1.432326213298402
+      },
+      "r_hat_maintain": [
+        -0.9975,
+        -1.9103,
+        -2.8454,
+        -3.7805,
+        -4.7155,
+        -5.6506,
+        -6.5857,
+        -7.5208,
+        -8.4559,
+        -9.4262
+      ],
+      "seconds": 143.0
+    },
+    {
+      "n_traj": 250,
+      "seed": 3,
+      "anchor": "paper_minimax",
+      "mape": 3.141974507574994,
+      "nfxp_oracle_mape": 1.5211678759421021,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.7684617284135167,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 350,
+        "oracle_best_mape": 3.1419745075749934
+      },
+      "r_hat_maintain": [
+        -0.9822,
+        -1.7525,
+        -3.0768,
+        -4.3633,
+        -4.8882,
+        -5.4131,
+        -5.938,
+        -6.4629,
+        -6.9903,
+        -7.6105
+      ],
+      "seconds": 143.4
+    },
+    {
+      "n_traj": 250,
+      "seed": 4,
+      "anchor": "paper_minimax",
+      "mape": 1.5989676451269716,
+      "nfxp_oracle_mape": 1.0509073693101945,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.41568573741405956,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 390,
+        "oracle_best_mape": 1.598967645126972
+      },
+      "r_hat_maintain": [
+        -1.0147,
+        -2.1008,
+        -3.0605,
+        -3.9216,
+        -4.7827,
+        -5.6438,
+        -6.3249,
+        -6.9459,
+        -7.5669,
+        -7.8559
+      ],
+      "seconds": 143.1
+    },
+    {
+      "n_traj": 250,
+      "seed": 5,
+      "anchor": "paper_minimax",
+      "mape": 1.5707584525247682,
+      "nfxp_oracle_mape": 2.100428594392177,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.5085077718093104,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 349,
+        "oracle_best_mape": 1.5707584525247682
+      },
+      "r_hat_maintain": [
+        -0.997,
+        -1.8499,
+        -2.9713,
+        -4.0864,
+        -5.1661,
+        -6.2458,
+        -6.9198,
+        -7.2048,
+        -7.7372,
+        -8.2696
+      ],
+      "seconds": 142.0
+    },
+    {
+      "n_traj": 250,
+      "seed": 6,
+      "anchor": "paper_minimax",
+      "mape": 1.1632505306945329,
+      "nfxp_oracle_mape": 1.3658523408730285,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.4777986557275548,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 174,
+        "oracle_best_mape": 1.1632505306945329
+      },
+      "r_hat_maintain": [
+        -0.9995,
+        -1.8394,
+        -2.8951,
+        -4.1205,
+        -5.1716,
+        -5.9682,
+        -7.2985,
+        -8.9534,
+        -10.5513,
+        -12.0601
+      ],
+      "seconds": 141.3
+    },
+    {
+      "n_traj": 250,
+      "seed": 7,
+      "anchor": "paper_minimax",
+      "mape": 5.119880006192429,
+      "nfxp_oracle_mape": 0.4521864097514994,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.42899206562161296,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 400,
+        "oracle_best_mape": 5.119880006192429
+      },
+      "r_hat_maintain": [
+        -0.9667,
+        -2.3363,
+        -3.3098,
+        -4.2865,
+        -5.2354,
+        -6.1843,
+        -7.1332,
+        -8.1075,
+        -9.0627,
+        -10.018
+      ],
+      "seconds": 141.7
+    },
+    {
+      "n_traj": 250,
+      "seed": 8,
+      "anchor": "paper_minimax",
+      "mape": 1.2782526840306312,
+      "nfxp_oracle_mape": 0.6696259507221101,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.49222945007427243,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 228,
+        "oracle_best_mape": 1.2782526840306312
+      },
+      "r_hat_maintain": [
+        -0.9994,
+        -2.0728,
+        -3.0698,
+        -4.0668,
+        -5.0638,
+        -6.0608,
+        -7.0578,
+        -8.0548,
+        -9.0519,
+        -10.0489
+      ],
+      "seconds": 142.6
+    },
+    {
+      "n_traj": 250,
+      "seed": 9,
+      "anchor": "paper_minimax",
+      "mape": 2.2555231993877847,
+      "nfxp_oracle_mape": 0.9568395082828479,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 409,
+        "termination": "GLADIUS reached max_epochs=409 without convergence",
+        "final_loss": 0.45718784899127823,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 381,
+        "oracle_best_mape": 2.255523199387785
+      },
+      "r_hat_maintain": [
+        -0.9537,
+        -1.9775,
+        -3.0013,
+        -3.9487,
+        -4.8892,
+        -5.8297,
+        -7.363,
+        -10.1603,
+        -12.9576,
+        -15.6379
+      ],
+      "seconds": 141.7
+    },
+    {
+      "n_traj": 500,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 1.4666000103633194,
+      "nfxp_oracle_mape": 1.6145457591317716,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.4436001082281453,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 147,
+        "oracle_best_mape": 1.4666000103633197
+      },
+      "r_hat_maintain": [
+        -0.9972,
+        -1.8755,
+        -2.8271,
+        -4.0037,
+        -5.1803,
+        -6.3568,
+        -7.5334,
+        -8.6482,
+        -9.7692,
+        -10.8903
+      ],
+      "seconds": 141.5
+    },
+    {
+      "n_traj": 500,
+      "seed": 1,
+      "anchor": "paper_minimax",
+      "mape": 1.5067324874413115,
+      "nfxp_oracle_mape": 0.5663032719966596,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.43150232158086904,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 107,
+        "oracle_best_mape": 1.5067324874413115
+      },
+      "r_hat_maintain": [
+        -0.9876,
+        -2.0576,
+        -2.9981,
+        -3.9204,
+        -4.8426,
+        -5.7649,
+        -6.6872,
+        -7.6094,
+        -8.5251,
+        -9.1641
+      ],
+      "seconds": 139.7
+    },
+    {
+      "n_traj": 500,
+      "seed": 2,
+      "anchor": "paper_minimax",
+      "mape": 1.8908631352228502,
+      "nfxp_oracle_mape": 1.9024441447425857,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.4517661214038694,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 199,
+        "oracle_best_mape": 1.8908631352228498
+      },
+      "r_hat_maintain": [
+        -0.9759,
+        -1.9395,
+        -2.9032,
+        -3.8668,
+        -4.8304,
+        -6.2229,
+        -8.6681,
+        -11.1477,
+        -13.6274,
+        -16.107
+      ],
+      "seconds": 139.6
+    },
+    {
+      "n_traj": 500,
+      "seed": 3,
+      "anchor": "paper_minimax",
+      "mape": 2.567415048149542,
+      "nfxp_oracle_mape": 1.3273076666068673,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.5753317817498449,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 84,
+        "oracle_best_mape": 2.567415048149542
+      },
+      "r_hat_maintain": [
+        -1.0285,
+        -1.8911,
+        -3.0226,
+        -4.154,
+        -5.2855,
+        -6.3719,
+        -6.8867,
+        -6.9624,
+        -6.9355,
+        -7.685
+      ],
+      "seconds": 139.8
+    },
+    {
+      "n_traj": 500,
+      "seed": 4,
+      "anchor": "paper_minimax",
+      "mape": 2.2301412419869107,
+      "nfxp_oracle_mape": 0.17213827527833192,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.8093249406069006,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 167,
+        "oracle_best_mape": 2.2301412419869115
+      },
+      "r_hat_maintain": [
+        -1.0001,
+        -1.5982,
+        -2.7407,
+        -3.8832,
+        -5.0258,
+        -6.1683,
+        -7.3108,
+        -8.4533,
+        -9.6107,
+        -10.7685
+      ],
+      "seconds": 139.4
+    },
+    {
+      "n_traj": 500,
+      "seed": 5,
+      "anchor": "paper_minimax",
+      "mape": 1.03186287782574,
+      "nfxp_oracle_mape": 1.73409521588832,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.45813485241366025,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 121,
+        "oracle_best_mape": 1.03186287782574
+      },
+      "r_hat_maintain": [
+        -1.002,
+        -1.9836,
+        -2.8992,
+        -4.0402,
+        -5.2438,
+        -6.4473,
+        -7.6508,
+        -8.8543,
+        -10.0642,
+        -11.0878
+      ],
+      "seconds": 141.5
+    },
+    {
+      "n_traj": 500,
+      "seed": 6,
+      "anchor": "paper_minimax",
+      "mape": 1.346781672124445,
+      "nfxp_oracle_mape": 1.1878213965058715,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.40773759675455634,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 138,
+        "oracle_best_mape": 1.3467816721244454
+      },
+      "r_hat_maintain": [
+        -1.0122,
+        -1.8682,
+        -2.8595,
+        -3.99,
+        -5.1219,
+        -6.2534,
+        -7.2461,
+        -7.8183,
+        -8.2715,
+        -8.7143
+      ],
+      "seconds": 137.8
+    },
+    {
+      "n_traj": 500,
+      "seed": 7,
+      "anchor": "paper_minimax",
+      "mape": 2.623338244496426,
+      "nfxp_oracle_mape": 1.3304877876042893,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.44266070056118056,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 143,
+        "oracle_best_mape": 2.6233382444964253
+      },
+      "r_hat_maintain": [
+        -1.0333,
+        -2.1205,
+        -3.1153,
+        -4.11,
+        -5.0075,
+        -5.9045,
+        -6.7986,
+        -7.6876,
+        -8.554,
+        -9.5639
+      ],
+      "seconds": 138.5
+    },
+    {
+      "n_traj": 500,
+      "seed": 8,
+      "anchor": "paper_minimax",
+      "mape": 0.9339579395481049,
+      "nfxp_oracle_mape": 0.843356729774634,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.4008022889114041,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 105,
+        "oracle_best_mape": 0.9339579395481051
+      },
+      "r_hat_maintain": [
+        -0.9934,
+        -2.0261,
+        -2.974,
+        -4.0027,
+        -5.0315,
+        -6.0602,
+        -7.0094,
+        -7.5498,
+        -8.1013,
+        -8.5389
+      ],
+      "seconds": 137.9
+    },
+    {
+      "n_traj": 500,
+      "seed": 9,
+      "anchor": "paper_minimax",
+      "mape": 1.4062637674383842,
+      "nfxp_oracle_mape": 1.1910745298915564,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 205,
+        "termination": "GLADIUS reached max_epochs=205 without convergence",
+        "final_loss": 0.45108443136022686,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 149,
+        "oracle_best_mape": 1.4062637674383844
+      },
+      "r_hat_maintain": [
+        -0.9961,
+        -1.9493,
+        -3.1204,
+        -4.1706,
+        -4.7074,
+        -5.2441,
+        -5.7808,
+        -6.3154,
+        -6.8493,
+        -7.3832
+      ],
+      "seconds": 139.2
+    },
+    {
+      "n_traj": 1000,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 1.5892263324294318,
+      "nfxp_oracle_mape": 1.1880651539551286,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.41523265046491925,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 99,
+        "oracle_best_mape": 1.5892263324294318
+      },
+      "r_hat_maintain": [
+        -0.9847,
+        -2.0759,
+        -3.0926,
+        -4.1557,
+        -5.3735,
+        -7.1802,
+        -8.9801,
+        -10.7775,
+        -12.582,
+        -14.3969
+      ],
+      "seconds": 139.7
+    },
+    {
+      "n_traj": 1000,
+      "seed": 1,
+      "anchor": "paper_minimax",
+      "mape": 2.9882501317786376,
+      "nfxp_oracle_mape": 0.6256965168854757,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.43746855771904003,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 99,
+        "oracle_best_mape": 2.988250131778638
+      },
+      "r_hat_maintain": [
+        -1.0474,
+        -2.0067,
+        -3.1533,
+        -4.0883,
+        -5.0232,
+        -5.9582,
+        -6.8932,
+        -7.8281,
+        -8.775,
+        -9.7234
+      ],
+      "seconds": 139.3
+    },
+    {
+      "n_traj": 1000,
+      "seed": 2,
+      "anchor": "paper_minimax",
+      "mape": 1.366642293090099,
+      "nfxp_oracle_mape": 1.4753901047463727,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.4663761743018198,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 66,
+        "oracle_best_mape": 1.3666422930900988
+      },
+      "r_hat_maintain": [
+        -1.0001,
+        -2.0391,
+        -2.8801,
+        -3.8399,
+        -4.7998,
+        -5.7597,
+        -6.7196,
+        -7.6795,
+        -8.6393,
+        -9.5992
+      ],
+      "seconds": 138.3
+    },
+    {
+      "n_traj": 1000,
+      "seed": 3,
+      "anchor": "paper_minimax",
+      "mape": 2.517218072628749,
+      "nfxp_oracle_mape": 1.0708644561158782,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.5818759807739459,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 20,
+        "oracle_best_mape": 2.517218072628749
+      },
+      "r_hat_maintain": [
+        -1.0264,
+        -1.8438,
+        -3.2828,
+        -4.0087,
+        -4.9545,
+        -6.2582,
+        -7.5619,
+        -8.8655,
+        -10.1692,
+        -11.4728
+      ],
+      "seconds": 138.3
+    },
+    {
+      "n_traj": 1000,
+      "seed": 4,
+      "anchor": "paper_minimax",
+      "mape": 7.963597940576965,
+      "nfxp_oracle_mape": 0.4181591420659214,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.4369772647298937,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 78,
+        "oracle_best_mape": 7.963597940576965
+      },
+      "r_hat_maintain": [
+        -0.875,
+        -2.3225,
+        -3.1879,
+        -4.0532,
+        -4.9186,
+        -5.7839,
+        -6.6493,
+        -7.4214,
+        -7.9713,
+        -8.5211
+      ],
+      "seconds": 138.3
+    },
+    {
+      "n_traj": 1000,
+      "seed": 5,
+      "anchor": "paper_minimax",
+      "mape": 1.9404152683978129,
+      "nfxp_oracle_mape": 0.9138813604379064,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.4405150762732313,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 94,
+        "oracle_best_mape": 1.9404152683978135
+      },
+      "r_hat_maintain": [
+        -0.9929,
+        -2.0357,
+        -2.9542,
+        -3.8728,
+        -4.7913,
+        -5.7833,
+        -6.989,
+        -8.1947,
+        -9.4004,
+        -10.6479
+      ],
+      "seconds": 138.9
+    },
+    {
+      "n_traj": 1000,
+      "seed": 6,
+      "anchor": "paper_minimax",
+      "mape": 3.0593422593868795,
+      "nfxp_oracle_mape": 0.09006278842230653,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.47965898530685697,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 81,
+        "oracle_best_mape": 3.0593422593868786
+      },
+      "r_hat_maintain": [
+        -1.0532,
+        -1.9937,
+        -2.9341,
+        -3.8746,
+        -4.8151,
+        -5.7187,
+        -6.7384,
+        -7.8307,
+        -8.923,
+        -10.0153
+      ],
+      "seconds": 137.3
+    },
+    {
+      "n_traj": 1000,
+      "seed": 7,
+      "anchor": "paper_minimax",
+      "mape": 46.53325806433236,
+      "nfxp_oracle_mape": 0.12025899214031625,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.473275531570774,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 77,
+        "oracle_best_mape": 46.533258064332365
+      },
+      "r_hat_maintain": [
+        0.0889,
+        -1.4162,
+        -2.791,
+        -4.0039,
+        -5.228,
+        -6.4691,
+        -7.7101,
+        -9.2867,
+        -11.2253,
+        -13.1639
+      ],
+      "seconds": 137.3
+    },
+    {
+      "n_traj": 1000,
+      "seed": 8,
+      "anchor": "paper_minimax",
+      "mape": 2.4621568477390388,
+      "nfxp_oracle_mape": 0.6513726203857593,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.45732094588308453,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 76,
+        "oracle_best_mape": 2.4621568477390388
+      },
+      "r_hat_maintain": [
+        -0.9994,
+        -1.9482,
+        -2.8955,
+        -3.8279,
+        -4.722,
+        -5.9761,
+        -7.2599,
+        -8.5437,
+        -9.8275,
+        -11.1113
+      ],
+      "seconds": 137.6
+    },
+    {
+      "n_traj": 1000,
+      "seed": 9,
+      "anchor": "paper_minimax",
+      "mape": 5.197180044884567,
+      "nfxp_oracle_mape": 0.48230665280099405,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 103,
+        "termination": "GLADIUS reached max_epochs=103 without convergence",
+        "final_loss": 0.4464857322629238,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 63,
+        "oracle_best_mape": 5.197180044884566
+      },
+      "r_hat_maintain": [
+        -0.947,
+        -1.9998,
+        -3.0498,
+        -4.0998,
+        -5.1497,
+        -6.1997,
+        -7.2497,
+        -8.2997,
+        -9.3497,
+        -10.4089
+      ],
+      "seconds": 136.9
+    },
+    {
+      "n_traj": 2500,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 6.640084599476927,
+      "nfxp_oracle_mape": 0.3937745955008853,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.4395709366142633,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 16,
+        "oracle_best_mape": 6.640084599476928
+      },
+      "r_hat_maintain": [
+        -0.9571,
+        -2.3888,
+        -3.5205,
+        -3.7754,
+        -4.0304,
+        -4.2853,
+        -4.5402,
+        -4.7952,
+        -5.0501,
+        -5.3055
+      ],
+      "seconds": 141.9
+    },
+    {
+      "n_traj": 2500,
+      "seed": 1,
+      "anchor": "paper_minimax",
+      "mape": 31.698549662739033,
+      "nfxp_oracle_mape": 0.2746260294892641,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.44024624121116035,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 15,
+        "oracle_best_mape": 31.698549662739033
+      },
+      "r_hat_maintain": [
+        -0.3638,
+        -1.4503,
+        -2.5177,
+        -3.5663,
+        -4.577,
+        -5.5876,
+        -6.5983,
+        -7.609,
+        -8.6196,
+        -9.8134
+      ],
+      "seconds": 141.3
+    },
+    {
+      "n_traj": 2500,
+      "seed": 2,
+      "anchor": "paper_minimax",
+      "mape": 0.8498572561532117,
+      "nfxp_oracle_mape": 0.8641066926591932,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.4467969344074947,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 40,
+        "oracle_best_mape": 0.8498572561532118
+      },
+      "r_hat_maintain": [
+        -0.9989,
+        -1.9627,
+        -2.9266,
+        -3.8905,
+        -4.8543,
+        -5.8182,
+        -6.782,
+        -7.7459,
+        -8.5614,
+        -9.159
+      ],
+      "seconds": 141.6
+    },
+    {
+      "n_traj": 2500,
+      "seed": 3,
+      "anchor": "paper_minimax",
+      "mape": 1.7260955946571268,
+      "nfxp_oracle_mape": 0.6232070932846134,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.7951578845321935,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 16,
+        "oracle_best_mape": 1.726095594657127
+      },
+      "r_hat_maintain": [
+        -0.9756,
+        -1.942,
+        -2.9624,
+        -4.1686,
+        -5.3672,
+        -6.6286,
+        -7.9545,
+        -8.5416,
+        -8.9722,
+        -9.3982
+      ],
+      "seconds": 142.4
+    },
+    {
+      "n_traj": 2500,
+      "seed": 4,
+      "anchor": "paper_minimax",
+      "mape": 44.42039954134987,
+      "nfxp_oracle_mape": 0.09808454764061644,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.43626874125022513,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 34,
+        "oracle_best_mape": 44.42039954134988
+      },
+      "r_hat_maintain": [
+        -0.0134,
+        -1.2197,
+        -2.4511,
+        -3.4641,
+        -4.4596,
+        -5.341,
+        -6.2224,
+        -7.1039,
+        -7.9853,
+        -9.498
+      ],
+      "seconds": 141.3
+    },
+    {
+      "n_traj": 2500,
+      "seed": 5,
+      "anchor": "paper_minimax",
+      "mape": 3.853998293623879,
+      "nfxp_oracle_mape": 0.09778815960732928,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.46479073542567084,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 14,
+        "oracle_best_mape": 3.8539982936238797
+      },
+      "r_hat_maintain": [
+        -0.9389,
+        -1.9534,
+        -2.8598,
+        -3.8923,
+        -4.7976,
+        -6.7343,
+        -9.0637,
+        -10.5925,
+        -11.8776,
+        -13.1626
+      ],
+      "seconds": 140.4
+    },
+    {
+      "n_traj": 2500,
+      "seed": 6,
+      "anchor": "paper_minimax",
+      "mape": 1.9496859897590573,
+      "nfxp_oracle_mape": 0.08714097101126446,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.4168063933979713,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 25,
+        "oracle_best_mape": 1.9496859897590577
+      },
+      "r_hat_maintain": [
+        -1.0058,
+        -1.9252,
+        -2.806,
+        -3.7481,
+        -4.7706,
+        -5.7932,
+        -6.8157,
+        -7.8383,
+        -8.8608,
+        -9.3318
+      ],
+      "seconds": 140.6
+    },
+    {
+      "n_traj": 2500,
+      "seed": 7,
+      "anchor": "paper_minimax",
+      "mape": 9.766114927384034,
+      "nfxp_oracle_mape": 0.8223592526351116,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.422273984987724,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 31,
+        "oracle_best_mape": 9.766114927384036
+      },
+      "r_hat_maintain": [
+        -0.8666,
+        -1.6521,
+        -2.4375,
+        -3.2229,
+        -4.0084,
+        -4.7387,
+        -5.2187,
+        -5.6987,
+        -6.1787,
+        -6.6587
+      ],
+      "seconds": 140.3
+    },
+    {
+      "n_traj": 2500,
+      "seed": 8,
+      "anchor": "paper_minimax",
+      "mape": 3.0644601831598046,
+      "nfxp_oracle_mape": 0.31925188475536004,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.45951538979481094,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 38,
+        "oracle_best_mape": 3.064460183159805
+      },
+      "r_hat_maintain": [
+        -1.0463,
+        -2.0584,
+        -3.0705,
+        -4.0826,
+        -5.0947,
+        -6.1068,
+        -6.8257,
+        -6.7569,
+        -6.5915,
+        -6.426
+      ],
+      "seconds": 141.9
+    },
+    {
+      "n_traj": 2500,
+      "seed": 9,
+      "anchor": "paper_minimax",
+      "mape": 11.067141948233646,
+      "nfxp_oracle_mape": 0.0446976089684555,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 41,
+        "termination": "GLADIUS reached max_epochs=41 without convergence",
+        "final_loss": 0.41399228651427095,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 18,
+        "oracle_best_mape": 11.067141948233651
+      },
+      "r_hat_maintain": [
+        -0.7742,
+        -2.1602,
+        -3.2816,
+        -4.4029,
+        -5.2222,
+        -6.0369,
+        -7.0118,
+        -7.9867,
+        -8.9616,
+        -9.9365
+      ],
+      "seconds": 140.8
+    },
+    {
+      "n_traj": 5000,
+      "seed": 0,
+      "anchor": "paper_minimax",
+      "mape": 9.098245002850796,
+      "nfxp_oracle_mape": 0.053512942806013396,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.6393574631157288,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 20,
+        "oracle_best_mape": 9.098245002850794
+      },
+      "r_hat_maintain": [
+        -0.9247,
+        -1.4878,
+        -2.4824,
+        -4.6905,
+        -5.5723,
+        -5.7653,
+        -5.9583,
+        -6.1513,
+        -6.3443,
+        -6.5203
+      ],
+      "seconds": 147.3
+    },
+    {
+      "n_traj": 5000,
+      "seed": 1,
+      "anchor": "paper_minimax",
+      "mape": 14.88470822313473,
+      "nfxp_oracle_mape": 0.09662933570185582,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.4636892805664524,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 15,
+        "oracle_best_mape": 14.884708223134732
+      },
+      "r_hat_maintain": [
+        -1.3163,
+        -2.1185,
+        -3.0761,
+        -4.1777,
+        -5.3667,
+        -6.5556,
+        -7.5611,
+        -7.7975,
+        -8.034,
+        -8.2704
+      ],
+      "seconds": 144.6
+    },
+    {
+      "n_traj": 5000,
+      "seed": 2,
+      "anchor": "paper_minimax",
+      "mape": 5.923797867792095,
+      "nfxp_oracle_mape": 0.32570761607434173,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.42712031264702716,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 8,
+        "oracle_best_mape": 5.9237978677920955
+      },
+      "r_hat_maintain": [
+        -1.0619,
+        -2.1745,
+        -3.2872,
+        -4.3998,
+        -5.4338,
+        -5.3804,
+        -5.3269,
+        -5.2735,
+        -5.2201,
+        -5.1667
+      ],
+      "seconds": 145.9
+    },
+    {
+      "n_traj": 5000,
+      "seed": 3,
+      "anchor": "paper_minimax",
+      "mape": 16.086088425124327,
+      "nfxp_oracle_mape": 0.6916272408723417,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.4397161953243487,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 3,
+        "oracle_best_mape": 16.086088425124327
+      },
+      "r_hat_maintain": [
+        -0.6729,
+        -2.116,
+        -2.7671,
+        -3.2205,
+        -4.2974,
+        -5.3743,
+        -5.8287,
+        -5.9793,
+        -6.1298,
+        -6.2804
+      ],
+      "seconds": 144.1
+    },
+    {
+      "n_traj": 5000,
+      "seed": 4,
+      "anchor": "paper_minimax",
+      "mape": 28.302392388082463,
+      "nfxp_oracle_mape": 0.04358130582929762,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.4978624454889025,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 20,
+        "oracle_best_mape": 28.30239238808246
+      },
+      "r_hat_maintain": [
+        -0.4586,
+        -0.9217,
+        -2.0984,
+        -3.2751,
+        -4.4518,
+        -5.4988,
+        -6.4147,
+        -7.3306,
+        -8.2466,
+        -9.1625
+      ],
+      "seconds": 145.9
+    },
+    {
+      "n_traj": 5000,
+      "seed": 5,
+      "anchor": "paper_minimax",
+      "mape": 0.9868608490655847,
+      "nfxp_oracle_mape": 0.11051564611875274,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.4103415177126281,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 15,
+        "oracle_best_mape": 0.9868608490655848
+      },
+      "r_hat_maintain": [
+        -1.0032,
+        -2.0095,
+        -2.9971,
+        -3.7984,
+        -4.5997,
+        -5.401,
+        -6.2023,
+        -7.0036,
+        -7.8049,
+        -8.6004
+      ],
+      "seconds": 145.5
+    },
+    {
+      "n_traj": 5000,
+      "seed": 6,
+      "anchor": "paper_minimax",
+      "mape": 42.11215591088436,
+      "nfxp_oracle_mape": 0.05674776740190116,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.4476495111303619,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 4,
+        "oracle_best_mape": 42.11215591088436
+      },
+      "r_hat_maintain": [
+        -0.093,
+        -1.3122,
+        -2.2443,
+        -3.1787,
+        -4.5691,
+        -5.9583,
+        -7.4467,
+        -8.9552,
+        -10.2712,
+        -11.2986
+      ],
+      "seconds": 144.2
+    },
+    {
+      "n_traj": 5000,
+      "seed": 7,
+      "anchor": "paper_minimax",
+      "mape": 17.479601680647527,
+      "nfxp_oracle_mape": 0.5361769529241774,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.5071793613177601,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 10,
+        "oracle_best_mape": 17.479601680647523
+      },
+      "r_hat_maintain": [
+        -0.7326,
+        -1.7014,
+        -2.8081,
+        -3.5622,
+        -4.3162,
+        -5.4675,
+        -6.3757,
+        -6.878,
+        -7.3803,
+        -7.8826
+      ],
+      "seconds": 145.3
+    },
+    {
+      "n_traj": 5000,
+      "seed": 8,
+      "anchor": "paper_minimax",
+      "mape": 2.8866559805820535,
+      "nfxp_oracle_mape": 0.4106510722924338,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 0.4580005670623116,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 17,
+        "oracle_best_mape": 2.8866559805820544
+      },
+      "r_hat_maintain": [
+        -1.0146,
+        -1.7106,
+        -2.9315,
+        -4.1523,
+        -5.3731,
+        -6.594,
+        -7.0582,
+        -6.9746,
+        -6.891,
+        -6.8074
+      ],
+      "seconds": 143.7
+    },
+    {
+      "n_traj": 5000,
+      "seed": 9,
+      "anchor": "paper_minimax",
+      "mape": 4.147790634679663,
+      "nfxp_oracle_mape": 0.04360193689621308,
+      "optimization": {
+        "converged": false,
+        "num_epochs": 21,
+        "termination": "GLADIUS reached max_epochs=21 without convergence",
+        "final_loss": 1.0211872791168926,
+        "lr_decay_unit": "epoch",
+        "oracle_selected": true,
+        "oracle_best_epoch": 14,
+        "oracle_best_mape": 4.147790634679663
+      },
+      "r_hat_maintain": [
+        -1.0836,
+        -2.0716,
+        -3.1324,
+        -4.153,
+        -5.1734,
+        -6.1938,
+        -8.125,
+        -10.2775,
+        -11.8167,
+        -13.3558
+      ],
+      "seconds": 145.4
+    }
+  ]
+}

@@ -8,18 +8,12 @@ import json
 import math
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_archived_rust_benchmark_artifact_matches_source_csv() -> None:
     source = ROOT / "examples" / "rust-bus-engine" / "benchmark_results.csv"
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "rust_cross_estimator_benchmark_archived.json"
-    )
+    artifact = ROOT / "validation" / "results" / "rust_cross_estimator_benchmark_archived.json"
 
     payload = json.loads(artifact.read_text(encoding="utf-8"))
     rows = list(csv.DictReader(source.read_text(encoding="utf-8").splitlines()))
@@ -37,12 +31,7 @@ def test_mpec_high_beta_smoke_artifact_uses_current_sqp_path() -> None:
     def reject_constant(value: str) -> None:
         raise ValueError(value)
 
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "mpec_high_beta_smoke.json"
-    )
+    artifact = ROOT / "validation" / "results" / "mpec_high_beta_smoke.json"
     payload = json.loads(
         artifact.read_text(encoding="utf-8"),
         parse_constant=reject_constant,
@@ -61,15 +50,12 @@ def test_mpec_high_beta_smoke_artifact_uses_current_sqp_path() -> None:
     assert result["passed"] is True
     assert result["converged"] is True
     assert result["method"] == "slsqp"
-    assert result["final_constraint_violation"] < thresholds[
-        "final_constraint_violation_max"
-    ]
+    assert result["final_constraint_violation"] < thresholds["final_constraint_violation_max"]
     assert result["num_iterations"] <= thresholds["num_iterations_max"]
     assert 0 < result["estimation_time"] < thresholds["estimation_time_max_seconds"]
     assert 0 < result["wall_time_seconds"] < thresholds["wall_time_max_seconds"]
     assert result["num_observations"] == (
-        payload["simulation_config"]["n_individuals"]
-        * payload["simulation_config"]["n_periods"]
+        payload["simulation_config"]["n_individuals"] * payload["simulation_config"]["n_periods"]
     )
     assert result["num_observations"] > 0
     assert result["parameters"]
@@ -82,12 +68,7 @@ def test_tdccp_primer_json_artifact_has_release_gates() -> None:
     def reject_constant(value: str) -> None:
         raise ValueError(value)
 
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "tdccp.json"
-    )
+    artifact = ROOT / "validation" / "results" / "tdccp.json"
 
     assert artifact.exists()
 
@@ -135,8 +116,9 @@ def test_tdccp_primer_json_artifact_has_release_gates() -> None:
     assert math.isfinite(paper_inference["lambda_fixed_point_residual_rms_max"])
     assert math.isfinite(paper_inference["lambda_fixed_point_residual_max_abs"])
     assert math.isfinite(paper_inference["preliminary_projected_gradient_norm_max"])
-    assert paper_inference["preliminary_projected_gradient_norm_max"] <= (
-        paper_inference["preliminary_stationarity_tol"]
+    assert (
+        paper_inference["preliminary_projected_gradient_norm_max"]
+        <= (paper_inference["preliminary_stationarity_tol"])
     )
     assert len(paper_inference["preliminary_optimizer_success"]) == 2
     assert len(paper_inference["preliminary_optimizer_messages"]) == 2
@@ -198,15 +180,18 @@ def test_tdccp_primer_json_artifact_has_release_gates() -> None:
     assert monte_carlo["covariance_units"] == ["individual"]
     assert monte_carlo["robust_optimizer_all_success_count"] == monte_carlo["n_replications"]
     assert monte_carlo["robust_optimizer_all_stationary_count"] == monte_carlo["n_replications"]
-    assert monte_carlo["preliminary_optimizer_all_stationary_count"] == monte_carlo["n_replications"]
+    assert (
+        monte_carlo["preliminary_optimizer_all_stationary_count"] == monte_carlo["n_replications"]
+    )
     assert 0.0 <= monte_carlo["coverage_95_overall"] <= 1.0
     assert monte_carlo["zeta_moment_norm_max"] < 1e-4
     assert math.isfinite(monte_carlo["lambda_fixed_point_residual_norm_max"])
     assert math.isfinite(monte_carlo["lambda_fixed_point_residual_rms_max"])
     assert math.isfinite(monte_carlo["lambda_fixed_point_residual_max_abs"])
     assert math.isfinite(monte_carlo["preliminary_projected_gradient_norm_max"])
-    assert monte_carlo["preliminary_projected_gradient_norm_max"] <= (
-        paper_inference["preliminary_stationarity_tol"]
+    assert (
+        monte_carlo["preliminary_projected_gradient_norm_max"]
+        <= (paper_inference["preliminary_stationarity_tol"])
     )
     assert len(monte_carlo["bias"]) == len(summary["parameters"])
     assert len(monte_carlo["rmse"]) == len(summary["parameters"])
@@ -225,16 +210,9 @@ def test_sees_validation_artifact_matches_explicit_harness_penalties() -> None:
 
     from validation.known_truth import build_known_truth_dgp, get_cell, make_estimator
 
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "sees.json"
-    )
+    artifact = ROOT / "validation" / "results" / "sees.json"
     payload = json.loads(artifact.read_text(encoding="utf-8"))
-    metadata_by_cell = {
-        row["cell_id"]: row["summary"]["metadata"] for row in payload["results"]
-    }
+    metadata_by_cell = {row["cell_id"]: row["summary"]["metadata"] for row in payload["results"]}
     expected = {
         "canonical_low_action": {
             "basis_dim": 21,
@@ -264,12 +242,7 @@ def test_iq_learn_artifact_keeps_support_gates_visible() -> None:
     def reject_constant(value: str) -> None:
         raise ValueError(value)
 
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "iq_learn.json"
-    )
+    artifact = ROOT / "validation" / "results" / "iq_learn.json"
     payload = json.loads(
         artifact.read_text(encoding="utf-8"),
         parse_constant=reject_constant,
@@ -295,12 +268,11 @@ def test_iq_learn_artifact_keeps_support_gates_visible() -> None:
         assert gates["expert_state_coverage"]["threshold"] == 1.0
         assert gates["expert_state_action_coverage"]["operator"] == ">="
         assert gates["expert_state_action_coverage"]["threshold"] == 0.95
-        assert gates["expert_state_coverage"]["value"] == metadata[
-            "expert_state_coverage"
-        ]
-        assert gates["expert_state_action_coverage"]["value"] == metadata[
-            "expert_state_action_coverage"
-        ]
+        assert gates["expert_state_coverage"]["value"] == metadata["expert_state_coverage"]
+        assert (
+            gates["expert_state_action_coverage"]["value"]
+            == metadata["expert_state_action_coverage"]
+        )
         assert 0.0 <= metadata["expert_state_coverage"] <= 1.0
         assert 0.0 <= metadata["expert_state_action_coverage"] <= 1.0
 
@@ -317,12 +289,7 @@ def test_iq_learn_sparse_support_guard_records_support_failure() -> None:
     def reject_constant(value: str) -> None:
         raise ValueError(value)
 
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "iq_learn_sparse_support_guard.json"
-    )
+    artifact = ROOT / "validation" / "results" / "iq_learn_sparse_support_guard.json"
     payload = json.loads(
         artifact.read_text(encoding="utf-8"),
         parse_constant=reject_constant,
@@ -334,14 +301,8 @@ def test_iq_learn_sparse_support_guard_records_support_failure() -> None:
     assert payload["artifact_name"] == "iq_learn_sparse_support_guard"
     assert payload["artifact_type"] == "local_sparse_support_guard"
     assert payload["estimator"] == "IQ-Learn"
-    assert (
-        payload["generated_by"]
-        == "validation/estimators/iq_learn/sparse_support_guard.py"
-    )
-    assert (
-        payload["release_status"]
-        == "local_support_guard_not_counterfactual_release_evidence"
-    )
+    assert payload["generated_by"] == "validation/estimators/iq_learn/sparse_support_guard.py"
+    assert payload["release_status"] == "local_support_guard_not_counterfactual_release_evidence"
     assert payload["counterfactual_valid_certified"] is False
     assert result["counterfactual_valid_certified"] is False
     assert result["treated_as_counterfactual_valid"] is False
@@ -383,12 +344,7 @@ def test_iq_learn_sparse_support_guard_records_support_failure() -> None:
 def test_airl_artifact_keeps_action_dependent_cell_diagnostic() -> None:
     """Plain AIRL must not claim the action-dependent diagnostic as support."""
 
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "airl.json"
-    )
+    artifact = ROOT / "validation" / "results" / "airl.json"
     payload = json.loads(artifact.read_text(encoding="utf-8"))
 
     assert payload["estimator"] == "AIRL"
@@ -412,12 +368,7 @@ def test_airl_artifact_keeps_action_dependent_cell_diagnostic() -> None:
 def test_f_irl_artifact_keeps_action_dependent_row_diagnostic() -> None:
     """f-IRL's action-dependent DDC row is a negative-control diagnostic."""
 
-    artifact = (
-        ROOT
-        / "validation"
-        / "results"
-        / "f_irl.json"
-    )
+    artifact = ROOT / "validation" / "results" / "f_irl.json"
     payload = json.loads(artifact.read_text(encoding="utf-8"))
 
     assert payload["estimator"] == "f-IRL"
@@ -440,45 +391,38 @@ def test_f_irl_artifact_keeps_action_dependent_row_diagnostic() -> None:
         "occupancy_l1",
         "reward_range",
     }
-    assert "reward_normalized_rmse" not in {
-        gate["name"] for gate in diagnostic["gates"]
-    }
+    assert "reward_normalized_rmse" not in {gate["name"] for gate in diagnostic["gates"]}
     assert not all(gate["passed"] for gate in diagnostic["gates"])
 
 
-def test_gladius_artifacts_keep_failed_structural_gates_visible() -> None:
-    """GLADIUS projected diagnostics must not hide raw/value gate failures."""
+def test_gladius_artifacts_distinguish_primary_pass_from_scaled_failure() -> None:
+    """GLADIUS receipts must preserve both the qualified and failed cells."""
 
-    artifacts = [
-        ROOT
-        / "validation"
-        / "results"
-        / "gladius.json",
-        ROOT
-        / "validation"
-        / "results"
-        / "gladius_scaled.json",
-    ]
+    primary = json.loads(
+        (ROOT / "validation" / "results" / "gladius.json").read_text(encoding="utf-8")
+    )
+    scaled = json.loads(
+        (ROOT / "validation" / "results" / "gladius_scaled.json").read_text(encoding="utf-8")
+    )
 
-    for artifact in artifacts:
-        payload = json.loads(artifact.read_text(encoding="utf-8"))
-        failed_gates = set(payload["failed_gates"])
-        gates = {gate["name"]: gate for gate in payload["gates"]}
+    assert primary["estimator"] == scaled["estimator"] == "GLADIUS"
+    assert primary["status"] == "strict_structural_counterfactual_pass"
+    assert primary["counterfactual_valid_certified"] is True
+    assert primary["failed_gates"] == []
+    assert all(gate["passed"] for gate in primary["gates"])
 
-        assert payload["estimator"] == "GLADIUS"
-        assert payload["status"] == "strict_structural_counterfactual_fail"
-        assert payload["counterfactual_valid_certified"] is False
-        assert {
-            "raw_bellman_reward_normalized_rmse",
-            "value_normalized_rmse",
-        } <= failed_gates
-        assert gates["projected_reward_normalized_rmse"]["passed"] is True
-        assert gates["raw_bellman_reward_normalized_rmse"]["passed"] is False
-        assert gates["value_normalized_rmse"]["passed"] is False
-        assert all(
-            gates[f"{kind}_regret"]["passed"]
-            for kind in ["type_a", "type_b", "type_c"]
-        )
+    failed_gates = set(scaled["failed_gates"])
+    gates = {gate["name"]: gate for gate in scaled["gates"]}
+    assert scaled["status"] == "strict_structural_counterfactual_fail"
+    assert scaled["counterfactual_valid_certified"] is False
+    assert {
+        "raw_bellman_reward_normalized_rmse",
+        "value_normalized_rmse",
+    } <= failed_gates
+    assert gates["projected_reward_normalized_rmse"]["passed"] is True
+    assert gates["raw_bellman_reward_normalized_rmse"]["passed"] is False
+    assert gates["value_normalized_rmse"]["passed"] is False
+    assert all(gates[f"{kind}_regret"]["passed"] for kind in ["type_a", "type_b", "type_c"])
 
 
 def test_structural_estimator_docs_topology_matches_nfxp_ccp() -> None:
@@ -506,9 +450,7 @@ def test_structural_estimator_docs_topology_matches_nfxp_ccp() -> None:
         missing = sorted(set(expected) - set(actual_files))
         assert not missing, (slug, missing)
 
-        parent = (ROOT / "docs" / "estimators" / f"{slug}.md").read_text(
-            encoding="utf-8"
-        )
+        parent = (ROOT / "docs" / "estimators" / f"{slug}.md").read_text(encoding="utf-8")
         toctree_start = parent.find("{toctree}")
         assert toctree_start != -1, (slug, "no toctree")
         toctree = parent[toctree_start:]

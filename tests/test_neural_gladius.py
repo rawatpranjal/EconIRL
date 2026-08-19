@@ -13,16 +13,15 @@ Tests cover:
 - Projection R-squared range
 """
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import pytest
-import jax
-import jax.numpy as jnp
 
 from econirl.core.reward_spec import RewardSpec
 from econirl.estimators.neural_gladius import NeuralGLADIUS
 from econirl.estimators.protocol import EstimatorProtocol
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -298,13 +297,13 @@ class TestPredictReward:
         states = jnp.array([0, 5])
         actions = jnp.array([1, 0])
         rewards = fitted_model.predict_reward(states, actions)
-        assert hasattr(rewards, 'shape')
+        assert hasattr(rewards, "shape")
 
     def test_with_context(self, fitted_model):
-        """predict_reward should accept context argument."""
+        """The paper path accepts the baseline context only."""
         states = jnp.array([0, 5])
         actions = jnp.array([1, 0])
-        contexts = jnp.array([0, 3])
+        contexts = jnp.array([0, 0])
         rewards = fitted_model.predict_reward(states, actions, contexts)
         assert rewards.shape == (2,)
 
@@ -316,23 +315,16 @@ class TestPredictReward:
 
 
 class TestConfInt:
-    """Test confidence intervals."""
+    """Sampling intervals are gated on a completed trajectory bootstrap."""
 
-    def test_returns_dict_with_intervals(self, fitted_model_with_features):
-        """conf_int should return dict of (lower, upper) tuples."""
-        ci = fitted_model_with_features.conf_int(alpha=0.05)
-        assert isinstance(ci, dict)
-        assert set(ci.keys()) == {"state_cost", "action_cost"}
-        for name, (lo, hi) in ci.items():
-            assert isinstance(lo, float)
-            assert isinstance(hi, float)
-            # Lower should be less than upper (for finite SEs)
-            if np.isfinite(lo) and np.isfinite(hi):
-                assert lo <= hi
+    def test_rejects_descriptive_projection_intervals(self, fitted_model_with_features):
+        """Projection SEs must not be presented as sampling uncertainty."""
+        with pytest.raises(NotImplementedError, match="compute_se=True"):
+            fitted_model_with_features.conf_int(alpha=0.05)
 
     def test_raises_without_features(self, fitted_model):
-        """conf_int should raise if no features were provided."""
-        with pytest.raises(RuntimeError, match="No projected parameters"):
+        """A fit without a bootstrap has no sampling intervals."""
+        with pytest.raises(NotImplementedError, match="compute_se=True"):
             fitted_model.conf_int()
 
 
@@ -373,11 +365,11 @@ class TestSummary:
         assert "No feature projection" in s or "None" in s
 
 
-class TestNoTransitionMatrix:
-    """Test that transitions= is accepted but ignored."""
+class TestTransitionMatrix:
+    """Transitions are excluded from fitting but retained for planning."""
 
-    def test_transitions_ignored(self, small_data):
-        """Passing transitions= should not raise."""
+    def test_valid_transitions_are_stored(self, small_data):
+        """Passing a valid transition tensor should retain it."""
         model = NeuralGLADIUS(
             n_actions=3,
             discount=0.95,
@@ -388,15 +380,16 @@ class TestNoTransitionMatrix:
             ev_hidden_dim=16,
             ev_num_layers=1,
         )
-        # Pass a dummy transitions argument
+        transitions = np.repeat(np.eye(10)[None, :, :], 3, axis=0)
         model.fit(
             data=small_data,
             state="state",
             action="action",
             id="id",
-            transitions=np.eye(10),
+            transitions=transitions,
         )
         assert model.policy_ is not None
+        np.testing.assert_array_equal(model.transitions_, transitions)
 
 
 class TestCustomEncoders:
@@ -404,6 +397,7 @@ class TestCustomEncoders:
 
     def test_custom_context_encoder(self, small_data):
         """Custom context encoder should be used."""
+
         # One-hot context encoder for 10 possible contexts
         def ctx_encoder(c):
             return jax.nn.one_hot(c, 10).astype(jnp.float32)
@@ -431,6 +425,7 @@ class TestCustomEncoders:
 
     def test_custom_state_encoder(self, small_data):
         """Custom state encoder should be used."""
+
         # One-hot state encoder
         def state_encoder(s):
             return jax.nn.one_hot(s, 10).astype(jnp.float32)
@@ -538,18 +533,17 @@ class TestPredictFromFeaturesGuard:
 
 
 class TestPredictProbaContext:
-    """predict_proba honors a context argument (#12)."""
+    """The paper path exposes its non-contextual boundary explicitly."""
 
     def test_context_zero_matches_stored_policy(self, fitted_model):
         states = np.array([0, 3, 7])
         recomputed = fitted_model.predict_proba(states, context=0)
         np.testing.assert_allclose(recomputed, fitted_model.policy_[states], atol=1e-5)
 
-    def test_context_path_returns_valid_distribution(self, fitted_model):
+    def test_nonzero_context_requires_context_aware_fit(self, fitted_model):
         states = np.array([0, 5, 9])
-        proba = fitted_model.predict_proba(states, context=1)
-        assert proba.shape == (3, 3)
-        np.testing.assert_allclose(proba.sum(axis=1), 1.0, atol=1e-5)
+        with pytest.raises(NotImplementedError, match="not context-conditioned"):
+            fitted_model.predict_proba(states, context=1)
 
 
 class TestAnchorValidation:
@@ -557,8 +551,14 @@ class TestAnchorValidation:
 
     def test_anchor_action_without_rewards_warns(self, small_data):
         model = NeuralGLADIUS(
-            n_actions=3, discount=0.95, max_epochs=4, patience=2,
-            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
+            n_actions=3,
+            discount=0.95,
+            max_epochs=4,
+            patience=2,
+            q_hidden_dim=8,
+            q_num_layers=1,
+            ev_hidden_dim=8,
+            ev_num_layers=1,
             anchor_action=0,
         )
         with pytest.warns(UserWarning, match="anchor has no effect"):
@@ -566,8 +566,14 @@ class TestAnchorValidation:
 
     def test_rewards_without_action_raises(self, small_data):
         model = NeuralGLADIUS(
-            n_actions=3, discount=0.95, max_epochs=4, patience=2,
-            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
+            n_actions=3,
+            discount=0.95,
+            max_epochs=4,
+            patience=2,
+            q_hidden_dim=8,
+            q_num_layers=1,
+            ev_hidden_dim=8,
+            ev_num_layers=1,
             anchor_rewards=tuple([0.0] * 10),
         )
         with pytest.raises(ValueError, match="anchor_action is None"):
@@ -575,26 +581,42 @@ class TestAnchorValidation:
 
     def test_wrong_length_rewards_raises(self, small_data):
         model = NeuralGLADIUS(
-            n_actions=3, discount=0.95, max_epochs=4, patience=2,
-            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
-            anchor_action=0, anchor_rewards=(0.0, 0.0, 0.0),
+            n_actions=3,
+            discount=0.95,
+            max_epochs=4,
+            patience=2,
+            q_hidden_dim=8,
+            q_num_layers=1,
+            ev_hidden_dim=8,
+            ev_num_layers=1,
+            anchor_action=0,
+            anchor_rewards=(0.0, 0.0, 0.0),
         )
         with pytest.raises(ValueError, match="one known reward per state"):
             model.fit(data=small_data, state="state", action="action", id="id")
 
 
 class TestTransitionsWarning:
-    """transitions= is a no-op and warns (#11)."""
+    """transitions= is retained for planning and excluded from fitting."""
 
     def test_transitions_warns(self, small_data):
         model = NeuralGLADIUS(
-            n_actions=3, discount=0.95, max_epochs=4, patience=2,
-            q_hidden_dim=8, q_num_layers=1, ev_hidden_dim=8, ev_num_layers=1,
+            n_actions=3,
+            discount=0.95,
+            max_epochs=4,
+            patience=2,
+            q_hidden_dim=8,
+            q_num_layers=1,
+            ev_hidden_dim=8,
+            ev_num_layers=1,
         )
         with pytest.warns(UserWarning, match="does not use a transition matrix"):
             model.fit(
-                data=small_data, state="state", action="action", id="id",
-                transitions=np.eye(10),
+                data=small_data,
+                state="state",
+                action="action",
+                id="id",
+                transitions=np.repeat(np.eye(10)[None, :, :], 3, axis=0),
             )
 
 
@@ -624,21 +646,25 @@ class TestAnchorScaleRecovery:
         model = NeuralGLADIUS(
             n_actions=env.num_actions,
             discount=0.95,
+            objective="anchor_moment",
+            network_mode="separate",
+            output_bias_init=None,
+            gradient_clip_mode="global_norm",
             state_encoder=lambda s: phi_state[np.asarray(s)],
             state_dim=K,
             anchor_action=0,
-            anchor_rewards=tuple(
-                float(x) for x in np.asarray(env.true_reward_matrix)[:, 0]
-            ),
-            q_hidden_dim=128, q_num_layers=3,
-            ev_hidden_dim=128, ev_num_layers=3,
-            max_epochs=400, batch_size=512,
+            anchor_rewards=tuple(float(x) for x in np.asarray(env.true_reward_matrix)[:, 0]),
+            q_hidden_dim=128,
+            q_num_layers=3,
+            ev_hidden_dim=128,
+            ev_num_layers=3,
+            max_epochs=400,
+            batch_size=512,
         )
         model.fit(panel, features=jnp.asarray(phi))
         theta_hat = np.asarray(model.coef_)
         cos = float(
-            theta_hat @ true_theta
-            / (np.linalg.norm(theta_hat) * np.linalg.norm(true_theta))
+            theta_hat @ true_theta / (np.linalg.norm(theta_hat) * np.linalg.norm(true_theta))
         )
         scale = float(np.linalg.norm(theta_hat) / np.linalg.norm(true_theta))
         assert cos >= 0.93, f"direction not recovered: cosine={cos:.3f}"

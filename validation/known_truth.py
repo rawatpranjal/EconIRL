@@ -2884,6 +2884,7 @@ def make_estimator(
                 v_num_layers=1 if smoke else 3,
                 max_epochs=10 if smoke else 500,
                 batch_size=128 if smoke else 512,
+                patience=11 if smoke else 501,
                 anchor_action=anchor_action,
                 anchor_rewards=anchor_rewards,
                 anchor_bellman_mode="anchor_moment",
