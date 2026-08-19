@@ -14,7 +14,7 @@ structural and inverse-reinforcement-learning identification lines.
 
 | Estimator | Family | Best for |
 | --- | --- | --- |
-| [NFXP](nfxp.md) | Structural | Exact tabular DDC, replicated to Rust (1987) Table IX. |
+| [NFXP](nfxp.md) | Structural | Exact tabular DDC, the maximum-likelihood reference. |
 | [CCP](ccp.md) | Structural | Hotz-Miller and NPL tabular DDC without a nested solve. |
 | [MCE-IRL](mce_irl.md) | IRL | Maximum causal entropy reward-feature matching. |
 | [Neural MCE-IRL](deep_mce_irl.md) | IRL | Unrestricted neural reward map under the MCE objective. |

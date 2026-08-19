@@ -46,7 +46,7 @@ studies.
 Example
 -------
 
-This example estimates Rust (1987).
+This example fits a bus engine replacement model to the bundled synthetic panel.
 
 .. code-block:: python
 

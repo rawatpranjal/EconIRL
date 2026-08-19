@@ -13,7 +13,7 @@ successor choices. Its parameter stage learns recursive continuation terms
 without fitting a transition density. A transition environment is still needed
 to compute fitted policies, values, simulations, and counterfactuals.
 
-The implementation follows Adusumilli and Eckardt (2025). The default is the
+The default is the
 paper's linear semigradient method with two-fold cross-fitting and locally
 robust inference. Neural and gradient-boosting approximate value iteration are
 also available.

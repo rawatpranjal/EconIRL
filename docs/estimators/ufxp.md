@@ -232,7 +232,7 @@ $$
 
 At optimal weights, the efficient-GMM sandwich $V = J^{-1}\Omega J^{-\top}$
 collapses to $D^{-1}/N$ because the moment variance $\Omega = D/N$ at the
-optimum (Theorem 2 of Oguz and Bray 2026).
+optimum.
 
 Thin states are downweighted by $\eta(s)$; unvisited states drop out of the moment
 system entirely.

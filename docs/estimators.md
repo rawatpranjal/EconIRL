@@ -11,7 +11,7 @@ Choose a section. Each estimator page contains its assumptions, identification
 argument, examples, and validation results.
 
 - [Core Estimators](estimators/core.md) - the curated main-method roster,
-  anchored by NFXP and its exact Rust (1987) Table IX replication.
+  anchored by NFXP.
 - [Other Estimators](estimators/other.md) - every implemented estimator outside
   the Core roster.
 

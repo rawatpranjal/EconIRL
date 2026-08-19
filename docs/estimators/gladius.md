@@ -148,7 +148,7 @@ gradient-based optimisation converges to the global minimiser. The empirical
 objective gap decreases at $O(T^{-1})$ in the number of gradient iterations
 $T$ (Kang et al. 2025, Thm. 12), and the $L^2(d^*)$ estimation error in $Q^*$
 decreases at $O(T^{-1/4})$ at $\alpha = 1/2$ (Thm. 13). No proof is reproduced
-here; see Kang et al. (2025) for the full argument.
+here.
 
 ## Estimator
 

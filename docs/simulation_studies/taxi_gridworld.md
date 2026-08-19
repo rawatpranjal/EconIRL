@@ -6,6 +6,10 @@ sparse or absent.
 
 Gridworld navigation is the home turf of the maximum-entropy IRL tradition of Ziebart's MaxEnt and its descendants, so this page weights the roster toward IRL methods. NFXP, CCP, MPEC, and UFXP run as the structural contrast. The environment also supplies a stress the bus engine does not. Every trajectory starts at the same corner and walks toward the goal, so states off that path are visited rarely or never. Methods that invert state-by-state choice frequencies feel that thinness. Methods that share strength through features or networks do not.
 
+![An aerial photograph of lower Manhattan in about 1931, its street grid and riverside piers seen from above.](../_static/simulation_studies/taxi_gridworld_photo.jpg)
+
+*The tip of Manhattan from the air, about 1931. Public domain, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Manhattan_1931.jpg). A city laid out on a grid is the setting this study abstracts.*
+
 ## The data-generating process
 
 States are cells of an $N \times N$ grid indexed $s = \mathrm{row} \cdot N + \mathrm{col}$, with five actions (left, right, up, down, stay), deterministic moves, and an absorbing goal at the bottom-right corner. The reward has three parts: a per-step penalty, a terminal bonus when the chosen move reaches the goal, and a shaping term in the Manhattan distance $d(s)$ to the goal:

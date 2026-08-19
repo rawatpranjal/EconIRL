@@ -348,6 +348,10 @@ CELLS = (
 NARRATIVE = {
     "title": "Gridworld navigation",
     "intro": (
+        '![An aerial photograph of lower Manhattan in about 1931, its street grid and riverside piers seen from above.](../_static/simulation_studies/taxi_gridworld_photo.jpg)\n'
+        '\n'
+        '*The tip of Manhattan from the air, about 1931. Public domain, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Manhattan_1931.jpg). A city laid out on a grid is the setting this study abstracts.*\n'
+        '\n'
         "Gridworld navigation is the home turf of the maximum-entropy IRL "
         "tradition of Ziebart's MaxEnt and its descendants, so this page "
         "weights the roster toward IRL methods. NFXP, CCP, MPEC, and UFXP run "

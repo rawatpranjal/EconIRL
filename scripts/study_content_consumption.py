@@ -449,6 +449,10 @@ def render_page(data: dict) -> str:
         "reward and a policy for each type, and sort each viewer into the right type."
     )
     lines.append("")
+    lines.append('![A mother, father and child sitting around a wooden radio cabinet in a farmhouse parlour.](../_static/simulation_studies/content_consumption_photo.jpg)')
+    lines.append("")
+    lines.append('*A farm family listening to their radio, 1926. National Archives 5729282, public domain, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:A_Farm_Family_Listening_to_Their_Radio_-_NARA_-_5729282_(page_1).jpg). One household, several tastes.*')
+    lines.append("")
     lines.append("## The data-generating process")
     lines.append("")
     lines.append(
