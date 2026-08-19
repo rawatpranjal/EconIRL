@@ -48,7 +48,7 @@ Legacy API (deprecated, for backward compatibility):
     >>> print(result.summary())
 """
 
-__version__ = "0.0.10"
+__version__ = "0.1.0"
 
 # Core types
 # Datasets
