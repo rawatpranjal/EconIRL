@@ -9,8 +9,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # Absolute paths from a maintainer machine. Validation runners write the paths
-# they actually used, so a re-run can reintroduce these into the receipts.
-LOCAL_PATH = re.compile(r"/(?:Users|home)/[^/\s\"']+/")
+# they actually used, so a re-run can reintroduce these into the receipts. The
+# wheel and notebook checks build under a private temporary directory, so those
+# roots leak the same way and belong in the same guard.
+LOCAL_PATH = re.compile(
+    r"(?:/(?:Users|home)/[^/\s\"']+/|/(?:private/)?(?:tmp|var/folders)/[^\s\"']+/)"
+)
 
 TEXT_SUFFIXES = {".py", ".json", ".md", ".rst", ".txt", ".toml", ".yaml", ".yml", ".ipynb", ".cff"}
 

@@ -19,7 +19,7 @@
     "simulated_states": 0.0
   },
   "module_outside_checkout": true,
-  "python_executable": "/tmp/econirl-gladius-wheel-check.4naEsI/venv/bin/python",
+  "python_executable": ".../venv/bin/python",
   "python_version": "3.13.12",
   "status": "ready",
   "summary_equal": true,

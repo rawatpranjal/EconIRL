@@ -14,7 +14,7 @@
     "reward": 0.0
   },
   "module_outside_checkout": true,
-  "python_executable": "/tmp/econirl-neural-final-wheel.wKPF62/venv/bin/python",
+  "python_executable": ".../venv/bin/python",
   "python_version": "3.13.12",
   "status": "passed",
   "summary_equal": true,
