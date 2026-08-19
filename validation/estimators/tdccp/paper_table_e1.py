@@ -2,7 +2,7 @@
 """Fit EconIRL TD-CCP to one exported official Table E.1 panel.
 
 The panel must be produced by the authors' DGP with
-``docs/research/papers/tdccp/zenodo_16184777/export_table_e1_panel.R``.
+the authors' Zenodo replication package (record 16184777).
 This script is an exact-panel bridge, not a replacement Monte Carlo.
 """
 

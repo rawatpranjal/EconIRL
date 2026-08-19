@@ -181,7 +181,7 @@
         "value_normalized_rmse": 0.0992017549243758,
         "value_rmse": 0.693267765148512
       },
-      "run_dir": "/tmp/econirl_deep_mce_irl_primer_known_truth/canonical_low_state_only_deep_mce_irl_primer_3d73fd10e4f8",
+      "run_dir": ".../canonical_low_state_only_deep_mce_irl_primer_3d73fd10e4f8",
       "simulation": {
         "n_individuals": 1000,
         "n_periods": 80,
@@ -787,7 +787,7 @@
         "value_normalized_rmse": 0.07783727981238392,
         "value_rmse": 0.013290521586106805
       },
-      "run_dir": "/tmp/econirl_deep_mce_irl_primer_known_truth/deep_mce_neural_reward_deep_mce_irl_primer_464d98a6afcf",
+      "run_dir": ".../deep_mce_neural_reward_deep_mce_irl_primer_464d98a6afcf",
       "simulation": {
         "n_individuals": 2000,
         "n_periods": 80,
@@ -1554,7 +1554,7 @@
         "value_normalized_rmse": 0.0054086423976295655,
         "value_rmse": 0.13152573309805562
       },
-      "run_dir": "/tmp/econirl_deep_mce_irl_primer_known_truth/deep_mce_neural_features_deep_mce_irl_primer_330f5fd27391",
+      "run_dir": ".../deep_mce_neural_features_deep_mce_irl_primer_330f5fd27391",
       "simulation": {
         "n_individuals": 2000,
         "n_periods": 80,
@@ -2341,7 +2341,7 @@
         "value_normalized_rmse": 0.014083220921839477,
         "value_rmse": 0.16994298593364937
       },
-      "run_dir": "/tmp/econirl_deep_mce_irl_primer_known_truth/deep_mce_neural_reward_features_deep_mce_irl_primer_d510f163e972",
+      "run_dir": ".../deep_mce_neural_reward_features_deep_mce_irl_primer_d510f163e972",
       "simulation": {
         "n_individuals": 2000,
         "n_periods": 80,

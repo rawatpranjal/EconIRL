@@ -1,5 +1,5 @@
 {
-  "checkpoint": "/private/tmp/econirl-neural-mce.fTjpdo/validation/results/deep_mce_irl_wulfmeier.jsonl",
+  "checkpoint": ".../validation/results/deep_mce_irl_wulfmeier.jsonl",
   "checks": [
     {
       "name": "all_cells_finite",

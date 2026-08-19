@@ -78,9 +78,6 @@ observed choices carry information about the structural costs.
 
 ## Identification
 
-This is the section that says when the constrained program has the same
-structural interpretation as NFXP rather than just a feasible optimizer output.
-
 MPEC point-identifies the reward parameters $\theta$ under the following
 assumptions, which are the same structural requirements as NFXP plus one
 additional condition arising from the constrained formulation.
@@ -318,8 +315,6 @@ value.
 
 ![MPEC parameter recovery, Monte Carlo](../_static/estimators/mpec_recovery.png)
 
-Recovery is measured over a Monte-Carlo run of 80 replications.
-
 | Parameter | True | Recovered (mean) | 95% interval |
 | --- | ---: | ---: | --- |
 | `action_0_intercept` | 0.10 | 0.103 | [0.053, 0.148] |
@@ -327,7 +322,8 @@ Recovery is measured over a Monte-Carlo run of 80 replications.
 | `action_1_intercept` | 0.00 | -0.005 | [-0.083, 0.064] |
 | `action_1_progress` | -0.20 | -0.190 | [-0.307, -0.089] |
 
-Across the 80 replications the true value sits inside the 95% interval for every parameter, and the mean estimate is close to the truth.
+Across the 80 replications the true value sits inside the 95% interval for
+every parameter.
 
 The behavioral and regret numbers below were produced with `solver="slsqp"` (the
 legacy augmented-Lagrangian solver); the Algorithm section's default and

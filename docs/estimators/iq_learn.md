@@ -61,9 +61,6 @@ $r_{\mathrm{IB}}$ is a diagnostic object rather than a structural estimate.
 
 ## Identification
 
-This is the section that says what IQ-Learn can support before any structural
-counterfactual interpretation is attempted.
-
 IQ-Learn yields an imitation policy and a Bellman-implied reward under the following
 conditions.
 
@@ -89,7 +86,7 @@ conditions.
 
 These hold inside a finite discrete state space with stationary dynamics. The estimator
 recovers the imitation policy on expert support. Structural counterfactual
-interpretation requires all coverage and Bellman-object gates to pass.
+interpretation requires every coverage and Bellman-object check to pass.
 
 ## Derivation
 
@@ -337,8 +334,8 @@ Behavioral recovery and counterfactual regret on the primary synthetic benchmark
 | Type C regret (action removal) | 0.0099 |
 
 These checks pass their thresholds on the primary cell (policy TV threshold 0.05,
-regret threshold 0.05). Reward, value, and Q recovery fail on all tested cells; the
-structural gates are not satisfied. Low counterfactual regret on the primary cell
+regret threshold 0.05). Reward, value, and Q recovery fail on all tested cells. The structural checks
+are not satisfied. Low counterfactual regret on the primary cell
 reflects that the Q-induced policy produces near-oracle welfare under the applied
 interventions, not that the reward or value objects are structurally accurate.
 

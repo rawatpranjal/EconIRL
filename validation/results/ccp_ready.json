@@ -40,7 +40,7 @@
       ]
     }
   },
-  "checkpoint": "/Users/pranjal/Code/econirl-release-0.1.0-wt/validation/results/ccp_ready.jsonl",
+  "checkpoint": "validation/results/ccp_ready.jsonl",
   "configs": {
     "hard_problem": {
       "base_seed": 51000,

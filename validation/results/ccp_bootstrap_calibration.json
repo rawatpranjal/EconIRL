@@ -1,5 +1,5 @@
 {
-  "checkpoint": "/Users/pranjal/Code/econirl-release-0.1.0-wt/validation/results/ccp_bootstrap_calibration.jsonl",
+  "checkpoint": "validation/results/ccp_bootstrap_calibration.jsonl",
   "design": {
     "bootstrap_base_seed": 81000,
     "failure_policy": "record failure and do not retry",

@@ -11,7 +11,7 @@ questions and should not be collapsed into one result.
    coverage, tail balance, draw success, width stability, and exact seeded
    reproducibility.
 
-The complete gate also requires installed-wheel notebook execution and exact
+The complete report also requires installed-wheel notebook execution and exact
 fresh-process serialization parity.
 
 ## Oracle-Simulation Structural Cell
@@ -98,7 +98,7 @@ The prespecified design uses 20 independently simulated panels and 19 whole-
 trajectory bootstrap draws per panel. It checks three reward and three policy
 functionals per panel using point-centered bootstrap-standard-error intervals.
 The controlled nominal states use a categorical encoder and the estimator seed
-is held fixed while panel and trajectory-resampling seeds vary. Required gates
+is held fixed while panel and trajectory-resampling seeds vary. The requirements
 are at least 85% empirical coverage, no more than 10% misses in either tail, at
 least 95% usable panels and successful draws, positive interval widths,
 p95-to-median width no larger than 4, and exact seeded reproducibility. The
@@ -113,8 +113,6 @@ PYTHONPATH=src:. uv run python validation/estimators/gladius/qualification_repor
 ```
 
 The report fails closed when a receipt is missing, a prespecified design changes, a
-scientific gate fails, serialization did not import the installed wheel, or a
+scientific check fails, serialization did not import the installed wheel, or a
 notebook code cell was not executed cleanly.
 
-The exact commands and clean-HEAD rule are in the
-[qualification runbook](qualification_runbook.md).

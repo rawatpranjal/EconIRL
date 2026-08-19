@@ -1,12 +1,9 @@
 # Simulation Studies
 
-Read these pages as controlled simulation experiments. They are designed to show what
-each estimator recovers or fails to recover when the data-generating process is
-fully controlled.
-
-Every page below is one experiment. We simulate data from a known model, run
-the estimators on it, and report what they recover. Because the truth is
-known, both recovery and failure are measurable.
+Every page below is one controlled experiment. We simulate data from a known
+model, run the estimators on it, and report what they recover. Because the
+model that generated the data is known, both recovery and failure are
+measurable.
 
 | Page | Environment | Size | Estimators | What it shows |
 | --- | --- | --- | --- | --- |
@@ -14,14 +11,13 @@ known, both recovery and failure are measurable.
 | [Gridworld navigation](taxi_gridworld.md) | Walk to a goal on a grid. | 64 states x 5 actions | MCE-IRL, Neural MCE-IRL, AIRL, GLADIUS, NFXP, CCP. | What happens where the data rarely goes. |
 | [Route choice](route_choice.md) | Synthetic road network (25 nodes, random geometric graph). | 25 states x 4 actions | NFXP, CCP, MCE-IRL, GLADIUS. | Structural parameter recovery and behavioral fidelity on a graph topology. |
 | [Stockpiling](stockpiling.md) | Consumer stockpiling of a storable good (Hendel-Nevo). | 20 states x 2 actions | NFXP, CCP, MCE-IRL, GLADIUS. | Structural recovery on a price-driven inventory model where the optimal policy stockpiles on sale. |
-| [Fleet maintenance](fleet_maintenance.md) | Multi-component bus engine replacement (Rust 1987, K=3 components). | 216 states x 2 actions | NFXP, CCP, MCE-IRL, GLADIUS. | High-dimensional factored environment. Structural recovery at scale; GLADIUS scalability on a factored state space. |
+| [Fleet maintenance](fleet_maintenance.md) | Multi-component bus engine replacement (Rust 1987, K=3 components). | 216 states x 2 actions | NFXP, CCP, MCE-IRL, GLADIUS. | High-dimensional factored environment. Structural recovery and GLADIUS scalability as the state space grows. |
 | [Content consumption](content_consumption.md) | Latent viewer types choosing what to watch (heterogeneous-agent model). | 65 states x 4 actions | AIRL2 vs homogeneous AIRL and MCE-IRL. | Heterogeneity recovery. AIRL2 sorts viewers into types and serves both, where a homogeneous fit settles on one and abandons the other. |
 | [RHIP lookahead](rhip_lookahead.md) | Route choice with finite-lookahead demonstrators. | 25 nodes x local actions | RHIP horizon sweep. | The best-fitting planning horizon recovers the demonstrator's true lookahead. |
 
-The findings in one line. On easy problems most estimators match the choice
-probabilities. On harder problems many do not, and the gap in behavior is the
-point. The differences also show up in parameter recovery, in counterfactuals,
-and in compute cost.
+Most estimators match the choice probabilities on the easy problems. Many do
+not on the harder ones, and that separation carries through to parameter
+recovery, counterfactuals, and compute cost.
 
 ## Reading the tables
 

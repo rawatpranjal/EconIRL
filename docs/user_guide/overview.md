@@ -11,7 +11,7 @@ policy calculations where the estimator supports them.
 Read this overview first if the menu names are unfamiliar. It gives the basic
 problem shape before the estimator pages start using method-specific notation.
 
-## What are DDC/IRL models even about?
+## Dynamic Discrete Choice and Inverse Reinforcement Learning
 
 Dynamic discrete choice models study repeated decisions. A user, firm, driver,
 or operator chooses an action today while anticipating how that choice changes
@@ -66,11 +66,3 @@ Output
 | I need to compare methods. | Use [Choosing and Comparing Estimators](../comparing_estimators.md). |
 | I need the signature of a class. | Read the [API reference](../api/index.rst). |
 | I need to understand simulation-study evidence. | Read [simulation studies](../simulation_studies/index.md). |
-
-## Latest Updates
-
-The documentation separates available methods from simulation-study evidence.
-Each estimator page states the target, the reported evidence, and the
-conditions under which the method should be used.
-
-NFXP is the reference structural estimator for tabular dynamic discrete choice.

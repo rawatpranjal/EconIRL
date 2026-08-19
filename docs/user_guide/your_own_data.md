@@ -41,15 +41,15 @@ means what you want it to mean.
   it as given.
 - **A reward anchor.** A reward is only recovered relative to a baseline. Fix one
   action to zero payoff, usually an exit or absorbing action, and hold the logit
-  scale fixed. This pins the level and the scale so the rest of the reward is
-  pinned down too.
+  scale fixed. That fixes the level and the scale, which is what makes the rest
+  of the reward identified.
 
 The estimator pages spell these out per method. The [NFXP identification
 section](../estimators/nfxp.md) is the worked example.
 
 ### Four questions that point to an estimator
 
-The assumptions above let any of these estimators run. Four further questions narrow the
+The assumptions above let any of these estimators run. These questions narrow the
 field to the one that fits your problem.
 
 - **Is the reward state-only or action-dependent?** A state-only reward depends on where
@@ -177,8 +177,6 @@ are moderate.
 The four questions above point to a family. Two families fit the same kind of panel but
 recover different objects. Pick by what you need from the answer.
 
-The key decisions, in short:
-
 - **Need parameters with units and counterfactuals?** Use a structural estimator.
 - **Reward state-only and dynamics deterministic?** AIRL or MCE-IRL recover it.
 - **State high-dimensional or reward form unknown?** Use a neural reward.
@@ -189,10 +187,9 @@ The key decisions, in short:
 | Structural | NFXP, CCP, MPEC | Finite reward parameters with a fixed meaning. | Supported: re-solve the model under a changed primitive. | Stronger: a parametric reward and the anchor above. |
 | IRL / behavioral | MCE-IRL, AIRL | A reward only up to behavior-preserving transformations. | Not always: some methods recover behavior without a re-solvable primitive. | Weaker: less structure on the reward. |
 
-Structural estimators are the choice when you need parameters with units and want to ask
-what happens under a new policy. IRL estimators trade that for weaker assumptions. They
-recover a reward that matches behavior but is identified only up to transformations that
-leave behavior unchanged.
+IRL estimators trade the structural assumptions for weaker ones. They recover a reward
+that matches behavior but is identified only up to transformations that leave behavior
+unchanged.
 
 When the reward is state-only and the dynamics are deterministic, MCE-IRL and AIRL recover
 the reward up to an additive constant, with linear features or a neural reward. An anchor

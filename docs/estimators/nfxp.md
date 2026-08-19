@@ -29,10 +29,10 @@ solver used in the package.
 
 ## Notation
 
-The discrete state is $s$ and the action is $a$. Individual $i$ is observed in
-period $t$. The index $b$ denotes an action inside a sum. The vector
-$\phi(s, a)$ contains the known reward features. The parameter vector is
-$\theta$, the discount factor is $\beta$, and the logit shock scale is $\sigma$.
+Individual $i$ is observed in period $t$ choosing action $a$ in discrete state
+$s$, with $b$ indexing an action inside a sum. The known reward features sit in
+$\phi(s, a)$ and are weighted by the parameter vector $\theta$. The discount
+factor is $\beta$ and the logit shock scale is $\sigma$.
 
 The transition kernel $P_a(s, s')$ gives the probability of moving from $s$ to
 $s'$ under action $a$. It is stored in $(A, S, S)$ orientation. The integrated
@@ -80,8 +80,8 @@ observed choices carry information about the structural costs.
 
 ## Identification
 
-This section states when the estimated parameters can be interpreted as
-primitive reward parameters rather than only as an in-sample choice fit.
+Under the assumptions below, $\theta$ is a primitive reward parameter. Without
+them it is an in-sample choice fit and nothing more.
 
 Interpreting $\theta$ as structural reward parameters requires the following
 assumptions.

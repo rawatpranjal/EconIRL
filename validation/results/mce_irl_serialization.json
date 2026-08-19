@@ -1,5 +1,5 @@
 {
-  "econirl_module": "/private/tmp/econirl-mce-final-wheel.FsfGD0/venv/lib/python3.13/site-packages/econirl/__init__.py",
+  "econirl_module": ".../venv/lib/python3.13/site-packages/econirl/__init__.py",
   "econirl_version": "0.0.10",
   "estimator": "MCE-IRL",
   "fresh_process": true,
@@ -11,7 +11,7 @@
     "predict_proba": 0.0
   },
   "module_outside_checkout": true,
-  "python_executable": "/tmp/econirl-mce-final-wheel.FsfGD0/venv/bin/python",
+  "python_executable": ".../venv/bin/python",
   "python_version": "3.13.12",
   "status": "ready",
   "summary_equal": true,
